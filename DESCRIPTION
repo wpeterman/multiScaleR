@@ -1,0 +1,17 @@
+Package: multiScaleR
+Type: Package
+Title: Package for optimizing scales of effect
+Version: 0.1.0
+Author: Bill Peterman
+Maintainer: Bill Peterman <Peterman.73@osu.edu>
+Description: This package is for optimizing scales of effect when modeling ecological processes in space. 
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.2.3
+Imports: 
+    magrittr,
+    terra,
+    sf
+Depends: 
+    R (>= 2.10)
