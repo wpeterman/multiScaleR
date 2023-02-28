@@ -1,7 +1,13 @@
+multiScaleR 0.1.2
+---------
+* Fixed bug in optimization function
+
+
 multiScaleR 0.1.1
 ---------
 * Fixed trap that was causing optimization with 'fixed' and 'expow' to fail
 * Updated plot and kernel_dist functions
+
 
 multiScaleR 0.1.0
 ---------
