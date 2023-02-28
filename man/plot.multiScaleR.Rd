@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.multiScaleR.R
 \name{plot.multiScaleR}
 \alias{plot.multiScaleR}
-\title{Plot mulitScaleR}
+\title{Plot multiScaleR}
 \usage{
 \method{plot}{multiScaleR}(x, prob = 0.9, scale_dist = TRUE, ...)
 }
@@ -13,7 +13,7 @@
 
 \item{scale_dist}{Logical. If TRUE (Default), The distance at which the specified density probability is achieved}
 
-\item{...}{Not used}
+\item{...}{Parameters to be used if not providing a 'multiScaleR' fitted object. See Details}
 }
 \value{
 Plots of kernel density distributions
@@ -22,7 +22,7 @@ Plots of kernel density distributions
 Function to plot fitted multiScaleR objects
 }
 \details{
-This function is used to visualize kernel density distributions from multiScaleR optimized objects.
+This function is used to visualize kernel density distributions from multiScaleR optimized objects. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 }
 \examples{
 plot(x)

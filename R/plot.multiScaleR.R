@@ -1,11 +1,11 @@
-#' @title Plot mulitScaleR
+#' @title Plot multiScaleR
 #' @description Function to plot fitted multiScaleR objects
 #' @param x \code{\link[multiScaleR]{multiScaleR}} object
 #' @param prob Density probability cutoff for plotting, Default: 0.9
 #' @param scale_dist Logical. If TRUE (Default), The distance at which the specified density probability is achieved
-#' @param ... Not used
+#' @param ... Parameters to be used if not providing a 'multiScaleR' fitted object. See Details
 #' @return Plots of kernel density distributions
-#' @details This function is used to visualize kernel density distributions from multiScaleR optimized objects.
+#' @details This function is used to visualize kernel density distributions from multiScaleR optimized objects. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 #' @examples
 #' plot(x)
 #'
@@ -13,7 +13,6 @@
 #' @export
 #' @importFrom Hmisc wtd.Ecdf
 #' @importFrom cowplot theme_cowplot
-#' @importFrom DescTools Quantile
 #' @importFrom ggplot2 aes annotate geom_line geom_vline ggplot xlab ylab theme_light
 plot.multiScaleR <- function(x,
                              prob = 0.9,
@@ -50,10 +49,6 @@ plot.multiScaleR <- function(x,
 
       mx <- Hmisc::wtd.Ecdf(d, weights = wt)
       mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
-
-      # mx <- round(DescTools::Quantile(d,
-      #                                 weights = wt,
-      #                                 probs = 0.99), digits = -1)
 
       d <- seq(1, mx, length.out = 100)
       wt <- scale_type(d = d,
@@ -118,9 +113,8 @@ plot.multiScaleR <- function(x,
                      shape = shp_,
                      output = 'wts')
 
-    mx <- round(DescTools::Quantile(d,
-                                    weights = wt,
-                                    probs = 0.999) * 1.1, digits = -1)
+    mx <- Hmisc::wtd.Ecdf(d, weights = wt)
+    mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
     d <- seq(1, mx, length.out = 100)
     wt <- scale_type(d = d,
@@ -129,9 +123,7 @@ plot.multiScaleR <- function(x,
                      shape = shp_,
                      output = 'wts')
 
-    scale_d <- DescTools::Quantile(d,
-                                   weights = wt,
-                                   probs = prob)
+    scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
 
     df <- data.frame(dist = d,
                      wt = wt)
@@ -146,7 +138,7 @@ plot.multiScaleR <- function(x,
       }
     }
     ggplot(data = df, aes(x = d, y = wt)) +
-      geom_line(size = 1.25) +
+      geom_line(linewidth = 1.25) +
       {if(isTRUE(scale_dist))
         geom_vline(xintercept = scale_d,
                    linetype = 'dashed',

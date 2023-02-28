@@ -184,9 +184,9 @@ kernel_prep <- function(pts,
     for (i in 1:dim(pts)[1]) {
       setTxtProgressBar(pb,i)
 
-      D[[i]] <- rdist(st_coordinates(pts[i,]),
-                      # r_ext[r_ext$id == i, c("x","y")])[1,]
-                      r_ext[[i]][, c("x","y")])[1,] / unit_conv
+      D[[i]] <- fields::rdist(st_coordinates(pts[i,]),
+                              # r_ext[r_ext$id == i, c("x","y")])[1,]
+                              r_ext[[i]][, c("x","y")])[1,] / unit_conv
 
     }
     close(pb)
@@ -231,9 +231,7 @@ kernel_prep <- function(pts,
                              sigma = sigma,
                              shape = shape,
                              # r_stack.df = r_ext[r_ext$id == i,],
-                             r_stack.df = r_ext[[i]][,1:nlyr(raster_stack)],
-                             nlayer = nlyr(raster_stack))
-    # X <- as.list(1:length(D))
+                             r_stack.df = r_ext[[i]][,1:nlyr(raster_stack)])
 
 
   }
