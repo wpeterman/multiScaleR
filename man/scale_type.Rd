@@ -10,7 +10,6 @@ scale_type(
   sigma,
   shape = NULL,
   r_stack.df = NULL,
-  nlayer = NULL,
   output = NULL
 )
 }
@@ -24,8 +23,6 @@ scale_type(
 \item{shape}{Shape parameter if using exponential power kernel}
 
 \item{r_stack.df}{Dataframe values extracted from rasters}
-
-\item{nlayer}{Number of raster layers being scaled}
 
 \item{output}{If NULL, a vector of weights is returned, otherwise a weighted raster values are returned, Default: NULL}
 }
