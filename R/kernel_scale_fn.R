@@ -42,7 +42,7 @@ kernel_scale_fn <- function(par,
     n_covs <- length(covs)
   } else if(any(class(mod) == 'glm')) {
     mod_class <- 'glm'
-    covs <- sapply(insight::find_predictors(mod), function(x) x[[1]])
+    covs <- insight::find_predictors(mod)$conditional
     dat <- insight::get_data(mod)
     dat0 <- insight::get_data(mod)
     # dat <- fitted_mod$data
@@ -102,6 +102,7 @@ kernel_scale_fn <- function(par,
     # if(class(mod_u)[[1]] == 'try-error'){
     #   browser()
     # }
+    # browser()
 
 }
 
