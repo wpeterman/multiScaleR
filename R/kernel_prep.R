@@ -49,7 +49,7 @@ kernel_prep <- function(pts,
                         sigma = NULL,
                         shape = NULL,
                         projected = TRUE){
-  unit_conv <- 1e5
+  unit_conv <- max_D
 
   if(class(raster_stack) != 'SpatRaster'){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')

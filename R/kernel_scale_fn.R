@@ -33,7 +33,7 @@ kernel_scale_fn <- function(par,
     # dat <- nlme::getData(mod)
     # covs <- all.vars(formula(mod)[-2])
     covs <- covs[which(covs %in% colnames(kernel_inputs$raw_cov[[1]]))]
-    # n_covs <- length(covs)
+    n_covs <- length(covs)
   } else if(any(grepl("^unmarked", class(mod)))) {
     mod_class <- 'unmarked'
     dat <- mod@data@siteCovs
@@ -62,19 +62,20 @@ kernel_scale_fn <- function(par,
 
 
   cov.w <- vector('list', n_ind)
+  sigma <- par[1:n_covs]
+  if(kernel == 'expow'){
+    shape <- par[(n_covs + 1):(n_covs * 2)]
+  } else {
+    shape <- NULL
+  }
+
+  if(any(sigma < 0)){
+    obj <- 1e6^10
+    return(obj)
+  }
 
   for(i in 1:n_ind){
-    sigma <- par[1:n_covs]
-    if(kernel == 'expow'){
-      shape <- par[(n_covs + 1):(n_covs * 2)]
-    } else {
-      shape <- NULL
-    }
 
-    if(any(sigma < 0)){
-      obj <- 9999
-      return(obj)
-    }
     cov.w[[i]] <-
       scale_type(d_list[[i]],
                  kernel = kernel,

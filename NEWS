@@ -1,3 +1,7 @@
+multiScaleR 0.1.3
+---------
+* Corrected issue with distance weighting function
+
 multiScaleR 0.1.2
 ---------
 * Fixed bug in optimization function

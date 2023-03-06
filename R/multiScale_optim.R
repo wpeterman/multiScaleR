@@ -114,16 +114,24 @@ multiScale_optim <- function(fitted_mod,
     lwr <- c(lwr, rep(0.75, n_covs))
     uppr <- c(uppr, rep(50, n_covs))
   }
+  # if(kernel_inputs$kernel == 'expow'){
+  #   lwr <- sqrt(c(lwr, rep(0.75, n_covs)))
+  #   uppr <- sqrt(c(uppr, rep(50, n_covs)))
+  # }
 
   if(is.null(par) & kernel_inputs$kernel != 'expow'){
-    # par <- rep(kernel_inputs$max_D/div[1]/kernel_inputs$unit_conv, n_covs)
-    par <- rep(par_starts[1], n_covs)
+    # par <- runif(n_covs, lwr, uppr)
+    par <- rep(par_starts[2], n_covs)
+    # par <- exp(rep(par_starts[2], n_covs))
   }
 
   if(is.null(par) & kernel_inputs$kernel == 'expow'){
-    # par <- rep(kernel_inputs$max_D/div[1]/kernel_inputs$unit_conv, n_covs)
-    par <- rep(par_starts[1], n_covs)
+    # par <- runif(n_covs, lwr[1:n_covs], uppr[1:n_covs])
+    # par <- runif(n_covs, lwr[(n_covs+1):(n_covs*2)], uppr[(n_covs+1):(n_covs*2)])
+    par <- rep(par_starts[2], n_covs)
     par <- c(par, rep(2, n_covs))
+    # par <- exp(rep(par_starts[2], n_covs))
+    # par <- c(par, sqrt(rep(2, n_covs)))
   }
 
   opt_results <- data.frame()
@@ -183,11 +191,14 @@ multiScale_optim <- function(fitted_mod,
 
         if(kernel_inputs$kernel != 'expow'){
           par <- rep(par_starts[cnt], n_covs)
+          # par <- exp(rep(par_starts[cnt], n_covs))
         }
 
         if(kernel_inputs$kernel == 'expow'){
           par <- rep(par_starts[cnt], n_covs)
           par <- c(par, rep(2, n_covs))
+          # par <- exp(rep(par_starts[cnt], n_covs))
+          # par <- c(par, sqrt(rep(2, n_covs)))
         }
       }
     } else {
@@ -216,11 +227,14 @@ multiScale_optim <- function(fitted_mod,
 
         if(kernel_inputs$kernel != 'expow'){
           par <- rep(par_starts[cnt], n_covs)
+          # par <- exp(rep(par_starts[cnt], n_covs))
         }
 
         if(kernel_inputs$kernel == 'expow'){
           par <- rep(par_starts[cnt], n_covs)
           par <- c(par, rep(2, n_covs))
+          # par <- exp(rep(par_starts[cnt], n_covs))
+          # par <- c(par, sqrt(rep(2, n_covs)))
         }
       }
     } # End if else
@@ -234,10 +248,13 @@ multiScale_optim <- function(fitted_mod,
   } else {
 
     cat('\n\nOptimization complete\n')
-
+# browser()
     opt_results$par_unscale <- c(opt_results$par[1:n_covs] * kernel_inputs$unit_conv,
                                  opt_results$par[(n_covs + 1):(n_covs * 2)])
     opt_results$hessian_unscale <- opt_results$hessian #* kernel_inputs$unit_conv
+    # opt_results$par_unscale <- c(log(opt_results$par[1:n_covs] * kernel_inputs$unit_conv),
+    #                              opt_results$par[(n_covs + 1):(n_covs * 2)]^2)
+    # opt_results$hessian_unscale <- opt_results$hessian #* kernel_inputs$unit_conv
 
     i_hess <- try(solve(opt_results$hessian_unscale))
 
