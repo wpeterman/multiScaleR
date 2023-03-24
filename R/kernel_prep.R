@@ -7,6 +7,7 @@
 #' @param sigma Initial values for optimizing the scale parameter. Default: NULL, initial values will be automatically generated. This is recommended.
 #' @param shape Initial values for optimizing the shape parameter if using exponential power kernel. Default: NULL, starting values will be automatically generated. This is recommended.
 #' @param projected Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected, Default: TRUE
+#' @param progress Should progress bars be printed to console. Default: FALSE
 #' @return A list of class `multiscaleR` with necessary elements to conduct scale optimization using the `multiScale_optim` function
 #' @details Spatial point locations and raster layers should have a defined projection and be the same CRS. If providing starting values for `sigma` or `shape`, it must be a vector of length equal to the number of raster layers for which scale is being assessed and should be provided in the unit of the used projection. When specifying `max_D`, ensure that your raster layers adequately extend beyond the points provided so that the surrounding landscape can be meaningfully sampled during scale optimization.
 #' @examples
@@ -31,7 +32,8 @@
 #'             kernel = 'gaussian',
 #'             sigma = NULL,
 #'             shape = NULL,
-#'             projected = TRUE)
+#'             projected = TRUE,
+#'             progress = FALSE)
 
 #' @rdname kernel_prep
 #' @export
@@ -48,7 +50,8 @@ kernel_prep <- function(pts,
                         kernel = 'gaussian',
                         sigma = NULL,
                         shape = NULL,
-                        projected = TRUE){
+                        projected = TRUE,
+                        progress = FALSE){
   unit_conv <- max_D
 
   if(class(raster_stack) != 'SpatRaster'){
@@ -98,24 +101,30 @@ kernel_prep <- function(pts,
     r_ext_ <- bind_rows(r_ext, .id = "id")
 
     ## Progress bar
-    cat(paste0("\nCalculating distances...\n"))
-    pb = txtProgressBar(min = 0,
-                        max = dim(r_pts)[1],
-                        initial = 0,
-                        char = "*",
-                        style = 3)
+    if(isTRUE(progress)){
+      cat(paste0("\nCalculating distances...\n"))
+      pb = txtProgressBar(min = 0,
+                          max = dim(r_pts)[1],
+                          initial = 0,
+                          char = "*",
+                          style = 3)
+    }
 
     D <- vector('list', dim(r_pts)[1])
     for (i in 1:dim(r_pts)[1]) {
-      setTxtProgressBar(pb,i)
+      if(isTRUE(progress)){
+        setTxtProgressBar(pb,i)
+      }
 
       D[[i]] <- rdist.earth(st_coordinates(r_pts[i,]),
                             # r_ext[r_ext$ID == 1,c("x","y")],
                             r_ext[[i]][,c("x","y")],
                             miles = F)[1,] * 1000
     }
-    close(pb)
 
+    if(isTRUE(progress)){
+      close(pb)
+    }
     min_D <- floor(rdist.earth(st_coordinates(r_ext[[1]][1:2,c("x","y")]),
                                miles = F)[1,2] * 1000)
 
@@ -153,7 +162,8 @@ kernel_prep <- function(pts,
                                           buff_poly,
                                           # full_colnames = T,
                                           # force_df = T,
-                                          include_xy = T)
+                                          include_xy = T,
+                                          progress = progress)
 
     if(nlyr(raster_stack) == 1){
       re_name <- function(x){
@@ -171,6 +181,9 @@ kernel_prep <- function(pts,
 
     ## Progress bar
     D <- vector('list', dim(pts)[1])
+
+    if(isTRUE(progress)){
+
     cat(paste0("\nCalculating distances...\n"))
 
     pb = txtProgressBar(min = 0,
@@ -179,52 +192,44 @@ kernel_prep <- function(pts,
                         char = "*",
                         style = 3)
 
-
+    }
 
     for (i in 1:dim(pts)[1]) {
-      setTxtProgressBar(pb,i)
+      if(isTRUE(progress)){
+        setTxtProgressBar(pb,i)
+      }
 
       D[[i]] <- fields::rdist(st_coordinates(pts[i,]),
                               # r_ext[r_ext$id == i, c("x","y")])[1,]
                               r_ext[[i]][, c("x","y")])[1,] / unit_conv
 
     }
-    close(pb)
+    if(isTRUE(progress)){
+      close(pb)
+    }
     min_D <- floor(rdist(r_ext[[1]][1:2,c("x","y")])[1,2])
   } ## End ifelse for projected points
 
-
-  # D <- lapply(D, function(x) x / unit_conv)
-
-  ### TEST ###
-  # D_ <- unlist(D)
-  # r_stack.df <- bind_rows(r_ext, .id = 'id')
-  # r_stack.df$id <- as.character(r_stack.df$id)
-  #
-  # system.time(cov.w_ <- scale_type_apply(d = D_,
-  #                                        kernel = kernel,
-  #                                        sigma = sigma,
-  #                                        shape = shape,
-  #                                        r_stack.df = r_stack.df,
-  #                                        nlayer = nlyr(raster_stack),
-  #                                        id = as.list(as.character(1:(dim(pts)[1])))))
-
-  ### END TEST ###
 
 
   cov.w <- vector('list', dim(pts)[1])
   sigma <- sigma / unit_conv
 
+  if(isTRUE(progress)){
   cat(paste0("\nCalculating weights...\n"))
+
 
   pb = txtProgressBar(min = 0,
                       max = dim(pts)[1],
                       initial = 0,
                       char = "*",
                       style = 3)
+  }
   # system.time(
   for(i in 1:dim(pts)[1]){
-    setTxtProgressBar(pb,i)
+    if(isTRUE(progress)){
+      setTxtProgressBar(pb,i)
+    }
 
     cov.w[[i]] <- scale_type(d = D[[i]],
                              kernel = kernel,
@@ -236,14 +241,16 @@ kernel_prep <- function(pts,
 
   }
   # )
-  close(pb)
+  if(isTRUE(progress)){
+    close(pb)
+  }
 
 
   df <- data.frame(do.call(rbind, cov.w))
+  colnames(df) <- names(raster_stack)
   # colnames(cov_df) <- colnames(df) <- names(raster_stack)
 
   out <- list(kernel_dat = as.data.frame(scale(df)),
-              # D = D,
               d_list = D,
               raw_cov = r_ext,
               kernel = kernel,

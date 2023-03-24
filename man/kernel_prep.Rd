@@ -10,7 +10,8 @@ kernel_prep(pts,
             kernel = 'gaussian',
             sigma = NULL,
             shape = NULL,
-            projected = TRUE)
+            projected = TRUE,
+            progress = FALSE)
 }
 \arguments{
 \item{pts}{Point locations provided as `SpatVector` or `sf` objects}
@@ -26,6 +27,8 @@ kernel_prep(pts,
 \item{shape}{Initial values for optimizing the shape parameter if using exponential power kernel. Default: NULL, starting values will be automatically generated. This is recommended.}
 
 \item{projected}{Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected, Default: TRUE}
+
+\item{progress}{Should progress bars be printed to console. Default: FALSE}
 }
 \value{
 A list of class `multiscaleR` with necessary elements to conduct scale optimization using the `multiScale_optim` function
