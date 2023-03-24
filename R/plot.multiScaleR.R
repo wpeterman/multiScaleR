@@ -2,12 +2,28 @@
 #' @description Function to plot fitted multiScaleR objects
 #' @param x \code{\link[multiScaleR]{multiScaleR}} object
 #' @param prob Density probability cutoff for plotting, Default: 0.9
-#' @param scale_dist Logical. If TRUE (Default), The distance at which the specified density probability is achieved
+#' @param scale_dist Logical. If TRUE (Default), the distance at which the specified density probability is achieved is added to the plot
+#' @param add_label Logical. If TRUE (Default), the distance value calculated for 'scale_dist' is added as an annotation to the plot.
 #' @param ... Parameters to be used if not providing a 'multiScaleR' fitted object. See Details
 #' @return Plots of kernel density distributions
 #' @details This function is used to visualize kernel density distributions from multiScaleR optimized objects. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 #' @examples
 #' plot(x)
+#'
+#' ## General use of plot method
+#' multiScaleR:::plot.multiScaleR(prob = 0.95,
+#'                                sigma = 100,
+#'                                kernel = 'gaussian')
+#' multiScaleR:::plot.multiScaleR(prob = 0.95,
+#'                                sigma = 100,
+#'                                kernel = 'exp')
+#' multiScaleR:::plot.multiScaleR(prob = 0.95,
+#'                                sigma = 100,
+#'                                kernel = 'fixed')
+#' multiScaleR:::plot.multiScaleR(prob = 0.95,
+#'                                sigma = 100,
+#'                                shape = 2.5,
+#'                                kernel = 'negexp')
 #'
 #' @rdname plot.multiScaleR
 #' @export
@@ -17,6 +33,7 @@
 plot.multiScaleR <- function(x,
                              prob = 0.9,
                              scale_dist = TRUE,
+                             add_label = TRUE,
                              ...) {
   if(isTRUE(scale_dist) & (!is.numeric(prob) | prob < 0 | prob > 1)){
     stop("`prob` must be a number between 0–1")
@@ -79,7 +96,7 @@ plot.multiScaleR <- function(x,
                      linetype = 'dashed',
                      color = 'red')
         } +
-        {if(isTRUE(scale_dist))
+        {if(isTRUE(scale_dist) & isTRUE(add_label))
           annotate('text', x = ax, y = ay,
                    label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0)))
         } +
@@ -144,7 +161,7 @@ plot.multiScaleR <- function(x,
                    linetype = 'dashed',
                    color = 'red')
       } +
-      {if(isTRUE(scale_dist))
+      {if(isTRUE(scale_dist) & isTRUE(add_label))
         annotate('text', x = ax, y = ay,
                  label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0)))
       } +

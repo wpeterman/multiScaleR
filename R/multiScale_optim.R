@@ -3,10 +3,12 @@
 #' @param fitted_mod Model object of class glm, lm, gls, or unmarked
 #' @param kernel_inputs Object created from running \code{\link[multiScaleR]{kernel_prep}}
 #' @param method Optimizer to be used. Default: 'L-BFGS-B', which is the only optimization method supported by \code{\link[optimParallel]{optimParallel}}
-#' @param par Optional starting values for parameter estimation. If provided, must be scaled by the `unit_conv` used during `kernel_prep` (which defaults to 1e5 if not specified), Default: NULL
+#' @param par Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
+#'
+#' @seealso \code{\link[kernel_dist]{kernel_dist}}
 #' @examples
 #' ## NOT RUN
 #' pts <- vect(cbind(c(3,5,7),
@@ -33,12 +35,49 @@
 #'
 #' ## NOTE: This code is only for demonstration
 #' ## Optimization results will have no meaning
+#'
 #' opt <- multiScale_optim(fitted_mod = mod,
 #'                         kernel_inputs = kernel_inputs,
 #'                         method ='L-BFGS-B',
 #'                         par = NULL,
 #'                         opt_parallel = FALSE,
 #'                         n_cores = NULL)
+#'
+#' ## Using package data
+#' data('pts')
+#' data('count_data')
+#' hab <- terra::rast(system.file('data/hab.tif', package = 'multiScaleR'))
+#'
+#' kernel_inputs <- kernel_prep(pts = pts,
+#'                              raster_stack = hab,
+#'                              max_D = 250,
+#'                              kernel = 'gaussian')
+#'
+#' mod <- glm(y ~ hab,
+#'            family = poisson,
+#'            data = count_data)
+#'
+#' ## Optimize scale
+#' opt <- multiScale_optim(fitted_mod = mod,
+#'                         kernel_inputs = kernel_inputs,
+#'                         opt_parallel = FALSE)
+#'
+#' ## Summary of fitted model
+#' summary(opt)
+#'
+#' ## 'True' parameter values data were simulated from:
+#' # hab scale = 75
+#' # Intercept = 0.5,
+#' # hab slope estimate = 0.75
+#'
+#' ## Plot and visualize kernel density
+#' plot(opt)
+#'
+#'
+#' ## Apply optimized kernel to the environmental raster
+#' opt_hab <- kernel_scale.raster(hab, scale_opt = opt)
+#'
+#' plot(c(hab, opt_hab))
 #'
 #' @usage
 #' multiScale_optim(fitted_mod,
@@ -298,3 +337,4 @@ multiScale_optim <- function(fitted_mod,
     return(out)
   }
 }
+

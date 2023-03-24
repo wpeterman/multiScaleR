@@ -18,7 +18,7 @@ multiScale_optim(fitted_mod,
 
 \item{method}{Optimizer to be used. Default: 'L-BFGS-B', which is the only optimization method supported by \code{\link[optimParallel]{optimParallel}}}
 
-\item{par}{Optional starting values for parameter estimation. If provided, must be scaled by the `unit_conv` used during `kernel_prep` (which defaults to 1e5 if not specified), Default: NULL}
+\item{par}{Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL}
 
 \item{n_cores}{If attempting to optimize in parallel, the number of cores to use. Default: NULL}
 }
@@ -57,6 +57,7 @@ mod <- glm(y ~ r1 + r2,
 
 ## NOTE: This code is only for demonstration
 ## Optimization results will have no meaning
+
 opt <- multiScale_optim(fitted_mod = mod,
                         kernel_inputs = kernel_inputs,
                         method ='L-BFGS-B',
@@ -64,7 +65,45 @@ opt <- multiScale_optim(fitted_mod = mod,
                         opt_parallel = FALSE,
                         n_cores = NULL)
 
+## Using package data
+data('pts')
+data('count_data')
+hab <- terra::rast(system.file('data/hab.tif', package = 'multiScaleR'))
+
+kernel_inputs <- kernel_prep(pts = pts,
+                             raster_stack = hab,
+                             max_D = 250,
+                             kernel = 'gaussian')
+
+mod <- glm(y ~ hab,
+           family = poisson,
+           data = count_data)
+
+## Optimize scale
+opt <- multiScale_optim(fitted_mod = mod,
+                        kernel_inputs = kernel_inputs,
+                        opt_parallel = FALSE)
+
+## Summary of fitted model
+summary(opt)
+
+## 'True' parameter values data were simulated from:
+# hab scale = 75
+# Intercept = 0.5,
+# hab slope estimate = 0.75
+
+## Plot and visualize kernel density
+plot(opt)
+
+
+## Apply optimized kernel to the environmental raster
+opt_hab <- kernel_scale.raster(hab, scale_opt = opt)
+
+plot(c(hab, opt_hab))
+
 }
 \seealso{
+\code{\link[kernel_dist]{kernel_dist}}
+
 \code{\link[optimParallel]{optimParallel}}
 }

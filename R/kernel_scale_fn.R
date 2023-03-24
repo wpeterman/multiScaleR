@@ -7,7 +7,6 @@
 #' @return Either estimated parameters or the fitted model using provided parameters
 #' @details For internal use
 #' @rdname kernel_scale_fn
-#' @export
 #' @keywords internal
 #' @importFrom insight get_data
 #' @importFrom stats formula logLik

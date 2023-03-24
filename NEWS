@@ -1,6 +1,12 @@
+multiScaleR 0.1.4
+---------
+* Cleaned code
+* Added documentation and examples to `multiScale_optim`
+
 multiScaleR 0.1.3
 ---------
 * Corrected issue with distance weighting function
+* Updated how parameters are scaled
 
 multiScaleR 0.1.2
 ---------

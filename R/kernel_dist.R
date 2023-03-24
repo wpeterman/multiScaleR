@@ -4,7 +4,8 @@
 #' @param prob Density probability cutoff for calculating distance, Default: 0.9
 #' @param ... Parameters to be used if not providing a 'multiScaleR' fitted object. See Details
 #' @return Distance at which cumulative density of kernel is reached
-#' @details This function is used to visualize kernel density distributions from multiScaleR optimized objects. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+#' @details This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+#' @seealso \code{\link[plot.multiScaleR]{plot.multiScaleR}}
 #' @examples
 #' kernel_dist(x)
 #'
@@ -23,7 +24,7 @@ kernel_dist <- function(model,
   }
 
 
-  if(isTRUE(scale_dist) & (!is.numeric(prob) | prob < 0 | prob > 1)){
+  if((!is.numeric(prob) | prob < 0 | prob > 1)){
     stop("`prob` must be a decimal between 0–1")
   }
 
@@ -60,13 +61,13 @@ kernel_dist <- function(model,
                            output = 'wts')
 
         scale_mn <- Hmisc::wtd.Ecdf(d, weights = wt_mn)
-        scale_mn <- round(scale_mn$x[which(scale_mn$ecdf > prob)[1]], digits = -2)
+        scale_mn <- round(scale_mn$x[which(scale_mn$ecdf > prob)[1]], digits = 2)
 
         scale_l <- Hmisc::wtd.Ecdf(d, weights = wt_l)
-        scale_l <- round(scale_l$x[which(scale_l$ecdf > prob)[1]], digits = -2)
+        scale_l <- round(scale_l$x[which(scale_l$ecdf > prob)[1]], digits = 2)
 
         scale_u <- Hmisc::wtd.Ecdf(d, weights = wt_u)
-        scale_u <- round(scale_u$x[which(scale_u$ecdf > prob)[1]], digits = -2)
+        scale_u <- round(scale_u$x[which(scale_u$ecdf > prob)[1]], digits = 2)
 
 
         dist_list[[i]] <- data.frame(mn = scale_mn,
@@ -110,7 +111,7 @@ kernel_dist <- function(model,
                      shape = shp_,
                      output = 'wts')
 
-    scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
+    scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], 2)
     return(scale_d)
   } else {
     stop("Parameters not correctly specified to calculate distance. See Details and try again.")

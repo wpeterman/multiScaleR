@@ -8,9 +8,9 @@
 }
 \usage{
 data(count_data)
-A data frame with 75 rows and 2 columns:
+A data frame with 75 rows and 2 columns. Data were simulated from a Poisson distribution with an intercept of 0.5, a slope of 0.75, and scale of effect (sigma) of 75
 \describe{
-  \item{y}{Counts at spatial locations}
+  \item{y}{Simulated counts at spatial locations}
   \item{had}{A scaled, weighted mean estimate of the habitat surrounding a point}#'
   ...
 }
