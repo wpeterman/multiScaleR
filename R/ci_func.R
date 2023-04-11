@@ -4,17 +4,18 @@
 #' @param df Degrees of Freedom
 #' @param min_D minimum distance, Default: NULL
 #' @param names Names of fitted variables, Default: NULL
+#' @param as_dist Calculate distance confidence interval; Default = FALSE
 #' @param ... Not used
 #' @return data frame with calculated confidence intervals
 
 #' @rdname ci_func
-#' @export
 #' @keywords internal
 #'
 ci_func <- function(x,
                     df,
                     min_D = NULL,
                     names = NULL,
+                    as_dist = FALSE,
                     ...){
 
   out <- vector('list', nrow(x))

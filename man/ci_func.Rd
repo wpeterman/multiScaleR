@@ -4,7 +4,7 @@
 \alias{ci_func}
 \title{CI Function}
 \usage{
-ci_func(x, df, min_D = NULL, names = NULL, ...)
+ci_func(x, df, min_D = NULL, names = NULL, as_dist = FALSE, ...)
 }
 \arguments{
 \item{x}{Estimates}
@@ -14,6 +14,8 @@ ci_func(x, df, min_D = NULL, names = NULL, ...)
 \item{min_D}{minimum distance, Default: NULL}
 
 \item{names}{Names of fitted variables, Default: NULL}
+
+\item{as_dist}{Calculate distance confidence interval; Default = FALSE}
 
 \item{...}{Not used}
 }

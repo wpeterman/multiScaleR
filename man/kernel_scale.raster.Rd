@@ -4,12 +4,14 @@
 \alias{kernel_scale.raster}
 \title{Create scaled rasters}
 \usage{
-kernel_scale.raster(raster_stack,
-                    sigma,
-                    scale_opt = NULL,
-                    shape = NULL,
-                    kernel = 'gaussian',
-                    pct_wt = 0.95)
+kernel_scale.raster(
+  raster_stack,
+  sigma,
+  scale_opt = NULL,
+  shape = NULL,
+  kernel = c("gaussian", "exp", "expow", "fixed"),
+  pct_wt = 0.95
+)
 }
 \arguments{
 \item{raster_stack}{Stack of combined `SpatRaster` layers}
@@ -42,5 +44,6 @@ r1_s <- kernel_scale.raster(r1,
                             sigma = 4,
                             kernel = 'gaussian')
 plot(c(r1, r1_s))
+
 
 }

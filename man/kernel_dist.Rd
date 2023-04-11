@@ -27,5 +27,5 @@ kernel_dist(x)
 
 }
 \seealso{
-\code{\link[plot.multiScaleR]{plot.multiScaleR}}
+\code{\link[multiScaleR]{plot.multiScaleR}}
 }

@@ -33,37 +33,39 @@ Identifies the kernel scale, and uncertainty of that scale, for each raster with
 }
 \examples{
 ## NOT RUN
-pts <- vect(cbind(c(3,5,7),
-                  c(7,5,3)))
+set.seed(555)
 
-mat_list <- list(r1 = rast(matrix(rnorm(100),
-                                  nrow = 10)),
-                 r2 = rast(matrix(rnorm(100),
-                                  nrow = 10)))
+points <- vect(cbind(c(5,7,9,11,13),
+                     c(13,11,9,7,5)))
+
+mat_list <- list(r1 = rast(matrix(rnorm(20^2),
+                                  nrow = 20)),
+                 r2 = rast(matrix(rnorm(20^2),
+                                  nrow = 20)))
 rast_stack <- rast(mat_list)
-kernel_inputs <- kernel_prep(pts = pts,
+kernel_inputs <- kernel_prep(pts = points,
                              raster_stack = rast_stack,
-                             max_D = 2,
+                             max_D = 5,
                              kernel = 'gaussian',
                              sigma = NULL)
 ## Example response data
-y <- rnorm(3)
+y <- rnorm(5)
 
 ## Create data frame with raster variables
-df <- data.frame(y = y,
-                 kernel_inputs$kernel_dat)
-mod <- glm(y ~ r1 + r2,
-           data = df)
+dat <- data.frame(y = y,
+                  kernel_inputs$kernel_dat)
+mod1 <- glm(y ~ r1 + r2,
+            data = dat)
 
 ## NOTE: This code is only for demonstration
 ## Optimization results will have no meaning
 
-opt <- multiScale_optim(fitted_mod = mod,
-                        kernel_inputs = kernel_inputs,
-                        method ='L-BFGS-B',
-                        par = NULL,
-                        opt_parallel = FALSE,
-                        n_cores = NULL)
+opt_mod <- multiScale_optim(fitted_mod = mod1,
+                            kernel_inputs = kernel_inputs,
+                            method ='L-BFGS-B',
+                            par = NULL,
+                            opt_parallel = FALSE,
+                            n_cores = NULL)
 
 ## Using package data
 data('pts')
@@ -104,6 +106,4 @@ plot(c(hab, opt_hab))
 }
 \seealso{
 \code{\link[kernel_dist]{kernel_dist}}
-
-\code{\link[optimParallel]{optimParallel}}
 }

@@ -4,14 +4,16 @@
 \alias{kernel_prep}
 \title{Kernel Scale Preparation}
 \usage{
-kernel_prep(pts,
-            raster_stack,
-            max_D,
-            kernel = 'gaussian',
-            sigma = NULL,
-            shape = NULL,
-            projected = TRUE,
-            progress = FALSE)
+kernel_prep(
+  pts,
+  raster_stack,
+  max_D,
+  kernel = c("gaussian", "exp", "expow", "fixed"),
+  sigma = NULL,
+  shape = NULL,
+  projected = TRUE,
+  progress = FALSE
+)
 }
 \arguments{
 \item{pts}{Point locations provided as `SpatVector` or `sf` objects}

@@ -7,12 +7,12 @@
 print(x)
 }
 \arguments{
-\item{x}{Object of class `multiScapeR` created from running  \code{\link[multiScaleR]{multiScale_optim}}}
+\item{x}{Object of class `multiScaleR` created from running  \code{\link[multiScale_optim]{multiScale_optim}}}
 
 \item{...}{Additional parameters; not used}
 }
 \value{
-OUTPUT_DESCRIPTION
+Summary of `multiScaleR` optimized object
 }
 \description{
 Print method for fitted multiScaleR objects

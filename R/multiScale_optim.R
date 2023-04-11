@@ -11,37 +11,39 @@
 #' @seealso \code{\link[kernel_dist]{kernel_dist}}
 #' @examples
 #' ## NOT RUN
-#' pts <- vect(cbind(c(3,5,7),
-#'                   c(7,5,3)))
+#' set.seed(555)
 #'
-#' mat_list <- list(r1 = rast(matrix(rnorm(100),
-#'                                   nrow = 10)),
-#'                  r2 = rast(matrix(rnorm(100),
-#'                                   nrow = 10)))
+#' points <- vect(cbind(c(5,7,9,11,13),
+#'                      c(13,11,9,7,5)))
+#'
+#' mat_list <- list(r1 = rast(matrix(rnorm(20^2),
+#'                                   nrow = 20)),
+#'                  r2 = rast(matrix(rnorm(20^2),
+#'                                   nrow = 20)))
 #' rast_stack <- rast(mat_list)
-#' kernel_inputs <- kernel_prep(pts = pts,
+#' kernel_inputs <- kernel_prep(pts = points,
 #'                              raster_stack = rast_stack,
-#'                              max_D = 2,
+#'                              max_D = 5,
 #'                              kernel = 'gaussian',
 #'                              sigma = NULL)
 #' ## Example response data
-#' y <- rnorm(3)
+#' y <- rnorm(5)
 #'
 #' ## Create data frame with raster variables
-#' df <- data.frame(y = y,
-#'                  kernel_inputs$kernel_dat)
-#' mod <- glm(y ~ r1 + r2,
-#'            data = df)
+#' dat <- data.frame(y = y,
+#'                   kernel_inputs$kernel_dat)
+#' mod1 <- glm(y ~ r1 + r2,
+#'             data = dat)
 #'
 #' ## NOTE: This code is only for demonstration
 #' ## Optimization results will have no meaning
 #'
-#' opt <- multiScale_optim(fitted_mod = mod,
-#'                         kernel_inputs = kernel_inputs,
-#'                         method ='L-BFGS-B',
-#'                         par = NULL,
-#'                         opt_parallel = FALSE,
-#'                         n_cores = NULL)
+#' opt_mod <- multiScale_optim(fitted_mod = mod1,
+#'                             kernel_inputs = kernel_inputs,
+#'                             method ='L-BFGS-B',
+#'                             par = NULL,
+#'                             opt_parallel = FALSE,
+#'                             n_cores = NULL)
 #'
 #' ## Using package data
 #' data('pts')
@@ -86,13 +88,12 @@
 #'                  par = NULL,
 #'                  opt_parallel = FALSE,
 #'                  n_cores = NULL)
-#' @seealso
-#'  \code{\link[optimParallel]{optimParallel}}
 #' @rdname multiScale_optim
 #' @export
 #' @importFrom optimParallel optimParallel
 #' @importFrom stats optim
 #' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster
+#' @importFrom crayon %+% green red bold blue
 
 multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
@@ -334,6 +335,22 @@ multiScale_optim <- function(fitted_mod,
                 call = match.call())
 
     class(out) <- 'multiScaleR'
+
+    scale_D <- kernel_dist(out)
+    if(dim(scale_D)[1] > 1){
+      est_D <- scale_D[,1]
+      suggest_D <-  max(scale_D[,1] * 2)
+
+    } else {
+      est_D <- scale_D[[1]]
+      suggest_D <-  scale_D[[1]] * 2
+
+    }
+    if(any((kernel_inputs$max_D / est_D) < 2)){
+      cat(red("\n WARNING!!!
+                  \n The estimated scale of effect extends beyond the maximum distance specified.\n",
+                  "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(suggest_D) %+% " to ensure accurate estimation of scale."))
+    }
     return(out)
   }
 }

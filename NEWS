@@ -1,3 +1,10 @@
+multiScaleR 0.1.5
+---------
+* Updated plot function to show 95% confidence interval of scale of effect distance
+* Updated summary function to report mean and 95% scale of effect distance
+* Updated example data included with package to demonstrate more extensive use of package
+* Future addition -- A vignette demonstrating the use of the package
+
 multiScaleR 0.1.4
 ---------
 * Cleaned code
