@@ -22,6 +22,8 @@ OUTPUT_DESCRIPTION
 Function to make spatial predictions of scale-optimized model
 }
 \details{
+Function not yet implemented
+
 Function not yet completed or operational
 }
 \examples{

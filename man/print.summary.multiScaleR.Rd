@@ -7,9 +7,9 @@
 \method{print}{summary.multiScaleR}(x, ...)
 }
 \arguments{
-\item{x}{PARAM_DESCRIPTION}
+\item{x}{Object of class multiScaleR}
 
-\item{...}{PARAM_DESCRIPTION}
+\item{...}{Not used}
 }
 \value{
 Prints full summary of fitted `multiScaleR` object

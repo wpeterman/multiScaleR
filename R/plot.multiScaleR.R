@@ -1,35 +1,23 @@
 #' @title Plot multiScaleR
 #' @description Function to plot fitted multiScaleR objects
-#' @param x \code{\link[multiScaleR]{multiScaleR}} object
-#' @param prob Density probability cutoff for plotting, Default: 0.9
-#' @param scale_dist Logical. If TRUE (Default), the distance at which the specified density probability is achieved is added to the plot
+#' @param x A `multiScaleR` object from  \code{\link[multiScaleR]{multiScale_optim}} object
+#' @param prob Cumulative kernel density to identify scale of effect distance, Default: 0.9
+#' @param scale_dist Logical. If TRUE (Default), the distance at which the specified density probability is achieved is added to the plot along with 95\% confidence interval
 #' @param add_label Logical. If TRUE (Default), the distance value calculated for 'scale_dist' is added as an annotation to the plot.
 #' @param ... Parameters to be used if not providing a 'multiScaleR' fitted object. See Details
-#' @return Plots of kernel density distributions
-#' @details This function is used to visualize kernel density distributions from multiScaleR optimized objects. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+#' @returns ggplot2 objects of kernel density distributions
+#' @details
+#' This function is used to visualize kernel density distributions from multiScaleR optimized objects. If not providing a fitted model, you can plot kernel distributions using the \code{\link[multiScaleR]{plot_kernel}}
+#' @seealso \code{\link[multiScaleR]{plot_kernel}}
 #' @examples
 #' plot(x)
-#'
-#' ## General use of plot method
-#' multiScaleR:::plot.multiScaleR(prob = 0.95,
-#'                                sigma = 100,
-#'                                kernel = 'gaussian')
-#' multiScaleR:::plot.multiScaleR(prob = 0.95,
-#'                                sigma = 100,
-#'                                kernel = 'exp')
-#' multiScaleR:::plot.multiScaleR(prob = 0.95,
-#'                                sigma = 100,
-#'                                kernel = 'fixed')
-#' multiScaleR:::plot.multiScaleR(prob = 0.95,
-#'                                sigma = 100,
-#'                                shape = 2.5,
-#'                                kernel = 'negexp')
-#'
 #' @rdname plot.multiScaleR
 #' @export
+#' @method plot multiScaleR
 #' @importFrom Hmisc wtd.Ecdf
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 aes annotate geom_line geom_vline ggplot xlab ylab theme_light
+#' @importFrom ggplot2 aes annotate geom_line geom_vline ggplot xlab ylab theme_light geom_rect ggtitle
+#'
 plot.multiScaleR <- function(x,
                              prob = 0.9,
                              scale_dist = TRUE,
@@ -45,7 +33,10 @@ plot.multiScaleR <- function(x,
     if(length(param_list) >= 1){
       warning("Plotting fitted scale relationship; Ignoring specified `sigma` and/or `shape` parameters")
     }
-    sig_ <- summary(x)$opt_scale
+    mod_summary <- summary(x)
+    sig_ <- mod_summary$opt_scale
+    titles <- rownames(sig_)
+    dist_tab <- mod_summary$opt_dist
 
     if(x$kernel_inputs$kernel == 'expow'){
       shp_ <- summary(x)$opt_shape
@@ -56,8 +47,8 @@ plot.multiScaleR <- function(x,
     df_list <- plot_list <- vector('list', nrow(sig_))
 
     for(i in 1:nrow(sig_)){
-      d <- seq(1, 1e6,
-               length.out = 1e6)
+      d <- seq(1, round(max(sig_)*1000,0),
+               length.out = round(max(sig_)*1000,0))
       wt <- scale_type(d = d,
                        kernel = x$kernel_inputs$kernel,
                        sigma = x$scale_est[[1]][i],
@@ -74,34 +65,46 @@ plot.multiScaleR <- function(x,
                        shape = x$shape_est[[1]][i],
                        output = 'wts')
 
-      scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
+      scale_d <- dist_tab[i,1]
+      scale_lci <- dist_tab[i,2]
+      scale_uci <- dist_tab[i,3]
 
       df_list[[i]] <- data.frame(dist = d,
                                  wt = wt)
+      mx_y <- max(wt)
 
       if(isTRUE(scale_dist)){
         if(min(prob) >= 0.8){
-          ax <- max(d) * 0.075
-          ay <- 0.075*max(wt)
+          ax <- max(d) * 0.08
+          ay <- 0.08*max(wt)
         } else {
           ax <- max(d) * 0.8
           ay <- 0.9*max(wt)
         }
       }
 
+# browser()
+
       plot_ <- ggplot(data = df_list[[i]], aes(x = dist, y = wt)) +
-        geom_line(linewidth = 1.25) +
         {if(isTRUE(scale_dist))
-          geom_vline(xintercept = scale_d,
-                     linetype = 'dashed',
-                     color = 'red')
+          geom_rect(xmin = scale_lci, xmax = scale_uci, ymin = -Inf, ymax = Inf,
+                    fill = 'lightgrey', alpha = 0.25)
+
+          } +
+        {if(isTRUE(scale_dist))
+        geom_vline(xintercept = scale_d,
+                   linetype = 'dashed',
+                   color = 'red')
         } +
         {if(isTRUE(scale_dist) & isTRUE(add_label))
           annotate('text', x = ax, y = ay,
-                   label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0)))
+                   label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0),
+                                  "\n  ", " 95% CI: ",round(scale_lci, 0), " - ", round(scale_uci, 0)))
         } +
+        geom_line(linewidth = 1.25) +
+        ggtitle(titles[i]) +
         xlab('Distance') +
-        ylab('Smoothing weight') +
+        ylab('Weight') +
         cowplot::theme_cowplot()
 
       plot_list[[i]] <- plot_
@@ -123,7 +126,9 @@ plot.multiScaleR <- function(x,
       stop('\nBoth a `sigma` and `shape` parameter must be specified when using the `expow` kernel; See Details\n')
     }
 
-    d <- seq(1, 1e6, length.out = 1e6)
+    # d <- seq(1, 1e6, length.out = 1e6)
+    d <- seq(1, round(max(sig_)*1000,0),
+             length.out = round(max(sig_)*1000,0))
     wt <- scale_type(d = d,
                      kernel = kern,
                      sigma = sig_,
@@ -166,7 +171,7 @@ plot.multiScaleR <- function(x,
                  label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0)))
       } +
       xlab('Distance') +
-      ylab('Smoothing weight') +
+      ylab('Weight') +
       cowplot::theme_cowplot()
   } else {
     stop("Parameters not correctly specified to create plot. See Details and try again.")

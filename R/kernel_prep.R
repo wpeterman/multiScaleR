@@ -25,16 +25,6 @@
 #'                              max_D = 2,
 #'                              kernel = 'gaussian',
 #'                              sigma = NULL)
-#' @usage
-#' kernel_prep(pts,
-#'             raster_stack,
-#'             max_D,
-#'             kernel = 'gaussian',
-#'             sigma = NULL,
-#'             shape = NULL,
-#'             projected = TRUE,
-#'             progress = FALSE)
-
 #' @rdname kernel_prep
 #' @export
 #' @importFrom exactextractr exact_extract
@@ -47,12 +37,14 @@
 kernel_prep <- function(pts,
                         raster_stack,
                         max_D,
-                        kernel = 'gaussian',
+                        kernel = c('gaussian', 'exp', 'expow', 'fixed'),
                         sigma = NULL,
                         shape = NULL,
                         projected = TRUE,
                         progress = FALSE){
   unit_conv <- max_D
+
+  kernel <- match.arg(kernel)
 
   if(class(raster_stack) != 'SpatRaster'){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')

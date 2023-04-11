@@ -5,7 +5,7 @@
 #' @param ... Parameters to be used if not providing a 'multiScaleR' fitted object. See Details
 #' @return Distance at which cumulative density of kernel is reached
 #' @details This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
-#' @seealso \code{\link[plot.multiScaleR]{plot.multiScaleR}}
+#' @seealso \code{\link[multiScaleR]{plot.multiScaleR}}
 #' @examples
 #' kernel_dist(x)
 #'
@@ -34,8 +34,29 @@ kernel_dist <- function(model,
     }
 
     if(!missing("model")){
-      ci_ <- summary(model)$opt_scale
-      d <- seq(1, 1e6, length.out = 1e6)
+      # ci_ <- summary(model)$opt_scale
+
+      if(any(class(model$opt_mod) == 'gls')){
+        df <- model$opt_mod$dims$N - model$opt_mod$dims$p
+        names <- all.vars(formula(model$opt_mod)[-2])
+
+      } else if(any(grepl("^unmarked", class(model$opt_mod)))){
+        df <- dim(model$opt_mod@data@y)[1]
+        names <- all.vars(model$opt_mod@formula)
+
+      } else {
+        df <- model$opt_mod$df.residual
+        names <- all.vars(formula(model$opt_mod)[-2])
+      }
+
+      ci_ <- ci_func(model$scale_est,
+                     df = df,
+                     min_D = model$min_D,
+                     names = row.names(model$scale_est))
+
+
+
+      d <- seq(1, round(max(ci_)*1000,0), length.out = round(max(ci_)*1000,0))
       dist_list <- vector('list', nrow(ci_))
 
 
@@ -94,7 +115,7 @@ kernel_dist <- function(model,
       stop('\nBoth a `sigma` and `shape` parameter must be specified when using the `expow` kernel; See Details\n')
     }
 
-    d <- seq(1, 1e6, length.out = 1e6)
+    d <- seq(1, round(sig_*1000,0), length.out = round(sig_*1000,0))
     wt <- scale_type(d = d,
                      kernel = kern,
                      sigma = sig_,

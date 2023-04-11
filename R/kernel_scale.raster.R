@@ -18,13 +18,6 @@
 #'                             kernel = 'gaussian')
 #' plot(c(r1, r1_s))
 #'
-#' @usage
-#' kernel_scale.raster(raster_stack,
-#'                     sigma,
-#'                     scale_opt = NULL,
-#'                     shape = NULL,
-#'                     kernel = 'gaussian',
-#'                     pct_wt = 0.95)
 #'
 #' @rdname kernel_scale.raster
 #' @export
@@ -35,8 +28,10 @@ kernel_scale.raster <- function(raster_stack,
                                 sigma,
                                 scale_opt = NULL,
                                 shape = NULL,
-                                kernel = 'gaussian',
+                                kernel = c('gaussian', 'exp', 'expow', 'fixed'),
                                 pct_wt = 0.95){
+
+  kernel <- match.arg(kernel)
 
   if(class(raster_stack) != 'SpatRaster'){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')

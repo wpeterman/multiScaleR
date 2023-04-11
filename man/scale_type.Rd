@@ -6,7 +6,7 @@
 \usage{
 scale_type(
   d,
-  kernel = "gaussian",
+  kernel = c("gaussian", "exp", "expow", "fixed"),
   sigma,
   shape = NULL,
   r_stack.df = NULL,

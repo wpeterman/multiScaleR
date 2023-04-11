@@ -14,11 +14,13 @@
 #' @keywords internal
 
 scale_type <- function(d,
-                       kernel = 'gaussian',
+                       kernel = c('gaussian', 'exp', 'expow', 'fixed'),
                        sigma,
                        shape = NULL,
                        r_stack.df = NULL,
                        output = NULL) {
+  kernel <- match.arg(kernel)
+
   if(kernel == 'exp'){
     d1 <- data.frame(exp(-outer(d, sigma, "/")))
     w0 <- mapply("*",d1, (1/(2*pi*sigma^2)))
