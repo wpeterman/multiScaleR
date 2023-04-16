@@ -8,10 +8,10 @@
 }
 \usage{
 data(count_data)
-A data frame with 100 rows and 2 columns. Data were simulated from a Poisson distribution with an intercept of 0.25; land1 effect = -0.5; site effect = 0.3; land2 effect = 0.7. True simulated Gaussian scale effects (sigma): land1 = 250; land2 = 500.
+A data frame with 75 rows and 2 columns. Data were simulated from a Poisson distribution with an intercept of 0.5, a `hab` effect of 0.75, and scale of effect (sigma) of 75.
 \describe{
-  \item{counts}{Simulated counts at spatial locations}
-  \item{site}{Scaled values from the local point level}
+  \item{y}{Simulated counts at spatial locations}
+  \item{hab}{Scaled and centered weighted mean values from the `hab` raster at each of the `pts`}
 
   ...
 }

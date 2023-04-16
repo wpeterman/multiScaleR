@@ -25,6 +25,8 @@ kernel_scale_fn <- function(par,
   n_ind <- length(d_list)
   mod <- fitted_mod
 
+  # browser()
+
   if(any(class(mod) == 'gls')){
     mod_class <- 'gls'
     covs <- insight::find_predictors(mod)$conditional
@@ -49,6 +51,7 @@ kernel_scale_fn <- function(par,
     covs <- covs[which(covs %in% colnames(kernel_inputs$raw_cov[[1]]))]
     n_covs <- length(covs)
   } else {
+    mod_class <- 'other'
     covs <- insight::find_predictors(mod)$conditional
     dat <- insight::get_data(mod)
     covs <- covs[which(covs %in% colnames(kernel_inputs$raw_cov[[1]]))]
@@ -82,6 +85,8 @@ kernel_scale_fn <- function(par,
                  shape = shape,
                  r_stack.df = cov_df[[i]][,covs])
   } ## End for loop
+
+  # browser()
 
   df <- data.frame(do.call(rbind, cov.w))
   colnames(df) <- covs

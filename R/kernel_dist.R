@@ -45,7 +45,7 @@ kernel_dist <- function(model,
         names <- all.vars(model$opt_mod@formula)
 
       } else {
-        df <- model$opt_mod$df.residual
+        df <- insight::get_df(model$opt_mod, type = "residual")
         names <- all.vars(formula(model$opt_mod)[-2])
       }
 

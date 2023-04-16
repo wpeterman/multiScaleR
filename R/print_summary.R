@@ -36,8 +36,29 @@ print.summary.multiScaleR <- function(x, ...){
   cat("\n\n  ==================================== ")
 
 
-  cat('\n\n *****     Fitted Model Summary     *****')
+  cat('\n\n *****     Fitted Model Summary     *****\n\n')
   print(summary(x$fitted_mod))
+
+  # Warning Messages --------------------------------------------------------
+
+
+  if(1 %in% x$warn_message){
+    cat(red("\n WARNING!!!\n",
+            "The estimated scale of effect extends beyond the maximum distance specified.\n",
+            "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to ensure accurate estimation of scale.\n\n"))
+  }
+
+  if(2 %in% x$warn_message){
+    cat(red("\n WARNING!!!\n",
+            "The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.\n",
+            "Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.\n\n"))
+  }
+
+  if(3 %in% x$warn_message){
+    cat(red("\n WARNING!!!\n",
+            "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
+            "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
+  }
 }
 
 
@@ -64,7 +85,7 @@ summary.multiScaleR <- function(object,...){
     names <- all.vars(object$opt_mod@formula)
 
   } else {
-    df <- object$opt_mod$df.residual
+    df <- insight::get_df(object$opt_mod, type = "residual")
     names <- all.vars(formula(object$opt_mod)[-2])
   }
 
@@ -82,6 +103,9 @@ summary.multiScaleR <- function(object,...){
     prob <- 0.9
   }
 
+  ## DEBUG
+  # browser()
+
   if(!is.null(object$shape_est)){
     tab_shape <- ci_func(object$shape_est,
                          df = object$opt_mod$df.residual,
@@ -93,6 +117,7 @@ summary.multiScaleR <- function(object,...){
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
+                warn_message = object$warn_message,
                 call = object$call)
   } else {
     out <- list(opt_scale = tab_scale,
@@ -101,6 +126,7 @@ summary.multiScaleR <- function(object,...){
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
+                warn_message = object$warn_message,
                 call = object$call)
   }
 
