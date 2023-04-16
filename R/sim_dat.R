@@ -108,6 +108,10 @@ sim_dat <- function(alpha = 1,
 
   pts <- pts[sample(dim(pts)[1], n_points),]
 
+  max_D <- kernel_dist(kernel = kernel,
+                       prob = 0.99,
+                       sigma = max(sigma)) * 1.1
+
   kernel_out <- kernel_prep(pts = pts,
                             sigma = sigma,
                             shape = shape,

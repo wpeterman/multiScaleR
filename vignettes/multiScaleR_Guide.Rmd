@@ -1,0 +1,479 @@
+---
+title: "multiScaleR User Guide"
+author: "Bill Peterman"
+output: rmarkdown::html_vignette
+fig_width: 12  
+fig_height: 7   
+vignette: >
+  %\VignetteIndexEntry{Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache.path = "cache/")
+library(multiScaleR)
+load("cache/vignette_data1.RData")
+load("cache/vignette_data2.RData")
+load("cache/vignette_data3.RData")
+load("cache/vignette_data4.RData")
+load("cache/vignette_data5.RData")
+load("cache/vignette_data6.RData")
+load("cache/vignette_data7.RData")
+load("cache/vignette_data8.RData")
+load("cache/vignette_data9.RData")
+load("cache/vignette_data10.RData")
+```
+
+## Background
+
+Many abiotic and ecological processes are a result of variables operating at multiple scales. Such multiscale ecological processes can be challenging to quantify, especially when the surrounding landscape contributes to the process. The extent and magnitude of contribution from the surrounding landscape is often referred to as the 'scale of effect'. Determining the scales of effect has long been the focus of ecologists seeking to address multiscale ecological questions, but until recently, methods to rigorously and can identify such scales have been lacking. With advanced coding skills, Bayesian analytical frameworks can be used (e.g., Stuber & Gruber 2020; Amirkhiz et al. 2023). More recently, user-friendly methods, implemented in R, have been developed (`Siland`: Carpentier & Martin 2021; `Scalescape`: Lowe et al. 2022). Both of these packages, like `multiScaleR`, estimate distance-weighted landscape effects (i.e. scales of effect). All take a similar approach to achieving this goal, but each works with different model classes and have different functions available to users.
+
+`multiScaleR` is fully supported in handling models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and that is a supported class in the R package [insight](https://cran.r-project.org/web/packages/insight/index.html). Let me know if you encounter issues or would like to see support for other model classes.
+
+**References**
+
+-   Amirkhiz, R. G., R. John, and D. L. Swanson. 2023. A Bayesian approach for multiscale modeling of the influence of seasonal and annual habitat variation on relative abundance of ring-necked pheasant roosters. Ecological Informatics 75:102003.
+
+-   Carpentier, F., and O. Martin. 2021. Siland a R package for estimating the spatial influence of landscape. Scientific Reports 11:7488.
+
+-   Lowe, E. B., B. Iuliano, C. Gratton, and A. R. Ives. 2022. 'Scalescape': an R package for estimating distance-weighted landscape effects on an environmental response. Landscape Ecology 37:1771--1785.
+
+-   Stuber, E. F., and L. F. Gruber. 2020. Recent methodological solutions to identifying scales of effect in multi-scale modeling. Current Landscape Ecology Reports 5:127--139.
+
+## Distance-weighted Effects
+
+There are *many* different kernel transformations that could be used to quantify the contribution of environmental variables as a function of distance. Four kernel functions are implemented in `multiScaleR` . Experience with simulated data suggests that the Exponential Power kernel, while flexible, is prone to over fitting and optimization often fails to converge. The Gaussian kernel is the default with `multiScaleR`. Note: Figures in this document rendered poorly. Re-running code on your local machine will provide much better results!
+
+1.  Gaussian (`gaus`) -- Decay in space governed by a single parameter (sigma)
+
+    ```{r echo=FALSE}
+    plot_kernel(prob = 0.9, 
+                sigma = 100, 
+                kernel = "gaus", 
+                scale_dist = F,
+                add_label = F)
+    ```
+
+2.  Negative Exponential (`exp`) -- Decay in space governed by a single parameter (sigma)
+
+    ```{r echo=FALSE}
+    plot_kernel(prob = 0.9, 
+                sigma = 50, 
+                kernel = "exp", 
+                scale_dist = F,
+                add_label = F)
+    ```
+
+3.  Exponential Power (`expow`) -- Decay in space governed by a scale parameter (sigma), and shape parameter (shape)
+
+    ```{r echo=FALSE}
+    plot_kernel(prob = 0.9, 
+                sigma = 250, 
+                shape = 5,
+                kernel = "expow", 
+                scale_dist = F,
+                add_label = F)
+    ```
+
+4.  Fixed width buffer (`fixed`) -- Effect does not decay with distance
+
+    ```{r echo=FALSE}
+    plot_kernel(prob = 0.9, 
+                sigma = 300, 
+                kernel = "fixed", 
+                scale_dist = F,
+                add_label = F)
+    ```
+
+## Preparing Data
+
+Prior to using `multiScaleR` to identify distance-weighted scales of effect, data must be appropriately formatted. These steps will be demonstrated with sample, simulated data provided with the package.
+
+```{r}
+library(multiScaleR)
+
+## Read in data
+data("landscape_counts")
+dat <- landscape_counts
+
+data("surv_pts")
+pts <- surv_pts
+
+land_rast <- terra::rast(system.file("data/landscape.tif", package = 'multiScaleR'))
+```
+
+The `landscape_counts` data frame contains simulated counts from 100 spatial point locations as well as a scaled and centered site-level covariate ('site'). The `landscape.tif` file is a `spatRaster` object consisting of three surfaces (land1 = binary habitat; land2 = continuous habitat / environment; land3 = continuous / environment). The counts were simulated using the following parameters:
+
+-   Poisson process
+
+    -   Intercept (alpha) of regression --\> **0.25**
+
+-   `site`
+
+    -   Effect --\> **0.3**
+
+-   `land1`
+
+    -   Effect --\> **-0.5**
+
+    -   Gaussian sigma --\> **250**
+
+-   `land2`
+
+    -   Effect --\> **0.7**
+
+    -   Gaussian sigma --\> **500**
+
+-   `land3`
+
+    -   Effect --\> **0** (does not affect counts)
+
+### Explore Data
+
+```{r }
+summary(dat)
+
+pts
+
+land_rast
+
+plot(land_rast)
+
+## Plot with points
+plot(land_rast$land1) 
+plot(st_geometry(pts), add = T, pch = 19)
+```
+
+### `kernel_prep`
+
+To begin an analysis, the `kernel_prep` function must be run with the `spatRaster` layers and spatial point data. In additionally, it is necessary to specify the maximum distance (in raster map units) that you want to consider in the analysis. The greater the distance considered, the more computationally intensive the analysis will be, so some consideration and discretion is needed. If the maximum distance appears to be too based on the optimization results, you will receive a warning.
+
+```{r}
+kernel_inputs <- kernel_prep(pts = pts,
+                             raster_stack = land_rast,
+                             max_D = 1700,
+                             kernel = 'gaussian')
+kernel_inputs
+```
+
+Next, you need to fit the preliminary model that will serve as the starting point for optimizing scales of effect. We will pull raster values from the newly created `kernel_inputs` then fit a GLM. These raster value are scaled and centered weighted mean values for each layer, at each point.
+
+```{r}
+df <- data.frame(dat,
+                 kernel_inputs$kernel_dat)
+str(df)
+```
+
+Fit Poisson GLM
+
+```{r}
+mod0 <- glm(counts ~ site + land1 + land2 + land3,
+            family = poisson(),
+            data = df)
+summary(mod0)
+```
+
+## Analysis
+
+### `multiScale_optim`
+
+We are now ready to use the `multiScale_optim` function. Note: for purposes of this vignette, the function is not being run in parallel. Optimization will be much quicker when parallelized by specifying `n_cores`. The optimization below takes \~90 seconds to complete.
+
+```{r opt1, eval=FALSE}
+opt1 <- multiScale_optim(fitted_mod = mod0,
+                         kernel_inputs = kernel_inputs)
+```
+
+We get some helpful warning messages indicating the estimated scale of effect for one of our raster variables exceeds the `max_D` threshold we specified with the `kernel_prep` function and we get a suggestion of how to correct this. We also get a warning that the precision (standard error) for one or more sigma terms is large relative to the mean estimate. Let's first take a look at our results.
+
+```{r}
+summary(opt1)
+```
+
+At the bottom of the output is the standard `GLM` model summary output. We see that `site` appears to have no effect, `land1` a negative effect, `land2` a positive effect and `land3` a weak positive effect on the observed counts. At the top of the summary output is the estimated sigma terms related to the Gaussian kernel for each raster layer. The standard error and 95% confidence intervals are also reported. Below this, the actual distance effect is calculated. By default, the distance that encompasses 90% of the kernel weight is identified. From these summaries, we see that `land3` is the variable that may have a larger scale of effect than we anticipated, but that it is also being imprecisely estimated. This may be a red flag that the variable is not relevant to the analysis and/or should not be scaled.
+
+We could update `max_D` by re-running `kernel_prep`, but we won't do that here. One thing to be aware of when optimizing scales of effect is that it is possible to have overfit models with parameters that don't have a strong relationship with your response. With this simulated data, we know that `land3` actually has no effect. Let's fit another model without this variable.
+
+```{r opt2}
+## New model
+mod0_2 <- glm(counts ~ site + land1 + land2,
+              family = poisson(),
+              data = df)
+
+```
+
+```{r eval=FALSE}
+## Optimize
+opt2 <- multiScale_optim(fitted_mod = mod0_2,
+                         kernel_inputs = kernel_inputs)
+```
+
+No warnings! Let's look at our results.
+
+```{r}
+summary(opt2)
+```
+
+Overall, we did a pretty good job recovering the data generating parameter values within the GLM as well as the sigma values for scaling the raster surfaces. We can further explore and visualize our results. Using the `plot` function, we can visualize how the weighted contribution of each variable decrease with distance. By default, the mean and 95% confidence interval of the 90% cumulative kernel weight is identified on the plot. This can be modified by changing `prob` within the plot function.
+
+```{r}
+## Kernel function
+plot(opt2)
+
+## Kernel function; 99% contribution
+plot(opt2, prob = 0.99)
+```
+
+We can also apply the optimized kernel to the raster surfaces.
+
+```{r kernel_raster}
+rast_opt <- kernel_scale.raster(raster_stack = land_rast,
+                                scale_opt = opt2)
+plot(rast_opt)
+```
+
+### Kernels
+
+Data were simulated from a Gaussian kernel, but we can optimize using other kernels and compare model performance. Starting values had to be specified when using the exponential power kernel due to convergence issues.
+
+```{r other_kernel}
+## Negative Exponential
+exp_inputs <- kernel_prep(pts = pts,
+                          raster_stack = land_rast,
+                          max_D = 1700,
+                          kernel = 'exp')
+
+## Exponential Power
+expow_inputs <- kernel_prep(pts = pts,
+                            raster_stack = land_rast,
+                            max_D = 1700,
+                            kernel = 'expow')
+
+## Fixed width buffer
+fixed_inputs <- kernel_prep(pts = pts,
+                            raster_stack = land_rast,
+                            max_D = 1700,
+                            kernel = 'fixed')
+```
+
+Optimize model with alternative kernels
+
+```{r eval=F}
+opt_exp <- multiScale_optim(fitted_mod = mod0_2,
+                            kernel_inputs = exp_inputs)
+
+## Starting values needed
+opt_expow <- multiScale_optim(fitted_mod = mod0_2,
+                              kernel_inputs = expow_inputs,
+                              par = c(500/1000,500/1000,5,10))
+
+opt_fixed <- multiScale_optim(fitted_mod = mod0_2,
+                              kernel_inputs = fixed_inputs)
+```
+
+If you explore each of the outputs, you'll see that we generally arrive at similar results. There are some warnings, but we won't worry about those right now. Next, we'll try to compare the relative support of these models using different weighted kernels.
+
+## Model Selection
+
+With `multiScaleR` it is possible to create AIC(c) or BIC tables from lists of fitted models.
+
+```{r}
+mod_list <- list(opt2,
+                 opt_exp,
+                 opt_expow,
+                 opt_fixed)
+
+## AIC table
+aic_tab(mod_list)
+
+## BIC table
+bic_tab(mod_list)
+```
+
+The questionably-fitting exponential power model is best-supported by AICc ranking while the Gaussian model is best-supported by BIC. Because of the added complexity (extra parameter) with the exponential power kernel, uncertain optimization, and general equivalency to other models, we should probably lean toward the simpler Gaussian kernel model. This example highlights the challenges that may be encountered when trying to parse different kernels for estimating scales of effect. From observations of performance with simulated data, use of different kernels tends to result in a similar final model and interpretation of variable effects. This, in part, is why the Gaussian kernel is the default, and likely will meet most researcher needs.
+
+Of greater interest is using model selection to identify the best supported model in terms of parameterization (not kernel used).
+
+```{r}
+## Landscape only effect
+mod0_3 <- glm(counts ~ land1 + land2,
+              family = poisson(),
+              data = df)
+
+## Landscape 1 only effect
+mod0_4 <- glm(counts ~ land1,
+              family = poisson(),
+              data = df)
+
+## Landscape 2 only effect
+mod0_5 <- glm(counts ~ land2,
+              family = poisson(),
+              data = df)
+
+## Landscape 3 only effect
+mod0_6 <- glm(counts ~ land3,
+              family = poisson(),
+              data = df)
+
+## Site only effect
+## No multiScaleR optimization
+mod0_7 <- glm(counts ~ site,
+              family = poisson(),
+              data = df)
+```
+
+Optimize scale for each alternative model
+
+```{r eval=FALSE}
+opt3 <- multiScale_optim(fitted_mod = mod0_3,
+                         kernel_inputs = kernel_inputs)
+opt4 <- multiScale_optim(fitted_mod = mod0_4,
+                         kernel_inputs = kernel_inputs)
+opt5 <- multiScale_optim(fitted_mod = mod0_5,
+                         kernel_inputs = kernel_inputs)
+opt6 <- multiScale_optim(fitted_mod = mod0_6,
+                         kernel_inputs = kernel_inputs)
+```
+
+Put models into list and assess.
+
+```{r}
+mod_list2 <- list(opt1, opt2, opt3, opt4, opt5, opt6, mod0_7)
+
+aic_tab(mod_list2)
+
+bic_tab(mod_list2)
+```
+
+Model selection tables clearly show that the inclusion of scaled landscape variables is important, however information criterion may not have the greatest resolution or power to differentiate among competing models. Analyses will likely require a critical, holistic assessment of information criterion, parameter effect sizes, and precision in scale of effect estimates (i.e. sigma).
+
+The challenge of identifying 'significant' scale relationships was also noted by Lowe et al., and the R package `scalescape` has a bootstrap function to determine the significance of parameters within the regression model. Such procedures are not currently implemented in `multiScaleR`.
+
+## Other Functions & Features
+
+Below is a brief walk through the other functions related to scales of effect that are included with the `multiScaleR` package.
+
+### `kernel_dist`
+
+In some cases, a direct assessment of scale of effect distance is desired.
+
+```{r}
+## With fitted model
+kernel_dist(opt2)
+
+## Distance of 95% kernel
+kernel_dist(opt2, prob = 0.95)
+
+```
+
+It's also possible to calculate distance of specified kernels without a fitted model.
+
+```{r}
+kernel_dist(kernel = "gaussian", sigma = 100, prob = 0.9)
+
+kernel_dist(kernel = "exp", sigma = 100, prob = 0.9)
+
+kernel_dist(kernel = "expow", sigma = 100, shape = 5, prob = 0.9)
+```
+
+### `plot_kernel`
+
+This is a generic function to visualize how kernel weight decays with distance
+
+```{r}
+plot_kernel(kernel = 'exp',
+            sigma = 50)
+
+plot_kernel(kernel = 'expow',
+            shape = 5,
+            sigma = 50)
+
+plot_kernel(kernel = 'gaussian',
+            sigma = 50)
+
+plot_kernel(kernel = 'gaussian',
+            sigma = 50)
+
+plot_kernel(kernel = 'gaussian',
+            sigma = 50,
+            scale_dist = F)
+
+plot_kernel(kernel = 'gaussian',
+            sigma = 50,
+            add_label = F)
+```
+
+### `sim_rast`
+
+If the `NLMR` package is installed, raster surfaces can be simulated that are amenable for use the `sim_dat` function.
+
+```{r error=FALSE, message=FALSE}
+r_sim1 <- sim_rast(dim = 100,
+                   resolution = 30,
+                   user_seed = 555)
+
+r_sim2 <- sim_rast(dim = 100,
+                   resolution = 30,
+                   autocorr_range1 = 25,
+                   autocorr_range2 = 50,
+                   nug = 1,
+                   user_seed = 555)
+
+plot(r_sim1)
+plot(r_sim2)
+```
+
+### `sim_dat`
+
+This function will simulate data from scaled raster surfaces.
+
+```{r}
+s_dat <- sim_dat(alpha = 0.25,
+                 beta = c(0.75, -0.75),
+                 kernel = 'gaussian',
+                 sigma = c(350, 200),
+                 type = 'count',
+                 n_points = 100,
+                 raster_stack = terra::subset(r_sim1, c(1,4)),
+                 min_D = 250,
+                 user_seed = 999)
+```
+
+Look at the simulated covariate relationships with counts
+
+```{r}
+plot(s_dat$df$y ~ s_dat$df$bin1)
+plot(s_dat$df$y ~ s_dat$df$cont2)
+```
+
+Use the simulated data with `multiScaleR`
+
+```{r}
+sim_mod <- glm(y ~ bin1 + cont2,
+               family = 'poisson',
+               data = s_dat$df)
+
+kernel_inputs <- kernel_prep(pts = s_dat$pts,
+                             raster_stack = r_sim1,
+                             max_D = 1500,
+                             kernel = 'gaussian')
+
+
+```
+
+```{r eval=FALSE}
+sim_opt <- multiScale_optim(fitted_mod = sim_mod,
+                            kernel_inputs = kernel_inputs)
+```
+
+Check results
+
+```{r}
+summary(sim_opt)
+
+plot(sim_opt)
+
+plot(kernel_scale.raster(raster_stack = r_sim1,
+                         scale_opt = sim_opt))
+```

@@ -4,18 +4,12 @@
 \alias{plot.multiScaleR}
 \title{Plot multiScaleR}
 \usage{
-\method{plot}{multiScaleR}(x, prob = 0.9, scale_dist = TRUE, add_label = TRUE, ...)
+\method{plot}{multiScaleR}(x, ...)
 }
 \arguments{
 \item{x}{A `multiScaleR` object from  \code{\link[multiScaleR]{multiScale_optim}} object}
 
-\item{prob}{Cumulative kernel density to identify scale of effect distance, Default: 0.9}
-
-\item{scale_dist}{Logical. If TRUE (Default), the distance at which the specified density probability is achieved is added to the plot along with 95\% confidence interval}
-
-\item{add_label}{Logical. If TRUE (Default), the distance value calculated for 'scale_dist' is added as an annotation to the plot.}
-
-\item{...}{Parameters to be used if not providing a 'multiScaleR' fitted object. See Details}
+\item{...}{Parameters to modify plot. See Details}
 }
 \value{
 ggplot2 objects of kernel density distributions
@@ -24,10 +18,21 @@ ggplot2 objects of kernel density distributions
 Function to plot fitted multiScaleR objects
 }
 \details{
-This function is used to visualize kernel density distributions from multiScaleR optimized objects. If not providing a fitted model, you can plot kernel distributions using the \code{\link[multiScaleR]{plot_kernel}}
+This function is used to visualize kernel density distributions from multiScaleR optimized objects. Plots can be modified by specifying:
+\tabular{ll}{
+ \tab * `prob` --> Cumulative kernel density to identify scale of effect distance, Default: 0.9 \cr
+ \tab * `scale_dist` --> Logical. If TRUE (Default), the distance at which the specified density probability is achieved is added to the plot along with 95\% confidence interval \cr
+ \tab * `add_label` --> Logical. If TRUE (Default), the distance value calculated for 'scale_dist' is added as an annotation to the plot. \cr
+ }
 }
 \examples{
 plot(x)
+
+plot(x, prob = 0.95)
+
+plot(x, scale_dist = FALSE)
+
+plot(x, scale_dist = TRUE, add_label = FALSE)
 }
 \seealso{
 \code{\link[multiScaleR]{plot_kernel}}

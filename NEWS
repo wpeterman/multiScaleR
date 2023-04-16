@@ -1,3 +1,9 @@
+multiScaleR 0.2.0
+---------
+* Modified `multiScaleR_optim` to reduce size of final optimized object.
+* Completed vignette: use 'build_vignettes = TRUE' when installing
+* Updated code to accomodate lme4 and other model classes supported by `insight` package.
+
 multiScaleR 0.1.5
 ---------
 * Updated plot function to show 95% confidence interval of scale of effect distance

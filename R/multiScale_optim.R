@@ -117,7 +117,7 @@ multiScale_optim <- function(fitted_mod,
     n_covs <- length(r_vars)
     fitType <- fitted_mod@fitType
   } else {
-    mod_class <- 'glm'
+    mod_class <- 'other'
     # mod_vars <- all.vars(formula(fitted_mod)[-2])
     mod_vars <- insight::find_predictors(fitted_mod)[[1]]
     r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
@@ -177,6 +177,7 @@ multiScale_optim <- function(fitted_mod,
   opt_results <- data.frame()
   class(opt_results) <- 'try-error'
 
+  # browser()
 
   while(class(opt_results) == 'try-error' & cnt < (length(par_starts))){
     if(is.numeric(n_cores) & isTRUE(opt_parallel)){
@@ -288,7 +289,7 @@ multiScale_optim <- function(fitted_mod,
   } else {
 
     cat('\n\nOptimization complete\n')
-# browser()
+
     opt_results$par_unscale <- c(opt_results$par[1:n_covs] * kernel_inputs$unit_conv,
                                  opt_results$par[(n_covs + 1):(n_covs * 2)])
     opt_results$hessian_unscale <- opt_results$hessian #* kernel_inputs$unit_conv
@@ -320,6 +321,9 @@ multiScale_optim <- function(fitted_mod,
       shape_est <- NULL
     }
 
+    # browser()
+
+
     final_mod <- kernel_scale_fn(par = c(opt_results$par),
                                  kernel_inputs = kernel_inputs,
                                  fitted_mod = fitted_mod,
@@ -330,8 +334,9 @@ multiScale_optim <- function(fitted_mod,
                 optim_results = opt_results,
                 opt_mod = final_mod$mod,
                 min_D = kernel_inputs$min_D,
-                kernel_inputs = kernel_inputs,
+                kernel_inputs = kernel_inputs[-c(2,3)],
                 scl_params = final_mod$scl_params,
+                warn_message = 0,
                 call = match.call())
 
     class(out) <- 'multiScaleR'
@@ -347,9 +352,24 @@ multiScale_optim <- function(fitted_mod,
 
     }
     if(any((kernel_inputs$max_D / est_D) < 2)){
-      cat(red("\n WARNING!!!
-                  \n The estimated scale of effect extends beyond the maximum distance specified.\n",
-                  "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(suggest_D) %+% " to ensure accurate estimation of scale."))
+      out$warn_message <- c(out$warn_message, 1)
+      cat(red("\n WARNING!!!\n",
+              "The estimated scale of effect extends beyond the maximum distance specified.\n",
+              "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(suggest_D) %+% " to ensure accurate estimation of scale.\n\n"))
+    }
+
+    if(any((scale_est[,1] / scale_est[,2]) < 2)){
+      out$warn_message <- c(out$warn_message, 2)
+      cat(red("\n WARNING!!!\n",
+              "The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.\n",
+              "Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.\n\n"))
+    }
+
+    if(any((shape_est[,1] / shape_est[,2]) < 2)){
+      out$warn_message <- c(out$warn_message, 3)
+      cat(red("\n WARNING!!!\n",
+              "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
+              "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
     }
     return(out)
   }

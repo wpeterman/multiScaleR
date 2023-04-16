@@ -34,4 +34,26 @@ print.multiScaleR <- function(x, ...){
   cat("\n  ==================================== ")
   cat("\n\n ***** Fitted Model *****\n")
   print(x$opt_mod)
+
+
+# Warning Messages --------------------------------------------------------
+
+
+  if(1 %in% x$warn_message){
+    cat(red("\n WARNING!!!\n",
+            "The estimated scale of effect extends beyond the maximum distance specified.\n",
+            "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to ensure accurate estimation of scale.\n\n"))
+  }
+
+  if(2 %in% x$warn_message){
+    cat(red("\n WARNING!!!\n",
+            "The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.\n",
+            "Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.\n\n"))
+  }
+
+  if(3 %in% x$warn_message){
+    cat(red("\n WARNING!!!\n",
+            "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
+            "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
+  }
 }

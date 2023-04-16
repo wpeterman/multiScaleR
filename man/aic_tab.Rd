@@ -58,7 +58,7 @@ mod1 <- glm(y ~ r1,
 mod2 <- glm(y ~ r2,
             data = dat)
 mod3 <- glm(y ~ r1 + r2,
-            data = dat)             
+            data = dat)
 
 ## NOTE: This code is only for demonstration
 ## Optimization results will have no meaning
@@ -69,7 +69,7 @@ opt_mod1 <- multiScale_optim(fitted_mod = mod1,
                              par = NULL,
                              opt_parallel = FALSE,
                              n_cores = NULL)
-                             
+
 opt_mod2 <- multiScale_optim(fitted_mod = mod2,
                              kernel_inputs = kernel_inputs,
                              method ='L-BFGS-B',
@@ -81,18 +81,18 @@ opt_mod3 <- multiScale_optim(fitted_mod = mod3,
                              method ='L-BFGS-B',
                              par = NULL,
                              opt_parallel = FALSE,
-                             n_cores = NULL)   
-                             
+                             n_cores = NULL)
+
  ## AIC table
  mod_list <- list(opt_mod1, opt_mod2, opt_mod3)
- 
+
  aic_tab(mod_list = mod_list,
          AICc = FALSE)
-         
- ## AICc table with specified names           
+
+ ## AICc table with specified names
  aic_tab(mod_list = mod_list,
          AICc = TRUE,
-         mod_names = c('mod1', 'mod2', 'mod3'))                                                
+         mod_names = c('mod1', 'mod2', 'mod3'))
 }
 \author{
 Bill Peterman
