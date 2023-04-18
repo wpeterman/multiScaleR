@@ -21,9 +21,9 @@ remotes::install_github("cran/RandomFields")
 remotes::install_github("ropensci/NLMR")
 
 remotes::install_github("wpeterman/multiScaleR", 
-                        build_vignettes = FALSE) # Download package
+                        build_vignettes = TRUE) # Download package
 
 library(multiScaleR) # Loads package and the other dependencies
 ```
 
-Eventually, a vignette will be developed to expand on the use of the package (stay tuned!).
+A vignette to accompany the package is now available with versions \>= 0.2.0. This document walks through all available functions as well provides worked analyses of simulated data.

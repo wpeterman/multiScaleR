@@ -1,13 +1,16 @@
 ---
 title: "multiScaleR User Guide"
 author: "Bill Peterman"
-output: rmarkdown::html_vignette
-fig_width: 12  
-fig_height: 7   
+output: 
+    rmarkdown::html_vignette: 
+        fig_width: 5.75  
+        fig_height: 4.25 
+        number_sections: true
+        toc: true
 vignette: >
   %\VignetteIndexEntry{Guide}
   %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+  \usepackage[utf8]{inputenc}
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
@@ -25,7 +28,7 @@ load("cache/vignette_data9.RData")
 load("cache/vignette_data10.RData")
 ```
 
-## Background
+# Background
 
 Many abiotic and ecological processes are a result of variables operating at multiple scales. Such multiscale ecological processes can be challenging to quantify, especially when the surrounding landscape contributes to the process. The extent and magnitude of contribution from the surrounding landscape is often referred to as the 'scale of effect'. Determining the scales of effect has long been the focus of ecologists seeking to address multiscale ecological questions, but until recently, methods to rigorously and can identify such scales have been lacking. With advanced coding skills, Bayesian analytical frameworks can be used (e.g., Stuber & Gruber 2020; Amirkhiz et al. 2023). More recently, user-friendly methods, implemented in R, have been developed (`Siland`: Carpentier & Martin 2021; `Scalescape`: Lowe et al. 2022). Both of these packages, like `multiScaleR`, estimate distance-weighted landscape effects (i.e. scales of effect). All take a similar approach to achieving this goal, but each works with different model classes and have different functions available to users.
 
@@ -41,7 +44,7 @@ Many abiotic and ecological processes are a result of variables operating at mul
 
 -   Stuber, E. F., and L. F. Gruber. 2020. Recent methodological solutions to identifying scales of effect in multi-scale modeling. Current Landscape Ecology Reports 5:127--139.
 
-## Distance-weighted Effects
+# Distance-weighted Effects
 
 There are *many* different kernel transformations that could be used to quantify the contribution of environmental variables as a function of distance. Four kernel functions are implemented in `multiScaleR` . Experience with simulated data suggests that the Exponential Power kernel, while flexible, is prone to over fitting and optimization often fails to converge. The Gaussian kernel is the default with `multiScaleR`. Note: Figures in this document rendered poorly. Re-running code on your local machine will provide much better results!
 
@@ -86,7 +89,7 @@ There are *many* different kernel transformations that could be used to quantify
                 add_label = F)
     ```
 
-## Preparing Data
+# Preparing Data
 
 Prior to using `multiScaleR` to identify distance-weighted scales of effect, data must be appropriately formatted. These steps will be demonstrated with sample, simulated data provided with the package.
 
@@ -129,7 +132,7 @@ The `landscape_counts` data frame contains simulated counts from 100 spatial poi
 
     -   Effect --\> **0** (does not affect counts)
 
-### Explore Data
+## Explore Data
 
 ```{r }
 summary(dat)
@@ -145,7 +148,7 @@ plot(land_rast$land1)
 plot(st_geometry(pts), add = T, pch = 19)
 ```
 
-### `kernel_prep`
+## `kernel_prep`
 
 To begin an analysis, the `kernel_prep` function must be run with the `spatRaster` layers and spatial point data. In additionally, it is necessary to specify the maximum distance (in raster map units) that you want to consider in the analysis. The greater the distance considered, the more computationally intensive the analysis will be, so some consideration and discretion is needed. If the maximum distance appears to be too based on the optimization results, you will receive a warning.
 
@@ -174,9 +177,9 @@ mod0 <- glm(counts ~ site + land1 + land2 + land3,
 summary(mod0)
 ```
 
-## Analysis
+# Analysis
 
-### `multiScale_optim`
+## `multiScale_optim`
 
 We are now ready to use the `multiScale_optim` function. Note: for purposes of this vignette, the function is not being run in parallel. Optimization will be much quicker when parallelized by specifying `n_cores`. The optimization below takes \~90 seconds to complete.
 
@@ -233,7 +236,7 @@ rast_opt <- kernel_scale.raster(raster_stack = land_rast,
 plot(rast_opt)
 ```
 
-### Kernels
+## Kernels
 
 Data were simulated from a Gaussian kernel, but we can optimize using other kernels and compare model performance. Starting values had to be specified when using the exponential power kernel due to convergence issues.
 
@@ -266,7 +269,9 @@ opt_exp <- multiScale_optim(fitted_mod = mod0_2,
 ## Starting values needed
 opt_expow <- multiScale_optim(fitted_mod = mod0_2,
                               kernel_inputs = expow_inputs,
-                              par = c(500/1000,500/1000,5,10))
+                              par = c(500/expow_inputs$max_D,
+                                      500/exp_inputs$max_D,
+                                      5,10))
 
 opt_fixed <- multiScale_optim(fitted_mod = mod0_2,
                               kernel_inputs = fixed_inputs)
@@ -274,7 +279,7 @@ opt_fixed <- multiScale_optim(fitted_mod = mod0_2,
 
 If you explore each of the outputs, you'll see that we generally arrive at similar results. There are some warnings, but we won't worry about those right now. Next, we'll try to compare the relative support of these models using different weighted kernels.
 
-## Model Selection
+# Model Selection
 
 With `multiScaleR` it is possible to create AIC(c) or BIC tables from lists of fitted models.
 
@@ -350,11 +355,11 @@ Model selection tables clearly show that the inclusion of scaled landscape varia
 
 The challenge of identifying 'significant' scale relationships was also noted by Lowe et al., and the R package `scalescape` has a bootstrap function to determine the significance of parameters within the regression model. Such procedures are not currently implemented in `multiScaleR`.
 
-## Other Functions & Features
+# Other Functions & Features
 
 Below is a brief walk through the other functions related to scales of effect that are included with the `multiScaleR` package.
 
-### `kernel_dist`
+## `kernel_dist`
 
 In some cases, a direct assessment of scale of effect distance is desired.
 
@@ -377,7 +382,7 @@ kernel_dist(kernel = "exp", sigma = 100, prob = 0.9)
 kernel_dist(kernel = "expow", sigma = 100, shape = 5, prob = 0.9)
 ```
 
-### `plot_kernel`
+## `plot_kernel`
 
 This is a generic function to visualize how kernel weight decays with distance
 
@@ -404,7 +409,7 @@ plot_kernel(kernel = 'gaussian',
             add_label = F)
 ```
 
-### `sim_rast`
+## `sim_rast`
 
 If the `NLMR` package is installed, raster surfaces can be simulated that are amenable for use the `sim_dat` function.
 
@@ -424,7 +429,7 @@ plot(r_sim1)
 plot(r_sim2)
 ```
 
-### `sim_dat`
+## `sim_dat`
 
 This function will simulate data from scaled raster surfaces.
 
