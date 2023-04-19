@@ -11,7 +11,7 @@ To install, right click on the Rtools40.exe and select "Run as administrator". D
 To install this package and all supporting packages needed use all functions, execute the following commands in R:
 
 ```         
-# Install 'devtools' package, if needed
+# Install 'remotes' package, if needed
 if(!("remotes" %in% list.files(.libPaths()))) {
       install.packages("remotes", repo = "http://cran.rstudio.com", dep = TRUE) 
 } 
