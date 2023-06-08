@@ -1,3 +1,7 @@
+multiScaleR 0.2.0-2
+---------
+* Fixed bug preventing optimization using unmarked models
+
 multiScaleR 0.2.0-1
 ---------
 * Modified formatting of vignette document

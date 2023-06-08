@@ -1,7 +1,7 @@
 Package: multiScaleR
 Type: Package
 Title: Package for optimizing scales of effect
-Version: 0.2.0-1
+Version: 0.2.0-2
 Author: Bill Peterman
 Maintainer: Bill Peterman <Peterman.73@osu.edu>
 Description: This package is for optimizing scales of effect when modeling ecological processes in space. Specifically, the scale parameter of a distance-weighted kernel distribution is identified for all environmental layers included in the model.
@@ -18,7 +18,8 @@ Imports:
     ggplot2,
     insight,
     stats,
-    utils
+    utils,
+    unmarked
 Depends: 
     R (>= 4.0),
     terra,

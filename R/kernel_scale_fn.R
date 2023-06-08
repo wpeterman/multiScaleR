@@ -8,8 +8,9 @@
 #' @details For internal use
 #' @rdname kernel_scale_fn
 #' @keywords internal
-#' @importFrom insight get_data
+#' @importFrom insight get_data get_loglikelihood
 #' @importFrom stats formula logLik
+#' @importFrom unmarked logLik update
 
 kernel_scale_fn <- function(par,
                             kernel_inputs,
@@ -111,8 +112,16 @@ kernel_scale_fn <- function(par,
 
 }
 
+  # browser()
+
   if(is.null(mod_return)){
-    obj <- logLik(mod_u)[1] * -1
+    obj <- try(logLik(mod_u)[1] * -1)
+
+    if(class(obj) == 'try-error'){
+      obj <- insight::get_loglikelihood(mod_u)[1] * -1
+
+    }
+
   } else {
     obj <- list(mod = mod_u,
                 scl_params = list(mean = attr(scl_df, "scaled:center"),
