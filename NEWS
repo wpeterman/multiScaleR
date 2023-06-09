@@ -1,3 +1,7 @@
+multiScaleR 0.2.0-3
+---------
+* Updated error handling across core functions
+
 multiScaleR 0.2.0-2
 ---------
 * Fixed bug preventing optimization using unmarked models

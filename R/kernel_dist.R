@@ -54,41 +54,46 @@ kernel_dist <- function(model,
                      min_D = model$min_D,
                      names = row.names(model$scale_est))
 
+      # browser()
 
-
-      d <- seq(1, round(max(ci_)*1000,0), length.out = round(max(ci_)*1000,0))
+      d <- seq(1, round(max(ci_, na.rm = T)*1000,0), length.out = round(max(ci_, na.rm = T)*1000,0))
       dist_list <- vector('list', nrow(ci_))
 
 
       for(i in 1:nrow(ci_)){
+        if(!is.nan(ci_[i,2])){
+          wt_mn <- scale_type(d = d,
+                              kernel = model$kernel_inputs$kernel,
+                              sigma = ci_[i, 1],
+                              shape = model$shape_est[i,1],
+                              output = 'wts')
 
-        wt_mn <- scale_type(d = d,
-                            kernel = model$kernel_inputs$kernel,
-                            sigma = ci_[i, 1],
-                            shape = model$shape_est[i,1],
-                            output = 'wts')
 
+          wt_l <- scale_type(d = d,
+                             kernel = model$kernel_inputs$kernel,
+                             sigma = ci_[i,3],
+                             shape = model$shape_est[i,1],
+                             output = 'wts')
 
-        wt_l <- scale_type(d = d,
-                           kernel = model$kernel_inputs$kernel,
-                           sigma = ci_[i,3],
-                           shape = model$shape_est[i,1],
-                           output = 'wts')
+          wt_u <- scale_type(d = d,
+                             kernel = model$kernel_inputs$kernel,
+                             sigma = ci_[i,4],
+                             shape = model$shape_est[i,1],
+                             output = 'wts')
 
-        wt_u <- scale_type(d = d,
-                           kernel = model$kernel_inputs$kernel,
-                           sigma = ci_[i,4],
-                           shape = model$shape_est[i,1],
-                           output = 'wts')
+          scale_mn <- Hmisc::wtd.Ecdf(d, weights = wt_mn)
+          scale_mn <- round(scale_mn$x[which(scale_mn$ecdf > prob)[1]], digits = 2)
 
-        scale_mn <- Hmisc::wtd.Ecdf(d, weights = wt_mn)
-        scale_mn <- round(scale_mn$x[which(scale_mn$ecdf > prob)[1]], digits = 2)
+          scale_l <- Hmisc::wtd.Ecdf(d, weights = wt_l)
+          scale_l <- round(scale_l$x[which(scale_l$ecdf > prob)[1]], digits = 2)
 
-        scale_l <- Hmisc::wtd.Ecdf(d, weights = wt_l)
-        scale_l <- round(scale_l$x[which(scale_l$ecdf > prob)[1]], digits = 2)
-
-        scale_u <- Hmisc::wtd.Ecdf(d, weights = wt_u)
-        scale_u <- round(scale_u$x[which(scale_u$ecdf > prob)[1]], digits = 2)
+          scale_u <- Hmisc::wtd.Ecdf(d, weights = wt_u)
+          scale_u <- round(scale_u$x[which(scale_u$ecdf > prob)[1]], digits = 2)
+        } else {
+          scale_mn <- NaN
+          scale_l <- NaN
+          scale_u <- NaN
+        }
 
 
         dist_list[[i]] <- data.frame(mn = scale_mn,

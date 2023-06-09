@@ -37,7 +37,11 @@ print.summary.multiScaleR <- function(x, ...){
 
 
   cat('\n\n *****     Fitted Model Summary     *****\n\n')
-  print(summary(x$fitted_mod))
+  if(any(grepl("^unmarked", class(x$fitted_mod)))) {
+    print(x$fitted_mod)
+  } else {
+    print(summary(x$fitted_mod))
+  }
 
   # Warning Messages --------------------------------------------------------
 
