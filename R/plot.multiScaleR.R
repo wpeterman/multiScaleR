@@ -30,115 +30,116 @@ plot.multiScaleR <- function(x,
                              ...) {
   param_list <- list(...)
 
-    if(length(param_list) >= 1){
-      if('prob' %in% names(param_list)){
-        prob <- param_list$prob
-      } else {
-        prob <- 0.9
-      }
-
-      if('scale_dist' %in% names(param_list)){
-        scale_dist <- param_list$scale_dist
-      } else {
-        scale_dist <- TRUE
-      }
-
-      if('add_label' %in% names(param_list)){
-        add_label <- param_list$add_label
-      } else {
-        add_label <- TRUE
-      }
+  if(length(param_list) >= 1){
+    if('prob' %in% names(param_list)){
+      prob <- param_list$prob
     } else {
       prob <- 0.9
+    }
+
+    if('scale_dist' %in% names(param_list)){
+      scale_dist <- param_list$scale_dist
+    } else {
       scale_dist <- TRUE
+    }
+
+    if('add_label' %in% names(param_list)){
+      add_label <- param_list$add_label
+    } else {
       add_label <- TRUE
     }
+  } else {
+    prob <- 0.9
+    scale_dist <- TRUE
+    add_label <- TRUE
+  }
 
-    if(isTRUE(scale_dist) & (!is.numeric(prob) | prob < 0 | prob > 1)){
-      stop("`prob` must be a number between 0–1")
+  if(isTRUE(scale_dist) & (!is.numeric(prob) | prob < 0 | prob > 1)){
+    stop("`prob` must be a number between 0–1")
+  }
+
+  mod_summary <- summary.multiScaleR(x, prob = prob)
+  sig_ <- mod_summary$opt_scale
+  shp_ <- mod_summary$opt_shape
+  titles <- rownames(sig_)
+  dist_tab <- mod_summary$opt_dist
+
+  ## DEBUG
+  # browser()
+
+  # if(x$kernel_inputs$kernel == 'expow'){
+  #   shp_ <- summary(x)$opt_shape
+  # } else {
+  #   shp_ <- NULL
+  # }
+
+  df_list <- plot_list <- vector('list', sum(!is.nan(sig_$SE)))
+  s <- which(!is.nan(sig_$SE))
+  for(t in 1:length(s)){
+    i <- s[t]
+    d <- seq(1, round(max(sig_[i,])*1000,0),
+             length.out = round(max(sig_[i,])*1000,0))
+    wt <- scale_type(d = d,
+                     kernel = x$kernel_inputs$kernel,
+                     sigma = x$scale_est[[1]][i],
+                     shape = x$shape_est[[1]][i],
+                     output = 'wts')
+
+    mx <- Hmisc::wtd.Ecdf(d, weights = wt)
+    mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
+
+    d <- seq(1, mx, length.out = 100)
+    wt <- scale_type(d = d,
+                     kernel = x$kernel_inputs$kernel,
+                     sigma = x$scale_est[[1]][i],
+                     shape = x$shape_est[[1]][i],
+                     output = 'wts')
+
+    scale_d <- dist_tab[i,1]
+    scale_lci <- dist_tab[i,2]
+    scale_uci <- dist_tab[i,3]
+
+    df_list[[i]] <- data.frame(dist = d,
+                               wt = wt)
+    mx_y <- max(wt)
+
+    if(isTRUE(scale_dist)){
+      if(min(prob) >= 0.8){
+        ax <- max(d) * 0.08
+        ay <- 0.08*max(wt)
+      } else {
+        ax <- max(d) * 0.8
+        ay <- 0.9*max(wt)
+      }
     }
 
-    mod_summary <- summary.multiScaleR(x, prob = prob)
-    sig_ <- mod_summary$opt_scale
-    shp_ <- mod_summary$opt_shape
-    titles <- rownames(sig_)
-    dist_tab <- mod_summary$opt_dist
-
-    ## DEBUG
     # browser()
 
-    # if(x$kernel_inputs$kernel == 'expow'){
-    #   shp_ <- summary(x)$opt_shape
-    # } else {
-    #   shp_ <- NULL
-    # }
+    plot_ <- ggplot(data = df_list[[i]], aes(x = dist, y = wt)) +
+      {if(isTRUE(scale_dist))
+        geom_rect(xmin = scale_lci, xmax = scale_uci, ymin = -Inf, ymax = Inf,
+                  fill = 'lightgrey', alpha = 0.25)
 
-    df_list <- plot_list <- vector('list', nrow(sig_))
+      } +
+      {if(isTRUE(scale_dist))
+        geom_vline(xintercept = scale_d,
+                   linetype = 'dashed',
+                   color = 'red')
+      } +
+      {if(isTRUE(scale_dist) & isTRUE(add_label))
+        annotate('text', x = ax, y = ay,
+                 label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0),
+                                "\n  ", " 95% CI: ",round(scale_lci, 0), " - ", round(scale_uci, 0)))
+      } +
+      geom_line(linewidth = 1.25) +
+      ggtitle(titles[i]) +
+      xlab('Distance') +
+      ylab('Weight') +
+      cowplot::theme_cowplot()
 
-    for(i in 1:nrow(sig_)){
-      d <- seq(1, round(max(sig_)*1000,0),
-               length.out = round(max(sig_)*1000,0))
-      wt <- scale_type(d = d,
-                       kernel = x$kernel_inputs$kernel,
-                       sigma = x$scale_est[[1]][i],
-                       shape = x$shape_est[[1]][i],
-                       output = 'wts')
-
-      mx <- Hmisc::wtd.Ecdf(d, weights = wt)
-      mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
-
-      d <- seq(1, mx, length.out = 100)
-      wt <- scale_type(d = d,
-                       kernel = x$kernel_inputs$kernel,
-                       sigma = x$scale_est[[1]][i],
-                       shape = x$shape_est[[1]][i],
-                       output = 'wts')
-
-      scale_d <- dist_tab[i,1]
-      scale_lci <- dist_tab[i,2]
-      scale_uci <- dist_tab[i,3]
-
-      df_list[[i]] <- data.frame(dist = d,
-                                 wt = wt)
-      mx_y <- max(wt)
-
-      if(isTRUE(scale_dist)){
-        if(min(prob) >= 0.8){
-          ax <- max(d) * 0.08
-          ay <- 0.08*max(wt)
-        } else {
-          ax <- max(d) * 0.8
-          ay <- 0.9*max(wt)
-        }
-      }
-
-      # browser()
-
-      plot_ <- ggplot(data = df_list[[i]], aes(x = dist, y = wt)) +
-        {if(isTRUE(scale_dist))
-          geom_rect(xmin = scale_lci, xmax = scale_uci, ymin = -Inf, ymax = Inf,
-                    fill = 'lightgrey', alpha = 0.25)
-
-        } +
-        {if(isTRUE(scale_dist))
-          geom_vline(xintercept = scale_d,
-                     linetype = 'dashed',
-                     color = 'red')
-        } +
-        {if(isTRUE(scale_dist) & isTRUE(add_label))
-          annotate('text', x = ax, y = ay,
-                   label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0),
-                                  "\n  ", " 95% CI: ",round(scale_lci, 0), " - ", round(scale_uci, 0)))
-        } +
-        geom_line(linewidth = 1.25) +
-        ggtitle(titles[i]) +
-        xlab('Distance') +
-        ylab('Weight') +
-        cowplot::theme_cowplot()
-
-      plot_list[[i]] <- plot_
-    }
-    return(plot_list)
+    plot_list[[i]] <- plot_
+  }
+  return(plot_list)
 
   # } else if(length(param_list) >= 1){
   #   sig_ <- param_list$sigma

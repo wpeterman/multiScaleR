@@ -344,7 +344,7 @@ multiScale_optim <- function(fitted_mod,
     scale_D <- kernel_dist(out)
     if(dim(scale_D)[1] > 1){
       est_D <- scale_D[,1]
-      suggest_D <-  max(scale_D[,1] * 2)
+      suggest_D <-  max(scale_D[,1] * 2, na.rm = TRUE)
 
     } else {
       est_D <- scale_D[[1]]
