@@ -2,11 +2,14 @@
 #' @description Function to conduct multiscale optimization
 #' @param fitted_mod Model object of class glm, lm, gls, or unmarked
 #' @param kernel_inputs Object created from running \code{\link[multiScaleR]{kernel_prep}}
+#' @param join_by Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)
 #' @param method Optimizer to be used. Default: 'L-BFGS-B', which is the only optimization method supported by \code{\link[optimParallel]{optimParallel}}
 #' @param par Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
+#'
+#' There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
 #'
 #' @seealso \code{\link[kernel_dist]{kernel_dist}}
 #' @examples
@@ -84,6 +87,7 @@
 #' @usage
 #' multiScale_optim(fitted_mod,
 #'                  kernel_inputs,
+#'                  join_by = NULL,
 #'                  method ='L-BFGS-B',
 #'                  par = NULL,
 #'                  opt_parallel = FALSE,
@@ -97,6 +101,7 @@
 
 multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
+                             join_by = NULL,
                              method ='L-BFGS-B',
                              par = NULL,
                              opt_parallel = FALSE,
@@ -196,6 +201,7 @@ multiScale_optim <- function(fitted_mod,
                                                       method = method,
                                                       fitted_mod = fitted_mod,
                                                       kernel_inputs = kernel_inputs,
+                                                      join_by = join_by,
                                                       control = list(maxit = 1000),
                                                       parallel = list(forward = F,
                                                                       loginfo = T)), silent = T)
@@ -214,7 +220,8 @@ multiScale_optim <- function(fitted_mod,
                                  method = method,
                                  fitted_mod = fitted_mod,
                                  control = list(maxit = 1000),
-                                 kernel_inputs = kernel_inputs),
+                                 kernel_inputs = kernel_inputs,
+                                 join_by = join_by),
                            silent = T)
       }
 
@@ -251,7 +258,8 @@ multiScale_optim <- function(fitted_mod,
                                method = method,
                                fitted_mod = fitted_mod,
                                control = list(maxit = 1000),
-                               kernel_inputs = kernel_inputs),
+                               kernel_inputs = kernel_inputs,
+                               join_by = join_by),
                          silent = T)
 
       cnt <- cnt + 1
@@ -327,6 +335,7 @@ multiScale_optim <- function(fitted_mod,
     final_mod <- kernel_scale_fn(par = c(opt_results$par),
                                  kernel_inputs = kernel_inputs,
                                  fitted_mod = fitted_mod,
+                                 join_by = join_by,
                                  mod_return = TRUE)
 
     out <- list(scale_est = scale_est,
@@ -351,21 +360,24 @@ multiScale_optim <- function(fitted_mod,
       suggest_D <-  scale_D[[1]] * 2
 
     }
-    if(any((kernel_inputs$max_D / est_D) < 2)){
+
+    # browser()
+
+    if(any((kernel_inputs$max_D / est_D) < 2, na.rm = T)){
       out$warn_message <- c(out$warn_message, 1)
       cat(red("\n WARNING!!!\n",
               "The estimated scale of effect extends beyond the maximum distance specified.\n",
               "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(suggest_D) %+% " to ensure accurate estimation of scale.\n\n"))
     }
 
-    if(any((scale_est[,1] / scale_est[,2]) < 2)){
+    if(any((scale_est[,1] / scale_est[,2]) < 2, na.rm = T)){
       out$warn_message <- c(out$warn_message, 2)
       cat(red("\n WARNING!!!\n",
               "The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.\n",
               "Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.\n\n"))
     }
 
-    if(any((shape_est[,1] / shape_est[,2]) < 2)){
+    if(any((shape_est[,1] / shape_est[,2]) < 2, na.rm = T)){
       out$warn_message <- c(out$warn_message, 3)
       cat(red("\n WARNING!!!\n",
               "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",

@@ -199,7 +199,7 @@ kernel_prep <- function(pts,
     if(isTRUE(progress)){
       close(pb)
     }
-    min_D <- floor(rdist(r_ext[[1]][1:2,c("x","y")])[1,2])
+    min_D <- floor(fields::rdist(r_ext[[1]][1:2,c("x","y")])[1,2])
   } ## End ifelse for projected points
 
 
@@ -250,8 +250,10 @@ kernel_prep <- function(pts,
               min_D = min_D,
               max_D = max_D,
               n_covs = nlyr(raster_stack),
-              unit_conv = unit_conv)
+              unit_conv = unit_conv,
+              sigma = sigma)
 
   class(out) <- 'multiScaleR_data'
   return(out)
 }
+

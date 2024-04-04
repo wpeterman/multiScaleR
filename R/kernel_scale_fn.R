@@ -3,6 +3,7 @@
 #' @param par list of parameters
 #' @param kernel_inputs object created from `kernel_prep`
 #' @param fitted_mod fitted model object
+#' @param join_by Data frame to join unmarked frame during optimization
 #' @param mod_return Default: NULL
 #' @return Either estimated parameters or the fitted model using provided parameters
 #' @details For internal use
@@ -15,6 +16,7 @@
 kernel_scale_fn <- function(par,
                             kernel_inputs,
                             fitted_mod,
+                            join_by = NULL,
                             mod_return = NULL){
 
 
@@ -95,8 +97,17 @@ kernel_scale_fn <- function(par,
     umf <- mod@data
     scl_df <- scale(df)
     # scl_df <- (df)
-    umf@siteCovs[,covs] <- scl_df
-    mod_u <- update(mod, data = umf)
+    if(!is.null(join_by)){
+      drop_cols <- which(colnames(umf@siteCovs) %in% covs)
+      umf@siteCovs <- umf@siteCovs[,-drop_cols]
+      scl_df <- data.frame(scl_df, join_by)
+      umf@siteCovs <- merge(umf@siteCovs, scl_df, by = colnames(join_by))
+      mod_u <- update(mod, data = umf)
+    } else {
+      umf@siteCovs[,covs] <- scl_df
+      mod_u <- update(mod, data = umf)
+    }
+
   } else {
     scl_df <- scale(df)
     # scl_df <- (df)
@@ -110,16 +121,21 @@ kernel_scale_fn <- function(par,
     # }
     # browser()
 
-}
+  }
 
   # browser()
 
   if(is.null(mod_return)){
-    obj <- try(logLik(mod_u)[1] * -1)
+    if(mod_class == 'unmarked'){
+      obj <- try(mod_u@negLogLike)
+    }
+
+    if(class(obj) == 'try-error'){
+      obj <- try(logLik(mod_u)[1] * -1)
+    }
 
     if(class(obj) == 'try-error'){
       obj <- insight::get_loglikelihood(mod_u)[1] * -1
-
     }
 
   } else {
