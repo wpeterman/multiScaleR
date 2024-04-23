@@ -52,5 +52,5 @@ plot_kernel(prob = 0.95,
 plot_kernel(prob = 0.95,
             sigma = 100,
             shape = 2.5,
-            kernel = 'negexp')
+            kernel = 'expow')
 }

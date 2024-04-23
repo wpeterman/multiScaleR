@@ -1,3 +1,8 @@
+multiScaleR 0.2.0-6
+---------
+* Bug fixes
+* Added 'join_by' command when optimizing `unmarked` models with stacked data formats
+
 multiScaleR 0.2.0-3
 ---------
 * Updated error handling across core functions
