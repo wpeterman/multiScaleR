@@ -4,7 +4,13 @@
 \alias{kernel_scale_fn}
 \title{Kernel scaling function}
 \usage{
-kernel_scale_fn(par, kernel_inputs, fitted_mod, mod_return = NULL)
+kernel_scale_fn(
+  par,
+  kernel_inputs,
+  fitted_mod,
+  join_by = NULL,
+  mod_return = NULL
+)
 }
 \arguments{
 \item{par}{list of parameters}
@@ -12,6 +18,8 @@ kernel_scale_fn(par, kernel_inputs, fitted_mod, mod_return = NULL)
 \item{kernel_inputs}{object created from `kernel_prep`}
 
 \item{fitted_mod}{fitted model object}
+
+\item{join_by}{Data frame to join unmarked frame during optimization}
 
 \item{mod_return}{Default: NULL}
 }

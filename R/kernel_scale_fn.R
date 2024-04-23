@@ -126,6 +126,9 @@ kernel_scale_fn <- function(par,
   # browser()
 
   if(is.null(mod_return)){
+    obj <- data.frame()
+    class(obj) <- 'try-error'
+
     if(mod_class == 'unmarked'){
       obj <- try(mod_u@negLogLike)
     }

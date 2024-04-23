@@ -6,6 +6,7 @@
 \usage{
 multiScale_optim(fitted_mod,
                  kernel_inputs,
+                 join_by = NULL,
                  method ='L-BFGS-B',
                  par = NULL,
                  opt_parallel = FALSE,
@@ -15,6 +16,8 @@ multiScale_optim(fitted_mod,
 \item{fitted_mod}{Model object of class glm, lm, gls, or unmarked}
 
 \item{kernel_inputs}{Object created from running \code{\link[multiScaleR]{kernel_prep}}}
+
+\item{join_by}{Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)}
 
 \item{method}{Optimizer to be used. Default: 'L-BFGS-B', which is the only optimization method supported by \code{\link[optimParallel]{optimParallel}}}
 
@@ -30,6 +33,8 @@ Function to conduct multiscale optimization
 }
 \details{
 Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
+
+There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
 }
 \examples{
 ## NOT RUN
