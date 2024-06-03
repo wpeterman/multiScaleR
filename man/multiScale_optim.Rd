@@ -23,6 +23,8 @@ multiScale_optim(fitted_mod,
 
 \item{par}{Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL}
 
+\item{opt_parallel}{Logical. If TRUE, scale optimization will be conducted in parallel using the the number of cores specified by `n_cores`. (Default = FALSE)}
+
 \item{n_cores}{If attempting to optimize in parallel, the number of cores to use. Default: NULL}
 }
 \value{

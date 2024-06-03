@@ -71,6 +71,15 @@ sim_rast <- function(dim = 100,
     user_seed1 <- user_seed2 <- user_seed3 <- user_seed4 <- user_seed
   }
 
+  try(zz <- NLMR::nlm_gaussianfield(ncol = dim,
+                                    nrow = dim,
+                                    resolution = resolution,
+                                    autocorr_range = autocorr_range1,
+                                    mag_var = mag_var,
+                                    nug = nug,
+                                    user_seed = user_seed1),
+      silent = TRUE)
+
   bin1 <- NLMR::nlm_gaussianfield(ncol = dim,
                                   nrow = dim,
                                   resolution = resolution,
