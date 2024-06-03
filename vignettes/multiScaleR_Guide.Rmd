@@ -26,6 +26,8 @@ load("cache/vignette_data7.RData")
 load("cache/vignette_data8.RData")
 load("cache/vignette_data9.RData")
 load("cache/vignette_data10.RData")
+load("cache/vignette_data11.RData")
+load("cache/vignette_data12.RData")
 ```
 
 # Background
@@ -150,7 +152,7 @@ plot(st_geometry(pts), add = T, pch = 19)
 
 ## `kernel_prep`
 
-To begin an analysis, the `kernel_prep` function must be run with the `spatRaster` layers and spatial point data. In additionally, it is necessary to specify the maximum distance (in raster map units) that you want to consider in the analysis. The greater the distance considered, the more computationally intensive the analysis will be, so some consideration and discretion is needed. If the maximum distance appears to be too based on the optimization results, you will receive a warning.
+To begin an analysis, the `kernel_prep` function must be run with the `spatRaster` layers and spatial point data. Additionally, it is necessary to specify the maximum distance (in raster map units) that you want to consider in the analysis. The greater the distance considered, the more computationally intensive the analysis will be, so some consideration and discretion is needed. If the maximum distance appears to be constraining the optimization results, you will receive a warning.
 
 ```{r}
 kernel_inputs <- kernel_prep(pts = pts,
@@ -181,7 +183,7 @@ summary(mod0)
 
 ## `multiScale_optim`
 
-We are now ready to use the `multiScale_optim` function. Note: for purposes of this vignette, the function is not being run in parallel. Optimization will be much quicker when parallelized by specifying `n_cores`. The optimization below takes \~90 seconds to complete.
+We are now ready to use the `multiScale_optim` function. Note: for purposes of this vignette, the function is not being run in parallel. Optimization will be much quicker when parallelized by specifying `opt_parallel = TRUE` and number of cores to use with `n_cores`. The optimization below takes \~90 seconds to complete.
 
 ```{r opt1, eval=FALSE}
 opt1 <- multiScale_optim(fitted_mod = mod0,
@@ -354,6 +356,121 @@ bic_tab(mod_list2)
 Model selection tables clearly show that the inclusion of scaled landscape variables is important, however information criterion may not have the greatest resolution or power to differentiate among competing models. Analyses will likely require a critical, holistic assessment of information criterion, parameter effect sizes, and precision in scale of effect estimates (i.e. sigma).
 
 The challenge of identifying 'significant' scale relationships was also noted by Lowe et al., and the R package `scalescape` has a bootstrap function to determine the significance of parameters within the regression model. Such procedures are not currently implemented in `multiScaleR`.
+
+# Optimization with `unmarked`
+
+Among the model classes that `multiScaleR` can be used to optimize are those from `unmarked`. We will use the simulation functions from the package to create data for this analysis. First, we will simulate and visualize raster surfaces.
+
+```{r}
+rs <- sim_rast(user_seed = 321, dim = 250)
+plot(rs)
+```
+
+## Poisson Count Model
+
+We'll use the `bin1` and `cont2` surfaces for our data simulation. First, we'll simulate count data with a Poisson distribution. For the `unmarked` data simulation, we need to specify the count model intercept (`alpha`), and regression coefficients that describe the effect of the raster layers (`beta`), the scale of effect (`sigma`), number of survey points on the landscape (`n_points`), the number of replicate surveys conducted (`n_surv`), the detection probability (`det`; here, the probability of detecting an individual), and the maximum distance to consider in the analysis (`max_D`).
+
+```{r}
+rs <- terra::subset(rs, c(1,4))
+s_dat <- sim_dat_unmarked(alpha = 1,
+                          beta = c(0.75,-0.75),
+                          kernel = 'gaussian',
+                          sigma = c(75, 150),
+                          n_points = 75,
+                          n_surv = 5,
+                          det = 0.5,
+                          type = 'count',
+                          raster_stack = rs,
+                          max_D = 550,
+                          user_seed = 123)
+plot(s_dat$df$y ~ s_dat$df$bin1)
+plot(s_dat$df$y ~ s_dat$df$cont2)
+```
+
+We can see that we have simulated a positive effect of `bin1` on counts and negative effect of `cont2` on counts. We can now prepare data for `unmarked` and optimize scale of effect with `multiScaleR`.
+
+```{r}
+library(unmarked)
+kernel_inputs <- kernel_prep(pts = s_dat$pts,
+                             raster_stack = rs,
+                             max_D = 550,
+                             kernel = 'gaus')
+
+umf <- unmarkedFramePCount(y = s_dat$y,
+                           siteCovs = kernel_inputs$kernel_dat)
+
+## Base unmarked model
+mod0_umf.p <- pcount(~1 ~bin1 + cont2,
+                     data = umf, 
+                     K = 100)
+```
+
+```{r eval=FALSE}
+opt_umf.p <- multiScale_optim(fitted_mod = mod0_umf.p,
+                              kernel_inputs = kernel_inputs,
+                              opt_parallel = TRUE,
+                              n_cores = 8)
+```
+
+Compare optimized results with simulated values. Note that the detection reported by `unmarked` is on the logit scale, so must be backtransformed. Overall, both the scale parameters and the Poisson count model parameters were accurately recovered.
+
+```{r}
+summary(opt_umf.p)
+
+plogis(opt_umf.p$opt_mod@estimates@estimates$det@estimates[[1]])
+```
+
+## Binomial Occurrence Model
+
+Now we'll simulate occurrence data suitable for analysis with `unmarked`. Preliminary experience has shown that simulation parameters can be harder to recover when using an occupancy model in `unmarked` with `multiScaleR`. We'll use the same raster surfaces.
+
+```{r}
+s_dat.occ <- sim_dat_unmarked(alpha = 0.75,
+                              beta = c(-1.25,0.75),
+                              kernel = 'gaussian',
+                              sigma = c(75, 75),
+                              n_points = 100,
+                              n_surv = 5,
+                              det = 0.5,
+                              type = 'occ',
+                              raster_stack = rs,
+                              max_D = 650,
+                              user_seed = 999)
+
+plot(s_dat.occ$df$y ~ s_dat.occ$df$bin1)
+plot(s_dat.occ$df$y ~ s_dat.occ$df$cont2)
+```
+
+Prepare inputs for use with `multiScaleR`
+
+```{r}
+kernel_inputs <- kernel_prep(pts = s_dat.occ$pts,
+                             raster_stack = rs,
+                             max_D = 500,
+                             kernel = 'gaus')
+
+## Occupancy frame
+umf <- unmarkedFrameOccu(y = s_dat.occ$y,
+                         siteCovs = kernel_inputs$kernel_dat)
+
+## Base unmarked model
+(mod0_umf.occ <- occu(~1 ~bin1 + cont2,
+                      data = umf))
+```
+
+```{r eval=FALSE}
+opt_umf.occ <- multiScale_optim(fitted_mod = mod0_umf.occ,
+                                kernel_inputs = kernel_inputs,
+                                opt_parallel = T,
+                                n_cores = 8)
+```
+
+```{r}
+summary(opt_umf.occ)
+plogis(opt_umf.occ$opt_mod@estimates@estimates$det@estimates[[1]])
+```
+
+We did a decent job of recovering simulated values, but the scales of effect (`sigma`) are very uncertain. There is opportunity for further exploration of data needs / limitations for estimating scales of effect, especially related to more complex models such those fit with `unmarked`.
 
 # Other Functions & Features
 

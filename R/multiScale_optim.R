@@ -5,6 +5,7 @@
 #' @param join_by Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)
 #' @param method Optimizer to be used. Default: 'L-BFGS-B', which is the only optimization method supported by \code{\link[optimParallel]{optimParallel}}
 #' @param par Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL
+#' @param opt_parallel Logical. If TRUE, scale optimization will be conducted in parallel using the the number of cores specified by `n_cores`. (Default = FALSE)
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
