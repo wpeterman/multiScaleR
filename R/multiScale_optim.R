@@ -97,7 +97,7 @@
 #' @export
 #' @importFrom optimParallel optimParallel
 #' @importFrom stats optim
-#' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster
+#' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster
 #' @importFrom crayon %+% green red bold blue
 
 multiScale_optim <- function(fitted_mod,
@@ -188,7 +188,12 @@ multiScale_optim <- function(fitted_mod,
   while(class(opt_results) == 'try-error' & cnt < (length(par_starts))){
     if(is.numeric(n_cores) & isTRUE(opt_parallel)){
       ## Initiate parallel cluster
-      cl <- makeCluster(n_cores)     # set the number of processor cores
+      if(.Platform$OS.type == "unix"){
+        cl <- makeForkCluster(n_cores)
+      } else {
+        cl <- makeCluster(n_cores)     # set the number of processor cores
+
+      }
       setDefaultCluster(cl = cl)     # set'cl'as default cluster
       if(mod_class == 'unmarked'){
         clusterEvalQ(cl, library('unmarked'))

@@ -1,7 +1,7 @@
 # Raster simulation -------------------------------------------------------
 #' Function to simulate raster surfaces
 #' @description
-#' FUnction to create four spatRaster surfaces, simulated using the \code{\link[nlm_gaussianfield]{NLMR}} function from the `NLMR` package.
+#' Function to create four spatRaster surfaces, simulated using the \code{\link[nlm_gaussianfield]{NLMR}} function from the `NLMR` package.
 #'  description
 #' @param dim Dimension (number of cells) on a side a square raster (Default = 100)
 #' @param resolution Resolution of raster cells (Default = 10)
@@ -38,7 +38,7 @@
 #'
 #'
 #' @details
-#' Requires `NLMR` and `fields` packages to be installed. This is a simple wrapped to create four different raster surfaces. Surfaces differ in the range of autocorrelation. Binary surfaces are created by thresholding continuous values of the Gaussian random surface.
+#' Requires `NLMR` package to be installed (https://github.com/ropensci/NLMR). This is a simple wrapper to create four different raster surfaces. Surfaces differ in the range of autocorrelation. Binary surfaces are created by thresholding continuous values of the Gaussian random surface.
 #'
 #' @rdname sim_rast
 #' @importFrom terra as.int rast plot
