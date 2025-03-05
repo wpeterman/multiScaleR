@@ -37,7 +37,7 @@ sim_rast(dim = 100,
 Four spatRaster surfaces. Two 1/0 binary surfaces and two continuous surfaces.
 }
 \description{
-FUnction to create four spatRaster surfaces, simulated using the \code{\link[nlm_gaussianfield]{NLMR}} function from the `NLMR` package.
+Function to create four spatRaster surfaces, simulated using the \code{\link[nlm_gaussianfield]{NLMR}} function from the `NLMR` package.
  description
 }
 \details{
