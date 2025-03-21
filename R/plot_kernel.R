@@ -59,21 +59,21 @@ plot_kernel <- function(prob = 0.9,
   # d <- seq(1, 1e6, length.out = 1e6)
   d <- seq(1, round(max(sig_)*1000,0),
            length.out = round(max(sig_)*1000,0))
-  wt <- scale_type(d = d,
-                   kernel = kern,
-                   sigma = sig_,
-                   shape = shp_,
-                   output = 'wts')
+  wt <- scale_type_r(d = d,
+                     kernel = kern,
+                     sigma = sig_,
+                     shape = shp_,
+                     output = 'wts')
 
   mx <- Hmisc::wtd.Ecdf(d, weights = wt)
   mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
   d <- seq(1, mx, length.out = 100)
-  wt <- scale_type(d = d,
-                   kernel = kern,
-                   sigma = sig_,
-                   shape = shp_,
-                   output = 'wts')
+  wt <- scale_type_r(d = d,
+                     kernel = kern,
+                     sigma = sig_,
+                     shape = shp_,
+                     output = 'wts')
 
   scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
 

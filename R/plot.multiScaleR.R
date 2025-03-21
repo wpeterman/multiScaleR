@@ -79,21 +79,21 @@ plot.multiScaleR <- function(x,
     i <- s[t]
     d <- seq(1, round(max(sig_[i,])*1000,0),
              length.out = round(max(sig_[i,])*1000,0))
-    wt <- scale_type(d = d,
-                     kernel = x$kernel_inputs$kernel,
-                     sigma = x$scale_est[[1]][i],
-                     shape = x$shape_est[[1]][i],
-                     output = 'wts')
+    wt <- scale_type_r(d = d,
+                       kernel = x$kernel_inputs$kernel,
+                       sigma = x$scale_est[[1]][i],
+                       shape = x$shape_est[[1]][i],
+                       output = 'wts')
 
     mx <- Hmisc::wtd.Ecdf(d, weights = wt)
     mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
     d <- seq(1, mx, length.out = 100)
-    wt <- scale_type(d = d,
-                     kernel = x$kernel_inputs$kernel,
-                     sigma = x$scale_est[[1]][i],
-                     shape = x$shape_est[[1]][i],
-                     output = 'wts')
+    wt <- scale_type_r(d = d,
+                       kernel = x$kernel_inputs$kernel,
+                       sigma = x$scale_est[[1]][i],
+                       shape = x$shape_est[[1]][i],
+                       output = 'wts')
 
     scale_d <- dist_tab[i,1]
     scale_lci <- dist_tab[i,2]

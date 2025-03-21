@@ -2,6 +2,8 @@
 #' @description Function for internal use with optim
 #' @param par list of parameters
 #' @param kernel_inputs object created from `kernel_prep`
+#' @param d_list List of distance vectors
+#' @param cov_df List of data frames with values extracted from rasters
 #' @param fitted_mod fitted model object
 #' @param join_by Data frame to join unmarked frame during optimization
 #' @param mod_return Default: NULL
@@ -15,15 +17,16 @@
 
 kernel_scale_fn <- function(par,
                             kernel_inputs,
+                            d_list,
+                            cov_df,
                             fitted_mod,
                             join_by = NULL,
                             mod_return = NULL){
 
 
   # D <- kernel_inputs$D
-  d_list <- kernel_inputs$d_list
-
-  cov_df <- kernel_inputs$raw_cov
+  # d_list <- kernel_inputs$d_list
+  # cov_df <- kernel_inputs$raw_cov
   kernel <- kernel_inputs$kernel
   n_ind <- length(d_list)
   mod <- fitted_mod

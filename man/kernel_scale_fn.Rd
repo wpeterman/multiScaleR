@@ -7,6 +7,8 @@
 kernel_scale_fn(
   par,
   kernel_inputs,
+  d_list,
+  cov_df,
   fitted_mod,
   join_by = NULL,
   mod_return = NULL
@@ -16,6 +18,10 @@ kernel_scale_fn(
 \item{par}{list of parameters}
 
 \item{kernel_inputs}{object created from `kernel_prep`}
+
+\item{d_list}{List of distance vectors}
+
+\item{cov_df}{List of data frames with values extracted from rasters}
 
 \item{fitted_mod}{fitted model object}
 

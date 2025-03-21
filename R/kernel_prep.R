@@ -228,7 +228,7 @@ kernel_prep <- function(pts,
                              sigma = sigma,
                              shape = shape,
                              # r_stack.df = r_ext[r_ext$id == i,],
-                             r_stack.df = r_ext[[i]][,1:nlyr(raster_stack)])
+                             r_stack.df = as.matrix(r_ext[[i]][,1:nlyr(raster_stack)]))
 
 
   }

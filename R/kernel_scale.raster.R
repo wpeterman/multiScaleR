@@ -68,11 +68,11 @@ kernel_scale.raster <- function(raster_stack,
     lyr <- covs[i]
     d <- seq(1, 1e6,
              length.out = 1e6)
-    wt <- scale_type(d = d,
-                     kernel = kernel,
-                     sigma = sigma[i],
-                     shape = shape[i],
-                     output = 'wts')
+    wt <- scale_type_r(d = d,
+                       kernel = kernel,
+                       sigma = sigma[i],
+                       shape = shape[i],
+                       output = 'wts')
 
     mx <- Hmisc::wtd.Ecdf(d, weights = wt)
     mx <- round(mx$x[which(mx$ecdf > pct_wt)[1]], digits = -1)
@@ -91,11 +91,11 @@ kernel_scale.raster <- function(raster_stack,
     cntr_crd <- xyFromCell(r_wt, ceiling(length(mat)/2))
     cell_crds <- crds(r_wt)
     r_wt[] <- rdist(cntr_crd, cell_crds)[1,] * r_res
-    r_wt[] <- scale_type(d = as.vector(r_wt),
-                         kernel = kernel,
-                         sigma = sigma[i],
-                         shape = shape[i],
-                         output = 'wts')
+    r_wt[] <- scale_type_r(d = as.vector(r_wt),
+                           kernel = kernel,
+                           sigma = sigma[i],
+                           shape = shape[i],
+                           output = 'wts')
 
 
     wt_mat <- as.matrix(r_wt, wide = T)
