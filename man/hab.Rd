@@ -10,7 +10,7 @@
 hab <- terra::rast(system.file("data/hab.tif", package = 'multiScaleR'))
 A binary SpatRaster object
 \describe{
-  \item{hab}{A binary raster}
+  \item{hab}{ --> A binary raster}
   ...
 }
 }

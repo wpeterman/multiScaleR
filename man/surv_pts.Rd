@@ -10,7 +10,7 @@
 data(surv_pts)
 An sf class point object:
 \describe{
-  \item{pts}{100 spatial point locations}
+  \item{pts}{ --> 100 spatial point locations}
   ...
 }
 }
