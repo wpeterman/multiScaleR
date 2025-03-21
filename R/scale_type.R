@@ -21,28 +21,47 @@ scale_type <- function(d,
                        output = NULL) {
   kernel <- match.arg(kernel)
 
-  if(kernel == 'exp'){
-    d1 <- data.frame(exp(-outer(d, sigma, "/")))
-    w0 <- mapply("*",d1, (1/(2*pi*sigma^2)))
-
-  } else if(kernel == 'fixed'){
-    w0 <- outer(d, sigma, "<") * 1 ## Fixed
-
-  } else if(kernel == 'gaussian'){
-    d1 <- data.frame(exp(-outer(d^2, (2*sigma^2), FUN = "/")))
-    w0 <- mapply("*", d1, (1/(pi*sigma^2)))
-
-    # browser()
+  if(!is.null(r_stack.df)){
+    out <- scale_type_cpp(d = d,
+                          kernel = kernel,
+                          sigma = sigma,
+                          shape = shape,
+                          r_stack_df = as.matrix(r_stack.df),
+                          output = output)
   } else {
-    d1 <- data.frame(exp(-(outer(d,shape,"^") / (sigma^shape))))
-    w0 <- mapply("*", d1, (shape/((2*pi*sigma^2)*gamma(2/shape))))
-
+    out <- scale_type_cpp(d = d,
+                          kernel = kernel,
+                          sigma = sigma,
+                          shape = shape,
+                          r_stack_df = r_stack.df,
+                          output = output)
   }
-  w <- apply(w0, 2, function(x) x/sum(x))
 
-  if(!is.null(output)){
-    return(w)
-  } else {
-    colSums(r_stack.df * w)  ## exact_extract solution
-  }
+
+  return(out)
+
+  # if(kernel == 'exp'){
+  #   d1 <- data.frame(exp(-outer(d, sigma, "/")))
+  #   w0 <- mapply("*",d1, (1/(2*pi*sigma^2)))
+  #
+  # } else if(kernel == 'fixed'){
+  #   w0 <- outer(d, sigma, "<") * 1 ## Fixed
+  #
+  # } else if(kernel == 'gaussian'){
+  #   d1 <- data.frame(exp(-outer(d^2, (2*sigma^2), FUN = "/")))
+  #   w0 <- mapply("*", d1, (1/(pi*sigma^2)))
+  #
+  #   # browser()
+  # } else {
+  #   d1 <- data.frame(exp(-(outer(d,shape,"^") / (sigma^shape))))
+  #   w0 <- mapply("*", d1, (shape/((2*pi*sigma^2)*gamma(2/shape))))
+  #
+  # }
+  # w <- apply(w0, 2, function(x) x/sum(x))
+  #
+  # if(!is.null(output)){
+  #   return(w)
+  # } else {
+  #   colSums(r_stack.df * w)  ## exact_extract solution
+  # }
 }

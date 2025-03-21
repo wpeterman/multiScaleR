@@ -11,6 +11,9 @@
 #' @rdname ci_func
 #' @keywords internal
 #'
+#' @useDynLib multiScaleR, .registration=TRUE
+#' @importFrom Rcpp evalCpp
+
 ci_func <- function(x,
                     df,
                     min_D = NULL,
@@ -18,27 +21,37 @@ ci_func <- function(x,
                     as_dist = FALSE,
                     ...){
 
-  out <- vector('list', nrow(x))
-  for(i in 1:nrow(x)){
-    if(is.nan(x[i,2]) | (x[i,2] == 'Inf')){
-      ci <- quantile(rnorm(10000, 10, 0.1), c(0.025, 0.975))
-      ci[ci > 0] <- NaN
-      out[[i]] <- ci
-    } else {
-      ci <- c("2.5%" = x[i,1] - qt(0.975, df = df) * x[i,2],
-              "97.5%" = x[i,1] + qt(0.975, df = df) * x[i,2])
-      # ci <- quantile(rnorm(10000, x[i,1], x[i,2]), c(0.025, 0.975)) ## Original
-      if(!is.null(min_D)){
-        ci[ci < min_D] <- min_D
-        out[[i]] <- ci
-      } else {
-        # ci[ci < 0] <- 0
-        out[[i]] <- ci
-      }
-    }
-  }
+  out <- ci_func_cpp(x = as.matrix(x),
+                     df = df,
+                     min_D = min_D,
+                     names = names)
 
-  out_df <- cbind(x, do.call(rbind, out))
-  rownames(out_df) <- names
-  return(out_df)
+  out <- as.data.frame(out)
+  rownames(out) <- names
+  colnames(out) <- c('Mean', 'SE', '2.5%', '97.5%')
+  return(out)
+
+  # out <- vector('list', nrow(x))
+  # for(i in 1:nrow(x)){
+  #   if(is.nan(x[i,2]) | (x[i,2] == 'Inf')){
+  #     ci <- quantile(rnorm(10000, 10, 0.1), c(0.025, 0.975))
+  #     ci[ci > 0] <- NaN
+  #     out[[i]] <- ci
+  #   } else {
+  #     ci <- c("2.5%" = x[i,1] - qt(0.975, df = df) * x[i,2],
+  #             "97.5%" = x[i,1] + qt(0.975, df = df) * x[i,2])
+  #     # ci <- quantile(rnorm(10000, x[i,1], x[i,2]), c(0.025, 0.975)) ## Original
+  #     if(!is.null(min_D)){
+  #       ci[ci < min_D] <- min_D
+  #       out[[i]] <- ci
+  #     } else {
+  #       # ci[ci < 0] <- 0
+  #       out[[i]] <- ci
+  #     }
+  #   }
+  # }
+  #
+  # out_df <- cbind(x, do.call(rbind, out))
+  # rownames(out_df) <- names
+  # return(out_df)
 }

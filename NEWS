@@ -1,3 +1,7 @@
+multiScaleR 0.3.0-1
+---------
+* Updated kernel density functions to c++ for speed
+
 multiScaleR 0.2.0-8
 ---------
 * Updated parallelization to use forking when operating on a Unix OS

@@ -62,24 +62,24 @@ kernel_dist <- function(model,
 
       for(i in 1:nrow(ci_)){
         if(!is.nan(ci_[i,2])){
-          wt_mn <- scale_type(d = d,
-                              kernel = model$kernel_inputs$kernel,
-                              sigma = ci_[i, 1],
-                              shape = model$shape_est[i,1],
-                              output = 'wts')
+          wt_mn <- scale_type_r(d = d,
+                                kernel = model$kernel_inputs$kernel,
+                                sigma = ci_[i, 1],
+                                shape = model$shape_est[i,1],
+                                output = 'wts')
 
 
-          wt_l <- scale_type(d = d,
-                             kernel = model$kernel_inputs$kernel,
-                             sigma = ci_[i,3],
-                             shape = model$shape_est[i,1],
-                             output = 'wts')
+          wt_l <- scale_type_r(d = d,
+                               kernel = model$kernel_inputs$kernel,
+                               sigma = ci_[i,3],
+                               shape = model$shape_est[i,1],
+                               output = 'wts')
 
-          wt_u <- scale_type(d = d,
-                             kernel = model$kernel_inputs$kernel,
-                             sigma = ci_[i,4],
-                             shape = model$shape_est[i,1],
-                             output = 'wts')
+          wt_u <- scale_type_r(d = d,
+                               kernel = model$kernel_inputs$kernel,
+                               sigma = ci_[i,4],
+                               shape = model$shape_est[i,1],
+                               output = 'wts')
 
           scale_mn <- Hmisc::wtd.Ecdf(d, weights = wt_mn)
           scale_mn <- round(scale_mn$x[which(scale_mn$ecdf > prob)[1]], digits = 2)
@@ -121,7 +121,7 @@ kernel_dist <- function(model,
     }
 
     d <- seq(1, round(sig_*1000,0), length.out = round(sig_*1000,0))
-    wt <- scale_type(d = d,
+    wt <- scale_type_r(d = d,
                      kernel = kern,
                      sigma = sig_,
                      shape = shp_,
@@ -131,7 +131,7 @@ kernel_dist <- function(model,
     mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
     d <- seq(1, mx, length.out = 100)
-    wt <- scale_type(d = d,
+    wt <- scale_type_r(d = d,
                      kernel = kern,
                      sigma = sig_,
                      shape = shp_,
