@@ -1,9 +1,9 @@
 #' @title Kernel scaling function
 #' @description Function for internal use with optim
 #' @param par list of parameters
-#' @param kernel_inputs object created from `kernel_prep`
 #' @param d_list List of distance vectors
 #' @param cov_df List of data frames with values extracted from rasters
+#' @param kernel Kernel used
 #' @param fitted_mod fitted model object
 #' @param join_by Data frame to join unmarked frame during optimization
 #' @param mod_return Default: NULL
@@ -14,11 +14,12 @@
 #' @importFrom insight get_data get_loglikelihood
 #' @importFrom stats formula logLik
 #' @importFrom unmarked logLik update
-
+#' @useDynLib multiScaleR, .registration=TRUE
+#' @importFrom Rcpp evalCpp
 kernel_scale_fn <- function(par,
-                            kernel_inputs,
                             d_list,
                             cov_df,
+                            kernel,
                             fitted_mod,
                             join_by = NULL,
                             mod_return = NULL){
@@ -27,7 +28,7 @@ kernel_scale_fn <- function(par,
   # D <- kernel_inputs$D
   # d_list <- kernel_inputs$d_list
   # cov_df <- kernel_inputs$raw_cov
-  kernel <- kernel_inputs$kernel
+  # kernel <- kernel_inputs$kernel
   n_ind <- length(d_list)
   mod <- fitted_mod
 
@@ -39,13 +40,13 @@ kernel_scale_fn <- function(par,
     dat <- insight::get_data(mod)
     # dat <- nlme::getData(mod)
     # covs <- all.vars(formula(mod)[-2])
-    covs <- covs[which(covs %in% colnames(kernel_inputs$raw_cov[[1]]))]
+    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   } else if(any(grepl("^unmarked", class(mod)))) {
     mod_class <- 'unmarked'
     dat <- mod@data@siteCovs
     covs <- all.vars(mod@formula)
-    covs <- covs[which(covs %in% colnames(kernel_inputs$raw_cov[[1]]))]
+    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   } else if(any(class(mod) == 'glm')) {
     mod_class <- 'glm'
@@ -54,13 +55,13 @@ kernel_scale_fn <- function(par,
     dat0 <- insight::get_data(mod)
     # dat <- fitted_mod$data
     # covs <- all.vars(formula(mod)[-2])
-    covs <- covs[which(covs %in% colnames(kernel_inputs$raw_cov[[1]]))]
+    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   } else {
     mod_class <- 'other'
     covs <- insight::find_predictors(mod)$conditional
     dat <- insight::get_data(mod)
-    covs <- covs[which(covs %in% colnames(kernel_inputs$raw_cov[[1]]))]
+    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   }
 

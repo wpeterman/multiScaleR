@@ -22,19 +22,25 @@ scale_type <- function(d,
   kernel <- match.arg(kernel)
 
   if(!is.null(r_stack.df)){
-    out <- scale_type_cpp(d = d,
-                          kernel = kernel,
-                          sigma = sigma,
-                          shape = shape,
-                          r_stack_df = as.matrix(r_stack.df),
-                          output = output)
+    # out <- scale_type_cpp(d = d,
+    #                       kernel = kernel,
+    #                       sigma = sigma,
+    #                       shape = shape,
+    #                       r_stack_df = as.matrix(r_stack.df),
+    #                       output = output)
+    out <- scale_type_sparse(d = d,
+                             kernel = kernel,
+                             sigma = sigma,
+                             shape = shape,
+                             r_stack_df = r_stack.df,
+                             output = output)
   } else {
-    out <- scale_type_cpp(d = d,
-                          kernel = kernel,
-                          sigma = sigma,
-                          shape = shape,
-                          r_stack_df = r_stack.df,
-                          output = output)
+    out <- scale_type_sparse(d = d,
+                             kernel = kernel,
+                             sigma = sigma,
+                             shape = shape,
+                             r_stack_df = r_stack.df,
+                             output = output)
   }
 
 
