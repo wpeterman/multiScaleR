@@ -33,6 +33,7 @@
 #' @importFrom dplyr bind_rows
 #' @importFrom fields rdist rdist.earth
 #' @importFrom utils setTxtProgressBar txtProgressBar
+#' @importFrom Matrix as.matrix
 
 kernel_prep <- function(pts,
                         raster_stack,
@@ -88,6 +89,11 @@ kernel_prep <- function(pts,
                                           buff_poly,
                                           include_cell = T,
                                           include_xy = T)
+
+
+    # Convert to list of sparse matrices
+    sparse_list <- lapply(r_ext, df_to_sparse)
+
     names(r_ext) <- 1:length(r_ext)
 
     r_ext_ <- bind_rows(r_ext, .id = "id")
@@ -157,6 +163,11 @@ kernel_prep <- function(pts,
                                           include_xy = T,
                                           progress = progress)
 
+    # Convert to list of sparse matrices
+    sparse_list <- lapply(r_ext, df_to_sparse)
+
+
+
     if(nlyr(raster_stack) == 1){
       re_name <- function(x){
         c_names <- colnames(x)
@@ -166,6 +177,7 @@ kernel_prep <- function(pts,
       }
 
       r_ext <- lapply(r_ext, re_name)
+      sparse_list <- lapply(sparse_list, re_name)
     }
 
     # r_ext <- bind_rows(r_ext, .id = 'id')
@@ -176,13 +188,13 @@ kernel_prep <- function(pts,
 
     if(isTRUE(progress)){
 
-    cat(paste0("\nCalculating distances...\n"))
+      cat(paste0("\nCalculating distances...\n"))
 
-    pb = txtProgressBar(min = 0,
-                        max = dim(pts)[1],
-                        initial = 0,
-                        char = "*",
-                        style = 3)
+      pb = txtProgressBar(min = 0,
+                          max = dim(pts)[1],
+                          initial = 0,
+                          char = "*",
+                          style = 3)
 
     }
 
@@ -208,14 +220,14 @@ kernel_prep <- function(pts,
   sigma <- sigma / unit_conv
 
   if(isTRUE(progress)){
-  cat(paste0("\nCalculating weights...\n"))
+    cat(paste0("\nCalculating weights...\n"))
 
 
-  pb = txtProgressBar(min = 0,
-                      max = dim(pts)[1],
-                      initial = 0,
-                      char = "*",
-                      style = 3)
+    pb = txtProgressBar(min = 0,
+                        max = dim(pts)[1],
+                        initial = 0,
+                        char = "*",
+                        style = 3)
   }
   # system.time(
   for(i in 1:dim(pts)[1]){
@@ -228,7 +240,7 @@ kernel_prep <- function(pts,
                              sigma = sigma,
                              shape = shape,
                              # r_stack.df = r_ext[r_ext$id == i,],
-                             r_stack.df = as.matrix(r_ext[[i]][,1:nlyr(raster_stack)]))
+                             r_stack.df = sparse_list[[i]][,1:nlyr(raster_stack)])
 
 
   }
@@ -244,7 +256,7 @@ kernel_prep <- function(pts,
 
   out <- list(kernel_dat = as.data.frame(scale(df)),
               d_list = D,
-              raw_cov = r_ext,
+              raw_cov = sparse_list,
               kernel = kernel,
               shape = shape,
               min_D = min_D,
@@ -257,3 +269,8 @@ kernel_prep <- function(pts,
   return(out)
 }
 
+# Function to convert a data frame to a sparse matrix
+df_to_sparse <- function(df) {
+  df <- df[, seq_len(ncol(df) - 3), drop = FALSE]  # Drop last three columns
+  as(as.matrix(df), "sparseMatrix")
+}

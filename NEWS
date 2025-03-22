@@ -1,3 +1,7 @@
+multiScaleR 0.3.0-2
+---------
+* Uses sparse matrices for reduced memory demands
+
 multiScaleR 0.3.0-1
 ---------
 * Updated kernel density functions to c++ for speed

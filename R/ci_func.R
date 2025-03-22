@@ -11,9 +11,6 @@
 #' @rdname ci_func
 #' @keywords internal
 #'
-#' @useDynLib multiScaleR, .registration=TRUE
-#' @importFrom Rcpp evalCpp
-
 ci_func <- function(x,
                     df,
                     min_D = NULL,

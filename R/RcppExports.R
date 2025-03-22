@@ -9,3 +9,7 @@ scale_type_cpp <- function(d, kernel = "gaussian", sigma_ = NULL, shape_ = NULL,
     .Call(`_multiScaleR_scale_type_cpp`, d, kernel, sigma_, shape_, r_stack_df, output)
 }
 
+scale_type_sparse <- function(d, kernel = "gaussian", sigma_ = NULL, shape_ = NULL, r_stack_df = NULL, output = NULL) {
+    .Call(`_multiScaleR_scale_type_sparse`, d, kernel, sigma_, shape_, r_stack_df, output)
+}
+
