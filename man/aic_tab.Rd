@@ -65,22 +65,16 @@ mod3 <- glm(y ~ r1 + r2,
 
 opt_mod1 <- multiScale_optim(fitted_mod = mod1,
                              kernel_inputs = kernel_inputs,
-                             method ='L-BFGS-B',
                              par = NULL,
-                             opt_parallel = FALSE,
                              n_cores = NULL)
 
 opt_mod2 <- multiScale_optim(fitted_mod = mod2,
                              kernel_inputs = kernel_inputs,
-                             method ='L-BFGS-B',
                              par = NULL,
-                             opt_parallel = FALSE,
                              n_cores = NULL)
 opt_mod3 <- multiScale_optim(fitted_mod = mod3,
                              kernel_inputs = kernel_inputs,
-                             method ='L-BFGS-B',
                              par = NULL,
-                             opt_parallel = FALSE,
                              n_cores = NULL)
 
  ## AIC table

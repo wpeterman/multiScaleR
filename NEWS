@@ -1,3 +1,8 @@
+multiScaleR 0.3.0-3
+---------
+* Updated variable checks of `multiScale_optim`
+* Removed use of `method` and `opt_parallel` variables. Method is always 'L-BFGS-B` and if cores > 1 is specified, parallelization is implicit.
+
 multiScaleR 0.3.0-2
 ---------
 * Uses sparse matrices for reduced memory demands
