@@ -183,7 +183,7 @@ summary(mod0)
 
 ## `multiScale_optim`
 
-We are now ready to use the `multiScale_optim` function. Note: for purposes of this vignette, the function is not being run in parallel. Optimization will be much quicker when parallelized by specifying `opt_parallel = TRUE` and number of cores to use with `n_cores`. The optimization below takes \~50 seconds to complete.
+We are now ready to use the `multiScale_optim` function. Note: for purposes of this vignette, the function is not being run in parallel. Optimization will be much quicker when parallelized by specifying the number of cores to use with `n_cores`. The optimization below takes \~50 seconds to complete.
 
 ```{r opt1, eval=FALSE}
 opt1 <- multiScale_optim(fitted_mod = mod0,
@@ -408,7 +408,6 @@ mod0_umf.p <- pcount(~1 ~bin1 + cont2,
 ```{r eval=FALSE}
 opt_umf.p <- multiScale_optim(fitted_mod = mod0_umf.p,
                               kernel_inputs = kernel_inputs,
-                              opt_parallel = TRUE,
                               n_cores = 8)
 ```
 
@@ -461,7 +460,6 @@ umf <- unmarkedFrameOccu(y = s_dat.occ$y,
 ```{r eval=FALSE}
 opt_umf.occ <- multiScale_optim(fitted_mod = mod0_umf.occ,
                                 kernel_inputs = kernel_inputs,
-                                opt_parallel = T,
                                 n_cores = 8)
 ```
 

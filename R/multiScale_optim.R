@@ -3,9 +3,7 @@
 #' @param fitted_mod Model object of class glm, lm, gls, or unmarked
 #' @param kernel_inputs Object created from running \code{\link[multiScaleR]{kernel_prep}}
 #' @param join_by Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)
-#' @param method Optimizer to be used. Default: 'L-BFGS-B', which is the only optimization method supported by \code{\link[optimParallel]{optimParallel}}
 #' @param par Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL
-#' @param opt_parallel Logical. If TRUE, scale optimization will be conducted in parallel using the the number of cores specified by `n_cores`. (Default = FALSE)
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
@@ -44,9 +42,7 @@
 #'
 #' opt_mod <- multiScale_optim(fitted_mod = mod1,
 #'                             kernel_inputs = kernel_inputs,
-#'                             method ='L-BFGS-B',
 #'                             par = NULL,
-#'                             opt_parallel = FALSE,
 #'                             n_cores = NULL)
 #'
 #' ## Using package data
@@ -65,8 +61,7 @@
 #'
 #' ## Optimize scale
 #' opt <- multiScale_optim(fitted_mod = mod,
-#'                         kernel_inputs = kernel_inputs,
-#'                         opt_parallel = FALSE)
+#'                         kernel_inputs = kernel_inputs)
 #'
 #' ## Summary of fitted model
 #' summary(opt)
@@ -89,9 +84,7 @@
 #' multiScale_optim(fitted_mod,
 #'                  kernel_inputs,
 #'                  join_by = NULL,
-#'                  method ='L-BFGS-B',
 #'                  par = NULL,
-#'                  opt_parallel = FALSE,
 #'                  n_cores = NULL)
 #' @rdname multiScale_optim
 #' @export
@@ -103,12 +96,62 @@
 multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
                              join_by = NULL,
-                             method ='L-BFGS-B',
                              par = NULL,
-                             opt_parallel = FALSE,
                              n_cores = NULL){
 
-  ## Need to add line to selectively identify the formula variables that are spatial raster layers
+  # Check fitted_mod class
+  # if (!inherits(fitted_mod, c("glm", "lm", "gls", "unmarked"))) {
+  #   stop("fitted_mod must be of class 'glm', 'lm', 'gls', or 'unmarked'.")
+  # }
+
+  # Check kernel_inputs structure
+  if (!is.list(kernel_inputs) || !all(c("raw_cov", "min_D", "max_D", "unit_conv", "kernel", "d_list") %in% names(kernel_inputs))) {
+    stop("kernel_inputs must be a list with required elements: 'raw_cov', 'min_D', 'max_D', 'unit_conv', 'kernel', and 'd_list'.")
+  }
+
+  # Check join_by if provided
+  if (!is.null(join_by) && !is.data.frame(join_by)) {
+    stop("join_by must be a data frame if provided.")
+  }
+
+  # Check par values if provided
+  if (!is.null(par) && !is.numeric(par)) {
+    stop("par must be numeric if provided.")
+  }
+
+  # Check n_cores
+  if (!is.null(n_cores) && (!is.numeric(n_cores) || n_cores < 1)) {
+    stop("n_cores must be a positive integer if provided.")
+  }
+
+  # Extract variables from fitted model
+  if (any(class(fitted_mod) == 'gls')) {
+    mod_vars <- insight::find_predictors(fitted_mod)[[1]]
+  } else if (any(grepl("^unmarked", class(fitted_mod)))) {
+    mod_vars <- all.vars(formula(fitted_mod@formula))
+  } else {
+    mod_vars <- insight::find_predictors(fitted_mod)[[1]]
+  }
+
+  # Ensure model variables are in kernel_inputs
+  r_vars <- mod_vars[mod_vars %in% colnames(kernel_inputs$raw_cov[[1]])]
+  if (length(r_vars) == 0) {
+    stop("The raster surfaces provided do not match the variables used in your fitted model. Ensure names of surfaces match model variable names.")
+  }
+
+  n_covs <- length(r_vars)
+
+  # Validate par length
+  if (!is.null(par)) {
+    expected_length <- if (kernel_inputs$kernel == 'expow') n_covs * 2 else n_covs
+    if (length(par) != expected_length) {
+      stop("The length of par does not match the expected number of covariates.")
+    }
+  }
+
+  # Determine if parallel optimization should be used
+  use_parallel <- !is.null(n_cores) && n_cores > 1
+
 
   if(any(class(fitted_mod) == 'gls')){
     mod_class <- 'gls'
@@ -186,7 +229,7 @@ multiScale_optim <- function(fitted_mod,
   # browser()
 
   while(class(opt_results) == 'try-error' & cnt < (length(par_starts))){
-    if(is.numeric(n_cores) & isTRUE(opt_parallel)){
+    if(use_parallel){
       ## Initiate parallel cluster
       if(.Platform$OS.type == "unix"){
         cl <- makeForkCluster(n_cores)
@@ -204,7 +247,6 @@ multiScale_optim <- function(fitted_mod,
                                                       hessian = TRUE,
                                                       lower = lwr,
                                                       upper = uppr,
-                                                      method = method,
                                                       fitted_mod = fitted_mod,
                                                       d_list = kernel_inputs$d_list,
                                                       cov_df = kernel_inputs$raw_cov,
@@ -213,6 +255,7 @@ multiScale_optim <- function(fitted_mod,
                                                       control = list(maxit = 1000),
                                                       parallel = list(forward = F,
                                                                       loginfo = T)), silent = T)
+
       ## Stop parallel cluster
       setDefaultCluster(cl = NULL)
       on.exit(stopCluster(cl))
@@ -225,7 +268,6 @@ multiScale_optim <- function(fitted_mod,
                                  hessian = TRUE,
                                  lower = lwr,
                                  upper = uppr,
-                                 method = method,
                                  fitted_mod = fitted_mod,
                                  d_list = kernel_inputs$d_list,
                                  cov_df = kernel_inputs$raw_cov,
@@ -249,14 +291,11 @@ multiScale_optim <- function(fitted_mod,
 
         if(kernel_inputs$kernel != 'expow'){
           par <- rep(par_starts[cnt], n_covs)
-          # par <- exp(rep(par_starts[cnt], n_covs))
         }
 
         if(kernel_inputs$kernel == 'expow'){
           par <- rep(par_starts[cnt], n_covs)
           par <- c(par, rep(2, n_covs))
-          # par <- exp(rep(par_starts[cnt], n_covs))
-          # par <- c(par, sqrt(rep(2, n_covs)))
         }
       }
     } else {
@@ -265,7 +304,6 @@ multiScale_optim <- function(fitted_mod,
                                hessian = TRUE,
                                lower = lwr,
                                upper = uppr,
-                               method = method,
                                fitted_mod = fitted_mod,
                                d_list = kernel_inputs$d_list,
                                cov_df = kernel_inputs$raw_cov,
@@ -288,14 +326,11 @@ multiScale_optim <- function(fitted_mod,
 
         if(kernel_inputs$kernel != 'expow'){
           par <- rep(par_starts[cnt], n_covs)
-          # par <- exp(rep(par_starts[cnt], n_covs))
         }
 
         if(kernel_inputs$kernel == 'expow'){
           par <- rep(par_starts[cnt], n_covs)
           par <- c(par, rep(2, n_covs))
-          # par <- exp(rep(par_starts[cnt], n_covs))
-          # par <- c(par, sqrt(rep(2, n_covs)))
         }
       }
     } # End if else

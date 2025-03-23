@@ -7,9 +7,7 @@
 multiScale_optim(fitted_mod,
                  kernel_inputs,
                  join_by = NULL,
-                 method ='L-BFGS-B',
                  par = NULL,
-                 opt_parallel = FALSE,
                  n_cores = NULL)
 }
 \arguments{
@@ -19,11 +17,7 @@ multiScale_optim(fitted_mod,
 
 \item{join_by}{Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)}
 
-\item{method}{Optimizer to be used. Default: 'L-BFGS-B', which is the only optimization method supported by \code{\link[optimParallel]{optimParallel}}}
-
 \item{par}{Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL}
-
-\item{opt_parallel}{Logical. If TRUE, scale optimization will be conducted in parallel using the the number of cores specified by `n_cores`. (Default = FALSE)}
 
 \item{n_cores}{If attempting to optimize in parallel, the number of cores to use. Default: NULL}
 }
@@ -69,9 +63,7 @@ mod1 <- glm(y ~ r1 + r2,
 
 opt_mod <- multiScale_optim(fitted_mod = mod1,
                             kernel_inputs = kernel_inputs,
-                            method ='L-BFGS-B',
                             par = NULL,
-                            opt_parallel = FALSE,
                             n_cores = NULL)
 
 ## Using package data
@@ -90,8 +82,7 @@ mod <- glm(y ~ hab,
 
 ## Optimize scale
 opt <- multiScale_optim(fitted_mod = mod,
-                        kernel_inputs = kernel_inputs,
-                        opt_parallel = FALSE)
+                        kernel_inputs = kernel_inputs)
 
 ## Summary of fitted model
 summary(opt)
