@@ -5,8 +5,11 @@
 #' @param join_by Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)
 #' @param par Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
+#' @param PSOCK Logical. If attempting to optimize in parallel on a Windows machine, a PSOCK cluster will be created. If using a Unix OS a FORK cluster will be created. You can force a Unix system to create a PSOCK cluster by setting to TRUE. Default: FALSE
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
+#'
+#' To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.ng(y ~ x, data = df)`
 #'
 #' There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
 #'
@@ -85,7 +88,8 @@
 #'                  kernel_inputs,
 #'                  join_by = NULL,
 #'                  par = NULL,
-#'                  n_cores = NULL)
+#'                  n_cores = NULL,
+#'                  PSOCK = FALSE)
 #' @rdname multiScale_optim
 #' @export
 #' @importFrom optimParallel optimParallel
@@ -97,7 +101,8 @@ multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
                              join_by = NULL,
                              par = NULL,
-                             n_cores = NULL){
+                             n_cores = NULL,
+                             PSOCK = FALSE){
 
   # Check fitted_mod class
   # if (!inherits(fitted_mod, c("glm", "lm", "gls", "unmarked"))) {
@@ -231,7 +236,7 @@ multiScale_optim <- function(fitted_mod,
   while(class(opt_results) == 'try-error' & cnt < (length(par_starts))){
     if(use_parallel){
       ## Initiate parallel cluster
-      if(.Platform$OS.type == "unix"){
+      if(.Platform$OS.type == "unix" & isFALSE(PSOCK)){
         cl <- makeForkCluster(n_cores)
       } else {
         cl <- makeCluster(n_cores)     # set the number of processor cores
