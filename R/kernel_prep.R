@@ -235,12 +235,24 @@ kernel_prep <- function(pts,
       setTxtProgressBar(pb,i)
     }
 
-    cov.w[[i]] <- scale_type(d = D[[i]],
-                             kernel = kernel,
-                             sigma = sigma,
-                             shape = shape,
-                             # r_stack.df = r_ext[r_ext$id == i,],
-                             r_stack.df = sparse_list[[i]][,1:nlyr(raster_stack)])
+
+    # if(nlyr(raster_stack) == 1){
+    #   rdf <- sparse_list[[i]][,1]
+    #   rdf <- as(as.matrix(rdf), "sparseMatrix")
+
+      cov.w[[i]] <- scale_type(d = D[[i]],
+                               kernel = kernel,
+                               sigma = sigma,
+                               shape = shape,
+                               r_stack.df = sparse_list[[i]])
+    # } else {
+    #   cov.w[[i]] <- scale_type(d = D[[i]],
+    #                            kernel = kernel,
+    #                            sigma = sigma,
+    #                            shape = shape,
+    #                            r_stack.df = sparse_list[[i]][,1:nlyr(raster_stack)])
+    # }
+
 
 
   }
@@ -252,7 +264,6 @@ kernel_prep <- function(pts,
 
   df <- data.frame(do.call(rbind, cov.w))
   colnames(df) <- names(raster_stack)
-  # colnames(cov_df) <- colnames(df) <- names(raster_stack)
 
   out <- list(kernel_dat = as.data.frame(scale(df)),
               d_list = D,

@@ -98,7 +98,6 @@ summary.multiScaleR <- function(object,...){
                        min_D = object$min_D,
                        names = row.names(object$scale_est))
 
-
   if(length(param_list) >= 1){
     if('prob' %in% names(param_list)){
       prob <- param_list$prob
