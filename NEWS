@@ -1,3 +1,7 @@
+multiScaleR 0.3.0-5
+---------
+* Fixed bug causing optimization failure if only a single spatial covariate was used.
+
 multiScaleR 0.3.0-4
 ---------
 * Updated documentation and created a PSOCK variable to force PSOCK cluster when using unix

@@ -84,7 +84,7 @@ NULL
 #'
 #' \describe{
 #'   A spatRaster object with three surfaces:
-#'   \item{land1}{ --> A binary landscape surface with low correlation}
+#'   \item{land1}{ --> A binary landscape surface with low autocorrelation}
 #'   \item{land2}{ --> A continuous landscape surface with low autocorrelation}
 #'   \item{land3}{ --> A continuous landscape surface with high autocorrelation}
 #'   ...

@@ -65,6 +65,12 @@ plot_kernel <- function(prob = 0.9,
                      shape = shp_,
                      output = 'wts')
 
+  # wt <- scale_type(d = d,
+  #                  kernel = kern,
+  #                  sigma = sig_,
+  #                  shape = shp_,
+  #                  output = 'wts')
+
   mx <- Hmisc::wtd.Ecdf(d, weights = wt)
   mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
@@ -74,6 +80,12 @@ plot_kernel <- function(prob = 0.9,
                      sigma = sig_,
                      shape = shp_,
                      output = 'wts')
+
+  # wt <- scale_type(d = d,
+  #                  kernel = kern,
+  #                  sigma = sig_,
+  #                  shape = shp_,
+  #                  output = 'wts')
 
   scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
 

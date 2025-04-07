@@ -33,7 +33,7 @@ NumericVector scale_type_sparse(NumericVector d,
   NumericVector sigma = NumericVector(sigma_);
   if (sigma.size() == 1 && ncol > 1) {
     sigma = rep(sigma[0], ncol); // Expand sigma to match ncol if it's a scalar
-  } else if (sigma.size() != ncol) {
+  } else if (sigma.size() != ncol && ncol != 0) {
     stop("sigma must have the same length as the number of columns in r_stack_df.");
   }
 
@@ -84,14 +84,9 @@ NumericVector scale_type_sparse(NumericVector d,
 
   // Handle output selection
   if (output.isNotNull()) {
-    std::string output_type = as<std::string>(output);
-
-    if (output_type == "first_column") {
-      return wrap(w0.col(0));  // Return the first column of weights
-    } else {
-      stop("Invalid output type. Supported: 'first_column'.");
-    }
+    return wrap(w0);  // Return weights matrix
   }
+
 
   // Compute weighted raster values using sparse matrix operations
   // Use sparse matrix multiplication instead of dense matrix operations

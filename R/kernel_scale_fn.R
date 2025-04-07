@@ -84,13 +84,21 @@ kernel_scale_fn <- function(par,
   }
 
   for(i in 1:n_ind){
-
-    cov.w[[i]] <-
-      scale_type(d_list[[i]],
-                 kernel = kernel,
-                 sigma = sigma,
-                 shape = shape,
-                 r_stack.df = cov_df[[i]][,covs])
+    if(n_covs == 1){
+      cov.w[[i]] <-
+        scale_type(d_list[[i]],
+                   kernel = kernel,
+                   sigma = sigma,
+                   shape = shape,
+                   r_stack.df = cov_df[[i]])
+    } else {
+      cov.w[[i]] <-
+        scale_type(d_list[[i]],
+                   kernel = kernel,
+                   sigma = sigma,
+                   shape = shape,
+                   r_stack.df = cov_df[[i]][,covs])
+    }
   } ## End for loop
 
   # browser()
@@ -153,5 +161,4 @@ kernel_scale_fn <- function(par,
     #             scl_params = NULL)
   }
   return(obj)
-
 }
