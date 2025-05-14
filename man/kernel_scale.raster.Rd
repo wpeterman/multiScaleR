@@ -10,7 +10,8 @@ kernel_scale.raster(
   scale_opt = NULL,
   shape = NULL,
   kernel = c("gaussian", "exp", "expow", "fixed"),
-  pct_wt = 0.95
+  pct_wt = 0.95,
+  fft = TRUE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ kernel_scale.raster(
 \item{kernel}{Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')}
 
 \item{pct_wt}{The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.95}
+
+\item{fft}{Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.}
 }
 \value{
 `SpatRaster` object containing scaled rasters
@@ -33,7 +36,7 @@ kernel_scale.raster(
 Function to create scaled rasters
 }
 \details{
-NA
+The fast Fourier transformation is substantially faster when scaling large raster surfaces with large kernel areas. There will be some edge effects on the outer boundaries.
 }
 \examples{
 ## Not Run

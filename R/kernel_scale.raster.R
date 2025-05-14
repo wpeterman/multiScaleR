@@ -6,8 +6,9 @@
 #' @param shape Vector of parameters listed in order to scale each raster if using 'expow' kernel. Default: NULL
 #' @param kernel Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')
 #' @param pct_wt The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.95
+#' @param fft Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.
 #' @return `SpatRaster` object containing scaled rasters
-#' @details NA
+#' @details The fast Fourier transformation is substantially faster when scaling large raster surfaces with large kernel areas. There will be some edge effects on the outer boundaries.
 #' @examples
 #' ## Not Run
 #' r1 <- rast(matrix(rnorm(25^2),
@@ -29,7 +30,8 @@ kernel_scale.raster <- function(raster_stack,
                                 scale_opt = NULL,
                                 shape = NULL,
                                 kernel = c('gaussian', 'exp', 'expow', 'fixed'),
-                                pct_wt = 0.95){
+                                pct_wt = 0.95,
+                                fft = TRUE){
 
   kernel <- match.arg(kernel)
 
@@ -103,9 +105,10 @@ kernel_scale.raster <- function(raster_stack,
     cat(paste0("\nSmoothing SpatRaster ",i, " of ", length(sigma), ": ",lyr,"\n"))
 
     smooth_list[[i]] <- focal(raster_stack[[lyr]],
-                              wt_mat,
-                              mean,
-                              expand = T)
+                              w = wt_mat,
+                              fun = 'mean',
+                              na.rm = T,
+                              expand = F)
   }
   smooth_stack <- rast(smooth_list)
   names(smooth_stack) <- names(raster_stack)
