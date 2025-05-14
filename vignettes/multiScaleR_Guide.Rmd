@@ -526,7 +526,7 @@ plot_kernel(kernel = 'gaussian',
 
 ## `sim_rast`
 
-If the `NLMR` package is installed, raster surfaces can be simulated that are amenable for use the `sim_dat` function.
+Raster surfaces can be simulated that are amenable for use the `sim_dat` function.
 
 ```{r error=FALSE, message=FALSE}
 r_sim1 <- sim_rast(dim = 100,
