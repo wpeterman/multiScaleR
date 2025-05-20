@@ -1,6 +1,7 @@
-multiScaleR 0.3.1-1
+multiScaleR 0.3.1-2
 ---------
 * Updated default `pct_wt` from 0.95 to 0.975 when smoothing raster layers
+* Fixed kernel_scale.raster error handling
 
 multiScaleR 0.3.1-1
 ---------
