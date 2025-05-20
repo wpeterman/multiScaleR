@@ -1,3 +1,8 @@
+multiScaleR 0.3.1-1
+---------
+* Fixed bug in raster smoothing
+* Added na.rm argument
+
 multiScaleR 0.3.1-0
 ---------
 * Implemented fft smoothing of rasters

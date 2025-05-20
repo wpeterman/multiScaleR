@@ -11,6 +11,9 @@
 
 fft_convolution <- function(x, kernel, fun = "mean", na.rm = TRUE) {
   # Check inputs
+    # Convert input to matrix
+    x <- x_mat <- as.matrix(x)
+
   if (!is.matrix(x) && !is.data.frame(x)) {
     stop("'x' must be a matrix or data frame")
   }
@@ -23,9 +26,6 @@ fft_convolution <- function(x, kernel, fun = "mean", na.rm = TRUE) {
   if (!(fun %in% c("mean", "sum"))) {
     stop("'fun' must be either 'mean' or 'sum'")
   }
-
-  # Convert input to matrix
-  x_mat <- as.matrix(x)
 
   # Store NA positions and replace NAs with 0
   x_na_mask <- is.na(x_mat)
