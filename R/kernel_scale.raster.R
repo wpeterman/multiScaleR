@@ -7,6 +7,7 @@
 #' @param kernel Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')
 #' @param pct_wt The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.95
 #' @param fft Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.
+#' @param na.rm Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.
 #' @return `SpatRaster` object containing scaled rasters
 #' @details The fast Fourier transformation is substantially faster when scaling large raster surfaces with large kernel areas. There will be some edge effects on the outer boundaries.
 #' @examples
@@ -31,12 +32,21 @@ kernel_scale.raster <- function(raster_stack,
                                 shape = NULL,
                                 kernel = c('gaussian', 'exp', 'expow', 'fixed'),
                                 pct_wt = 0.95,
-                                fft = TRUE){
+                                fft = TRUE,
+                                na.rm = TRUE){
 
   kernel <- match.arg(kernel)
 
   if(class(raster_stack) != 'SpatRaster'){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
+  }
+
+  if(!is.logical(na.rm)){
+    stop("`na.rm` must be TRUE or FALSE")
+  }
+
+  if(!is.logical(fft)){
+    stop("`fft` must be TRUE or FALSE")
   }
 
   if(!is.null(scale_opt) & class(scale_opt) == 'multiScaleR'){
@@ -54,10 +64,6 @@ kernel_scale.raster <- function(raster_stack,
     covs <- names(raster_stack)
   }
 
-  # if(kernel != 'gaussian'){
-  #   stop('Only gaussian kernel is currently supported with this function!')
-  # }
-
   if(length(sigma) != nlyr(raster_stack)){
     warning("Number of sigma values must equal the number of raster layers!!!  \n  All raster layers will be smoothed using the same sigma value")
     sigma <- rep(sigma[1], nlyr(raster_stack))
@@ -65,16 +71,17 @@ kernel_scale.raster <- function(raster_stack,
 
 
   smooth_list <- wt_list <-  vector('list', length(sigma))
+  out <- terra::rast(raster_stack[[1]])
 
   for(i in 1:length(sigma)){
     lyr <- covs[i]
     d <- seq(1, 1e6,
              length.out = 1e6)
-    wt <- scale_type_r(d = d,
-                       kernel = kernel,
-                       sigma = sigma[i],
-                       shape = shape[i],
-                       output = 'wts')
+    wt <- multiScaleR:::scale_type_r(d = d,
+                                     kernel = kernel,
+                                     sigma = sigma[i],
+                                     shape = shape[i],
+                                     output = 'wts')
 
     mx <- Hmisc::wtd.Ecdf(d, weights = wt)
     mx <- round(mx$x[which(mx$ecdf > pct_wt)[1]], digits = -1)
@@ -92,27 +99,44 @@ kernel_scale.raster <- function(raster_stack,
     cntr_crd <- cellFromRowCol(r_wt, focal_d/2, focal_d/2)
     cntr_crd <- xyFromCell(r_wt, ceiling(length(mat)/2))
     cell_crds <- crds(r_wt)
-    r_wt[] <- rdist(cntr_crd, cell_crds)[1,] * r_res
-    r_wt[] <- scale_type_r(d = as.vector(r_wt),
-                           kernel = kernel,
-                           sigma = sigma[i],
-                           shape = shape[i],
-                           output = 'wts')
+    r_wt[] <- fields::rdist(cntr_crd, cell_crds)[1,] * r_res
+    r_wt[] <- multiScaleR:::scale_type_r(d = as.vector(r_wt),
+                                         kernel = kernel,
+                                         sigma = sigma[i],
+                                         shape = shape[i],
+                                         output = 'wts')
 
 
     wt_mat <- as.matrix(r_wt, wide = T)
 
     cat(paste0("\nSmoothing SpatRaster ",i, " of ", length(sigma), ": ",lyr,"\n"))
 
-    smooth_list[[i]] <- focal(raster_stack[[lyr]],
-                              w = wt_mat,
-                              fun = 'mean',
-                              na.rm = T,
-                              expand = F)
+    if(fft){
+      mat <- matrix(terra::values(raster_stack[[lyr]]),
+                    nrow = terra::nrow(raster_stack[[lyr]]),
+                    ncol = terra::ncol(raster_stack[[lyr]]),
+                    byrow = TRUE)
+
+      mat <- terra::as.matrix(raster_stack[[lyr]], wide = T)
+
+      fft_mat <- fft_convolution(mat,
+                                 wt_mat,
+                                 fun = "mean",
+                                 na.rm = na.rm)
+      terra::values(out) <- as.vector(fft_mat)
+
+      smooth_list[[i]] <- out
+    } else {
+      smooth_list[[i]] <- focal(raster_stack[[lyr]],
+                                w = wt_mat,
+                                fun = "mean",
+                                na.rm = na.rm,
+                                expand = F)
+    }
+
   }
   smooth_stack <- rast(smooth_list)
   names(smooth_stack) <- names(raster_stack)
 
-  # class(smooth_stack) <- c('multiScaleR_SpatRaster')
   return(smooth_stack)
 }

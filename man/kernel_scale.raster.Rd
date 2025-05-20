@@ -11,7 +11,8 @@ kernel_scale.raster(
   shape = NULL,
   kernel = c("gaussian", "exp", "expow", "fixed"),
   pct_wt = 0.95,
-  fft = TRUE
+  fft = TRUE,
+  na.rm = TRUE
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ kernel_scale.raster(
 \item{pct_wt}{The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.95}
 
 \item{fft}{Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.}
+
+\item{na.rm}{Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.}
 }
 \value{
 `SpatRaster` object containing scaled rasters
