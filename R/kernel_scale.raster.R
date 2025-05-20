@@ -35,20 +35,6 @@ kernel_scale.raster <- function(raster_stack,
                                 fft = TRUE,
                                 na.rm = TRUE){
 
-  kernel <- match.arg(kernel)
-
-  if(class(raster_stack) != 'SpatRaster'){
-    stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
-  }
-
-  if(!is.logical(na.rm)){
-    stop("`na.rm` must be TRUE or FALSE")
-  }
-
-  if(!is.logical(fft)){
-    stop("`fft` must be TRUE or FALSE")
-  }
-
   if(!is.null(scale_opt) & class(scale_opt) == 'multiScaleR'){
     covs <- rownames(scale_opt$scale_est)
     sigma <- scale_opt$scale_est[,1]
@@ -64,6 +50,20 @@ kernel_scale.raster <- function(raster_stack,
     covs <- names(raster_stack)
   }
 
+  kernel <- match.arg(kernel)
+
+  if(class(raster_stack) != 'SpatRaster'){
+    stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
+  }
+
+  if(!is.logical(na.rm)){
+    stop("`na.rm` must be TRUE or FALSE")
+  }
+
+  if(!is.logical(fft)){
+    stop("`fft` must be TRUE or FALSE")
+  }
+
   if(length(sigma) != nlyr(raster_stack)){
     warning("Number of sigma values must equal the number of raster layers!!!  \n  All raster layers will be smoothed using the same sigma value")
     sigma <- rep(sigma[1], nlyr(raster_stack))
@@ -77,7 +77,7 @@ kernel_scale.raster <- function(raster_stack,
     lyr <- covs[i]
 
     if(pct_wt == 0.975 && kernel == 'gaussian'){
-      mx <- 2.25 * sigma
+      mx <- 2.25 * sigma[i]
     } else {
       d <- seq(1, 1e6,
                length.out = 1e6)
