@@ -10,7 +10,7 @@ kernel_scale.raster(
   scale_opt = NULL,
   shape = NULL,
   kernel = c("gaussian", "exp", "expow", "fixed"),
-  pct_wt = 0.95,
+  pct_wt = 0.975,
   fft = TRUE,
   na.rm = TRUE
 )
@@ -26,7 +26,7 @@ kernel_scale.raster(
 
 \item{kernel}{Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')}
 
-\item{pct_wt}{The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.95}
+\item{pct_wt}{The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.975}
 
 \item{fft}{Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.}
 

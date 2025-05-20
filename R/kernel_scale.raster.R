@@ -5,7 +5,7 @@
 #' @param scale_opt If scale optimization with `multiScale_optim` has been completed, provide the `multiscaleR` object here. Default: NULL
 #' @param shape Vector of parameters listed in order to scale each raster if using 'expow' kernel. Default: NULL
 #' @param kernel Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')
-#' @param pct_wt The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.95
+#' @param pct_wt The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.975
 #' @param fft Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.
 #' @param na.rm Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.
 #' @return `SpatRaster` object containing scaled rasters
@@ -31,7 +31,7 @@ kernel_scale.raster <- function(raster_stack,
                                 scale_opt = NULL,
                                 shape = NULL,
                                 kernel = c('gaussian', 'exp', 'expow', 'fixed'),
-                                pct_wt = 0.95,
+                                pct_wt = 0.975,
                                 fft = TRUE,
                                 na.rm = TRUE){
 
@@ -75,16 +75,21 @@ kernel_scale.raster <- function(raster_stack,
 
   for(i in 1:length(sigma)){
     lyr <- covs[i]
-    d <- seq(1, 1e6,
-             length.out = 1e6)
-    wt <- multiScaleR:::scale_type_r(d = d,
-                                     kernel = kernel,
-                                     sigma = sigma[i],
-                                     shape = shape[i],
-                                     output = 'wts')
 
-    mx <- Hmisc::wtd.Ecdf(d, weights = wt)
-    mx <- round(mx$x[which(mx$ecdf > pct_wt)[1]], digits = -1)
+    if(pct_wt == 0.975 && kernel == 'gaussian'){
+      mx <- 2.25 * sigma
+    } else {
+      d <- seq(1, 1e6,
+               length.out = 1e6)
+      wt <- multiScaleR:::scale_type_r(d = d,
+                                       kernel = kernel,
+                                       sigma = sigma[i],
+                                       shape = shape[i],
+                                       output = 'wts')
+
+      mx <- Hmisc::wtd.Ecdf(d, weights = wt)
+      mx <- round(mx$x[which(mx$ecdf > pct_wt)[1]], digits = -1)
+    }
 
     r_res <- res(raster_stack)[1]
     focal_d <- ceiling(mx / r_res) * 2
