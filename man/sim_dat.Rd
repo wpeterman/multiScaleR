@@ -31,7 +31,7 @@ sim_dat(
 
 \item{StDev}{If specifying 'count_nb' or 'gaus' for type, this is the dispersion term for those respective processes (Default = 0.5)}
 
-\item{n_points}{Number of spatial sample points (Default = 50).}
+\item{n_points}{Number of spatial sample points (Default = 50). Alternatively, provide a spatVector point file.}
 
 \item{min_D}{Minimum distance between points. Function will attempt to create the number of sample points specified while honoring this minimum distance.}
 
