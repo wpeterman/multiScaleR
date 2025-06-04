@@ -362,7 +362,7 @@ The challenge of identifying 'significant' scale relationships was also noted by
 Among the model classes that `multiScaleR` can be used to optimize are those from `unmarked`. We will use the simulation functions from the package to create data for this analysis. First, we will simulate and visualize raster surfaces.
 
 ```{r}
-rs <- sim_rast(user_seed = 321, dim = 250)
+rs <- sim_rast(user_seed = 999, dim = 250)
 plot(rs)
 ```
 
@@ -382,7 +382,7 @@ s_dat <- sim_dat_unmarked(alpha = 1,
                           type = 'count',
                           raster_stack = rs,
                           max_D = 550,
-                          user_seed = 123)
+                          user_seed = 555)
 plot(s_dat$df$y ~ s_dat$df$bin1)
 plot(s_dat$df$y ~ s_dat$df$cont2)
 ```
@@ -400,9 +400,9 @@ umf <- unmarkedFramePCount(y = s_dat$y,
                            siteCovs = kernel_inputs$kernel_dat)
 
 ## Base unmarked model
-mod0_umf.p <- pcount(~1 ~bin1 + cont2,
-                     data = umf, 
-                     K = 100)
+mod0_umf.p <- unmarked::pcount(~1 ~bin1 + cont2,
+                               data = umf, 
+                               K = 100)
 ```
 
 ```{r eval=FALSE}
@@ -428,13 +428,13 @@ s_dat.occ <- sim_dat_unmarked(alpha = 0.75,
                               beta = c(-1.25,0.75),
                               kernel = 'gaussian',
                               sigma = c(75, 75),
-                              n_points = 100,
+                              n_points = 200,
                               n_surv = 5,
                               det = 0.5,
                               type = 'occ',
                               raster_stack = rs,
                               max_D = 650,
-                              user_seed = 999)
+                              user_seed = 555)
 
 plot(s_dat.occ$df$y ~ s_dat.occ$df$bin1)
 plot(s_dat.occ$df$y ~ s_dat.occ$df$cont2)
@@ -445,7 +445,7 @@ Prepare inputs for use with `multiScaleR`
 ```{r}
 kernel_inputs <- kernel_prep(pts = s_dat.occ$pts,
                              raster_stack = rs,
-                             max_D = 500,
+                             max_D = 650,
                              kernel = 'gaus')
 
 ## Occupancy frame
@@ -453,8 +453,8 @@ umf <- unmarkedFrameOccu(y = s_dat.occ$y,
                          siteCovs = kernel_inputs$kernel_dat)
 
 ## Base unmarked model
-(mod0_umf.occ <- occu(~1 ~bin1 + cont2,
-                      data = umf))
+(mod0_umf.occ <- unmarked::occu(~1 ~bin1 + cont2,
+                                data = umf))
 ```
 
 ```{r eval=FALSE}
@@ -468,7 +468,7 @@ summary(opt_umf.occ)
 plogis(opt_umf.occ$opt_mod@estimates@estimates$det@estimates[[1]])
 ```
 
-We did a decent job of recovering simulated values, but the scales of effect (`sigma`) are very uncertain. There is opportunity for further exploration of data needs / limitations for estimating scales of effect, especially related to more complex models such those fit with `unmarked`.
+We did a decent job of recovering simulated values. Note that the sample size was increased for this simulation. Previous explorations suggested that smaller sample sizes (e.g., 100) did not contain enough information to optimize the scales of effect (`sigma`). There is opportunity for further exploration of data needs / limitations for estimating scales of effect, especially related to more complex models such those fit with `unmarked`.
 
 # Other Functions & Features
 

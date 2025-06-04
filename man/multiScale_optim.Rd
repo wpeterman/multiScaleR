@@ -33,7 +33,7 @@ Function to conduct multiscale optimization
 \details{
 Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
 
-To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.ng(y ~ x, data = df)`
+To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.nb(y ~ x, data = df)`
 
 There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
 }

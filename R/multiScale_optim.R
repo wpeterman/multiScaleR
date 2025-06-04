@@ -9,7 +9,7 @@
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
 #'
-#' To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.ng(y ~ x, data = df)`
+#' To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.nb(y ~ x, data = df)`
 #'
 #' There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
 #'
@@ -94,7 +94,7 @@
 #' @export
 #' @importFrom optimParallel optimParallel
 #' @importFrom stats optim
-#' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster
+#' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster clusterExport
 #' @importFrom crayon %+% green red bold blue
 
 multiScale_optim <- function(fitted_mod,
@@ -243,9 +243,10 @@ multiScale_optim <- function(fitted_mod,
 
       }
       setDefaultCluster(cl = cl)     # set'cl'as default cluster
-      if(mod_class == 'unmarked'){
-        clusterEvalQ(cl, library('unmarked'))
-      }
+      # if(mod_class == 'unmarked'){
+      #   clusterEvalQ(cl, library('unmarked'))
+      # }
+      cluster_prep(fitted_mod, cl)
 
       opt_results <- try(optimParallel::optimParallel(par = par,
                                                       fn = kernel_scale_fn,
@@ -263,7 +264,7 @@ multiScale_optim <- function(fitted_mod,
 
       ## Stop parallel cluster
       setDefaultCluster(cl = NULL)
-      on.exit(stopCluster(cl))
+      stopCluster(cl)
 
       if(class(opt_results) == 'try-error'){
         cat('\n\nParallel optimization failed; attempting standard optimization ')

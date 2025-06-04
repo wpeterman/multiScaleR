@@ -9,7 +9,7 @@
 #' @param type Type of response data to simulate. Valid options are 'count' for Poisson distributed count; 'count_nb' for negative binomial counts; 'occ' for binomial response; and 'gaussian' for normally distributed response.
 #' 'count' for normally distributed response (Default = 'count')
 #' @param StDev If specifying 'count_nb' or 'gaus' for type, this is the dispersion term for those respective processes (Default = 0.5)
-#' @param n_points Number of spatial sample points (Default = 50).
+#' @param n_points Number of spatial sample points (Default = 50). Alternatively, provide a spatVector point file.
 #' @param min_D Minimum distance between points. Function will attempt to create the number of sample points specified while honoring this minimum distance.
 #' @param raster_stack A spatRaster object
 #' @param sigma The scale term dictating the rate of decay with distance
@@ -81,36 +81,33 @@ sim_dat <- function(alpha = 1,
     stop("Shape parameter(s) must be specified when using the `expow` kernel!")
   }
 
-  s_ext <- as.vector(ext(raster_stack[[1]]))
-  min_x <- min_y <- floor(s_ext[1] + (s_ext[2] * 0.15))
-  max_x <- max_y <- floor(s_ext[2] - (s_ext[2] * 0.15))
-  r <- rast()
-  ext(r) <- c(min_x, max_x, min_y, max_y)
-  poly <- terra::as.polygons(ext(c(min_x, max_x, min_y, max_y)))
-  poly_sf <- st_as_sf(poly)
+  if(is.numeric(n_points)){
+    s_ext <- as.vector(ext(raster_stack[[1]]))
+    min_x <- min_y <- floor(s_ext[1] + (s_ext[2] * 0.15))
+    max_x <- max_y <- floor(s_ext[2] - (s_ext[2] * 0.15))
+    r <- rast()
+    ext(r) <- c(min_x, max_x, min_y, max_y)
+    poly <- terra::as.polygons(ext(c(min_x, max_x, min_y, max_y)))
+    poly_sf <- st_as_sf(poly)
 
-  pts <- 0
-  while(length(pts) < n_points){
-    min_D <- min_D * 0.97
-    pts <- sf::st_make_grid(poly_sf,
-                            cellsize = min_D,
-                            # n = n_points,
-                            what = 'centers')
+    pts <- 0
+    while(length(pts) < n_points){
+      min_D <- min_D * 0.97
+      pts <- sf::st_make_grid(poly_sf,
+                              cellsize = min_D,
+                              # n = n_points,
+                              what = 'centers')
+    }
+
+    pts <- sf::st_as_sf(pts)
+    pts <- pts[sample(dim(pts)[1], n_points),]
   }
 
-  # pts <- spatSample(raster_stack[[1]],
-  #                   size = n_points,
-  #                   ext = ext(r),
-  #                   as.points = TRUE)
-
-  # names(pts) <- 'sample_points'
-  pts <- sf::st_as_sf(pts)
-
-  pts <- pts[sample(dim(pts)[1], n_points),]
-
+  if(is.null(max_D)){
   max_D <- kernel_dist(kernel = kernel,
                        prob = 0.99,
                        sigma = max(sigma)) * 1.1
+  }
 
   kernel_out <- kernel_prep(pts = pts,
                             sigma = sigma,
