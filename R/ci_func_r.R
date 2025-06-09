@@ -10,6 +10,7 @@
 
 #' @rdname ci_func_r
 #' @keywords internal
+#' @importFrom stats quantile rnorm qt
 
 ci_func_r <- function(x,
                     df,

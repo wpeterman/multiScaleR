@@ -8,6 +8,7 @@
 #' @return A matrix
 #' @rdname fft_convolution
 #' @keywords internal
+#' @importFrom stats fft
 
 fft_convolution <- function(x, kernel, fun = "mean", na.rm = TRUE) {
   # Check inputs

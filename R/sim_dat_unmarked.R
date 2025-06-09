@@ -84,7 +84,8 @@ sim_dat_unmarked <- function(alpha = 1,
                              sigma = NULL,
                              shape = NULL,
                              max_D = NULL,
-                             user_seed = NULL)
+                             user_seed = NULL,
+                             ...)
 {
 
   kernel <- match.arg(kernel)
@@ -112,25 +113,18 @@ sim_dat_unmarked <- function(alpha = 1,
   max_x <- max_y <- floor(s_ext[2] - (s_ext[2] * 0.15))
   r <- rast()
   ext(r) <- c(min_x, max_x, min_y, max_y)
-  poly <- terra::as.polygons(ext(c(min_x, max_x, min_y, max_y)))
+  poly <- as.polygons(ext(c(min_x, max_x, min_y, max_y)))
   poly_sf <- st_as_sf(poly)
 
   pts <- 0
   while(length(pts) < n_points){
     min_D <- min_D * 0.97
-    pts <- sf::st_make_grid(poly_sf,
+    pts <- st_make_grid(poly_sf,
                             cellsize = min_D,
-                            # n = n_points,
                             what = 'centers')
   }
 
-  # pts <- spatSample(raster_stack[[1]],
-  #                   size = n_points,
-  #                   ext = ext(r),
-  #                   as.points = TRUE)
-
-  # names(pts) <- 'sample_points'
-  pts <- sf::st_as_sf(pts)
+  pts <- st_as_sf(pts)
 
   pts <- pts[sample(dim(pts)[1], n_points),]
 

@@ -16,7 +16,8 @@ sim_dat(
   sigma = NULL,
   shape = NULL,
   max_D = NULL,
-  user_seed = NULL
+  user_seed = NULL,
+  ...
 )
 }
 \arguments{

@@ -22,8 +22,11 @@ used to fit a model object, assuming the function was called using the
 For internal use
 }
 \examples{
-mod <- spaMM::fitme(...)  # assuming valid call
+\dontrun{
+#' ## Not Run
+mod <- stats::glm(...)  # assuming valid call
 extract_namespace(mod)
+}
 
 }
 \keyword{internal}

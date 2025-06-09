@@ -29,11 +29,12 @@
 #' @export
 #' @importFrom exactextractr exact_extract
 #' @importFrom terra nlyr vect
-#' @importFrom sf st_as_sf st_buffer st_coordinates st_crs
+#' @importFrom sf st_as_sf st_buffer st_coordinates st_crs st_crs<-
 #' @importFrom dplyr bind_rows
 #' @importFrom fields rdist rdist.earth
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @importFrom Matrix as.matrix
+#' @importFrom methods as
 
 kernel_prep <- function(pts,
                         raster_stack,
@@ -47,7 +48,7 @@ kernel_prep <- function(pts,
 
   kernel <- match.arg(kernel)
 
-  if(class(raster_stack) != 'SpatRaster'){
+  if(!inherits(raster_stack, "SpatRaster")){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
   }
 
@@ -79,16 +80,10 @@ kernel_prep <- function(pts,
 
     cat(paste0("\nExtracting values from raster layers...\n"))
 
-    ## Extract values and cell positions from buffers
-    # r_ext <- extract(raster_stack,
-    #                  spat_poly,
-    #                  cells = T,
-    #                  xy = T)
-
-    r_ext <- exactextractr::exact_extract(raster_stack,
-                                          buff_poly,
-                                          include_cell = T,
-                                          include_xy = T)
+    r_ext <- exact_extract(raster_stack,
+                           buff_poly,
+                           include_cell = T,
+                           include_xy = T)
 
 
     # Convert to list of sparse matrices
@@ -126,8 +121,6 @@ kernel_prep <- function(pts,
     min_D <- floor(rdist.earth(st_coordinates(r_ext[[1]][1:2,c("x","y")]),
                                miles = F)[1,2] * 1000)
 
-    # class(D) <- class(min_D) <- 'numeric'
-
   } else { ## Projected points
     if (!any(grep(paste(c("SpatVector",
                           "sf"), collapse = "|"), class(pts))))
@@ -136,32 +129,24 @@ kernel_prep <- function(pts,
     # if (class(pts)[1] == "sf") {
     if(any(grep(paste(c("sfc", "sfc_MULTIPOINT", "sf"), collapse = "|"),
                 class(pts)))){
-      buff_poly <- sf::st_buffer(pts,
-                                 dist = max_D)
-      # spat_poly <- vect(buff_poly)
-      # pts <- as(pts, "Spatial")
+      buff_poly <- st_buffer(pts,
+                             dist = max_D)
     }
 
     if(class(pts)[1] == "SpatVector"){
       pts <- st_as_sf(pts)
-      buff_poly <- sf::st_buffer(pts,
-                                 dist = max_D)
+      buff_poly <- st_buffer(pts,
+                             dist = max_D)
     }
-
-    ## Extract values and cell positions from buffers
-    # r_ext <- extract(raster_stack,
-    #                  spat_poly,
-    #                  cells = T,
-    #                  xy = T)
 
     cat(paste0("\nExtracting values from raster layers...\n"))
 
-    r_ext <- exactextractr::exact_extract(raster_stack,
-                                          buff_poly,
-                                          # full_colnames = T,
-                                          # force_df = T,
-                                          include_xy = T,
-                                          progress = progress)
+    r_ext <- exact_extract(raster_stack,
+                           buff_poly,
+                           # full_colnames = T,
+                           # force_df = T,
+                           include_xy = T,
+                           progress = progress)
 
     # Convert to list of sparse matrices
     sparse_list <- lapply(r_ext, df_to_sparse)
@@ -179,9 +164,6 @@ kernel_prep <- function(pts,
       r_ext <- lapply(r_ext, re_name)
       sparse_list <- lapply(sparse_list, re_name)
     }
-
-    # r_ext <- bind_rows(r_ext, .id = 'id')
-    # r_ext$id <- as.numeric(r_ext$id)
 
     ## Progress bar
     D <- vector('list', dim(pts)[1])
@@ -203,18 +185,16 @@ kernel_prep <- function(pts,
         setTxtProgressBar(pb,i)
       }
 
-      D[[i]] <- fields::rdist(st_coordinates(pts[i,]),
-                              # r_ext[r_ext$id == i, c("x","y")])[1,]
-                              r_ext[[i]][, c("x","y")])[1,] / unit_conv
+      D[[i]] <- rdist(st_coordinates(pts[i,]),
+                      # r_ext[r_ext$id == i, c("x","y")])[1,]
+                      r_ext[[i]][, c("x","y")])[1,] / unit_conv
 
     }
     if(isTRUE(progress)){
       close(pb)
     }
-    min_D <- floor(fields::rdist(r_ext[[1]][1:2,c("x","y")])[1,2])
+    min_D <- floor(rdist(r_ext[[1]][1:2,c("x","y")])[1,2])
   } ## End ifelse for projected points
-
-
 
   cov.w <- vector('list', dim(pts)[1])
   sigma <- sigma / unit_conv
@@ -235,28 +215,13 @@ kernel_prep <- function(pts,
       setTxtProgressBar(pb,i)
     }
 
-
-    # if(nlyr(raster_stack) == 1){
-    #   rdf <- sparse_list[[i]][,1]
-    #   rdf <- as(as.matrix(rdf), "sparseMatrix")
-
-      cov.w[[i]] <- scale_type(d = D[[i]],
-                               kernel = kernel,
-                               sigma = sigma,
-                               shape = shape,
-                               r_stack.df = sparse_list[[i]])
-    # } else {
-    #   cov.w[[i]] <- scale_type(d = D[[i]],
-    #                            kernel = kernel,
-    #                            sigma = sigma,
-    #                            shape = shape,
-    #                            r_stack.df = sparse_list[[i]][,1:nlyr(raster_stack)])
-    # }
-
-
+    cov.w[[i]] <- scale_type(d = D[[i]],
+                             kernel = kernel,
+                             sigma = sigma,
+                             shape = shape,
+                             r_stack.df = sparse_list[[i]])
 
   }
-  # )
   if(isTRUE(progress)){
     close(pb)
   }
@@ -264,6 +229,8 @@ kernel_prep <- function(pts,
 
   df <- data.frame(do.call(rbind, cov.w))
   colnames(df) <- names(raster_stack)
+
+  scl_df <- scale(df)
 
   out <- list(kernel_dat = as.data.frame(scale(df)),
               d_list = D,
@@ -274,7 +241,9 @@ kernel_prep <- function(pts,
               max_D = max_D,
               n_covs = nlyr(raster_stack),
               unit_conv = unit_conv,
-              sigma = sigma)
+              sigma = sigma,
+              scl_params = list(mean = attr(scl_df, "scaled:center"),
+                                sd = attr(scl_df, "scaled:scale")))
 
   class(out) <- 'multiScaleR_data'
   return(out)

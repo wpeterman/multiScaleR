@@ -7,11 +7,11 @@
 kernel_dist(model, prob = 0.9, ...)
 }
 \arguments{
+\item{model}{\code{\link{multiScale_optim}} object of class 'multiScaleR'}
+
 \item{prob}{Density probability cutoff for calculating distance, Default: 0.9}
 
 \item{...}{Parameters to be used if not providing a 'multiScaleR' fitted object. See Details}
-
-\item{x}{\code{\link[multiScaleR]{multiScaleR}} object}
 }
 \value{
 Distance at which cumulative density of kernel is reached
@@ -23,9 +23,13 @@ Function to estimate the effective distance encompassing a specified probability
 This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 }
 \examples{
-kernel_dist(x)
+\dontrun{
+kernel_dist(model)
+
+kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
+}
 
 }
 \seealso{
-\code{\link[multiScaleR]{plot.multiScaleR}}
+\code{\link{plot.multiScaleR}}
 }

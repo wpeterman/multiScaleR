@@ -4,15 +4,13 @@
 \alias{surv_pts}
 \title{Spatial sample points}
 \format{
-`surv_pts`
-}
-\usage{
-data(surv_pts)
 An sf class point object:
 \describe{
   \item{pts}{ --> 100 spatial point locations}
-  ...
 }
+}
+\usage{
+data(surv_pts)
 }
 \description{
 Example point file for use with vignette document example

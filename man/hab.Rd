@@ -4,16 +4,15 @@
 \alias{hab}
 \title{Example raster}
 \format{
-## `hab`
-}
-\usage{
-hab <- terra::rast(system.file("data/hab.tif", package = 'multiScaleR'))
 A binary SpatRaster object
 \describe{
   \item{hab}{ --> A binary raster}
-  ...
 }
 }
 \description{
 Example habitat raster for optimizing scales of effect
+}
+\examples{
+hab <- terra::rast(system.file("extdata",
+                   "hab.tif", package = 'multiScaleR'))
 }

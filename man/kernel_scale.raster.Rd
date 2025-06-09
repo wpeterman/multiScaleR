@@ -6,13 +6,17 @@
 \usage{
 kernel_scale.raster(
   raster_stack,
-  sigma,
-  scale_opt = NULL,
+  sigma = NULL,
+  multiScaleR = NULL,
   shape = NULL,
   kernel = c("gaussian", "exp", "expow", "fixed"),
   pct_wt = 0.975,
   fft = TRUE,
-  na.rm = TRUE
+  scale_center = FALSE,
+  clamp = FALSE,
+  pct_mx = 0.15,
+  na.rm = TRUE,
+  ...
 )
 }
 \arguments{
@@ -20,7 +24,7 @@ kernel_scale.raster(
 
 \item{sigma}{Vector of parameters listed in order to scale each raster}
 
-\item{scale_opt}{If scale optimization with `multiScale_optim` has been completed, provide the `multiscaleR` object here. Default: NULL}
+\item{multiScaleR}{If scale optimization with `multimultiScaleRim` has been completed, provide the `multiscaleR` object here. You can also pass an object of class "multiScaleR_data" created using `kernel_prep`.  Default: NULL}
 
 \item{shape}{Vector of parameters listed in order to scale each raster if using 'expow' kernel. Default: NULL}
 
@@ -30,7 +34,15 @@ kernel_scale.raster(
 
 \item{fft}{Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.}
 
+\item{scale_center}{Logical. If `TRUE`, raster values are scaled and centered accordingly to the data used to fit the model. Necessary when predicting model results across the landscape.}
+
+\item{clamp}{Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data, expanded by `pct_mx`.}
+
+\item{pct_mx}{Numeric. Proportion by which to expand the min/max range when clamping. Default is `0.15`.}
+
 \item{na.rm}{Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.}
+
+\item{...}{Not used}
 }
 \value{
 `SpatRaster` object containing scaled rasters

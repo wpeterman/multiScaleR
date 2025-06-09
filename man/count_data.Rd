@@ -4,17 +4,14 @@
 \alias{count_data}
 \title{Example data frame}
 \format{
-## `count_data`
-}
-\usage{
-data(count_data)
 A data frame with 75 rows and 2 columns. Data were simulated from a Poisson distribution with an intercept of 0.5, a `hab` effect of 0.75, and scale of effect (sigma) of 75.
 \describe{
   \item{y}{   --> Simulated counts at spatial locations}
   \item{hab}{ --> Scaled and centered weighted mean values from the `hab` raster at each of the `pts`}
-
-  ...
 }
+}
+\usage{
+data(count_data)
 }
 \description{
 Example count data to be used for optimizing scales of effect

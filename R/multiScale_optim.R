@@ -13,7 +13,7 @@
 #'
 #' There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
 #'
-#' @seealso \code{\link[kernel_dist]{kernel_dist}}
+#' @seealso \code{\link[multiScaleR]{kernel_dist}}
 #' @examples
 #' ## NOT RUN
 #' set.seed(555)
@@ -42,7 +42,6 @@
 #'
 #' ## NOTE: This code is only for demonstration
 #' ## Optimization results will have no meaning
-#'
 #' opt_mod <- multiScale_optim(fitted_mod = mod1,
 #'                             kernel_inputs = kernel_inputs,
 #'                             par = NULL,
@@ -51,7 +50,8 @@
 #' ## Using package data
 #' data('pts')
 #' data('count_data')
-#' hab <- terra::rast(system.file('data/hab.tif', package = 'multiScaleR'))
+#' hab <- terra::rast(system.file('extdata',
+#'                    'hab.tif', package = 'multiScaleR'))
 #'
 #' kernel_inputs <- kernel_prep(pts = pts,
 #'                              raster_stack = hab,
@@ -79,9 +79,17 @@
 #'
 #'
 #' ## Apply optimized kernel to the environmental raster
-#' opt_hab <- kernel_scale.raster(hab, scale_opt = opt)
+#' opt_hab <- kernel_scale.raster(hab, multiScaleR = opt)
 #'
 #' plot(c(hab, opt_hab))
+#'
+#' ## Project model; scale & center
+#' opt_hab.s_c <- kernel_scale.raster(raster_stack = hab,
+#'                                    multiScaleR = opt,
+#'                                    scale_center = TRUE)
+#'
+#' mod_pred <- predict(opt_hab.s_c, opt$opt_mod, type = 'response')
+#' plot(mod_pred)
 #'
 #' @usage
 #' multiScale_optim(fitted_mod,
@@ -131,11 +139,11 @@ multiScale_optim <- function(fitted_mod,
 
   # Extract variables from fitted model
   if (any(class(fitted_mod) == 'gls')) {
-    mod_vars <- insight::find_predictors(fitted_mod)[[1]]
+    mod_vars <- find_predictors(fitted_mod)[[1]]
   } else if (any(grepl("^unmarked", class(fitted_mod)))) {
     mod_vars <- all.vars(formula(fitted_mod@formula))
   } else {
-    mod_vars <- insight::find_predictors(fitted_mod)[[1]]
+    mod_vars <- find_predictors(fitted_mod)[[1]]
   }
 
   # Ensure model variables are in kernel_inputs
@@ -160,7 +168,7 @@ multiScale_optim <- function(fitted_mod,
 
   if(any(class(fitted_mod) == 'gls')){
     mod_class <- 'gls'
-    mod_vars <- insight::find_predictors(fitted_mod)[[1]]
+    mod_vars <- find_predictors(fitted_mod)[[1]]
     # mod_vars <- all.vars(formula(fitted_mod)[-2])
     r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
     n_covs <- length(r_vars)
@@ -173,7 +181,7 @@ multiScale_optim <- function(fitted_mod,
   } else {
     mod_class <- 'other'
     # mod_vars <- all.vars(formula(fitted_mod)[-2])
-    mod_vars <- insight::find_predictors(fitted_mod)[[1]]
+    mod_vars <- find_predictors(fitted_mod)[[1]]
     r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
     n_covs <- length(r_vars)
   }
@@ -248,25 +256,25 @@ multiScale_optim <- function(fitted_mod,
       # }
       cluster_prep(fitted_mod, cl)
 
-      opt_results <- try(optimParallel::optimParallel(par = par,
-                                                      fn = kernel_scale_fn,
-                                                      hessian = TRUE,
-                                                      lower = lwr,
-                                                      upper = uppr,
-                                                      fitted_mod = fitted_mod,
-                                                      d_list = kernel_inputs$d_list,
-                                                      cov_df = kernel_inputs$raw_cov,
-                                                      kernel = kernel_inputs$kernel,
-                                                      join_by = join_by,
-                                                      control = list(maxit = 1000),
-                                                      parallel = list(forward = F,
-                                                                      loginfo = T)), silent = T)
+      opt_results <- try(optimParallel(par = par,
+                                       fn = kernel_scale_fn,
+                                       hessian = TRUE,
+                                       lower = lwr,
+                                       upper = uppr,
+                                       fitted_mod = fitted_mod,
+                                       d_list = kernel_inputs$d_list,
+                                       cov_df = kernel_inputs$raw_cov,
+                                       kernel = kernel_inputs$kernel,
+                                       join_by = join_by,
+                                       control = list(maxit = 1000),
+                                       parallel = list(forward = F,
+                                                       loginfo = T)), silent = T)
 
       ## Stop parallel cluster
       setDefaultCluster(cl = NULL)
       stopCluster(cl)
 
-      if(class(opt_results) == 'try-error'){
+      if(inherits(opt_results, "try-error")){
         cat('\n\nParallel optimization failed; attempting standard optimization ')
 
         opt_results <- try(optim(par = par,
@@ -286,7 +294,7 @@ multiScale_optim <- function(fitted_mod,
 
       cnt <- cnt + 1
 
-      if(class(opt_results) == 'try-error'){
+      if(inherits(opt_results, "try-error")){
         cat('\n\nAttempt ')
         cat(cnt)
         cat(" failed\n")
@@ -322,7 +330,7 @@ multiScale_optim <- function(fitted_mod,
 
       cnt <- cnt + 1
 
-      if(class(opt_results) == 'try-error'){
+      if(inherits(opt_results, "try-error")){
         cat('\n\nAttempt ')
         cat(cnt)
         cat(" failed\n")
@@ -344,7 +352,7 @@ multiScale_optim <- function(fitted_mod,
     } # End if else
   } # End while
 
-  if(class(opt_results) == 'try-error'){
+  if(inherits(opt_results, "try-error")){
 
 
     warning("\nOptimization has failed!\nConsider providing more informative starting values for optimization.")
@@ -385,7 +393,6 @@ multiScale_optim <- function(fitted_mod,
     }
 
     # browser()
-
 
     final_mod <- kernel_scale_fn(par = c(opt_results$par),
                                  kernel = kernel_inputs$kernel,

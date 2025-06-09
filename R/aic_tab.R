@@ -101,12 +101,12 @@ aic_tab <- function(mod_list,
   }
 
   ## All models comparable
-  mod_dims <- as.vector(lapply(opt_list, function(x) insight::n_obs(x)))
+  mod_dims <- as.vector(lapply(opt_list, function(x) n_obs(x)))
   if(length(unique.default(mod_dims)) != 1L) {
     stop(cat("\n You are attempting to compare models with different number of sample locations. These are not valid comparisons. \n"))
   }
 
-  mod_eq <- as.vector(sapply(opt_list, function(x) (insight::find_formula(x)$conditional)[-2]))
+  mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))
   mod_kernel <- as.vector(sapply(mod_list[msclr], function(x) x$kernel_inputs$kernel))
   if(length(msclr) != length(mod_list)){
     mod_kernel <- c(mod_kernel, rep('NA', length(mod_list) - length(msclr)))
@@ -120,35 +120,32 @@ aic_tab <- function(mod_list,
 
     }
   } else {
-    k <- as.vector(sapply(opt_list[msclr], function(x) nrow(insight::get_parameters(x))[1])+1)
-    mod_df <- as.vector(sapply(opt_list, function(x) insight::n_obs(x)))
+    k <- as.vector(sapply(opt_list[msclr], function(x) nrow(get_parameters(x))[1])+1)
+    mod_df <- as.vector(sapply(opt_list, function(x) n_obs(x)))
     if(length(msclr) != length(mod_list)){
-      k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(insight::get_parameters(x))[1]))
+      k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(get_parameters(x))[1]))
       k <- c(k, k2)
 
     }
   }
 
-   k[(mod_kernel %in% 'expow')] <- k[(mod_kernel %in% 'expow')] + 1
+  k[(mod_kernel %in% 'expow')] <- k[(mod_kernel %in% 'expow')] + 1
 
   if(is.null(mod_names)){
     mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
   }
 
-  # mod_loglik <- as.vector(sapply(opt_list, function(x) insight::get_loglikelihood(x)))
   mod_loglik <- as.vector(sapply(opt_list, function(x) logLik(x)))
-  # mod_AIC <- as.vector(sapply(opt_list, function(x) x$aic))
-
 
   # AIC ---------------------------------------------------------------------
   if(AICc == FALSE) {
 
-    tab <- AICcmodavg::aictabCustom(logL = mod_loglik,
-                                    K = k,
-                                    modnames = mod_names,
-                                    second.ord = FALSE,
-                                    nobs = mod_df,
-                                    sort = TRUE)
+    tab <- aictabCustom(logL = mod_loglik,
+                        K = k,
+                        modnames = mod_names,
+                        second.ord = FALSE,
+                        nobs = mod_df,
+                        sort = TRUE)
 
     if(isTRUE(verbose)){
       return(print(tab))
@@ -160,12 +157,12 @@ aic_tab <- function(mod_list,
 
   } else {
 
-    tab <- AICcmodavg::aictabCustom(logL = mod_loglik,
-                                    K = k,
-                                    modnames = mod_names,
-                                    second.ord = TRUE,
-                                    nobs = mod_df,
-                                    sort = TRUE)
+    tab <- aictabCustom(logL = mod_loglik,
+                        K = k,
+                        modnames = mod_names,
+                        second.ord = TRUE,
+                        nobs = mod_df,
+                        sort = TRUE)
 
     if(isTRUE(verbose)){
       return(print(tab))
@@ -273,19 +270,19 @@ bic_tab <- function(mod_list,
   }
 
   ## All models comparable
-  mod_dims <- as.vector(lapply(opt_list, function(x) insight::n_obs(x)))
+  mod_dims <- as.vector(lapply(opt_list, function(x) n_obs(x)))
   if(length(unique.default(mod_dims)) != 1L) {
     stop(cat("\n You are attempting to compare models with different number of sample locations. These are not valid comparisons. \n"))
   }
 
-  mod_eq <- as.vector(sapply(opt_list, function(x) (insight::find_formula(x)$conditional)[-2]))
+  mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))
   mod_kernel <- as.vector(sapply(mod_list[msclr], function(x) x$kernel_inputs$kernel))
   if(length(msclr) != length(mod_list)){
     mod_kernel <- c(mod_kernel, rep('NA', length(mod_list) - length(msclr)))
   }
-  k <- as.vector(sapply(opt_list[msclr], function(x) nrow(insight::get_parameters(x))[1])+1)
+  k <- as.vector(sapply(opt_list[msclr], function(x) nrow(get_parameters(x))[1])+1)
   if(length(msclr) != length(mod_list)){
-    k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(insight::get_parameters(x))[1]))
+    k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(get_parameters(x))[1]))
     k <- c(k, k2)
   }
   k[(mod_kernel %in% 'expow')] <- k[(mod_kernel %in% 'expow')] + 1
@@ -294,19 +291,16 @@ bic_tab <- function(mod_list,
     mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
   }
 
-  # mod_loglik <- as.vector(sapply(opt_list, function(x) insight::get_loglikelihood(x)))
   mod_loglik <- as.vector(sapply(opt_list, function(x) logLik(x)))
-  mod_df <- as.vector(sapply(opt_list, function(x) insight::n_obs(x)))
-  # mod_AIC <- as.vector(sapply(opt_list, function(x) x$aic))
-
+  mod_df <- as.vector(sapply(opt_list, function(x) n_obs(x)))
 
   # * BIC ---------------------------------------------------------------------
 
-  tab <- AICcmodavg::bictabCustom(logL = mod_loglik,
-                                  K = k,
-                                  modnames = mod_names,
-                                  nobs = mod_df,
-                                  sort = TRUE)
+  tab <- bictabCustom(logL = mod_loglik,
+                      K = k,
+                      modnames = mod_names,
+                      nobs = mod_df,
+                      sort = TRUE)
 
   if(isTRUE(verbose)){
     return(print(tab))

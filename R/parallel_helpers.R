@@ -8,6 +8,8 @@
 #' @details For internal use
 #' @rdname cluster_prep
 #' @keywords internal
+#' @importFrom utils getS3method
+#' @importFrom methods getClassDef
 cluster_prep <- function(model, cl) {
 
   pkg <- extract_namespace(model)
@@ -49,10 +51,10 @@ cluster_prep <- function(model, cl) {
   }
 
   # Export pkg to workers
-  parallel::clusterExport(cl, varlist = "pkg", envir = environment())
+  clusterExport(cl, varlist = "pkg", envir = environment())
 
   # Load required packages on each worker
-  parallel::clusterEvalQ(cl, {
+  clusterEvalQ(cl, {
     library(pkg, character.only = TRUE)
     library("multiScaleR")
   })
@@ -75,8 +77,11 @@ cluster_prep <- function(model, cl) {
 #'   if the namespace cannot be determined.
 #'
 #' @examples
-#' mod <- spaMM::fitme(...)  # assuming valid call
+#' \dontrun{
+#' #' ## Not Run
+#' mod <- stats::glm(...)  # assuming valid call
 #' extract_namespace(mod)
+#' }
 #'
 #' @details For internal use
 #' @rdname extract_namespace

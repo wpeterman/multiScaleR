@@ -11,11 +11,12 @@
 #' @details For internal use
 #' @rdname kernel_scale_fn
 #' @keywords internal
-#' @importFrom insight get_data get_loglikelihood
-#' @importFrom stats formula logLik
+#' @importFrom insight get_data get_loglikelihood find_predictors
+#' @importFrom stats formula logLik model.frame
 #' @importFrom unmarked logLik update
 #' @useDynLib multiScaleR, .registration=TRUE
 #' @importFrom Rcpp evalCpp
+#' @importFrom methods is
 kernel_scale_fn <- function(par,
                             d_list,
                             cov_df,
@@ -24,11 +25,6 @@ kernel_scale_fn <- function(par,
                             join_by = NULL,
                             mod_return = NULL){
 
-
-  # D <- kernel_inputs$D
-  # d_list <- kernel_inputs$d_list
-  # cov_df <- kernel_inputs$raw_cov
-  # kernel <- kernel_inputs$kernel
   n_ind <- length(d_list)
   mod <- fitted_mod
 
@@ -36,10 +32,8 @@ kernel_scale_fn <- function(par,
 
   if(any(class(mod) == 'gls')){
     mod_class <- 'gls'
-    covs <- insight::find_predictors(mod)$conditional
-    dat <- insight::get_data(mod)
-    # dat <- nlme::getData(mod)
-    # covs <- all.vars(formula(mod)[-2])
+    covs <- find_predictors(mod)$conditional
+    dat <- get_data(mod)
     covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   } else if(any(grepl("^unmarked", class(mod)))) {
@@ -50,17 +44,18 @@ kernel_scale_fn <- function(par,
     n_covs <- length(covs)
   } else if(any(class(mod) == 'glm')) {
     mod_class <- 'glm'
-    covs <- insight::find_predictors(mod)$conditional
-    dat <- insight::get_data(mod)
-    dat0 <- insight::get_data(mod)
-    # dat <- fitted_mod$data
-    # covs <- all.vars(formula(mod)[-2])
+    covs <- find_predictors(mod)$conditional
+    dat <- get_data(mod)
+    dat0 <- get_data(mod)
     covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   } else {
     mod_class <- 'other'
-    covs <- insight::find_predictors(mod)$conditional
-    dat <- insight::get_data(mod)
+    dat <- extract_model_data(mod)
+    if(is.null(dat)){
+      dat <- get_data(mod, effects = 'all')
+    }
+    covs <- find_predictors(mod)$conditional
     covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   }
@@ -68,7 +63,6 @@ kernel_scale_fn <- function(par,
   if(is.null(dat)){
     stop("Data from original model not saved to data frame. Try using `glm`.\n UDPATE FUNCTION TO GENERALIZE!!!")
   }
-
 
   cov.w <- vector('list', n_ind)
   sigma <- par[1:n_covs]
@@ -145,12 +139,12 @@ kernel_scale_fn <- function(par,
       obj <- try(mod_u@negLogLike)
     }
 
-    if(class(obj) == 'try-error'){
+    if(inherits(obj, "try-error")){
       obj <- try(logLik(mod_u)[1] * -1)
     }
 
-    if(class(obj) == 'try-error'){
-      obj <- insight::get_loglikelihood(mod_u)[1] * -1
+    if(inherits(obj, "try-error")){
+      obj <- get_loglikelihood(mod_u)[1] * -1
     }
 
   } else {
@@ -161,4 +155,49 @@ kernel_scale_fn <- function(par,
     #             scl_params = NULL)
   }
   return(obj)
+}
+
+
+## Custom data extraction
+extract_model_data <- function(model) {
+  # Try common extraction methods
+  data <- tryCatch({
+    # Method 1: model.frame() (works for most stats models)
+    mf <- model.frame(model)
+    if (!is.null(mf)) return(mf)
+
+    # Method 2: Check for @frame (lme4, glmmTMB)
+    if (is(model, "merMod") || is(model, "glmmTMB")) {
+      return(model@frame)
+    }
+
+    # Method 3: Check for $data (some packages store it here)
+    if (!is.null(model$data)) {
+      return(model$data)
+    }
+
+    # Method 4: Try eval(model$call$data) (if data was passed in the call)
+    if (!is.null(model$call$data)) {
+      data_name <- as.character(model$call$data)
+      if (exists(data_name, envir = parent.frame())) {
+        return(get(data_name, envir = parent.frame()))
+      }
+    }
+
+    # Method 5: For spaMM models (specific checks)
+    if (inherits(model, "HLfit")) {
+      if (!is.null(model$data)) return(model$data)
+      # Alternative for spaMM: model$fr
+      if (!is.null(model$fr)) return(model$fr)
+    }
+
+    # Fallback: Return NULL if no method worked
+    warning("Could not extract data from model object.")
+    NULL
+  }, error = function(e) {
+    warning("Failed to extract data: ", e$message)
+    NULL
+  })
+
+  return(data)
 }

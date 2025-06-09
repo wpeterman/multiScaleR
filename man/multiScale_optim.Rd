@@ -65,7 +65,6 @@ mod1 <- glm(y ~ r1 + r2,
 
 ## NOTE: This code is only for demonstration
 ## Optimization results will have no meaning
-
 opt_mod <- multiScale_optim(fitted_mod = mod1,
                             kernel_inputs = kernel_inputs,
                             par = NULL,
@@ -74,7 +73,8 @@ opt_mod <- multiScale_optim(fitted_mod = mod1,
 ## Using package data
 data('pts')
 data('count_data')
-hab <- terra::rast(system.file('data/hab.tif', package = 'multiScaleR'))
+hab <- terra::rast(system.file('extdata',
+                   'hab.tif', package = 'multiScaleR'))
 
 kernel_inputs <- kernel_prep(pts = pts,
                              raster_stack = hab,
@@ -102,11 +102,19 @@ plot(opt)
 
 
 ## Apply optimized kernel to the environmental raster
-opt_hab <- kernel_scale.raster(hab, scale_opt = opt)
+opt_hab <- kernel_scale.raster(hab, multiScaleR = opt)
 
 plot(c(hab, opt_hab))
 
+## Project model; scale & center
+opt_hab.s_c <- kernel_scale.raster(raster_stack = hab,
+                                   multiScaleR = opt,
+                                   scale_center = TRUE)
+
+mod_pred <- predict(opt_hab.s_c, opt$opt_mod, type = 'response')
+plot(mod_pred)
+
 }
 \seealso{
-\code{\link[kernel_dist]{kernel_dist}}
+\code{\link[multiScaleR]{kernel_dist}}
 }

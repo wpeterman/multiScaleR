@@ -1,31 +1,35 @@
 #' @title Scale Distance
 #' @description Function to estimate the effective distance encompassing a specified probability density of the kernel density function
-#' @param x \code{\link[multiScaleR]{multiScaleR}} object
+#' @param model \code{\link{multiScale_optim}} object of class 'multiScaleR'
 #' @param prob Density probability cutoff for calculating distance, Default: 0.9
 #' @param ... Parameters to be used if not providing a 'multiScaleR' fitted object. See Details
 #' @return Distance at which cumulative density of kernel is reached
 #' @details This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
-#' @seealso \code{\link[multiScaleR]{plot.multiScaleR}}
+#' @seealso \code{\link{plot.multiScaleR}}
 #' @examples
-#' kernel_dist(x)
+#' \dontrun{
+#' kernel_dist(model)
+#'
+#' kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
+#' }
 #'
 #' @rdname kernel_dist
 #' @export
+#' @importFrom insight get_df
+
 kernel_dist <- function(model,
                         prob = 0.9,
                         ...){
-
   param_list <- list(...)
 
   if(!missing("model")){
-    if(class(model) != 'multiScaleR'){
+    if(!inherits(model, "multiScaleR")){
       stop("Provide a fitted `multiScaleR` model object")
     }
   }
 
-
   if((!is.numeric(prob) | prob < 0 | prob > 1)){
-    stop("`prob` must be a decimal between 0–1")
+    stop("`prob` must be a decimal between 0 and 1")
   }
 
   if(!missing("model")){
@@ -45,7 +49,7 @@ kernel_dist <- function(model,
         names <- all.vars(model$opt_mod@formula)
 
       } else {
-        df <- insight::get_df(model$opt_mod, type = "residual")
+        df <- get_df(model$opt_mod, type = "residual")
         names <- all.vars(formula(model$opt_mod)[-2])
       }
 
@@ -81,13 +85,13 @@ kernel_dist <- function(model,
                                shape = model$shape_est[i,1],
                                output = 'wts')
 
-          scale_mn <- Hmisc::wtd.Ecdf(d, weights = wt_mn)
+          scale_mn <- wtd.Ecdf(d, weights = wt_mn)
           scale_mn <- round(scale_mn$x[which(scale_mn$ecdf > prob)[1]], digits = 2)
 
-          scale_l <- Hmisc::wtd.Ecdf(d, weights = wt_l)
+          scale_l <- wtd.Ecdf(d, weights = wt_l)
           scale_l <- round(scale_l$x[which(scale_l$ecdf > prob)[1]], digits = 2)
 
-          scale_u <- Hmisc::wtd.Ecdf(d, weights = wt_u)
+          scale_u <- wtd.Ecdf(d, weights = wt_u)
           scale_u <- round(scale_u$x[which(scale_u$ecdf > prob)[1]], digits = 2)
         } else {
           scale_mn <- NaN
@@ -127,7 +131,7 @@ kernel_dist <- function(model,
                      shape = shp_,
                      output = 'wts')
 
-    mx <- Hmisc::wtd.Ecdf(d, weights = wt)
+    mx <- wtd.Ecdf(d, weights = wt)
     mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
     d <- seq(1, mx, length.out = 100)
@@ -137,7 +141,7 @@ kernel_dist <- function(model,
                      shape = shp_,
                      output = 'wts')
 
-    scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], 2)
+    scale_d <- round(d[which(wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], 2)
     return(scale_d)
   } else {
     stop("Parameters not correctly specified to calculate distance. See Details and try again.")
