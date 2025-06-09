@@ -26,7 +26,6 @@
 #' @return
 #' Four spatRaster surfaces. Two 1/0 binary surfaces and two continuous surfaces.
 #' @export
-#' @importFrom gstat gstat vgm
 #' @examples
 #'
 #' sim1 <- sim_rast()
@@ -39,7 +38,9 @@
 #' Requires `NLMR` package to be installed (https://github.com/ropensci/NLMR). This is a simple wrapper to create four different raster surfaces. Surfaces differ in the range of autocorrelation. Binary surfaces are created by thresholding continuous values of the Gaussian random surface.
 #'
 #' @rdname sim_rast
-#' @importFrom terra as.int rast plot
+#' @importFrom terra as.int rast plot minmax ext<- values<- crs<-
+#' @importFrom gstat gstat vgm
+#' @importFrom stats rpois rnbinom plogis rbinom dist predict
 
 sim_rast <- function(dim = 100,
                      resolution = 10,
@@ -74,14 +75,10 @@ sim_rast <- function(dim = 100,
     user_seed1 <- user_seed2 <- user_seed3 <- user_seed4 <- user_seed
   }
 
-  r <- terra::rast(nrows = dim, ncols = dim,
-                   xmin = 0, xmax = dim*resolution,
-                   ymin = 0, ymax = dim*resolution,
-                   resolution = resolution)
-  # terra::values(r) <- as.vector(terra::rast(sim_data[, c("x", "y", "sim1")]))
-  # r <- (r - minmax(r)[1]) / (minmax(r)[2] - minmax(r)[1])
-
-  # plot(r, main = "Gaussian Random Field")
+  r <- rast(nrows = dim, ncols = dim,
+            xmin = 0, xmax = dim*resolution,
+            ymin = 0, ymax = dim*resolution,
+            resolution = resolution)
 
   set.seed(user_seed1)
   g <- gstat(
@@ -100,7 +97,7 @@ sim_rast <- function(dim = 100,
 
   # Simulate the Gaussian field
   sim_data <- predict(g, newdata = grid, nsim = 1)
-  terra::values(r) <- as.vector(terra::rast(sim_data[, c("x", "y", "sim1")]))
+  values(r) <- as.vector(rast(sim_data[, c("x", "y", "sim1")]))
   r <- (r - minmax(r)[1]) / (minmax(r)[2] - minmax(r)[1])
   bin1 <- as.numeric((r >= 0.55))
 
@@ -120,7 +117,7 @@ sim_rast <- function(dim = 100,
   )
   # Simulate the Gaussian field
   sim_data <- predict(g, newdata = grid, nsim = 1)
-  terra::values(r) <- as.vector(terra::rast(sim_data[, c("x", "y", "sim1")]))
+  values(r) <- as.vector(rast(sim_data[, c("x", "y", "sim1")]))
   r <- (r - minmax(r)[1]) / (minmax(r)[2] - minmax(r)[1])
   bin2 <- as.numeric(r < 0.4)
 
@@ -141,7 +138,7 @@ sim_rast <- function(dim = 100,
   )
   # Simulate the Gaussian field
   sim_data <- predict(g, newdata = grid, nsim = 1)
-  terra::values(r) <- as.vector(terra::rast(sim_data[, c("x", "y", "sim1")]))
+  values(r) <- as.vector(rast(sim_data[, c("x", "y", "sim1")]))
   cont1 <- (r - minmax(r)[1]) / (minmax(r)[2] - minmax(r)[1])
 
 
@@ -161,7 +158,7 @@ sim_rast <- function(dim = 100,
   )
   # Simulate the Gaussian field
   sim_data <- predict(g, newdata = grid, nsim = 1)
-  terra::values(r) <- as.vector(terra::rast(sim_data[, c("x", "y", "sim1")]))
+  values(r) <- as.vector(rast(sim_data[, c("x", "y", "sim1")]))
   cont2 <- (r - minmax(r)[1]) / (minmax(r)[2] - minmax(r)[1])
 
   r_stack <- rast(list(bin1 = (bin1),

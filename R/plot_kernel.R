@@ -39,7 +39,7 @@ plot_kernel <- function(prob = 0.9,
                         add_label = TRUE,
                         ...) {
   if(isTRUE(scale_dist) & (!is.numeric(prob) | prob < 0 | prob > 1)){
-    stop("`prob` must be a number between 0–1")
+    stop("`prob` must be a decimal between 0 and 1")
   }
 
   sig_ <- sigma
@@ -71,7 +71,7 @@ plot_kernel <- function(prob = 0.9,
   #                  shape = shp_,
   #                  output = 'wts')
 
-  mx <- Hmisc::wtd.Ecdf(d, weights = wt)
+  mx <- wtd.Ecdf(d, weights = wt)
   mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
   d <- seq(1, mx, length.out = 100)
@@ -87,7 +87,7 @@ plot_kernel <- function(prob = 0.9,
   #                  shape = shp_,
   #                  output = 'wts')
 
-  scale_d <- round(d[which(Hmisc::wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
+  scale_d <- round(d[which(wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
 
   df <- data.frame(dist = d,
                    wt = wt)
@@ -114,6 +114,6 @@ plot_kernel <- function(prob = 0.9,
     } +
     xlab('Distance') +
     ylab('Weight') +
-    cowplot::theme_cowplot()
+    theme_cowplot()
 }
 

@@ -4,15 +4,13 @@
 \alias{pts}
 \title{Spatial sample points}
 \format{
-## `pts`
-}
-\usage{
-data(pts)
 An sf class point object:
 \describe{
   \item{pts}{ --> spatial location of points}
-  ...
 }
+}
+\usage{
+data(pts)
 }
 \description{
 Example point file for optimizing scales of effect

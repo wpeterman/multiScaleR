@@ -14,27 +14,26 @@ vignette: >
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache.path = "cache/")
 library(multiScaleR)
-load("cache/vignette_data1.RData")
-load("cache/vignette_data2.RData")
-load("cache/vignette_data3.RData")
-load("cache/vignette_data4.RData")
-load("cache/vignette_data5.RData")
-load("cache/vignette_data6.RData")
-load("cache/vignette_data7.RData")
-load("cache/vignette_data8.RData")
-load("cache/vignette_data9.RData")
-load("cache/vignette_data10.RData")
-load("cache/vignette_data11.RData")
-load("cache/vignette_data12.RData")
+load(system.file("extdata", "vignette_data1.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data2.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data3.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data4.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data5.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data6.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data7.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data8.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data9.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data10.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data11.RData", package = 'multiScaleR'))
+load(system.file("extdata", "vignette_data12.RData", package = 'multiScaleR'))
 ```
 
 # Background
 
 Many abiotic and ecological processes are a result of variables operating at multiple scales. Such multiscale ecological processes can be challenging to quantify, especially when the surrounding landscape contributes to the process. The extent and magnitude of contribution from the surrounding landscape is often referred to as the 'scale of effect'. Determining the scales of effect has long been the focus of ecologists seeking to address multiscale ecological questions, but until recently, methods to rigorously and can identify such scales have been lacking. With advanced coding skills, Bayesian analytical frameworks can be used (e.g., Stuber & Gruber 2020; Amirkhiz et al. 2023). More recently, user-friendly methods, implemented in R, have been developed (`Siland`: Carpentier & Martin 2021; `Scalescape`: Lowe et al. 2022). Both of these packages, like `multiScaleR`, estimate distance-weighted landscape effects (i.e. scales of effect). All take a similar approach to achieving this goal, but each works with different model classes and have different functions available to users.
 
-`multiScaleR` is fully supported in handling models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and that is a supported class in the R package [insight](https://cran.r-project.org/web/packages/insight/index.html). Let me know if you encounter issues or would like to see support for other model classes.
+`multiScaleR` is fully supported in handling models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and that is a supported class in the R package [insight](https://cran.r-project.org/web/packages/insight/index.html). This package has been developed to provide an efficient modeling workflow, facilitating scaling of rasters and spatial projections of optimized models. Let me know if you encounter issues or would like to see support for other model classes.
 
 **References**
 
@@ -105,7 +104,9 @@ dat <- landscape_counts
 data("surv_pts")
 pts <- surv_pts
 
-land_rast <- terra::rast(system.file("data/landscape.tif", package = 'multiScaleR'))
+land_rast <- terra::rast(system.file("extdata", 
+                                     "landscape.tif", 
+                                     package = 'multiScaleR'))
 ```
 
 The `landscape_counts` data frame contains simulated counts from 100 spatial point locations as well as a scaled and centered site-level covariate ('site'). The `landscape.tif` file is a `spatRaster` object consisting of three surfaces (land1 = binary habitat; land2 = continuous habitat / environment; land3 = continuous / environment). The counts were simulated using the following parameters:
@@ -196,7 +197,7 @@ We get some helpful warning messages indicating the estimated scale of effect fo
 summary(opt1)
 ```
 
-At the bottom of the output is the standard `GLM` model summary output. We see that `site` appears to have no effect, `land1` a negative effect, `land2` a positive effect and `land3` a weak positive effect on the observed counts. At the top of the summary output is the estimated sigma terms related to the Gaussian kernel for each raster layer. The standard error and 95% confidence intervals are also reported. Below this, the actual distance effect is calculated. By default, the distance that encompasses 90% of the kernel weight is identified. From these summaries, we see that `land3` is the variable that may have a larger scale of effect than we anticipated, but that it is also being imprecisely estimated. This may be a red flag that the variable is not relevant to the analysis and/or should not be scaled.
+At the bottom of the output is the standard `GLM` model summary output. We see that `site` appears to have no effect, `land1` a negative effect, `land2` a positive effect and `land3` a weak positive effect on the observed counts. At the top of the summary output are the estimated sigma terms related to the Gaussian kernel for each raster layer. The standard error and 95% confidence intervals are also reported. Below this, the actual distance effect is calculated. By default, the distance that encompasses 90% of the kernel weight is identified. From these summaries, we see that `land3` is the variable that may have a larger scale of effect than we anticipated, but that it is also being imprecisely estimated. This may be a red flag that the variable is not relevant to the analysis and/or should not be scaled.
 
 We could update `max_D` by re-running `kernel_prep`, but we won't do that here. One thing to be aware of when optimizing scales of effect is that it is possible to have overfit models with parameters that don't have a strong relationship with your response. With this simulated data, we know that `land3` actually has no effect. Let's fit another model without this variable.
 
@@ -234,7 +235,7 @@ We can also apply the optimized kernel to the raster surfaces.
 
 ```{r kernel_raster}
 rast_opt <- kernel_scale.raster(raster_stack = land_rast,
-                                scale_opt = opt2)
+                                multiScaleR = opt2)
 plot(rast_opt)
 ```
 
@@ -419,6 +420,28 @@ summary(opt_umf.p)
 plogis(opt_umf.p$opt_mod@estimates@estimates$det@estimates[[1]])
 ```
 
+### Project model
+
+Finally, we may want to project our fitted model to the landscape to make spatial predictions. To do this, we need to scale and center our raster surfaces after applying our kernel transformations. The `spatRaster` object can then be used with the `terra::predict` function. Depending upon the spatial coverage of your sample points, you may find predicted values across a broader region unrealistic. In these instances, you may need to clamp the scaled rasters to be within a reasonable range of those observed in your sample data.
+
+```{r}
+## Project model 
+rast_scale.center <- kernel_scale.raster(raster_stack = rs,
+                                         multiScaleR = opt_umf.p,
+                                         scale_center = TRUE,
+                                         clamp = TRUE,
+                                         pct_mx = 0.05)
+
+plot(rast_scale.center)
+
+
+ab.mod_pred <- terra::predict(rast_scale.center, 
+                             opt_umf.p$opt_mod, 
+                             type = 'state')
+
+plot(ab.mod_pred)
+```
+
 ## Binomial Occurrence Model
 
 Now we'll simulate occurrence data suitable for analysis with `unmarked`. Preliminary experience has shown that simulation parameters can be harder to recover when using an occupancy model in `unmarked` with `multiScaleR`. We'll use the same raster surfaces.
@@ -469,6 +492,23 @@ plogis(opt_umf.occ$opt_mod@estimates@estimates$det@estimates[[1]])
 ```
 
 We did a decent job of recovering simulated values. Note that the sample size was increased for this simulation. Previous explorations suggested that smaller sample sizes (e.g., 100) did not contain enough information to optimize the scales of effect (`sigma`). There is opportunity for further exploration of data needs / limitations for estimating scales of effect, especially related to more complex models such those fit with `unmarked`.
+
+### Project model
+
+```{r}
+## Project model 
+rast_scale.center <- kernel_scale.raster(raster_stack = rs,
+                                         multiScaleR = opt_umf.occ,
+                                         scale_center = TRUE,
+                                         clamp = F)
+plot(rast_scale.center)
+
+occ.mod_pred <- terra::predict(rast_scale.center, 
+                             opt_umf.occ$opt_mod, 
+                             type = 'state')
+
+plot(occ.mod_pred)
+```
 
 # Other Functions & Features
 
@@ -595,5 +635,5 @@ summary(sim_opt)
 plot(sim_opt)
 
 plot(kernel_scale.raster(raster_stack = r_sim1,
-                         scale_opt = sim_opt))
+                         multiScaleR = sim_opt))
 ```

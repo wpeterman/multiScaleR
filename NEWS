@@ -1,3 +1,14 @@
+multiScaleR 0.4.0-0
+---------
+* Incorporated scaling & centering `kernel_scale.raster`
+* `scale_opt` is now deprecated in `kernel_scale.raster`; replaced with `multiScaleR` argument.
+* Updated package data file structure
+* Passes CRAN checks
+
+multiScaleR 0.3.1-4
+---------
+* Updates to better generalize across model classes
+
 multiScaleR 0.3.1-3
 ---------
 * Updated parallel processing handling to generalize use across model classes
