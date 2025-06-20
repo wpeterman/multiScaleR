@@ -7,7 +7,7 @@
 plot_kernel(
   prob = 0.9,
   sigma,
-  shape = NULL,
+  beta = NULL,
   kernel,
   scale_dist = TRUE,
   add_label = TRUE,
@@ -19,7 +19,7 @@ plot_kernel(
 
 \item{sigma}{Value of scaling parameter, sigma}
 
-\item{shape}{If plotting an Exponential Power kernel. Values between 1-50 are typically valid. (Default = NULL)}
+\item{beta}{Numeric. Shape parameter for exponential power kernel. Ignored unless kernel = "expow". Values between 1-50 are typically valid. (Default = NULL)}
 
 \item{kernel}{Kernel function to use. Valid functions are c('exp', 'gaussian', fixed', 'expow'). See details}
 
@@ -36,7 +36,7 @@ ggplot2 objects of kernel density distributions
 Generic function to plot kernels
 }
 \details{
-This function is used to visualize kernel density distributions without having a fitted multiScaleR optimized object. Requires (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+This function is used to visualize kernel density distributions without having a fitted multiScaleR optimized object. Requires (1) sigma, (2) beta (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 }
 \examples{
 #' ## General use of plot method
@@ -51,6 +51,6 @@ plot_kernel(prob = 0.95,
             kernel = 'fixed')
 plot_kernel(prob = 0.95,
             sigma = 100,
-            shape = 2.5,
+            beta = 2.5,
             kernel = 'expow')
 }

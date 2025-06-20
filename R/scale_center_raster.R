@@ -27,16 +27,17 @@ scale_center_raster <- function(r,
   covs <- names(r)
 
   if(inherits(multiScaleR, "multiScaleR_data")){
-    mns <- multiScaleR$scl_params$mean
-    sds <- multiScaleR$scl_params$sd
+    # covs_ <- names(multiScaleR$scl_params$mean)
+    # covs <- intersect(covs, covs_)
+
+    mns <- multiScaleR$scl_params$mean[covs]
+    sds <- multiScaleR$scl_params$sd[covs]
     dat <- multiScaleR$kernel_dat
-    # r_ <- r
     r_ <- vector('list', length(covs))
     names(r_) <- covs
   } else {
-    mns <- multiScaleR$scl_params$mean
-    sds <- multiScaleR$scl_params$sd
-    # r_ <- r
+    mns <- multiScaleR$scl_params$mean[covs]
+    sds <- multiScaleR$scl_params$sd[covs]
     r_ <- vector('list', length(covs))
     names(r_) <- covs
     mod <- multiScaleR$opt_mod

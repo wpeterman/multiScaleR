@@ -14,19 +14,22 @@ kernel_dist(model, prob = 0.9, ...)
 \item{...}{Parameters to be used if not providing a 'multiScaleR' fitted object. See Details}
 }
 \value{
-Distance at which cumulative density of kernel is reached
+Numeric. Distance at which the cumulative kernel density reaches the specified proportion.
 }
 \description{
-Function to estimate the effective distance encompassing a specified probability density of the kernel density function
+Function to estimate the effective distance encompassing a specified cumulative probability density of the kernel function
 }
 \details{
-This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) beta (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 }
 \examples{
 \dontrun{
 kernel_dist(model)
-
+kernel_dist(model, prob = 0.95)
 kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
+kernel_distance(sigma = 100, prob = 0.975, kernel = "exp")
+kernel_distance(sigma = 100, prob = 0.95, kernel = "expow", beta = 1.5)
+kernel_distance(sigma = 100, kernel = "fixed")
 }
 
 }

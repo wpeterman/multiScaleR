@@ -103,7 +103,8 @@ summary.multiScaleR <- function(object,...){
 
   if(!is.null(object$shape_est)){
     tab_shape <- ci_func(object$shape_est,
-                         df = object$opt_mod$df.residual,
+                         df = df,
+                         min_D = NULL,
                          names = row.names(object$shape_est))
 
     out <- list(opt_scale = tab_scale,

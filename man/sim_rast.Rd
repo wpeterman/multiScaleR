@@ -4,28 +4,27 @@
 \alias{sim_rast}
 \title{Function to simulate raster surfaces}
 \usage{
-sim_rast(dim = 100,
-         resolution = 10,
-         autocorr_range1 = NULL,
-         autocorr_range2 = NULL,
-         mag_var = 10,
-         nug = 3,
-         plot = FALSE,
-         user_seed = NULL,
-         ...)
+sim_rast(
+  dim = 100,
+  resolution = 10,
+  autocorr_range1 = NULL,
+  autocorr_range2 = NULL,
+  sill = 10,
+  plot = FALSE,
+  user_seed = NULL,
+  ...
+)
 }
 \arguments{
 \item{dim}{Dimension (number of cells) on a side a square raster (Default = 100)}
 
 \item{resolution}{Resolution of raster cells (Default = 10)}
 
-\item{autocorr_range1}{Optional, range in cells for autocorrelation of first binary raster. If NULL (default), autocorrelation range will be 0.03 of specified dimension.}
+\item{autocorr_range1}{Optional, Numeric. Spatial correlation range in map cells. Controls the decay of the exponential covariance. If NULL (default), autocorrelation range will be 5\% of specified dimension.}
 
-\item{autocorr_range2}{Optional, range in cells for autocorrelation of second second raster. If NULL (default), autocorrelation range will be 0.15 of specified dimension.}
+\item{autocorr_range2}{Optional, Numeric. Spatial correlation range in map cells. Controls the decay of the exponential covariance. If NULL (default), autocorrelation range will be 25\% of specified dimension.}
 
-\item{mag_var}{Magnitude of variation over the entire landscape (Default = 10)}
-
-\item{nug}{Magnitude of variation in the scale of autocorr_range, smaller values lead to more homogeneous landscapes. (Default = 3)}
+\item{sill}{Numeric. Variance (partial sill) of the random field (default = 10).}
 
 \item{plot}{Logical. If TRUE, the spatRaster stack will be plotted following the simulation}
 
@@ -37,11 +36,10 @@ sim_rast(dim = 100,
 Four spatRaster surfaces. Two 1/0 binary surfaces and two continuous surfaces.
 }
 \description{
-Function to create four spatRaster surfaces, simulated using the \code{\link[gstat]{gstat}} package.
- description
+Function to create four spatRaster surfaces
 }
 \details{
-Requires `NLMR` package to be installed (https://github.com/ropensci/NLMR). This is a simple wrapper to create four different raster surfaces. Surfaces differ in the range of autocorrelation. Binary surfaces are created by thresholding continuous values of the Gaussian random surface.
+This is a simple wrapper to create four different raster surfaces. Surfaces differ in the range of autocorrelation. Binary surfaces are created by thresholding continuous values of the Gaussian random surface.
 }
 \examples{
 

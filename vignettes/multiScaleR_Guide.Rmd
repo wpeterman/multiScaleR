@@ -26,7 +26,7 @@ load(system.file("extdata", "vignette_data8.RData", package = 'multiScaleR'))
 load(system.file("extdata", "vignette_data9.RData", package = 'multiScaleR'))
 load(system.file("extdata", "vignette_data10.RData", package = 'multiScaleR'))
 load(system.file("extdata", "vignette_data11.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data12.RData", package = 'multiScaleR'))
+load(system.file("extdata", "opt_occ.RData", package = 'multiScaleR'))
 ```
 
 # Background
@@ -69,12 +69,12 @@ There are *many* different kernel transformations that could be used to quantify
                 add_label = F)
     ```
 
-3.  Exponential Power (`expow`) -- Decay in space governed by a scale parameter (sigma), and shape parameter (shape)
+3.  Exponential Power (`expow`) -- Decay in space governed by a scale parameter (sigma), and shape parameter (beta)
 
     ```{r echo=FALSE}
     plot_kernel(prob = 0.9, 
                 sigma = 250, 
-                shape = 5,
+                beta = 5,
                 kernel = "expow", 
                 scale_dist = F,
                 add_label = F)
@@ -102,7 +102,7 @@ data("landscape_counts")
 dat <- landscape_counts
 
 data("surv_pts")
-pts <- surv_pts
+pts <- vect(surv_pts)
 
 land_rast <- terra::rast(system.file("extdata", 
                                      "landscape.tif", 
@@ -148,7 +148,7 @@ plot(land_rast)
 
 ## Plot with points
 plot(land_rast$land1) 
-plot(st_geometry(pts), add = T, pch = 19)
+plot(pts, add = T, pch = 19)
 ```
 
 ## `kernel_prep`
@@ -231,6 +231,12 @@ plot(opt2)
 plot(opt2, prob = 0.99)
 ```
 
+In addition to the plotting the kernel function, effects plots from the fitted model object can also be generated using `plot_marginal_effects`
+
+```{r}
+plot_marginal_effects(opt2)
+```
+
 We can also apply the optimized kernel to the raster surfaces.
 
 ```{r kernel_raster}
@@ -272,8 +278,8 @@ opt_exp <- multiScale_optim(fitted_mod = mod0_2,
 ## Starting values needed
 opt_expow <- multiScale_optim(fitted_mod = mod0_2,
                               kernel_inputs = expow_inputs,
-                              par = c(500/expow_inputs$max_D,
-                                      500/exp_inputs$max_D,
+                              par = c(500/expow_inputs$unit_conv,
+                                      500/exp_inputs$unit_conv,
                                       5,10))
 
 opt_fixed <- multiScale_optim(fitted_mod = mod0_2,
@@ -420,6 +426,13 @@ summary(opt_umf.p)
 plogis(opt_umf.p$opt_mod@estimates@estimates$det@estimates[[1]])
 ```
 
+Assess kernel and effects plots
+
+```{r}
+plot(opt_umf.p)
+plot_marginal_effects(opt_umf.p)
+```
+
 ### Project model
 
 Finally, we may want to project our fitted model to the landscape to make spatial predictions. To do this, we need to scale and center our raster surfaces after applying our kernel transformations. The `spatRaster` object can then be used with the `terra::predict` function. Depending upon the spatial coverage of your sample points, you may find predicted values across a broader region unrealistic. In these instances, you may need to clamp the scaled rasters to be within a reasonable range of those observed in your sample data.
@@ -447,16 +460,16 @@ plot(ab.mod_pred)
 Now we'll simulate occurrence data suitable for analysis with `unmarked`. Preliminary experience has shown that simulation parameters can be harder to recover when using an occupancy model in `unmarked` with `multiScaleR`. We'll use the same raster surfaces.
 
 ```{r}
-s_dat.occ <- sim_dat_unmarked(alpha = 0.75,
-                              beta = c(-1.25,0.75),
+s_dat.occ <- sim_dat_unmarked(alpha = 0.25,
+                              beta = c(-0.75,1),
                               kernel = 'gaussian',
-                              sigma = c(75, 75),
-                              n_points = 200,
+                              sigma = c(225, 75),
+                              n_points = 250,
                               n_surv = 5,
                               det = 0.5,
                               type = 'occ',
                               raster_stack = rs,
-                              max_D = 650,
+                              max_D = 800,
                               user_seed = 555)
 
 plot(s_dat.occ$df$y ~ s_dat.occ$df$bin1)
@@ -468,7 +481,7 @@ Prepare inputs for use with `multiScaleR`
 ```{r}
 kernel_inputs <- kernel_prep(pts = s_dat.occ$pts,
                              raster_stack = rs,
-                             max_D = 650,
+                             max_D = 800,
                              kernel = 'gaus')
 
 ## Occupancy frame
@@ -527,14 +540,14 @@ kernel_dist(opt2, prob = 0.95)
 
 ```
 
-It's also possible to calculate distance of specified kernels without a fitted model.
+It's also possible to calculate the distance encompassed by specified kernels without a fitted model.
 
 ```{r}
 kernel_dist(kernel = "gaussian", sigma = 100, prob = 0.9)
 
 kernel_dist(kernel = "exp", sigma = 100, prob = 0.9)
 
-kernel_dist(kernel = "expow", sigma = 100, shape = 5, prob = 0.9)
+kernel_dist(kernel = "expow", sigma = 100, beta = 5, prob = 0.9)
 ```
 
 ## `plot_kernel`
@@ -546,7 +559,7 @@ plot_kernel(kernel = 'exp',
             sigma = 50)
 
 plot_kernel(kernel = 'expow',
-            shape = 5,
+            beta = 5,
             sigma = 50)
 
 plot_kernel(kernel = 'gaussian',
@@ -575,9 +588,9 @@ r_sim1 <- sim_rast(dim = 100,
 
 r_sim2 <- sim_rast(dim = 100,
                    resolution = 30,
-                   autocorr_range1 = 25,
-                   autocorr_range2 = 50,
-                   nug = 1,
+                   autocorr_range1 = 100,
+                   autocorr_range2 = 1,
+                   sill = 10,
                    user_seed = 555)
 
 plot(r_sim1)
@@ -636,4 +649,6 @@ plot(sim_opt)
 
 plot(kernel_scale.raster(raster_stack = r_sim1,
                          multiScaleR = sim_opt))
+
+plot_marginal_effects(sim_opt)
 ```

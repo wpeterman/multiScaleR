@@ -29,7 +29,6 @@
 #' @export
 #' @method plot multiScaleR
 #'
-#' @importFrom Hmisc wtd.Ecdf
 #' @importFrom cowplot theme_cowplot
 #' @importFrom ggplot2 aes annotate geom_line geom_vline ggplot xlab ylab theme_light geom_rect ggtitle
 plot.multiScaleR <- function(x,
@@ -74,16 +73,21 @@ plot.multiScaleR <- function(x,
   s <- which(!is.nan(sig_$SE))
   for(t in 1:length(s)){
     i <- s[t]
-    d <- seq(1, round(max(sig_[i,])*1000,0),
-             length.out = round(max(sig_[i,])*1000,0))
-    wt <- scale_type_r(d = d,
-                       kernel = x$kernel_inputs$kernel,
-                       sigma = x$scale_est[[1]][i],
-                       shape = x$shape_est[[1]][i],
-                       output = 'wts')
+    # d <- seq(1, round(max(sig_[i,])*1000,0),
+    #          length.out = round(max(sig_[i,])*1000,0))
+    # wt <- scale_type_r(d = d,
+    #                    kernel = x$kernel_inputs$kernel,
+    #                    sigma = x$scale_est[[1]][i],
+    #                    shape = x$shape_est[[1]][i],
+    #                    output = 'wts')
+    #
+    # mx <- wtd.Ecdf(d, weights = wt)
+    # mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
-    mx <- wtd.Ecdf(d, weights = wt)
-    mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
+    mx <- round(k_dist(sigma = max(sig_[i,]),
+                       prob = 0.9999,
+                       kernel = x$kernel_inputs$kernel,
+                       beta = x$shape_est[[1]][i]), digits = -1)
 
     d <- seq(1, mx, length.out = 100)
     wt <- scale_type_r(d = d,
@@ -136,5 +140,8 @@ plot.multiScaleR <- function(x,
 
     plot_list[[i]] <- plot_
   }
+  # Print all plots
+  lapply(plot_list, print)
+
   invisible(plot_list)
-}
+  }
