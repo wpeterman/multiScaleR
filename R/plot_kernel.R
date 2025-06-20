@@ -2,14 +2,14 @@
 #' @description Generic function to plot kernels
 #' @param prob Cumulative kernel density to identify scale of effect distance, Default: 0.9
 #' @param sigma Value of scaling parameter, sigma
-#' @param shape If plotting an Exponential Power kernel. Values between 1-50 are typically valid. (Default = NULL)
+#' @param beta Numeric. Shape parameter for exponential power kernel. Ignored unless kernel = "expow". Values between 1-50 are typically valid. (Default = NULL)
 #' @param kernel Kernel function to use. Valid functions are c('exp', 'gaussian', fixed', 'expow'). See details
 #' @param scale_dist Logical. If TRUE (Default), the distance at which the specified density probability is achieved is added to the plot along with 95\% confidence interval
 #' @param add_label Logical. If TRUE (Default), the distance value calculated for 'scale_dist' is added as an annotation to the plot.
 #' @param ... Not used
 #' @returns ggplot2 objects of kernel density distributions
 #' @details
-#' This function is used to visualize kernel density distributions without having a fitted multiScaleR optimized object. Requires (1) sigma, (2) shape (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+#' This function is used to visualize kernel density distributions without having a fitted multiScaleR optimized object. Requires (1) sigma, (2) beta (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 #'
 #' @examples
 #'#' ## General use of plot method
@@ -24,16 +24,15 @@
 #'             kernel = 'fixed')
 #' plot_kernel(prob = 0.95,
 #'             sigma = 100,
-#'             shape = 2.5,
+#'             beta = 2.5,
 #'             kernel = 'expow')
 #' @rdname plot_kernel
 #' @export
-#' @importFrom Hmisc wtd.Ecdf
 #' @importFrom cowplot theme_cowplot
 #' @importFrom ggplot2 aes annotate geom_line geom_vline ggplot xlab ylab theme_light geom_rect ggtitle
 plot_kernel <- function(prob = 0.9,
                         sigma,
-                        shape = NULL,
+                        beta = NULL,
                         kernel,
                         scale_dist = TRUE,
                         add_label = TRUE,
@@ -43,7 +42,7 @@ plot_kernel <- function(prob = 0.9,
   }
 
   sig_ <- sigma
-  shp_ <- shape
+  shp_ <- beta
   kern <- kernel
 
   if(is.null(sig_)){
@@ -53,26 +52,24 @@ plot_kernel <- function(prob = 0.9,
     stop('\nYou must specify `kernel` function; See Details\n')
   }
   if(kern == 'expow' & is.null(shp_)){
-    stop('\nBoth a `sigma` and `shape` parameter must be specified when using the `expow` kernel; See Details\n')
+    stop('\nBoth a `sigma` and `beta` parameter must be specified when using the `expow` kernel; See Details\n')
   }
 
-  # d <- seq(1, 1e6, length.out = 1e6)
-  d <- seq(1, round(max(sig_)*1000,0),
-           length.out = round(max(sig_)*1000,0))
-  wt <- scale_type_r(d = d,
-                     kernel = kern,
-                     sigma = sig_,
-                     shape = shp_,
-                     output = 'wts')
+  # d <- seq(1, round(max(sig_)*1000,0),
+  #          length.out = round(max(sig_)*1000,0))
+  # wt <- scale_type_r(d = d,
+  #                    kernel = kern,
+  #                    sigma = sig_,
+  #                    shape = shp_,
+  #                    output = 'wts')
+  #
+  # mx <- wtd.Ecdf(d, weights = wt)
+  # mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
 
-  # wt <- scale_type(d = d,
-  #                  kernel = kern,
-  #                  sigma = sig_,
-  #                  shape = shp_,
-  #                  output = 'wts')
-
-  mx <- wtd.Ecdf(d, weights = wt)
-  mx <- round(mx$x[which(mx$ecdf > 0.999)[1]], digits = -2)
+  mx <- round(k_dist(sigma = sig_,
+               prob = 0.999,
+               kernel = kern,
+               beta = shp_), digits = -1)
 
   d <- seq(1, mx, length.out = 100)
   wt <- scale_type_r(d = d,
@@ -81,13 +78,11 @@ plot_kernel <- function(prob = 0.9,
                      shape = shp_,
                      output = 'wts')
 
-  # wt <- scale_type(d = d,
-  #                  kernel = kern,
-  #                  sigma = sig_,
-  #                  shape = shp_,
-  #                  output = 'wts')
-
-  scale_d <- round(d[which(wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
+  # scale_d <- round(d[which(wtd.Ecdf(d, weights = wt)$ecdf > prob)[1]], -1)
+  scale_d <- round(k_dist(sigma = sig_,
+                                prob = prob,
+                                kernel = kern,
+                                beta = shp_), digits = -1)
 
   df <- data.frame(dist = d,
                    wt = wt)

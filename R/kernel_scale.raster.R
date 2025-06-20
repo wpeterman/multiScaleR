@@ -27,7 +27,6 @@
 #'
 #' @rdname kernel_scale.raster
 #' @export
-#' @importFrom Hmisc wtd.Ecdf
 #' @importFrom terra crs rast subset cellFromRowCol crds focal res xyFromCell nlyr clamp nrow ncol values as.matrix
 
 kernel_scale.raster <- function(raster_stack,
@@ -44,6 +43,7 @@ kernel_scale.raster <- function(raster_stack,
                                 ...){
 
   args <- list(...)
+
   if ("scale_opt" %in% names(args)) {
     warning("Argument 'scale_opt' is deprecated. Use 'multiScaleR' instead.", call. = FALSE)
     if (is.null(multiScaleR) & !is.null(args$scale_opt)) {
@@ -57,17 +57,24 @@ kernel_scale.raster <- function(raster_stack,
     shape <- multiScaleR$shape_est[,1]
     kernel <- multiScaleR$kernel_inputs$kernel
 
-    if(isFALSE(covs %in% names(raster_stack))){
-      stop('optimized covariate is not present in the provided SpatRaster!')
+    if(!any(covs %in% names(raster_stack))){
+      stop('optimized covariate(s) not present in the provided SpatRaster!')
     } else {
-      raster_stack <- subset(raster_stack, covs)
+      var <- intersect(covs, names(raster_stack))
+      c <- which(var == covs)
+      raster_stack <- subset(raster_stack, var)
+      sigma <- sigma[c]
+      shape <- shape[c]
     }
   }
 
   if(!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR_data")){
     covs <- colnames(multiScaleR$kernel_dat)
-    sigma <- multiScaleR$sigma * multiScaleR$unit_conv
-    shape <- multiScaleR$shape
+    var <- intersect(covs, names(raster_stack))
+    c <- which(var == covs)
+
+    sigma <- multiScaleR$sigma[c] * multiScaleR$unit_conv
+    shape <- multiScaleR$shape[c]
     kernel <- multiScaleR$kernel
 
     if(isFALSE(covs %in% names(raster_stack))){
@@ -107,22 +114,13 @@ kernel_scale.raster <- function(raster_stack,
   out <- rast(raster_stack[[1]])
 
   for(i in 1:length(sigma)){
-    lyr <- covs[i]
+    # lyr <- covs[i]
+    lyr <- var[i]
 
-    if(pct_wt == 0.975 && kernel == 'gaussian'){
-      mx <- 2.25 * sigma[i]
-    } else {
-      d <- seq(1, 1e6,
-               length.out = 1e6)
-      wt <- scale_type_r(d = d,
-                         kernel = kernel,
-                         sigma = sigma[i],
-                         shape = shape[i],
-                         output = 'wts')
-
-      mx <- wtd.Ecdf(d, weights = wt)
-      mx <- round(mx$x[which(mx$ecdf > pct_wt)[1]], digits = -1)
-    }
+    mx <- kernel_dist(kernel = kernel,
+                      sigma = sigma[i],
+                      shape = shape[i],
+                      prob = pct_wt)
 
     r_res <- res(raster_stack)[1]
     focal_d <- ceiling(mx / r_res) * 2
@@ -150,11 +148,6 @@ kernel_scale.raster <- function(raster_stack,
     cat(paste0("\nSmoothing spatRaster ",i, " of ", length(sigma), ": ",lyr,"\n"))
 
     if(fft){
-      mat <- matrix(values(raster_stack[[lyr]]),
-                    nrow = nrow(raster_stack[[lyr]]),
-                    ncol = ncol(raster_stack[[lyr]]),
-                    byrow = TRUE)
-
       mat <- as.matrix(raster_stack[[lyr]], wide = T)
 
       fft_mat <- fft_convolution(mat,

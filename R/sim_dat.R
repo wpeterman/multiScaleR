@@ -102,6 +102,15 @@ sim_dat <- function(alpha = 1,
 
     pts <- st_as_sf(pts)
     pts <- pts[sample(dim(pts)[1], n_points),]
+  } else {
+    pts <- n_points
+    if(!is_spatial(pts)){
+      stop("A spatVector or sf point object is required if `n_points` is not numeric")
+    }
+
+    n_points <- length(pts)
+
+
   }
 
   if(is.null(max_D)){
@@ -164,4 +173,15 @@ sim_dat <- function(alpha = 1,
   return(list(obs = obs,
               df = df,
               pts = pts))
+}
+
+is_spatial <- function(x) {
+  # Check for spatVector (terra package)
+  spatvec_check <- inherits(x, "SpatVector")
+
+  # Check for sf object (sf package)
+  sf_check <- inherits(x, "sf") || inherits(x, "sfc")
+
+  # Return TRUE if either check passes
+  spatvec_check || sf_check
 }

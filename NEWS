@@ -1,3 +1,13 @@
+multiScaleR 0.4.1-0
+---------
+* Updated calculation of cumulative distance
+* Added marginal effects plot function `plot_marginal_effect`
+* Updated `kernel_scale.raster`
+
+multiScaleR 0.4.0-1
+---------
+* Updated `sim_rast` for efficiency. Uses custom fft
+
 multiScaleR 0.4.0-0
 ---------
 * Incorporated scaling & centering `kernel_scale.raster`
