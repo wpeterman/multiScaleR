@@ -83,7 +83,7 @@ kernel_scale.raster <- function(raster_stack,
       raster_stack <- subset(raster_stack, covs)
     }
   } else {
-    covs <- names(raster_stack)
+    covs <- var <- names(raster_stack)
   }
 
   kernel <- match.arg(kernel)
