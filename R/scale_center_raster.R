@@ -54,10 +54,6 @@ scale_center_raster <- function(r,
       mod_class <- 'unmarked'
       dat <- mod@data@siteCovs
 
-    } else if(any(class(mod) == 'glm')){
-      mod_class <- 'glm'
-      dat <- mod$data
-
     } else {
       mod_class <- 'other'
       dat <- extract_model_data(mod)

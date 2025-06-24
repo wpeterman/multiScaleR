@@ -61,7 +61,7 @@ kernel_scale.raster <- function(raster_stack,
       stop('optimized covariate(s) not present in the provided SpatRaster!')
     } else {
       var <- intersect(covs, names(raster_stack))
-      c <- which(var == covs)
+      c <- which(covs %in% var)
       raster_stack <- subset(raster_stack, var)
       sigma <- sigma[c]
       shape <- shape[c]
@@ -71,7 +71,7 @@ kernel_scale.raster <- function(raster_stack,
   if(!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR_data")){
     covs <- colnames(multiScaleR$kernel_dat)
     var <- intersect(covs, names(raster_stack))
-    c <- which(var == covs)
+    c <- which(var %in% covs)
 
     sigma <- multiScaleR$sigma[c] * multiScaleR$unit_conv
     shape <- multiScaleR$shape[c]
@@ -145,9 +145,9 @@ kernel_scale.raster <- function(raster_stack,
 
     wt_mat <- as.matrix(r_wt, wide = T)
 
-    cat(paste0("\nSmoothing spatRaster ",i, " of ", length(sigma), ": ",lyr,"\n"))
+    cat(paste0("\nSmoothing spatRaster ",i, " of ", length(sigma), ": ",lyr," at sigma = ",floor(sigma[i]),"\n"))
 
-    if(fft){
+    if(isTRUE(fft)){
       mat <- as.matrix(raster_stack[[lyr]], wide = T)
 
       fft_mat <- fft_convolution(mat,

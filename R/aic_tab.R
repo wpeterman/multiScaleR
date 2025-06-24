@@ -111,7 +111,7 @@ aic_tab <- function(mod_list,
   if(length(msclr) != length(mod_list)){
     mod_kernel <- c(mod_kernel, rep('NA', length(mod_list) - length(msclr)))
   }
-  if(any(sapply(opt_list, function(x) grepl("^unmarked", class(x))))){
+  if(any(sapply(opt_list, function(x) any(grepl("^unmarked", class(x)))))){
     k <- as.vector(sapply(opt_list[msclr], function(x) length(all.vars(formula(x@formula)))+1))
     mod_df <- as.vector(sapply(opt_list, function(x) dim(x@data@siteCovs)[1]))
     if(length(msclr) != length(mod_list)){
@@ -280,10 +280,24 @@ bic_tab <- function(mod_list,
   if(length(msclr) != length(mod_list)){
     mod_kernel <- c(mod_kernel, rep('NA', length(mod_list) - length(msclr)))
   }
-  k <- as.vector(sapply(opt_list[msclr], function(x) nrow(get_parameters(x))[1])+1)
-  if(length(msclr) != length(mod_list)){
-    k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(get_parameters(x))[1]))
-    k <- c(k, k2)
+
+
+  if(any(sapply(opt_list, function(x) any(grepl("^unmarked", class(x)))))){
+    k <- as.vector(sapply(opt_list[msclr], function(x) length(all.vars(formula(x@formula)))+1))
+    mod_df <- as.vector(sapply(opt_list, function(x) dim(x@data@siteCovs)[1]))
+    if(length(msclr) != length(mod_list)){
+      k2 <- as.vector(sapply(opt_list[-msclr], function(x) length(all.vars(formula(x@formula)))))
+      k <- c(k, k2)
+
+    }
+  } else {
+    k <- as.vector(sapply(opt_list[msclr], function(x) nrow(get_parameters(x))[1])+1)
+    mod_df <- as.vector(sapply(opt_list, function(x) n_obs(x)))
+    if(length(msclr) != length(mod_list)){
+      k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(get_parameters(x))[1]))
+      k <- c(k, k2)
+
+    }
   }
   k[(mod_kernel %in% 'expow')] <- k[(mod_kernel %in% 'expow')] + 1
 
