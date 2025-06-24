@@ -1,3 +1,8 @@
+multiScaleR 0.4.1-1
+---------
+* Updated `aic_tab` and `bic_tab` to properly check model types.
+* Fixed bug in `kernel_scale.raster`
+
 multiScaleR 0.4.1-0
 ---------
 * Updated calculation of cumulative distance
