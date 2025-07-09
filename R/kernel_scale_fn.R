@@ -32,7 +32,8 @@ kernel_scale_fn <- function(par,
 
   if(any(class(mod) == 'gls')){
     mod_class <- 'gls'
-    covs <- find_predictors(mod)$conditional
+    # covs <- find_predictors(mod)$conditional
+    covs <- unlist(find_predictors(mod))
     dat <- get_data(mod)
     covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
@@ -44,7 +45,8 @@ kernel_scale_fn <- function(par,
     n_covs <- length(covs)
   } else if(any(class(mod) == 'glm')) {
     mod_class <- 'glm'
-    covs <- find_predictors(mod)$conditional
+    # covs <- find_predictors(mod)$conditional
+    covs <- unlist(find_predictors(mod))
     dat <- get_data(mod)
     dat0 <- get_data(mod)
     covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
@@ -55,7 +57,8 @@ kernel_scale_fn <- function(par,
     if(is.null(dat)){
       dat <- get_data(mod, effects = 'all')
     }
-    covs <- find_predictors(mod)$conditional
+    # covs <- find_predictors(mod)$conditional
+    covs <- unlist(find_predictors(mod))
     covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)
   }

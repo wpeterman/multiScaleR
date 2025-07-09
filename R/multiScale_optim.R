@@ -139,11 +139,13 @@ multiScale_optim <- function(fitted_mod,
 
   # Extract variables from fitted model
   if (any(class(fitted_mod) == 'gls')) {
-    mod_vars <- find_predictors(fitted_mod)[[1]]
+    # mod_vars <- find_predictors(fitted_mod)[[1]]
+    mod_vars <- unlist(find_predictors(fitted_mod))
   } else if (any(grepl("^unmarked", class(fitted_mod)))) {
     mod_vars <- all.vars(formula(fitted_mod@formula))
   } else {
-    mod_vars <- find_predictors(fitted_mod)[[1]]
+    # mod_vars <- find_predictors(fitted_mod)[[1]]
+    mod_vars <- unlist(find_predictors(fitted_mod))
   }
 
   # Ensure model variables are in kernel_inputs
@@ -168,8 +170,8 @@ multiScale_optim <- function(fitted_mod,
 
   if(any(class(fitted_mod) == 'gls')){
     mod_class <- 'gls'
-    mod_vars <- find_predictors(fitted_mod)[[1]]
-    # mod_vars <- all.vars(formula(fitted_mod)[-2])
+    # mod_vars <- find_predictors(fitted_mod)[[1]]
+    mod_vars <- unlist(find_predictors(fitted_mod))
     r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
     n_covs <- length(r_vars)
   } else if(any(grepl("^unmarked", class(fitted_mod)))) {
@@ -180,8 +182,8 @@ multiScale_optim <- function(fitted_mod,
     fitType <- fitted_mod@fitType
   } else {
     mod_class <- 'other'
-    # mod_vars <- all.vars(formula(fitted_mod)[-2])
-    mod_vars <- find_predictors(fitted_mod)[[1]]
+    # mod_vars <- find_predictors(fitted_mod)[[1]]
+    mod_vars <- unlist(find_predictors(fitted_mod))
     r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
     n_covs <- length(r_vars)
   }

@@ -21,7 +21,7 @@
 #'
 #' @export
 #' @importFrom unmarked coef predict
-#' @importFrom insight get_parameters link_inverse find_predictors
+#' @importFrom insight get_parameters link_inverse find_predictors get_predicted
 #' @importFrom ggplot2 ggplot aes geom_ribbon geom_line xlab ylab
 #' @importFrom cowplot theme_cowplot
 
@@ -40,9 +40,15 @@ plot_marginal_effects <- function(x,
 
   # Extract variables from fitted model
   if (any(grepl("^unmarked", class(mod)))) {
-    vars <- names(coef(mod, altNames = FALSE, type = 'state'))[-1]
+    vars <- names(coef(mod, altNames = FALSE))[-1]
+    # Find the index of the second "Int"
+    second_int_index <- which(vars == "Int")[1]
+
+    # Subset the vector up to (but not including) the second "Int"
+    vars <- vars[1:(second_int_index - 1)]
+    c_vars <- vars <- vars[!grepl("I\\(", vars)]  # `grepl` checks for "I(" in each term
     dat <- mod@data@siteCovs
-    dat_ns <- dat[!vars %in% names(scl$mean)]
+    dat_ns <- dat[which(names(scl$mean) %in% vars)]
 
     if(is.null(type)){
       stop("`type` must be specified as either 'lambda' or 'state'.")
@@ -79,9 +85,10 @@ plot_marginal_effects <- function(x,
     })
   } else {
     # vars <- names(coef(mod))[-1]
-    vars <- find_predictors(mod)[[1]]
+    c_vars <- find_predictors(mod)[[1]]
+    vars <- unlist(find_predictors(mod))
 
-    plot_list <- lapply(vars, function(v) {
+    plot_list <- lapply(c_vars, function(v) {
       if(!v %in% names(scl$mean)){
         dat <- get_data(mod)[,-1]
         dat_ns <- dat[!vars %in% names(scl$mean)]
@@ -104,11 +111,17 @@ plot_marginal_effects <- function(x,
         preds_ <- predict(mod, newdata = newdata, variances = list(respVar = TRUE), re.form = NA)
         preds <- list(preds = as.vector(preds_),
                       se = sqrt(attr(preds_, "fixefVar")))
+      } else if(inherits(mod, "zeroinfl")) {
+        preds <- as.data.frame(get_predicted(mod, data = newdata))
       } else {
         preds <- predict(mod, newdata = newdata, se.fit = T)
       }
 
-      if(!is.null(link_inverse(mod)) && link){
+      if(inherits(mod, "zeroinfl")) {
+        fit_ <- preds$Predicted
+        lwr <- preds$CI_low
+        upr <- preds$CI_high
+      } else if(!is.null(link_inverse(mod)) && link){
         if(!inherits(preds,'list') || (is.list(preds) && length(preds) == 1)){
           fit_ <- link_inverse(mod)(as.data.frame(preds)[,1])
           lwr <- upr <- NA
@@ -140,7 +153,7 @@ plot_marginal_effects <- function(x,
     })
   }
 
-  names(plot_list) <- vars
+  names(plot_list) <- c_vars
 
   # Build ggplots
   gg_list <- lapply(plot_list, function(df) {
@@ -157,7 +170,7 @@ plot_marginal_effects <- function(x,
     p
   })
 
-  names(gg_list) <- vars
+  names(gg_list) <- c_vars
 
   lapply(gg_list, print)
   invisible(gg_list)

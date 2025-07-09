@@ -15,18 +15,11 @@ vignette: >
 
 ```{r setup, include=FALSE, echo=FALSE}
 library(multiScaleR)
-load(system.file("extdata", "vignette_data1.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data2.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data3.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data4.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data5.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data6.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data7.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data8.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data9.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data10.RData", package = 'multiScaleR'))
-load(system.file("extdata", "vignette_data11.RData", package = 'multiScaleR'))
-load(system.file("extdata", "opt_occ.RData", package = 'multiScaleR'))
+rdat <- list.files(system.file("extdata", package = 'multiScaleR'), 
+                   pattern = "RData")
+for(x in rdat){
+    load(system.file("extdata", x, package = 'multiScaleR'))
+}
 ```
 
 # Background
@@ -271,7 +264,7 @@ fixed_inputs <- kernel_prep(pts = pts,
 
 Optimize model with alternative kernels
 
-```{r eval=F}
+```{r eval=FALSE}
 opt_exp <- multiScale_optim(fitted_mod = mod0_2,
                             kernel_inputs = exp_inputs)
 
@@ -521,6 +514,91 @@ occ.mod_pred <- terra::predict(rast_scale.center,
                              type = 'state')
 
 plot(occ.mod_pred)
+```
+
+# Other model classes
+
+`multiScaleR` has been developed to work with any model class that has an update function. It has been tested with models fit using several different packages. If a particular model class does not work, please let me know so I can trouble shoot and try to incorporate functionality for it. In the example below, I demonstrate the fitting of a zero-inflated model with the `pscl` package. Notably, the zero-inflated term is a spatial variable that is also smoothed during the analysis. This requires some manual processing to simulate data.
+
+```{r}
+set.seed(12345)
+rs <- sim_rast(user_seed = 999, 
+               dim = 500, resolution = 30)
+rs <- terra::subset(rs, c(1,3))
+
+## Zero-inflated parameters
+zi_alpha <- -0.25
+zi_beta <- -1
+
+n_points <- 400
+alpha <- 0.5
+beta <- 0.75
+kernel <- 'gaussian'
+sigma <- c(400, # For main effect, bin1
+           200) # For zero-inflated, cont1
+StDev <- 2  # Negative binomial dispersion
+
+## Generate random points
+bnd <- buffer(vect(ext(rs[[1]])), -1000)
+pts <- spatSample(x = rs[[1]], 
+                  size = n_points, 
+                  method = 'random',
+                  ext = ext(bnd),
+                  replace = F,
+                  as.points = T)
+
+kernel_out <- kernel_prep(pts = pts,
+                          raster_stack = rs,
+                          max_D = 1500,
+                          kernel = kernel,
+                          sigma = sigma)
+
+## ZINB simulation
+zi_prob <- plogis(zi_alpha + zi_beta*kernel_out$kernel_dat$cont1)
+
+# Simulate zero-inflated counts
+# 1 = excess zero, 0 = from Poisson
+is_zero <- rbinom(length(zi_prob), size = 1, prob = zi_prob)  
+
+obs <- exp(alpha + beta*kernel_out$kernel_dat$bin1)
+
+obs.zinb <- ifelse(is_zero, 0,
+                   rnbinom(length(is_zero),
+                           mu = obs,
+                           size = StDev))
+
+dat <- data.frame(cnt = obs.zinb,
+                  kernel_out$kernel_dat)
+with(dat, plot(cnt ~ bin1))
+```
+
+With data generated, we can now fit our zero-inflated model and `kernel_prep`
+
+```{r echo=FALSE}
+zinb_mod <- pscl::zeroinfl(cnt ~ bin1 | cont1,
+                           dist = 'negbin',
+                           data = dat)
+
+kernel_inputs <- kernel_prep(pts = pts,
+                             kernel = kernel,
+                             max_D = 1500,
+                             raster_stack = rs)
+```
+
+and optimize with `multiScaleR`.
+
+```{r eval=FALSE}
+zinb_opt <- multiScale_optim(zinb_mod, 
+                             kernel_inputs,
+                             n_cores = 4)
+```
+
+We did a pretty good job in this simple scenario. Note the larger sample size. This was necessary to get good estimates for all parameters. Also, while `cont1` was estimated relatively accurately, there is much greater uncertainty when compared to `bin1`.
+
+```{r}
+summary(zinb_opt)
+plot(zinb_opt)
+plot_marginal_effects(zinb_opt)
 ```
 
 # Other Functions & Features

@@ -1,3 +1,7 @@
+multiScaleR 0.4.1-2
+---------
+* Updated vignette to demonstrate fitting of zero-inflated model
+
 multiScaleR 0.4.1-1
 ---------
 * Updated `aic_tab` and `bic_tab` to properly check model types.
