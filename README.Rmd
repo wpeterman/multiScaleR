@@ -4,10 +4,12 @@ output: github_document
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
 knitr::opts_chunk$set(
-  echo = FALSE,
-  fig.path = "man/figures/README-"
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
 )
 ```
 
@@ -26,8 +28,7 @@ If installing the development version from GitHub, Windows users will need to in
 To install, right click on the ".exe" file and select "Run as administrator".
 
 Then execute the following commands in R:
-
-```{r install, eval=FALSE}
+```{r, eval=FALSE}
 # Install 'remotes' package, if needed
 if(!("remotes" %in% list.files(.libPaths()))) {
       install.packages("remotes", repo = "http://cran.rstudio.com", dep = TRUE) 
@@ -39,6 +40,6 @@ remotes::install_github("wpeterman/multiScaleR",
 library(multiScaleR) # Loads package and the other dependencies
 ```
 
-A vignette to accompany the package is now available with versions \>= 0.2.0. This document walks through all available functions as well provides worked analyses of simulated data.
+The package vignette walks through all available functions as well provides worked analyses of simulated data.
 
 <p align="center"> <img src="man/figures/logo.png" height="200"/> </p>

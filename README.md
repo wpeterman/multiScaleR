@@ -24,8 +24,19 @@ administrator”.
 
 Then execute the following commands in R:
 
-A vignette to accompany the package is now available with versions \>=
-0.2.0. This document walks through all available functions as well
+``` r
+# Install 'remotes' package, if needed
+if(!("remotes" %in% list.files(.libPaths()))) {
+      install.packages("remotes", repo = "http://cran.rstudio.com", dep = TRUE) 
+} 
+
+remotes::install_github("wpeterman/multiScaleR", 
+                        build_vignettes = TRUE) # Install & build vignette
+
+library(multiScaleR) # Loads package and the other dependencies
+```
+
+The package vignette walks through all available functions as well
 provides worked analyses of simulated data.
 
 <p align="center">
