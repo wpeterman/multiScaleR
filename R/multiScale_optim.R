@@ -104,6 +104,7 @@
 #' @importFrom stats optim
 #' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster clusterExport
 #' @importFrom crayon %+% green red bold blue
+#' @importFrom pscl zeroinfl
 
 multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
