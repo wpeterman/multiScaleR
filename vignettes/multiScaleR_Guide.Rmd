@@ -572,12 +572,13 @@ dat <- data.frame(cnt = obs.zinb,
 with(dat, plot(cnt ~ bin1))
 ```
 
-With data generated, we can now fit our zero-inflated model and `kernel_prep`
+With data generated, we can now fit our zero-inflated model and `kernel_prep` and optimize with `multiScaleR`.
 
 ```{r echo=FALSE}
-zinb_mod <- pscl::zeroinfl(cnt ~ bin1 | cont1,
-                           dist = 'negbin',
-                           data = dat)
+library(pscl)
+zinb_mod <- zeroinfl(cnt ~ bin1 | cont1,
+                     dist = 'negbin',
+                     data = dat)
 
 kernel_inputs <- kernel_prep(pts = pts,
                              kernel = kernel,
@@ -585,7 +586,7 @@ kernel_inputs <- kernel_prep(pts = pts,
                              raster_stack = rs)
 ```
 
-and optimize with `multiScaleR`.
+**NOTE: It is highly encouraged to fit your model as `pscl::zeroinfl`. For purposes of creating this vignette, this was not done in the code above.**
 
 ```{r eval=FALSE}
 zinb_opt <- multiScale_optim(zinb_mod, 

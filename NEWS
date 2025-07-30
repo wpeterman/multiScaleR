@@ -1,3 +1,9 @@
+multiScaleR 0.4.2-0
+---------
+* Update dependencies to pass CRAN checks
+* Added hex sticker
+* Added `rhub.yaml`
+
 multiScaleR 0.4.1-2
 ---------
 * Updated vignette to demonstrate fitting of zero-inflated model
