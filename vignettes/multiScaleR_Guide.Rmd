@@ -2,15 +2,15 @@
 title: "multiScaleR User Guide"
 author: "Bill Peterman"
 output: 
-    rmarkdown::html_vignette: 
-        fig_width: 5.75  
-        fig_height: 4.25 
-        number_sections: true
-        toc: true
+  rmarkdown::html_vignette:
+    fig_width: 5.75  
+    fig_height: 4.25 
+    number_sections: true
+    toc: true
 vignette: >
   %\VignetteIndexEntry{Guide}
   %\VignetteEngine{knitr::rmarkdown}
-  \usepackage[utf8]{inputenc}
+  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
@@ -26,7 +26,7 @@ for(x in rdat){
 
 Many abiotic and ecological processes are a result of variables operating at multiple scales. Such multiscale ecological processes can be challenging to quantify, especially when the surrounding landscape contributes to the process. The extent and magnitude of contribution from the surrounding landscape is often referred to as the 'scale of effect'. Determining the scales of effect has long been the focus of ecologists seeking to address multiscale ecological questions, but until recently, methods to rigorously and can identify such scales have been lacking. With advanced coding skills, Bayesian analytical frameworks can be used (e.g., Stuber & Gruber 2020; Amirkhiz et al. 2023). More recently, user-friendly methods, implemented in R, have been developed (`Siland`: Carpentier & Martin 2021; `Scalescape`: Lowe et al. 2022). Both of these packages, like `multiScaleR`, estimate distance-weighted landscape effects (i.e. scales of effect). All take a similar approach to achieving this goal, but each works with different model classes and have different functions available to users.
 
-`multiScaleR` is fully supported in handling models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and that is a supported class in the R package [insight](https://cran.r-project.org/web/packages/insight/index.html). This package has been developed to provide an efficient modeling workflow, facilitating scaling of rasters and spatial projections of optimized models. Let me know if you encounter issues or would like to see support for other model classes.
+`multiScaleR` is fully supported in handling models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and that is a supported class in the R package [insight](https://CRAN.R-project.org/web/packages/insight/index.html). This package has been developed to provide an efficient modeling workflow, facilitating scaling of rasters and spatial projections of optimized models. Let me know if you encounter issues or would like to see support for other model classes.
 
 **References**
 
