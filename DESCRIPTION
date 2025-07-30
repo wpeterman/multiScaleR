@@ -1,7 +1,7 @@
 Package: multiScaleR
 Type: Package
 Title: Package for Optimizing Scales of Effect
-Version: 0.4.2-0
+Version: 0.4.2
 Description: A tool for optimizing scales of effect when modeling ecological processes in space. Specifically, the scale parameter of a distance-weighted kernel distribution is identified for all environmental layers included in the model.
 License: GPL-3
 Encoding: UTF-8
