@@ -24,6 +24,7 @@
 #' @importFrom insight get_parameters link_inverse find_predictors get_predicted
 #' @importFrom ggplot2 ggplot aes geom_ribbon geom_line xlab ylab
 #' @importFrom cowplot theme_cowplot
+#' @importFrom utils globalVariables
 
 plot_marginal_effects <- function(x,
                                   ylab = "Estimated response",
@@ -289,3 +290,5 @@ namespace <- function(x) {
 
   invisible(pkg)
 }
+
+utils::globalVariables(c("fit", "lwr", "upr"))
