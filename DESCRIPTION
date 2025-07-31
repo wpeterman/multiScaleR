@@ -37,7 +37,7 @@ Suggests:
     rmarkdown
 URL: https://github.com/wpeterman/multiScaleR
 BugReports: https://github.com/wpeterman/multiScaleR/issues
-BuildVignettes: true
+BuildVignettes: false
 VignetteBuilder: knitr
 Authors@R: 
     person("Bill", "Peterman", , "Peterman.73@osu.edu", role = c("aut", "cre"),
