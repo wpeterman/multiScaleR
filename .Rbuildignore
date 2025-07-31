@@ -4,7 +4,7 @@
 ^cran-comments\.md$
 ^\.github$
 ^README\.Rmd$
-^inst/extdata/.*\\.RData$
+^inst/extdata/.*\.RData$
 ^vignettes/.*\.Rmd$
 ^vignettes/.*\.Rmarkdown$
 ^vignettes/.*\.rmd$
