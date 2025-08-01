@@ -5,10 +5,4 @@
 ^\.github$
 ^README\.Rmd$
 ^inst/extdata/.*\.RData$
-^vignettes/.*\.Rmd$
-^vignettes/.*\.Rmarkdown$
-^vignettes/.*\.rmd$
-^vignettes/.*_cache$
 ^vignettes/build_vignettes\.R$
-^vignettes$
-^inst/doc/.*\.Rmd$
