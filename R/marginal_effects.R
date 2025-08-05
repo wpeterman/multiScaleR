@@ -122,6 +122,10 @@ plot_marginal_effects <- function(x,
         fit_ <- preds$Predicted
         lwr <- preds$CI_low
         upr <- preds$CI_high
+
+        if(is.null(lwr) && is.null(upr)){
+          lwr <- upr <- NA
+        }
       } else if(!is.null(link_inverse(mod)) && link){
         if(!inherits(preds,'list') || (is.list(preds) && length(preds) == 1)){
           fit_ <- link_inverse(mod)(as.data.frame(preds)[,1])
