@@ -1,3 +1,7 @@
+multiScaleR 0.4.3
+---------
+* Updated handling of zero-infalted models in `plot_marginal_effects`
+
 multiScaleR 0.4.2
 ---------
 * Update dependencies to pass CRAN checks
