@@ -14,7 +14,7 @@ kernel_scale.raster(
   fft = TRUE,
   scale_center = FALSE,
   clamp = FALSE,
-  pct_mx = 0.15,
+  pct_mx = 0,
   na.rm = TRUE,
   ...
 )
@@ -36,9 +36,9 @@ kernel_scale.raster(
 
 \item{scale_center}{Logical. If `TRUE`, raster values are scaled and centered accordingly to the data used to fit the model. Necessary when predicting model results across the landscape.}
 
-\item{clamp}{Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data, expanded by `pct_mx`.}
+\item{clamp}{Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data.}
 
-\item{pct_mx}{Numeric. Proportion by which to expand the min/max range when clamping. Default is `0.15`.}
+\item{pct_mx}{Numeric. If `clamp` is `TRUE`, this value specifies the amount (percentage; positive or negative) by which to expand/contract the min/max range when clamping. Can range from -0.99–0.99 (Default = 0).}
 
 \item{na.rm}{Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.}
 

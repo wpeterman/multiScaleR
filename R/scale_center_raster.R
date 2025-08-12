@@ -4,8 +4,8 @@
 #'
 #' @param r A `terra::SpatRaster` containing covariate layers to be scaled. All layer names must match those used in the `multiScaleR` model.
 #' @param multiScaleR A `multiScaleR` object created using `kernel_prep` or `multiScale_optim`.
-#' @param clamp Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data, expanded by `pct_mx`.
-#' @param pct_mx Numeric. Proportion by which to expand the min/max range when clamping. Default is `0.15`.
+#' @param clamp Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data.
+#' @param pct_mx Numeric. If `clamp` is `TRUE`, this value specifies the amount (percentage; positive or negative) by which to expand/contract the min/max range when clamping. Default = 0.
 #'
 #' @return A `terra::SpatRaster` with each layer scaled and optionally clamped.
 #' @keywords internal
@@ -14,16 +14,11 @@
 #'
 #' # scaled_r <- scale_center_raster(r, opt_mod, clamp = TRUE)
 #'
-#' @usage
-#' scale_center_raster(r,
-#'                     multiScaleR,
-#'                     clamp = FALSE,
-#'                     pct_mx = 0.15)
 #' @rdname scale_center_raster
 scale_center_raster <- function(r,
                                 multiScaleR,
                                 clamp = FALSE,
-                                pct_mx = 0.15){
+                                pct_mx = 0){
   covs <- names(r)
 
   if(inherits(multiScaleR, "multiScaleR_data")){

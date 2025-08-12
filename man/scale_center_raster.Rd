@@ -4,19 +4,16 @@
 \alias{scale_center_raster}
 \title{Scale and Center Raster Layers Using Model Parameters}
 \usage{
-scale_center_raster(r,
-                    multiScaleR,
-                    clamp = FALSE,
-                    pct_mx = 0.15)
+scale_center_raster(r, multiScaleR, clamp = FALSE, pct_mx = 0)
 }
 \arguments{
 \item{r}{A `terra::SpatRaster` containing covariate layers to be scaled. All layer names must match those used in the `multiScaleR` model.}
 
 \item{multiScaleR}{A `multiScaleR` object created using `kernel_prep` or `multiScale_optim`.}
 
-\item{clamp}{Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data, expanded by `pct_mx`.}
+\item{clamp}{Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data.}
 
-\item{pct_mx}{Numeric. Proportion by which to expand the min/max range when clamping. Default is `0.15`.}
+\item{pct_mx}{Numeric. If `clamp` is `TRUE`, this value specifies the amount (percentage; positive or negative) by which to expand/contract the min/max range when clamping. Default = 0.}
 }
 \value{
 A `terra::SpatRaster` with each layer scaled and optionally clamped.
