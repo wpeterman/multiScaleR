@@ -8,8 +8,8 @@
 #' @param pct_wt The percentage of the weighted density to include when applying the kernel smoothing function, Default: 0.975
 #' @param fft Logical. If TRUE (Default), a fast Fourier transformation will be used to smooth the raster surface. See details.
 #' @param scale_center Logical. If `TRUE`, raster values are scaled and centered accordingly to the data used to fit the model. Necessary when predicting model results across the landscape.
-#' @param clamp Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data, expanded by `pct_mx`.
-#' @param pct_mx Numeric. Proportion by which to expand the min/max range when clamping. Default is `0.15`.
+#' @param clamp Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data.
+#' @param pct_mx Numeric. If `clamp` is `TRUE`, this value specifies the amount (percentage; positive or negative) by which to expand/contract the min/max range when clamping. Can range from -0.99–0.99 (Default = 0).
 #' @param na.rm Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.
 #' @param ... Not used
 #' @return `SpatRaster` object containing scaled rasters
@@ -38,7 +38,7 @@ kernel_scale.raster <- function(raster_stack,
                                 fft = TRUE,
                                 scale_center = FALSE,
                                 clamp = FALSE,
-                                pct_mx = 0.15,
+                                pct_mx = 0,
                                 na.rm = TRUE,
                                 ...){
 

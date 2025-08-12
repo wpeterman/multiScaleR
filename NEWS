@@ -1,3 +1,7 @@
+multiScaleR 0.4.4
+---------
+* Updated `kernel_scale.raster` documentation and clamping defaults
+
 multiScaleR 0.4.3
 ---------
 * Updated handling of zero-infalted models in `plot_marginal_effects`
