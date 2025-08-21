@@ -76,13 +76,6 @@ cluster_prep <- function(model, cl) {
 #' @return A character string with the namespace (package name), or `NULL`
 #'   if the namespace cannot be determined.
 #'
-#' @examples
-#' \dontrun{
-#' #' ## Not Run
-#' mod <- stats::glm(...)  # assuming valid call
-#' extract_namespace(mod)
-#' }
-#'
 #' @details For internal use
 #' @rdname extract_namespace
 #' @keywords internal

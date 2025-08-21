@@ -6,8 +6,9 @@
 #' @param kernel Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')
 #' @param sigma Initial values for optimizing the scale parameter. Default: NULL, initial values will be automatically generated. This is recommended.
 #' @param shape Initial values for optimizing the shape parameter if using exponential power kernel. Default: NULL, starting values will be automatically generated. This is recommended.
-#' @param projected Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected, Default: TRUE
+#' @param projected Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected. Default: TRUE
 #' @param progress Should progress bars be printed to console. Default: FALSE
+#' @param verbose Logical. Print preparation information to the console. Default: TRUE
 #' @return A list of class `multiscaleR` with necessary elements to conduct scale optimization using the `multiScale_optim` function
 #' @details Spatial point locations and raster layers should have a defined projection and be the same CRS. If providing starting values for `sigma` or `shape`, it must be a vector of length equal to the number of raster layers for which scale is being assessed and should be provided in the unit of the used projection. When specifying `max_D`, ensure that your raster layers adequately extend beyond the points provided so that the surrounding landscape can be meaningfully sampled during scale optimization.
 #' @examples
@@ -43,7 +44,8 @@ kernel_prep <- function(pts,
                         sigma = NULL,
                         shape = NULL,
                         projected = TRUE,
-                        progress = FALSE){
+                        progress = FALSE,
+                        verbose = TRUE){
   unit_conv <- max_D
 
   kernel <- match.arg(kernel)
@@ -54,14 +56,18 @@ kernel_prep <- function(pts,
 
   if(is.null(sigma)){
     sigma <- rep(max_D/2, nlyr(raster_stack)) ## Need to set to minimum distance...no scale
-    cat(paste("\nNo sigma values provided...",
-              "Creating necessary elements to optimize sigma\n", sep = '\n'))
+    if(verbose){
+      cat(paste("\nNo sigma values provided...",
+                "Creating necessary elements to optimize sigma\n", sep = '\n'))
+    }
   }
 
   if(is.null(shape) & kernel == 'expow'){
     shape <- rep(2, nlyr(raster_stack)) ## Need to set shape
-    cat(paste("\nNo shape values provided...",
-              "Creating necessary elements to optimize shape\n", sep = '\n'))
+    if(verbose){
+      cat(paste("\nNo shape values provided...",
+                "Creating necessary elements to optimize shape\n", sep = '\n'))
+    }
   }
 
 
@@ -78,8 +84,9 @@ kernel_prep <- function(pts,
                            dist = max_D)
     spat_poly <- vect(buff_poly)
 
-    cat(paste0("\nExtracting values from raster layers...\n"))
-
+    if(verbose){
+      cat(paste0("\nExtracting values from raster layers...\n"))
+    }
     r_ext <- exact_extract(raster_stack,
                            buff_poly,
                            include_cell = T,
@@ -139,8 +146,9 @@ kernel_prep <- function(pts,
                              dist = max_D)
     }
 
-    cat(paste0("\nExtracting values from raster layers...\n"))
-
+    if(verbose){
+      cat(paste0("\nExtracting values from raster layers...\n"))
+    }
     r_ext <- exact_extract(raster_stack,
                            buff_poly,
                            # full_colnames = T,

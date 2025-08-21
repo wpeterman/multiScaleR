@@ -234,16 +234,6 @@ safe_predict <- function(mod, newdata) {
 }
 
 namespace <- function(x) {
-  extract_namespace <- function(x) {
-    fc <- tryCatch(
-      get_call(x),
-      error = function(e) NULL
-    )
-    if (!is.null(fc)) {
-      fc <- paste(fc, collapse = "")  # ensure single string
-      if (grepl("::", fc)) sub("::.*", "", fc) else NULL
-    }
-  }
 
   pkg <- extract_namespace(x)
 

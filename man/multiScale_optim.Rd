@@ -4,12 +4,15 @@
 \alias{multiScale_optim}
 \title{Multiscale optimization}
 \usage{
-multiScale_optim(fitted_mod,
-                 kernel_inputs,
-                 join_by = NULL,
-                 par = NULL,
-                 n_cores = NULL,
-                 PSOCK = FALSE)
+multiScale_optim(
+  fitted_mod,
+  kernel_inputs,
+  join_by = NULL,
+  par = NULL,
+  n_cores = NULL,
+  PSOCK = FALSE,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{fitted_mod}{Model object of class glm, lm, gls, or unmarked}
@@ -23,6 +26,8 @@ multiScale_optim(fitted_mod,
 \item{n_cores}{If attempting to optimize in parallel, the number of cores to use. Default: NULL}
 
 \item{PSOCK}{Logical. If attempting to optimize in parallel on a Windows machine, a PSOCK cluster will be created. If using a Unix OS a FORK cluster will be created. You can force a Unix system to create a PSOCK cluster by setting to TRUE. Default: FALSE}
+
+\item{verbose}{Logical. Print status of optimization to the console. Default: TRUE}
 }
 \value{
 Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
@@ -38,7 +43,7 @@ To ensure that fitted model function calls are properly parallelized, fit models
 There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
 }
 \examples{
-## NOT RUN
+\donttest{
 set.seed(555)
 
 points <- vect(cbind(c(5,7,9,11,13),
@@ -113,7 +118,7 @@ opt_hab.s_c <- kernel_scale.raster(raster_stack = hab,
 
 mod_pred <- predict(opt_hab.s_c, opt$opt_mod, type = 'response')
 plot(mod_pred)
-
+}
 }
 \seealso{
 \code{\link[multiScaleR]{kernel_dist}}

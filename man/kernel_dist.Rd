@@ -23,13 +23,33 @@ Function to estimate the effective distance encompassing a specified cumulative 
 This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) beta (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
 }
 \examples{
-\dontrun{
-kernel_dist(model)
-kernel_dist(model, prob = 0.95)
+\donttest{
+## Using package data
+data('pts')
+data('count_data')
+hab <- terra::rast(system.file('extdata',
+                   'hab.tif', package = 'multiScaleR'))
+
+kernel_inputs <- kernel_prep(pts = pts,
+                             raster_stack = hab,
+                             max_D = 250,
+                             kernel = 'gaussian')
+
+mod <- glm(y ~ hab,
+           family = poisson,
+           data = count_data)
+
+## Optimize scale
+opt <- multiScale_optim(fitted_mod = mod,
+                        kernel_inputs = kernel_inputs)
+
+## Uses of `kernel_dist`
+kernel_dist(model = opt)
+kernel_dist(model = opt, prob = 0.95)
 kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
-kernel_distance(sigma = 100, prob = 0.975, kernel = "exp")
-kernel_distance(sigma = 100, prob = 0.95, kernel = "expow", beta = 1.5)
-kernel_distance(sigma = 100, kernel = "fixed")
+kernel_dist(sigma = 100, prob = 0.975, kernel = "exp")
+kernel_dist(sigma = 100, prob = 0.95, kernel = "expow", beta = 1.5)
+kernel_dist(sigma = 100, kernel = "fixed")
 }
 
 }

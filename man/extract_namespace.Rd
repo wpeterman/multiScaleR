@@ -21,12 +21,4 @@ used to fit a model object, assuming the function was called using the
 \details{
 For internal use
 }
-\examples{
-\dontrun{
-#' ## Not Run
-mod <- stats::glm(...)  # assuming valid call
-extract_namespace(mod)
-}
-
-}
 \keyword{internal}

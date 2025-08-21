@@ -68,7 +68,7 @@ Function to simulate data with known scales of effect from spatial spatRaster va
 This function distributes sample points across the landscape on a hexagonal grid, then subsamples to the specified number. The weighted values of each landscape are determined according to the simulation parameters, then the specified response is generated.
 }
 \examples{
-\dontrun{
+\donttest{
 rs <- sim_rast(user_seed = 123)
 rs <- terra::subset(rs, c(1,3))
 s_dat <- sim_dat_unmarked(alpha = 1,

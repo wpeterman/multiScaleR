@@ -11,6 +11,9 @@
 
 \item{...}{Ignored}
 }
+\value{
+Invisibly returns the input \code{multiScaleR} object
+}
 \description{
 Print method for objects of class \code{multiScaleR}.
 }

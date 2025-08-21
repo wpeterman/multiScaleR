@@ -4,6 +4,7 @@
 #' @param ... Ignored
 #' @export
 #' @method print summary_multiScaleR
+#' @return Invisibly returns the input \code{summary_multiScaleR} object
 print.summary_multiScaleR <- function(x, ...){
   cat("\nCall:\n")
   print(x$call)
@@ -56,6 +57,7 @@ print.summary_multiScaleR <- function(x, ...){
             "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
             "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
   }
+  invisible(x)
 }
 
 #' Summarize multiScaleR objects
@@ -138,6 +140,7 @@ summary.multiScaleR <- function(object,...){
 #' @param ... Ignored
 #' @export
 #' @method print multiScaleR
+#' @return Invisibly returns the input \code{multiScaleR} object
 print.multiScaleR <- function(x, ...){
   cat("\nCall:\n")
   print(x$call)
@@ -182,6 +185,7 @@ print.multiScaleR <- function(x, ...){
             "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
             "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
   }
+  invisible(x)
 }
 
 #' @title Print method for multiScaleR_data
@@ -190,6 +194,7 @@ print.multiScaleR <- function(x, ...){
 #' @param ... Ignored
 #' @export
 #' @method print multiScaleR_data
+#' @return Invisibly returns the input \code{multiScaleR_data} object
 print.multiScaleR_data <- function(x, ...){
   cat("\nThere are ")
   cat(paste0(nrow(x$kernel_dat)," observations at ", ncol(x$kernel_dat), ' spatial covariate(s): \n'))
@@ -206,4 +211,5 @@ print.multiScaleR_data <- function(x, ...){
   cat(x$max_D)
   cat("\nUnit Conversion:\n")
   cat(x$unit_conv)
+  invisible(x)
 }

@@ -11,6 +11,7 @@
 #' @param clamp Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data.
 #' @param pct_mx Numeric. If `clamp` is `TRUE`, this value specifies the amount (percentage; positive or negative) by which to expand/contract the min/max range when clamping. Can range from -0.99–0.99 (Default = 0).
 #' @param na.rm Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.
+#' @param verbose Logical. Print status of raster scaling to the console. Default: TRUE
 #' @param ... Not used
 #' @return `SpatRaster` object containing scaled rasters
 #' @details The fast Fourier transformation is substantially faster when scaling large raster surfaces with large kernel areas. There will be some edge effects on the outer boundaries.
@@ -40,6 +41,7 @@ kernel_scale.raster <- function(raster_stack,
                                 clamp = FALSE,
                                 pct_mx = 0,
                                 na.rm = TRUE,
+                                verbose = TRUE,
                                 ...){
 
   args <- list(...)
@@ -145,8 +147,9 @@ kernel_scale.raster <- function(raster_stack,
 
     wt_mat <- as.matrix(r_wt, wide = T)
 
-    cat(paste0("\nSmoothing spatRaster ",i, " of ", length(sigma), ": ",lyr," at sigma = ",floor(sigma[i]),"\n"))
-
+    if(verbose){
+      cat(paste0("\nSmoothing spatRaster ",i, " of ", length(sigma), ": ",lyr," at sigma = ",floor(sigma[i]),"\n"))
+    }
     if(isTRUE(fft)){
       mat <- as.matrix(raster_stack[[lyr]], wide = T)
 

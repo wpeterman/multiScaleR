@@ -21,10 +21,4 @@ A `terra::SpatRaster` with each layer scaled and optionally clamped.
 \description{
 Standardizes raster covariates in a `terra::SpatRaster` using mean and standard deviation values extracted from a fitted model `multiScaleR` model.
 }
-\examples{
-## NOT RUN
-
-# scaled_r <- scale_center_raster(r, opt_mod, clamp = TRUE)
-
-}
 \keyword{internal}

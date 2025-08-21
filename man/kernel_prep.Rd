@@ -12,7 +12,8 @@ kernel_prep(
   sigma = NULL,
   shape = NULL,
   projected = TRUE,
-  progress = FALSE
+  progress = FALSE,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -28,9 +29,11 @@ kernel_prep(
 
 \item{shape}{Initial values for optimizing the shape parameter if using exponential power kernel. Default: NULL, starting values will be automatically generated. This is recommended.}
 
-\item{projected}{Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected, Default: TRUE}
+\item{projected}{Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected. Default: TRUE}
 
 \item{progress}{Should progress bars be printed to console. Default: FALSE}
+
+\item{verbose}{Logical. Print preparation information to the console. Default: TRUE}
 }
 \value{
 A list of class `multiscaleR` with necessary elements to conduct scale optimization using the `multiScale_optim` function

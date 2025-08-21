@@ -16,6 +16,7 @@ kernel_scale.raster(
   clamp = FALSE,
   pct_mx = 0,
   na.rm = TRUE,
+  verbose = TRUE,
   ...
 )
 }
@@ -41,6 +42,8 @@ kernel_scale.raster(
 \item{pct_mx}{Numeric. If `clamp` is `TRUE`, this value specifies the amount (percentage; positive or negative) by which to expand/contract the min/max range when clamping. Can range from -0.99–0.99 (Default = 0).}
 
 \item{na.rm}{Logical. If TRUE (Default), NA values are removed from the weighted mean calculation.}
+
+\item{verbose}{Logical. Print status of raster scaling to the console. Default: TRUE}
 
 \item{...}{Not used}
 }
