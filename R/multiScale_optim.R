@@ -6,6 +6,7 @@
 #' @param par Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
 #' @param PSOCK Logical. If attempting to optimize in parallel on a Windows machine, a PSOCK cluster will be created. If using a Unix OS a FORK cluster will be created. You can force a Unix system to create a PSOCK cluster by setting to TRUE. Default: FALSE
+#' @param verbose Logical. Print status of optimization to the console. Default: TRUE
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
 #'
@@ -15,7 +16,7 @@
 #'
 #' @seealso \code{\link[multiScaleR]{kernel_dist}}
 #' @examples
-#' ## NOT RUN
+#' \donttest{
 #' set.seed(555)
 #'
 #' points <- vect(cbind(c(5,7,9,11,13),
@@ -90,14 +91,7 @@
 #'
 #' mod_pred <- predict(opt_hab.s_c, opt$opt_mod, type = 'response')
 #' plot(mod_pred)
-#'
-#' @usage
-#' multiScale_optim(fitted_mod,
-#'                  kernel_inputs,
-#'                  join_by = NULL,
-#'                  par = NULL,
-#'                  n_cores = NULL,
-#'                  PSOCK = FALSE)
+#'}
 #' @rdname multiScale_optim
 #' @export
 #' @importFrom optimParallel optimParallel
@@ -111,7 +105,8 @@ multiScale_optim <- function(fitted_mod,
                              join_by = NULL,
                              par = NULL,
                              n_cores = NULL,
-                             PSOCK = FALSE){
+                             PSOCK = FALSE,
+                             verbose = TRUE){
 
   # Check fitted_mod class
   # if (!inherits(fitted_mod, c("glm", "lm", "gls", "unmarked"))) {
@@ -278,7 +273,9 @@ multiScale_optim <- function(fitted_mod,
       stopCluster(cl)
 
       if(inherits(opt_results, "try-error")){
-        cat('\n\nParallel optimization failed; attempting standard optimization ')
+        if(verbose){
+          cat('\n\nParallel optimization failed; attempting standard optimization ')
+        }
 
         opt_results <- try(optim(par = par,
                                  fn = kernel_scale_fn,
@@ -298,15 +295,16 @@ multiScale_optim <- function(fitted_mod,
       cnt <- cnt + 1
 
       if(inherits(opt_results, "try-error")){
-        cat('\n\nAttempt ')
-        cat(cnt)
-        cat(" failed\n")
-        cat('raw par =  ')
-        cat(par)
-        cat('\nunscaled par =  ')
-        cat(par * kernel_inputs$unit_conv)
-        cat('\n')
-
+        if(verbose){
+          cat('\n\nAttempt ')
+          cat(cnt)
+          cat(" failed\n")
+          cat('raw par =  ')
+          cat(par)
+          cat('\nunscaled par =  ')
+          cat(par * kernel_inputs$unit_conv)
+          cat('\n')
+        }
         if(kernel_inputs$kernel != 'expow'){
           par <- rep(par_starts[cnt], n_covs)
         }
@@ -334,15 +332,16 @@ multiScale_optim <- function(fitted_mod,
       cnt <- cnt + 1
 
       if(inherits(opt_results, "try-error")){
-        cat('\n\nAttempt ')
-        cat(cnt)
-        cat(" failed\n")
-        cat('raw par =  ')
-        cat(par)
-        cat('\nunscaled par =  ')
-        cat(par * kernel_inputs$unit_conv)
-        cat('\n')
-
+        if(verbose){
+          cat('\n\nAttempt ')
+          cat(cnt)
+          cat(" failed\n")
+          cat('raw par =  ')
+          cat(par)
+          cat('\nunscaled par =  ')
+          cat(par * kernel_inputs$unit_conv)
+          cat('\n')
+        }
         if(kernel_inputs$kernel != 'expow'){
           par <- rep(par_starts[cnt], n_covs)
         }

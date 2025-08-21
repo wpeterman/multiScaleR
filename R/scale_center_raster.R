@@ -9,12 +9,6 @@
 #'
 #' @return A `terra::SpatRaster` with each layer scaled and optionally clamped.
 #' @keywords internal
-#' @examples
-#' ## NOT RUN
-#'
-#' # scaled_r <- scale_center_raster(r, opt_mod, clamp = TRUE)
-#'
-#' @rdname scale_center_raster
 scale_center_raster <- function(r,
                                 multiScaleR,
                                 clamp = FALSE,
@@ -22,8 +16,6 @@ scale_center_raster <- function(r,
   covs <- names(r)
 
   if(inherits(multiScaleR, "multiScaleR_data")){
-    # covs_ <- names(multiScaleR$scl_params$mean)
-    # covs <- intersect(covs, covs_)
 
     mns <- multiScaleR$scl_params$mean[covs]
     sds <- multiScaleR$scl_params$sd[covs]

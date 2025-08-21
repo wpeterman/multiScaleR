@@ -89,9 +89,6 @@ aic_tab <- function(mod_list,
 
   p <- list(...)
 
-  # if(length(unique(sapply(mod_list, function(x) class(x)))) != 1L){
-  #   stop(cat("\n All objects in list must be of class `multiScaleR` \n"))
-  # }
   class_list <- lapply(mod_list, function(x) class(x))
   msclr <- which(class_list == 'multiScaleR')
   opt_list <- lapply(mod_list[msclr], function(x) x$opt_mod)
@@ -103,7 +100,7 @@ aic_tab <- function(mod_list,
   ## All models comparable
   mod_dims <- as.vector(lapply(opt_list, function(x) n_obs(x)))
   if(length(unique.default(mod_dims)) != 1L) {
-    stop(cat("\n You are attempting to compare models with different number of sample locations. These are not valid comparisons. \n"))
+    stop("\nYou are attempting to compare models with different number of sample locations. These are not valid comparisons.\n")
   }
 
   mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))
@@ -258,9 +255,6 @@ bic_tab <- function(mod_list,
 
   p <- list(...)
 
-  # if(length(unique(sapply(mod_list, function(x) class(x)))) != 1L){
-  #   stop(cat("\n All objects in list must be of class `multiScaleR` \n"))
-  # }
   class_list <- lapply(mod_list, function(x) class(x))
   msclr <- which(class_list == 'multiScaleR')
   opt_list <- lapply(mod_list[msclr], function(x) x$opt_mod)
@@ -272,7 +266,7 @@ bic_tab <- function(mod_list,
   ## All models comparable
   mod_dims <- as.vector(lapply(opt_list, function(x) n_obs(x)))
   if(length(unique.default(mod_dims)) != 1L) {
-    stop(cat("\n You are attempting to compare models with different number of sample locations. These are not valid comparisons. \n"))
+    stop("\nYou are attempting to compare models with different number of sample locations. These are not valid comparisons.\n")
   }
 
   mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))

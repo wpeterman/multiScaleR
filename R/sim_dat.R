@@ -125,7 +125,8 @@ sim_dat <- function(alpha = 1,
                             kernel = kernel,
                             max_D = max_D,
                             raster_stack = raster_stack,
-                            projected = T)
+                            projected = T,
+                            verbose = F)
 
   if(type =='count'){
 

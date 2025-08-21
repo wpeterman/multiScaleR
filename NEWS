@@ -1,3 +1,8 @@
+multiScaleR 0.4.5
+---------
+* Added `verbose` argument to functions to optionally supress console printing
+* Made updates for CRAN checks
+
 multiScaleR 0.4.4
 ---------
 * Updated `kernel_scale.raster` documentation and clamping defaults

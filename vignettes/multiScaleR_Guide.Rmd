@@ -166,7 +166,8 @@ To begin an analysis, the `kernel_prep` function must be run with the `spatRaste
 kernel_inputs <- kernel_prep(pts = pts,
                              raster_stack = land_rast,
                              max_D = 1700,
-                             kernel = 'gaussian')
+                             kernel = 'gaussian',
+                             verbose = FALSE)
 kernel_inputs
 ```
 
@@ -213,7 +214,6 @@ We could update `max_D` by re-running `kernel_prep`, but we won't do that here. 
 mod0_2 <- glm(counts ~ site + land1 + land2,
               family = poisson(),
               data = df)
-
 ```
 
 ```{r eval=FALSE}
@@ -261,19 +261,22 @@ Data were simulated from a Gaussian kernel, but we can optimize using other kern
 exp_inputs <- kernel_prep(pts = pts,
                           raster_stack = land_rast,
                           max_D = 1700,
-                          kernel = 'exp')
+                          kernel = 'exp',
+                          verbose = FALSE)
 
 ## Exponential Power
 expow_inputs <- kernel_prep(pts = pts,
                             raster_stack = land_rast,
                             max_D = 1700,
-                            kernel = 'expow')
+                            kernel = 'expow',
+                            verbose = FALSE)
 
 ## Fixed width buffer
 fixed_inputs <- kernel_prep(pts = pts,
                             raster_stack = land_rast,
                             max_D = 1700,
-                            kernel = 'fixed')
+                            kernel = 'fixed',
+                            verbose = FALSE)
 ```
 
 Optimize model with alternative kernels
@@ -408,7 +411,8 @@ library(unmarked)
 kernel_inputs <- kernel_prep(pts = s_dat$pts,
                              raster_stack = rs,
                              max_D = 550,
-                             kernel = 'gaus')
+                             kernel = 'gaus',
+                             verbose = FALSE)
 
 umf <- unmarkedFramePCount(y = s_dat$y,
                            siteCovs = kernel_inputs$kernel_dat)
@@ -450,7 +454,7 @@ rast_scale.center <- kernel_scale.raster(raster_stack = rs,
                                          multiScaleR = opt_umf.p,
                                          scale_center = TRUE,
                                          clamp = TRUE,
-                                         pct_mx = 0.05)
+                                         pct_mx = 0.00)
 
 plot(rast_scale.center)
 
@@ -489,7 +493,8 @@ Prepare inputs for use with `multiScaleR`
 kernel_inputs <- kernel_prep(pts = s_dat.occ$pts,
                              raster_stack = rs,
                              max_D = 800,
-                             kernel = 'gaus')
+                             kernel = 'gaus',
+                             verbose = FALSE)
 
 ## Occupancy frame
 umf <- unmarkedFrameOccu(y = s_dat.occ$y,
@@ -520,7 +525,7 @@ We did a decent job of recovering simulated values. Note that the sample size wa
 rast_scale.center <- kernel_scale.raster(raster_stack = rs,
                                          multiScaleR = opt_umf.occ,
                                          scale_center = TRUE,
-                                         clamp = F)
+                                         clamp = T)
 plot(rast_scale.center)
 
 occ.mod_pred <- terra::predict(rast_scale.center, 
@@ -565,7 +570,8 @@ kernel_out <- kernel_prep(pts = pts,
                           raster_stack = rs,
                           max_D = 1500,
                           kernel = kernel,
-                          sigma = sigma)
+                          sigma = sigma,
+                          verbose = FALSE)
 
 ## ZINB simulation
 zi_prob <- plogis(zi_alpha + zi_beta*kernel_out$kernel_dat$cont1)
@@ -597,7 +603,8 @@ zinb_mod <- pscl::zeroinfl(cnt ~ bin1 | cont1,
 kernel_inputs <- kernel_prep(pts = pts,
                              kernel = kernel,
                              max_D = 1500,
-                             raster_stack = rs)
+                             raster_stack = rs,
+                             verbose = FALSE)
 ```
 
 **NOTE: It is highly encouraged to fit your model as `pscl::zeroinfl`. **
@@ -723,9 +730,8 @@ sim_mod <- glm(y ~ bin1 + cont2,
 kernel_inputs <- kernel_prep(pts = s_dat$pts,
                              raster_stack = r_sim1,
                              max_D = 1500,
-                             kernel = 'gaussian')
-
-
+                             kernel = 'gaussian',
+                             verbose = FALSE)
 ```
 
 ```{r eval=FALSE}
