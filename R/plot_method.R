@@ -15,14 +15,33 @@
 #'
 #' @return A list of ggplot2 objects.
 #' @examples
-#' \dontrun{
-#' plot(x)
+#' \donttest{
+#' ## Using package data
+#' data('pts')
+#' data('count_data')
+#' hab <- terra::rast(system.file('extdata',
+#'                    'hab.tif', package = 'multiScaleR'))
 #'
-#' plot(x, prob = 0.95)
+#' kernel_inputs <- kernel_prep(pts = pts,
+#'                              raster_stack = hab,
+#'                              max_D = 250,
+#'                              kernel = 'gaussian')
 #'
-#' plot(x, scale_dist = FALSE)
+#' mod <- glm(y ~ hab,
+#'            family = poisson,
+#'            data = count_data)
 #'
-#' plot(x, scale_dist = TRUE, add_label = FALSE)
+#' ## Optimize scale
+#' opt <- multiScale_optim(fitted_mod = mod,
+#'                         kernel_inputs = kernel_inputs)
+#'
+#' plot(opt)
+#'
+#' plot(opt, prob = 0.95)
+#'
+#' plot(opt, scale_dist = FALSE)
+#'
+#' plot(opt, scale_dist = TRUE, add_label = FALSE)
 #' }
 #'
 #' @seealso \code{\link[multiScaleR]{plot_kernel}}
