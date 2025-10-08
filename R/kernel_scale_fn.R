@@ -53,9 +53,9 @@ kernel_scale_fn <- function(par,
     n_covs <- length(covs)
   } else {
     mod_class <- 'other'
-    dat <- extract_model_data(mod)
+    dat <- get_data(mod, effects = 'all')
     if(is.null(dat)){
-      dat <- get_data(mod, effects = 'all')
+      dat <- extract_model_data(mod)
     }
     # covs <- find_predictors(mod)$conditional
     covs <- unlist(find_predictors(mod))

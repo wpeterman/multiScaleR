@@ -1,3 +1,7 @@
+multiScaleR 0.4.6
+---------
+* Updated handling of mixed effects models
+
 multiScaleR 0.4.5
 ---------
 * Added `verbose` argument to functions to optionally supress console printing
