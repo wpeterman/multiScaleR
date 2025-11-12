@@ -57,7 +57,6 @@ kernel_scale_fn <- function(par,
     if(is.null(dat)){
       dat <- extract_model_data(mod)
     }
-    # covs <- find_predictors(mod)$conditional
     covs <- unlist(find_predictors(mod))
     covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
     n_covs <- length(covs)

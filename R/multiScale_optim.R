@@ -237,122 +237,90 @@ multiScale_optim <- function(fitted_mod,
   opt_results <- data.frame()
   class(opt_results) <- 'try-error'
 
-  # browser()
-
-  while(class(opt_results) == 'try-error' & cnt < (length(par_starts))){
-    if(use_parallel){
-      ## Initiate parallel cluster
-      if(.Platform$OS.type == "unix" & isFALSE(PSOCK)){
-        cl <- makeForkCluster(n_cores)
-      } else {
-        cl <- makeCluster(n_cores)     # set the number of processor cores
-
-      }
-      setDefaultCluster(cl = cl)     # set'cl'as default cluster
-      # if(mod_class == 'unmarked'){
-      #   clusterEvalQ(cl, library('unmarked'))
-      # }
-      cluster_prep(fitted_mod, cl)
-
-      opt_results <- try(optimParallel(par = par,
-                                       fn = kernel_scale_fn,
-                                       hessian = TRUE,
-                                       lower = lwr,
-                                       upper = uppr,
-                                       fitted_mod = fitted_mod,
-                                       d_list = kernel_inputs$d_list,
-                                       cov_df = kernel_inputs$raw_cov,
-                                       kernel = kernel_inputs$kernel,
-                                       join_by = join_by,
-                                       control = list(maxit = 1000),
-                                       parallel = list(forward = F,
-                                                       loginfo = T)), silent = T)
-
-      ## Stop parallel cluster
-      setDefaultCluster(cl = NULL)
-      stopCluster(cl)
-
-      if(inherits(opt_results, "try-error")){
-        if(verbose){
-          cat('\n\nParallel optimization failed; attempting standard optimization ')
-        }
-
-        opt_results <- try(optim(par = par,
-                                 fn = kernel_scale_fn,
-                                 hessian = TRUE,
-                                 lower = lwr,
-                                 upper = uppr,
-                                 method = 'L-BFGS-B',
-                                 fitted_mod = fitted_mod,
-                                 d_list = kernel_inputs$d_list,
-                                 cov_df = kernel_inputs$raw_cov,
-                                 control = list(maxit = 1000),
-                                 kernel = kernel_inputs$kernel,
-                                 join_by = join_by),
-                           silent = T)
-      }
-
-      cnt <- cnt + 1
-
-      if(inherits(opt_results, "try-error")){
-        if(verbose){
-          cat('\n\nAttempt ')
-          cat(cnt)
-          cat(" failed\n")
-          cat('raw par =  ')
-          cat(par)
-          cat('\nunscaled par =  ')
-          cat(par * kernel_inputs$unit_conv)
-          cat('\n')
-        }
-        if(kernel_inputs$kernel != 'expow'){
-          par <- rep(par_starts[cnt], n_covs)
-        }
-
-        if(kernel_inputs$kernel == 'expow'){
-          par <- rep(par_starts[cnt], n_covs)
-          par <- c(par, rep(2, n_covs))
-        }
-      }
+  if (use_parallel) {
+    ## Initiate parallel cluster
+    if (.Platform$OS.type == "unix" & isFALSE(PSOCK)) {
+      cl <- makeForkCluster(n_cores)
     } else {
-      opt_results <- try(optim(par = par,
-                               fn = kernel_scale_fn,
-                               hessian = TRUE,
-                               lower = lwr,
-                               upper = uppr,
-                               method = 'L-BFGS-B',
-                               fitted_mod = fitted_mod,
-                               d_list = kernel_inputs$d_list,
-                               cov_df = kernel_inputs$raw_cov,
-                               control = list(maxit = 1000),
-                               kernel = kernel_inputs$kernel,
-                               join_by = join_by),
-                         silent = T)
+      cl <- makeCluster(n_cores)
+    }
+    setDefaultCluster(cl = cl)
+    cluster_prep(fitted_mod, cl)
 
-      cnt <- cnt + 1
+    ## Run parallel optimization
+    opt_results <- try(
+      optimParallel(
+        par = par,
+        fn = kernel_scale_fn,
+        hessian = TRUE,
+        lower = lwr,
+        upper = uppr,
+        fitted_mod = fitted_mod,
+        d_list = kernel_inputs$d_list,
+        cov_df = kernel_inputs$raw_cov,
+        kernel = kernel_inputs$kernel,
+        join_by = join_by,
+        control = list(maxit = 1000),
+        parallel = list(forward = FALSE, loginfo = TRUE)
+      ),
+      silent = TRUE
+    )
 
-      if(inherits(opt_results, "try-error")){
-        if(verbose){
-          cat('\n\nAttempt ')
-          cat(cnt)
-          cat(" failed\n")
-          cat('raw par =  ')
-          cat(par)
-          cat('\nunscaled par =  ')
-          cat(par * kernel_inputs$unit_conv)
-          cat('\n')
+    ## Stop parallel cluster
+    setDefaultCluster(cl = NULL)
+    stopCluster(cl)
+
+    ## If parallel optimization failed
+    if (inherits(opt_results, "try-error")) {
+      err_msg <- attr(opt_results, "condition")
+      if (verbose) {
+        cat("\n\n*** Parallel optimization failed ***\n")
+        if (!is.null(err_msg)) {
+          cat("Error message:\n", conditionMessage(err_msg), "\n", sep = "")
+        } else {
+          cat("Unknown error occurred during parallel optimization.\n")
         }
-        if(kernel_inputs$kernel != 'expow'){
-          par <- rep(par_starts[cnt], n_covs)
-        }
+        cat("Parallel optimization aborted.\n")
+        cat("Try running with `n_cores = 1` to use standard optimization.\n\n")
+      }
+      stop("Parallel optimization failed. See message above.")
+    }
 
-        if(kernel_inputs$kernel == 'expow'){
-          par <- rep(par_starts[cnt], n_covs)
-          par <- c(par, rep(2, n_covs))
+  } else {
+    ## Standard (non-parallel) optimization
+    opt_results <- try(
+      optim(
+        par = par,
+        fn = kernel_scale_fn,
+        hessian = TRUE,
+        lower = lwr,
+        upper = uppr,
+        method = "L-BFGS-B",
+        fitted_mod = fitted_mod,
+        d_list = kernel_inputs$d_list,
+        cov_df = kernel_inputs$raw_cov,
+        control = list(maxit = 1000),
+        kernel = kernel_inputs$kernel,
+        join_by = join_by
+      ),
+      silent = TRUE
+    )
+
+    ## Handle standard optimization errors
+    if (inherits(opt_results, "try-error")) {
+      err_msg <- attr(opt_results, "condition")
+      if (verbose) {
+        cat("\n\n*** Standard optimization failed ***\n")
+        if (!is.null(err_msg)) {
+          cat("Error message:\n", conditionMessage(err_msg), "\n", sep = "")
+        } else {
+          cat("Unknown error occurred during standard optimization.\n")
         }
       }
-    } # End if else
-  } # End while
+      stop("Standard optimization failed. See message above.")
+    }
+  }
+
 
   if(inherits(opt_results, "try-error")){
 
