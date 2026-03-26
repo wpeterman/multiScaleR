@@ -2,18 +2,16 @@
 #' @description Kernel smoothing with fft
 #' @param x A matrix of the raster layer
 #' @param kernel A weight matrix for the smoothing
-#' @param fun Only calculates mean
-#' @param na.rm Always remove NA values from mean calculation
-
+#' @param fun Either "mean" or "sum"
+#' @param na.rm Logical; should NA values be removed from mean calculation?
+#'
 #' @return A matrix
 #' @rdname fft_convolution
 #' @keywords internal
 #' @importFrom stats fft
 
 fft_convolution <- function(x, kernel, fun = "mean", na.rm = TRUE) {
-  # Check inputs
-    # Convert input to matrix
-    x <- x_mat <- as.matrix(x)
+  x <- x_mat <- as.matrix(x)
 
   if (!is.matrix(x) && !is.data.frame(x)) {
     stop("'x' must be a matrix or data frame")
@@ -28,46 +26,71 @@ fft_convolution <- function(x, kernel, fun = "mean", na.rm = TRUE) {
     stop("'fun' must be either 'mean' or 'sum'")
   }
 
-  # Store NA positions and replace NAs with 0
-  x_na_mask <- is.na(x_mat)
-  x_mat[x_na_mask] <- 0
+  nr_x <- nrow(x_mat)
+  nc_x <- ncol(x_mat)
+  nr_k <- nrow(kernel)
+  nc_k <- ncol(kernel)
 
-  # Determine padded size for convolution
-  nr <- nrow(x_mat) + nrow(kernel) - 1
-  nc <- ncol(x_mat) + ncol(kernel) - 1
+  row_off <- floor(nr_k / 2)
+  col_off <- floor(nc_k / 2)
 
-  # Zero-pad x and kernel
-  pad_x <- matrix(0, nr, nc)
-  pad_k <- matrix(0, nr, nc)
-  pad_x[1:nrow(x_mat), 1:ncol(x_mat)] <- x_mat
-  pad_k[1:nrow(kernel), 1:ncol(kernel)] <- kernel
-
-  # Perform FFT-based convolution
-  fft_x <- fft(pad_x)
-  fft_k <- fft(pad_k)
-  conv_full <- Re(fft(fft_x * fft_k, inverse = TRUE)) / (nr * nc)
-
-  # Determine crop boundaries to match original size
-  row_off <- floor(nrow(kernel) / 2)
-  col_off <- floor(ncol(kernel) / 2)
   i1 <- row_off + 1
-  i2 <- row_off + nrow(x_mat)
+  i2 <- row_off + nr_x
   j1 <- col_off + 1
-  j2 <- col_off + ncol(x_mat)
+  j2 <- col_off + nc_x
 
-  # Crop to original dimensions
-  conv_crop <- conv_full[i1:i2, j1:j2]
+  nr <- nr_x + nr_k - 1
+  nc <- nc_x + nc_k - 1
 
-  # Normalize if 'mean' is requested
-  if (fun == "mean") {
-    k_sum <- sum(kernel, na.rm = na.rm)
-    if (k_sum == 0) stop("Sum of kernel is zero; cannot normalize by mean.")
-    conv_crop <- conv_crop / k_sum
+  x_na_mask <- is.na(x_mat)
+  has_na <- any(x_na_mask)
+
+  # numerator data
+  if (has_na) {
+    x_mat[x_na_mask] <- 0
   }
 
-  # Restore NA values
-  conv_crop[x_na_mask] <- NA
+  # pad x and kernel
+  pad_x <- matrix(0, nr, nc)
+  pad_k <- matrix(0, nr, nc)
 
-  # Return result with transposition to match original orientation
-  return(t(conv_crop))
+  pad_x[1:nr_x, 1:nc_x] <- x_mat
+  pad_k[1:nr_k, 1:nc_k] <- kernel
+
+  # FFTs
+  fft_x <- fft(pad_x)
+  fft_k <- fft(pad_k)
+
+  # numerator convolution
+  conv_full <- Re(fft(fft_x * fft_k, inverse = TRUE)) / (nr * nc)
+  conv_crop <- conv_full[i1:i2, j1:j2, drop = FALSE]
+
+  if (fun == "mean") {
+
+    # fast path: no missing data, or na.rm = FALSE
+    if (!na.rm || !has_na) {
+      k_sum <- sum(kernel)
+      if (k_sum == 0) stop("Sum of kernel is zero; cannot normalize by mean.")
+      conv_crop <- conv_crop / k_sum
+
+    } else {
+      # NA-aware denominator only when needed
+      valid_mask <- matrix(1, nr_x, nc_x)
+      valid_mask[x_na_mask] <- 0
+
+      pad_valid <- matrix(0, nr, nc)
+      pad_valid[1:nr_x, 1:nc_x] <- valid_mask
+
+      fft_valid <- fft(pad_valid)
+      weight_full <- Re(fft(fft_valid * fft_k, inverse = TRUE)) / (nr * nc)
+      weight_crop <- weight_full[i1:i2, j1:j2, drop = FALSE]
+
+      conv_crop <- conv_crop / weight_crop
+      conv_crop[weight_crop == 0] <- NA_real_
+    }
+  }
+
+  conv_crop[x_na_mask] <- NA_real_
+
+  t(conv_crop)
 }

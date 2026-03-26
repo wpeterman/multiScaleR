@@ -1,3 +1,9 @@
+multiScaleR 0.5.0
+---------
+* Updated handling of edge and NA values in `kernel_scale.raster`
+* Updated `kernel_scale.raster` to create 'dummy' layers for site effect variables
+* Added vignette on spatial projections
+
 multiScaleR 0.4.6
 ---------
 * Updated handling of mixed effects models
