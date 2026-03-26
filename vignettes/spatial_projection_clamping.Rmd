@@ -1,0 +1,417 @@
+---
+title: "Spatial Projection and Clamping"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    fig_width: 6.5
+    fig_height: 5
+number_sections: true
+toc: true
+vignette: >
+  %\VignetteIndexEntry{Spatial Projection and Clamping}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r load, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.align = "center",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r setup}
+library(multiScaleR)
+library(terra)
+library(MASS)
+```
+
+# Introduction to Spatial Projection
+
+Once distance-weighted scales of effect have been estimated with `multiScale_optim()`, the next step is often to project the fitted model across the landscape to generate spatial predictions of abundance, occurrence, or related ecological responses.
+
+In `multiScaleR`, this workflow is implemented through `kernel_scale.raster()`, which applies the fitted smoothing kernels to raster covariates and, when requested, scales and centers projected values so they match the covariate space used to fit the model. This makes spatial projection straightforward, but it also introduces a practical problem: projected covariate values may extend beyond the range represented at the sampled points.
+
+This matters because many ecological models use nonlinear link functions. Under a log-link or logit-link, even moderate extrapolation in covariate space can produce biologically implausible predictions. For this reason, `kernel_scale.raster()` includes optional clamping, which constrains projected covariate values to user-defined bounds derived from the training data.
+
+This vignette has two goals:
+
+1.  demonstrate how to project a fitted `multiScaleR` model across a raster landscape,
+2.  show how clamping and `pct_mx` alter projected covariate values and resulting predictions, and
+
+# Demonstrating Clamping Under Controlled Extrapolation
+
+## Conceptual setup
+
+To make the role of clamping explicit, we use a deliberately biased sampling design. We first simulate a landscape with a known response surface, then fit the model using points drawn from only a restricted portion of the available environmental gradient. The fitted model is therefore trained on a limited range of covariate values, but is asked to make predictions across the full landscape.
+
+This creates two domains:
+
+-   a **supported domain**, where projected values fall within the range represented in the training data, and
+-   an **unsupported domain**, where predictions require extrapolation.
+
+Clamping acts by restricting projected covariate values in the unsupported domain back toward the sampled range. The example below is intentionally exaggerated. The objective is not to reproduce a realistic field design, but to create a transparent demonstration of what clamping does and how `pct_mx` changes projection behavior.
+
+## Simulating a known landscape and response surface
+
+We begin by simulating a raster landscape with two covariates. We then smooth those covariates using known kernels to define the true scales of effect in the data-generating process.
+
+```{r simulate-landscape}
+set.seed(321)
+
+# Simulate a raster landscape with two binary covariates
+rs <- sim_rast(user_seed = 999, dim = 500, resolution = 30)
+rs <- terra::subset(rs, c("bin1", "bin2"))
+
+# Apply the TRUE smoothing used to generate the ecological signal
+true_sigmas <- c(400, 200)
+
+true_smoothed <- kernel_scale.raster(
+  raster_stack = rs,
+  sigma = true_sigmas,
+  kernel = "gaussian",
+  scale_center = FALSE,
+  verbose = FALSE
+)
+```
+
+For simulation purposes, we next standardize each smoothed covariate across the **full** landscape. This defines the true environmental gradient available on the map. Later, the fitted model will scale projected values using only the sampled data. That mismatch is intentional, because it helps clarify why extrapolation occurs.
+
+```{r standardize-truth}
+z_stack <- scale(true_smoothed)
+```
+
+We now define a true response surface. The linear predictor includes a strong positive effect of `bin1` and a negative effect of `bin2`. To avoid trivial demonstrations driven by explosive exponential growth, we apply a saturating transformation before converting the linear predictor to the expected count surface.
+
+```{r define-truth}
+# Define true model coefficients
+alpha <- 0.5
+beta1 <- 1.25
+beta2 <- -0.75
+
+# Calculate the linear predictor
+linpred_true <- alpha + (beta1 * z_stack$bin1) + (beta2 * z_stack$bin2)
+
+# Saturate the linear predictor so extreme gradients remain interpretable
+linpred_true <- 4 * tanh(linpred_true / 4)
+
+# Convert to the expected count surface (Poisson mean)
+true_mu <- exp(linpred_true)
+```
+
+## Restricting sampling to a biased domain
+
+We next impose a sampling bias by retaining only a narrow subset of the available environmental gradient. In this example, we sample from locations with moderately high values of `bin1` and intermediate values of `bin2`. This forces the fitted model to learn from a truncated portion of predictor space.
+
+```{r restrict-sampling}
+# Define a restricted environmental envelope for sampling
+q1 <- quantile(values(z_stack$bin1), probs = c(0.50, 0.90), na.rm = TRUE)
+q2 <- quantile(values(z_stack$bin2), probs = c(0.25, 0.75), na.rm = TRUE)
+
+# Create a mask that isolates this specific domain
+sample_mask <- z_stack$bin1
+sample_mask[] <- ifelse(
+  z_stack$bin1[] >= q1[1] & z_stack$bin1[] <= q1[2] &
+    z_stack$bin2[] >= q2[1] & z_stack$bin2[] <= q2[2],
+  1, NA
+)
+
+# Sample only within this restricted domain
+pts <- spatSample(
+  sample_mask,
+  size = 150,
+  method = "random",
+  na.rm = TRUE,
+  as.points = TRUE
+)
+
+# Extract the true mean surface at sampled points and simulate counts
+mu_pts <- terra::extract(true_mu, pts)[, 2]
+counts <- rpois(length(mu_pts), lambda = mu_pts)
+```
+
+The model is fit to a narrow slice of the available environmental gradient, but projection is carried out across the full raster extent.
+
+```{r visualize-sampling-domain, fig.width=9, fig.height=4.5}
+par(mfrow = c(1, 2))
+
+# Plot the restricted sampling mask and points
+plot(sample_mask, main = "Restricted Sampling Domain")
+points(pts, pch = 16, cex = 0.45)
+
+# Plot the true mean surface and points
+plot(true_mu, main = "True Mean Surface")
+points(pts, pch = 16, cex = 0.35)
+
+par(mfrow = c(1, 1))
+```
+
+## Fitting the multiscale model
+
+We now prepare the inputs required by `multiScaleR`, fit a base Poisson model, and optimize scales of effect. All scaling and centering used during fitting are now derived from the sampled points, not the full landscape.
+
+```{r fit-model}
+# Prepare multiscale data objects based on the sampled points
+kernel_inputs <- kernel_prep(
+  pts = pts,
+  raster_stack = rs,
+  max_D = 1500,
+  kernel = "gaussian",
+  verbose = FALSE
+)
+
+# Combine count data with kernel predictors
+dat <- data.frame(counts = counts, kernel_inputs$kernel_dat)
+
+# Fit the base GLM
+mod <- glm(counts ~ bin1 + bin2, family = poisson(), data = dat)
+```
+
+```{r model-summary}
+# Optimize scales of effect
+opt_mod <- multiScale_optim(
+  fitted_mod = mod,
+  kernel_inputs = kernel_inputs
+)
+
+summary(opt_mod)
+```
+
+# The Extrapolation Problem
+
+When `kernel_scale.raster()` is called with `multiScaleR = opt_mod` and `scale_center = TRUE`, it projects smoothed covariate rasters using the same centering and scaling parameters used to fit the model. This is essential for prediction, but it also reveals the extrapolation problem: raster cells can contain projected covariate values well beyond the range represented in the training data.
+
+We first generate an **unclamped** projection.
+
+```{r project-unclamped}
+# Project covariates without clamping
+r_unclamped <- kernel_scale.raster(
+  raster_stack = rs,
+  multiScaleR = opt_mod,
+  scale_center = TRUE,
+  clamp = FALSE,       # Clamping disabled
+  verbose = FALSE
+)
+
+# Predict the expected counts
+pred_unclamped <- predict(r_unclamped, opt_mod$opt_mod, type = "response")
+
+# Calculate error (Predicted - True)
+unclamped_error <- pred_unclamped - true_mu
+```
+
+To make the problem explicit, we compare the range of each projected covariate in the training data to the range of the projected raster.
+
+```{r compare-ranges-unclamped}
+# Extract training values and projected raster values
+train_vals <- opt_mod$opt_mod$model[, c("bin1", "bin2")]
+proj_vals_unclamped <- as.data.frame(values(r_unclamped))
+
+# Construct a table comparing the ranges
+range_tab <- data.frame(
+  covariate = c("bin1", "bin2"),
+  train_min = c(min(train_vals$bin1, na.rm = TRUE), min(train_vals$bin2, na.rm = TRUE)),
+  train_max = c(max(train_vals$bin1, na.rm = TRUE), max(train_vals$bin2, na.rm = TRUE)),
+  raster_min_unclamped = c(min(proj_vals_unclamped$bin1, na.rm = TRUE),
+                           min(proj_vals_unclamped$bin2, na.rm = TRUE)),
+  raster_max_unclamped = c(max(proj_vals_unclamped$bin1, na.rm = TRUE),
+                           max(proj_vals_unclamped$bin2, na.rm = TRUE))
+)
+
+range_tab
+```
+
+```{r visualize-unclamped, fig.width=9, fig.height=4.5}
+par(mfrow = c(1, 3))
+plot(true_mu, main = "True Mean Surface")
+plot(pred_unclamped, main = "Unclamped Prediction")
+plot(unclamped_error, main = "Unclamped Error")
+par(mfrow = c(1, 1))
+```
+
+In this example, the projected covariates extend well beyond the range represented in the training data. Under a log-link, those unsupported predictor values can generate very large predictions. The model is forced into covariate space where it lacks empirical support.
+
+# Understanding and Applying Clamping
+
+Clamping acts on **projected covariate values before prediction**. When a raster cell falls outside the training-data range for a covariate, its value is truncated to user-defined bounds. This limits marginal extrapolation and can greatly reduce extreme artifacts in projected response surfaces.
+
+Clamping is best viewed as a practical safeguard, not as a correction for model misspecification. It does not solve omitted variables, residual spatial structure, or novel combinations of predictors. It simply constrains individual projected covariate values so they do not extend arbitrarily far beyond the domain represented in the sampled data.
+
+## The `pct_mx` argument
+
+The `pct_mx` argument controls how strictly those clamping bounds are enforced.
+
+-   `pct_mx = 0` clamps to the exact observed minimum and maximum.
+-   `pct_mx > 0` expands the admissible range and therefore permits limited extrapolation.
+-   `pct_mx < 0` contracts the admissible range and yields more conservative predictions.
+
+Accordingly, `pct_mx` should be viewed as a tuning parameter controlling how cautiously projected values are allowed to extend beyond the sampled domain.
+
+## Comparing different clamping settings
+
+We now compare four projection strategies:
+
+1.  no clamping,
+2.  contracted bounds (`pct_mx = -0.20`),
+3.  strict clamping (`pct_mx = 0`), and
+4.  expanded bounds (`pct_mx = 0.20`).
+
+The values used here are intentionally strong so that the effect of `pct_mx` is easy to see.
+
+```{r project-clamped}
+# Contracted bounds
+r_cn20 <- kernel_scale.raster(
+  raster_stack = rs,
+  multiScaleR = opt_mod,
+  scale_center = TRUE,
+  clamp = TRUE,
+  pct_mx = -0.20,
+  verbose = FALSE
+)
+
+# Strict clamping
+r_c0 <- kernel_scale.raster(
+  raster_stack = rs,
+  multiScaleR = opt_mod,
+  scale_center = TRUE,
+  clamp = TRUE,
+  pct_mx = 0,
+  verbose = FALSE
+)
+
+# Expanded bounds
+r_cp20 <- kernel_scale.raster(
+  raster_stack = rs,
+  multiScaleR = opt_mod,
+  scale_center = TRUE,
+  clamp = TRUE,
+  pct_mx = 0.20,
+  verbose = FALSE
+)
+
+# Generate predictions for each clamped raster
+pred_cn20 <- predict(r_cn20, opt_mod$opt_mod, type = "response")
+pred_c0   <- predict(r_c0,   opt_mod$opt_mod, type = "response")
+pred_cp20 <- predict(r_cp20, opt_mod$opt_mod, type = "response")
+
+# Calculate errors
+error_cn20 <- pred_cn20 - true_mu
+error_c0   <- pred_c0   - true_mu
+error_cp20 <- pred_cp20 - true_mu
+```
+
+We can again compare the projected covariate ranges under each setting.
+
+```{r compare-ranges-clamped}
+proj_vals_cn20 <- as.data.frame(values(r_cn20))
+proj_vals_c0   <- as.data.frame(values(r_c0))
+proj_vals_cp20 <- as.data.frame(values(r_cp20))
+
+range_tab_clamp <- data.frame(
+  covariate = rep(c("bin1", "bin2"), each = 4),
+  setting = rep(c("unclamped", "pct_mx = -0.20", "pct_mx = 0", "pct_mx = 0.20"), times = 2),
+  min_value = c(
+    min(proj_vals_unclamped$bin1, na.rm = TRUE),
+    min(proj_vals_cn20$bin1, na.rm = TRUE),
+    min(proj_vals_c0$bin1, na.rm = TRUE),
+    min(proj_vals_cp20$bin1, na.rm = TRUE),
+    min(proj_vals_unclamped$bin2, na.rm = TRUE),
+    min(proj_vals_cn20$bin2, na.rm = TRUE),
+    min(proj_vals_c0$bin2, na.rm = TRUE),
+    min(proj_vals_cp20$bin2, na.rm = TRUE)
+  ),
+  max_value = c(
+    max(proj_vals_unclamped$bin1, na.rm = TRUE),
+    max(proj_vals_cn20$bin1, na.rm = TRUE),
+    max(proj_vals_c0$bin1, na.rm = TRUE),
+    max(proj_vals_cp20$bin1, na.rm = TRUE),
+    max(proj_vals_unclamped$bin2, na.rm = TRUE),
+    max(proj_vals_cn20$bin2, na.rm = TRUE),
+    max(proj_vals_c0$bin2, na.rm = TRUE),
+    max(proj_vals_cp20$bin2, na.rm = TRUE)
+  )
+)
+
+range_tab_clamp
+```
+
+Notice how `pct_mx` smoothly regulates the hard boundaries applied to the projected rasters. We can visually inspect the predictions and errors below:
+
+```{r visualize-clamped-predictions, fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+plot(pred_unclamped, main = "Unclamped")
+plot(pred_cn20, main = "Clamped: pct_mx = -0.20")
+plot(pred_c0, main = "Clamped: pct_mx = 0")
+plot(pred_cp20, main = "Clamped: pct_mx = 0.20")
+par(mfrow = c(1, 1))
+```
+
+```{r visualize-clamped-errors, fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+plot(unclamped_error, main = "Error: Unclamped")
+plot(error_cn20, main = "Error: pct_mx = -0.20")
+plot(error_c0, main = "Error: pct_mx = 0")
+plot(error_cp20, main = "Error: pct_mx = 0.20")
+par(mfrow = c(1, 1))
+```
+
+These comparisons make two points clear. First, unclamped projection can generate extreme predictions where projected covariate values extend well beyond the sampled range. Second, `pct_mx` governs how aggressively those extremes are suppressed. Negative values produce the most conservative maps, `pct_mx = 0` anchors projection to the observed range, and positive values allow limited re-expansion of the predictor bounds.
+
+## Quantifying prediction error inside and outside the sampled domain
+
+Visual comparisons are helpful, but the effect of clamping is easier to interpret if we separate prediction error in the supported and unsupported domains.
+
+```{r rmse-comparison}
+# Create masks representing areas inside and outside the sampled domain
+inside_mask <- sample_mask
+outside_mask <- sample_mask
+inside_mask[] <- ifelse(!is.na(sample_mask[]), 1, NA)
+outside_mask[] <- ifelse(is.na(sample_mask[]), 1, NA)
+
+# Helper function to compute RMSE
+rmse <- function(pred, truth, mask) {
+  p <- values(pred, mat = FALSE)
+  t <- values(truth, mat = FALSE)
+  m <- values(mask, mat = FALSE)
+  
+  idx <- !is.na(m) & is.finite(p) & is.finite(t)
+  sqrt(mean((p[idx] - t[idx])^2, na.rm = TRUE))
+}
+
+# Compile RMSE scores into a table
+rmse_tab <- data.frame(
+  model = c("unclamped", "pct_mx = -0.20", "pct_mx = 0", "pct_mx = 0.20"),
+  RMSE_inside = c(
+    rmse(pred_unclamped, true_mu, inside_mask),
+    rmse(pred_cn20, true_mu, inside_mask),
+    rmse(pred_c0, true_mu, inside_mask),
+    rmse(pred_cp20, true_mu, inside_mask)
+  ),
+  RMSE_outside = c(
+    rmse(pred_unclamped, true_mu, outside_mask),
+    rmse(pred_cn20, true_mu, outside_mask),
+    rmse(pred_c0, true_mu, outside_mask),
+    rmse(pred_cp20, true_mu, outside_mask)
+  )
+)
+
+rmse_tab
+```
+
+In most applications, differences among projection methods are modest in the supported domain because prediction is interpolation. The larger contrasts occur outside the sampled domain, where clamping prevents projected values from drifting arbitrarily far from the covariate space on which the model was fit.
+
+A final caution is worth emphasizing. Clamping can reduce extreme marginal extrapolation, but it does not guarantee ecological realism. If the model is being projected into genuinely novel environments, the resulting map is still an unsupported inference problem. Clamping only reduces how strongly that problem expresses itself.
+
+# Key Takeaways
+
+Clamping should be viewed as a practical safeguard against extreme marginal extrapolation during spatial projection.
+
+-   It limits projected covariate values to a user-defined range derived from the sampled data.
+-   It can reduce extreme prediction artifacts in poorly supported regions of environmental space.
+-   It does not eliminate unsupported inference, nor does it correct structural model misspecification.
+
+The `pct_mx` argument provides a simple way to tune how conservative that safeguard should be. Values near zero are often a sensible starting point for applied analyses. In this vignette, more extreme sampling bias and more extreme `pct_mx` values were used deliberately so that the mechanism of clamping is easy to see.
