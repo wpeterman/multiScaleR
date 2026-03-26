@@ -607,7 +607,7 @@ kernel_inputs <- kernel_prep(pts = pts,
                              verbose = FALSE)
 ```
 
-**NOTE: It is highly encouraged to fit your model as `pscl::zeroinfl`. **
+**NOTE: It is highly encouraged to fit your model as `pscl::zeroinfl`.**
 
 ```{r eval=FALSE}
 zinb_opt <- multiScale_optim(zinb_mod, 
