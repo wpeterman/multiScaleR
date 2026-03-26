@@ -11,9 +11,9 @@ fft_convolution(x, kernel, fun = "mean", na.rm = TRUE)
 
 \item{kernel}{A weight matrix for the smoothing}
 
-\item{fun}{Only calculates mean}
+\item{fun}{Either "mean" or "sum"}
 
-\item{na.rm}{Always remove NA values from mean calculation}
+\item{na.rm}{Logical; should NA values be removed from mean calculation?}
 }
 \value{
 A matrix
