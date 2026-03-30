@@ -1,8 +1,13 @@
+multiScaleR 0.6.0
+---------
+* Added unit testing
+
 multiScaleR 0.5.0
 ---------
 * Updated handling of edge and NA values in `kernel_scale.raster`
 * Updated `kernel_scale.raster` to create 'dummy' layers for site effect variables
 * Added vignette on spatial projections
+* Submitted to CRAN
 
 multiScaleR 0.4.6
 ---------

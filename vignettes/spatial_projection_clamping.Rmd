@@ -5,8 +5,8 @@ output:
   rmarkdown::html_vignette:
     fig_width: 6.5
     fig_height: 5
-number_sections: true
-toc: true
+    number_sections: true
+    toc: true
 vignette: >
   %\VignetteIndexEntry{Spatial Projection and Clamping}
   %\VignetteEngine{knitr::rmarkdown}
@@ -14,14 +14,14 @@ vignette: >
 ---
 
 ```{r load, include=FALSE}
-library(multiScaleR)
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  fig.align = "center",
-  message = FALSE,
-  warning = FALSE
-)
+# library(multiScaleR)
+# knitr::opts_chunk$set(
+#   collapse = TRUE,
+#   comment = "#>",
+#   fig.align = "center",
+#   message = FALSE,
+#   warning = FALSE
+# )
 ```
 
 ```{r setup}
