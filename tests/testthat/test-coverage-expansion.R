@@ -72,7 +72,7 @@ test_that("simulation helpers cover alternate response types, spatial inputs, an
       max_D = 120,
       n_points = 3
     ),
-    "must be equal"
+    "beta"
   )
   expect_error(
     sim_dat(
@@ -136,7 +136,7 @@ test_that("sim_dat_unmarked covers alternate response types and validations", {
       raster_stack = fix$rs_two,
       n_points = 5
     ),
-    "must be equal"
+    "beta"
   )
   expect_error(
     sim_dat_unmarked(
@@ -383,12 +383,12 @@ test_that("kernel_dist, summary, print, and plotting helpers cover alternate bra
   unmark <- make_unmarked_fixture()
 
   expect_error(kernel_dist(structure(list(), class = "not_multiScaleR")), "Provide a fitted")
-  expect_error(kernel_dist(prob = 2, sigma = 1, kernel = "gaussian"), "decimal")
+  expect_error(kernel_dist(prob = 2, sigma = 1, kernel = "gaussian"), "within \\(0, 1\\)")
   expect_error(kernel_dist(), "Parameters not correctly specified")
   expect_error(kernel_dist(sigma = NULL, kernel = "gaussian"), "sigma")
   expect_error(kernel_dist(sigma = 1, kernel = NULL), "kernel")
   expect_error(kernel_dist(sigma = 1, kernel = "expow"), "shape")
-  expect_error(kernel_dist(sigma = 1, kernel = "expow", beta = -1), "positive")
+  expect_error(kernel_dist(sigma = 1, kernel = "expow", beta = -1), "beta")
 
   gls_mod <- nlme::gls(y ~ cont1 + site, data = fix$df)
   gls_obj <- structure(
@@ -471,6 +471,108 @@ test_that("kernel_dist, summary, print, and plotting helpers cover alternate bra
   expect_error(plot(fix$opt, prob = 2), "decimal between 0 and 1")
   expect_error(plot_kernel(sigma = NULL, kernel = "gaussian"), "sigma")
   expect_error(plot_kernel(sigma = 1, kernel = NULL), "kernel")
+})
+
+test_that("new front-end validation catches malformed user inputs early", {
+  fix <- make_core_fixture()
+  sim_fix <- make_simulation_fixture()
+
+  expect_error(
+    sim_dat(
+      beta = 0.5,
+      sigma = 25,
+      raster_stack = NULL,
+      max_D = 120,
+      n_points = 3
+    ),
+    "raster_stack"
+  )
+  expect_error(
+    sim_dat(
+      beta = 0.5,
+      sigma = 25,
+      raster_stack = terra::subset(sim_fix$rs, "cont1"),
+      max_D = 120,
+      n_points = 0
+    ),
+    "n_points"
+  )
+  expect_error(
+    sim_dat_unmarked(
+      beta = c(0.5, 0.25),
+      sigma = c(20, 30),
+      raster_stack = sim_fix$rs_two,
+      n_points = 5,
+      n_surv = 0
+    ),
+    "n_surv"
+  )
+  expect_error(
+    sim_dat_unmarked(
+      beta = c(0.5, 0.25),
+      sigma = c(20, 30),
+      raster_stack = sim_fix$rs_two,
+      n_points = 5,
+      det = 2
+    ),
+    "det"
+  )
+
+  expect_error(plot_marginal_effects(structure(list(), class = "not_multiScaleR")), "multiScaleR")
+  expect_error(plot_marginal_effects(fix$opt, length.out = 0), "length.out")
+  expect_error(plot_marginal_effects(fix$opt, link = NA), "link")
+
+  expect_error(
+    multiScaleR:::scale_center_raster(
+      r = data.frame(x = 1),
+      multiScaleR = fix$kernel_inputs
+    ),
+    "SpatRaster"
+  )
+  expect_error(
+    multiScaleR:::scale_center_raster(
+      r = fix$rs,
+      multiScaleR = structure(list(), class = "not_multiScaleR")
+    ),
+    "multiScaleR"
+  )
+
+  expect_warning(
+    kernel_scale.raster(
+      raster_stack = fix$rs,
+      sigma = 1,
+      scale_center = TRUE,
+      verbose = FALSE
+    ),
+    "scale_center = TRUE"
+  )
+  expect_warning(
+    kernel_scale.raster(
+      raster_stack = fix$rs,
+      sigma = 1,
+      clamp = TRUE,
+      verbose = FALSE
+    ),
+    "clamp = TRUE"
+  )
+  expect_error(
+    kernel_scale.raster(
+      raster_stack = fix$rs,
+      sigma = 1,
+      pct_wt = 1,
+      verbose = FALSE
+    ),
+    "pct_wt"
+  )
+  expect_error(
+    kernel_scale.raster(
+      raster_stack = fix$rs,
+      sigma = 1,
+      pct_mx = 2,
+      verbose = FALSE
+    ),
+    "pct_mx"
+  )
 })
 
 test_that("marginal effects and model selection cover remaining alternate branches", {

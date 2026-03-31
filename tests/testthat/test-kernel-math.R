@@ -22,7 +22,7 @@ test_that("kernel distance helpers match expected formulas", {
 
 test_that("kernel distance helpers validate arguments", {
   expect_error(kernel_dist(sigma = 10, kernel = "expow", prob = 0.9), "shape")
-  expect_error(kernel_dist(sigma = 10, kernel = "gaussian", prob = 1.2), "between 0 and 1")
+  expect_error(kernel_dist(sigma = 10, kernel = "gaussian", prob = 1.2), "within \\(0, 1\\)")
   expect_error(plot_kernel(sigma = 10, kernel = "expow"), "beta")
 })
 

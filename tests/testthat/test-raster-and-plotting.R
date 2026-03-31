@@ -158,3 +158,30 @@ test_that("plot_marginal_effects mocked branches cover HLfit, missing CI, and nu
   expect_length(hlfit_plots, 1)
   expect_length(zeroinfl_plots, 1)
 })
+
+test_that("plot_marginal_effects reports prediction failures clearly", {
+  open_null_device()
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  expect_error(
+    with_mocked_bindings(
+      {
+        fake <- structure(
+          list(
+            opt_mod = structure(list(), class = "fake_predict_error"),
+            scl_params = list(mean = c(x = 0), sd = c(x = 1))
+          ),
+          class = "multiScaleR"
+        )
+        plot_marginal_effects(fake, length.out = 5, link = FALSE)
+      },
+      namespace = function(x) invisible("fakepkg"),
+      find_predictors = function(x) list(c("x")),
+      get_data = function(x, ...) data.frame(y = 1:5, x = seq(1, 5)),
+      link_inverse = function(x) NULL,
+      predict = function(object, newdata, se.fit = TRUE) stop("mock prediction failure"),
+      .package = "multiScaleR"
+    ),
+    "Failed to compute marginal effects for covariate 'x'"
+  )
+})

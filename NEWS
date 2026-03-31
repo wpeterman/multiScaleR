@@ -1,3 +1,8 @@
+multiScaleR 0.6.2
+---------
+* Expanded test coverage
+* Improved error messaging
+
 multiScaleR 0.6.1
 ---------
 * Fixed test error

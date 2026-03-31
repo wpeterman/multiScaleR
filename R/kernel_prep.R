@@ -49,6 +49,10 @@ kernel_prep <- function(pts,
   unit_conv <- max_D
 
   kernel <- match.arg(kernel)
+  validate_scalar_numeric(max_D, "max_D", positive = TRUE)
+  validate_scalar_logical(projected, "projected")
+  validate_scalar_logical(progress, "progress")
+  validate_scalar_logical(verbose, "verbose")
 
   if(!inherits(raster_stack, "SpatRaster")){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
@@ -73,6 +77,17 @@ kernel_prep <- function(pts,
 
   if(length(sigma) != nlyr(raster_stack)){
     stop("Number of sigma values must equal the number of raster layers!!!")
+  }
+  validate_numeric_vector(sigma,
+                          "sigma",
+                          length_ = nlyr(raster_stack),
+                          positive = TRUE)
+
+  if(kernel == 'expow'){
+    validate_numeric_vector(shape,
+                            "shape",
+                            length_ = nlyr(raster_stack),
+                            positive = TRUE)
   }
 
   if(isFALSE(projected)){
@@ -146,6 +161,10 @@ kernel_prep <- function(pts,
                              dist = max_D)
     }
 
+    if(nrow(pts) == 0){
+      stop("`pts` must contain at least one point.")
+    }
+
     if(verbose){
       cat(paste0("\nExtracting values from raster layers...\n"))
     }
@@ -204,7 +223,11 @@ kernel_prep <- function(pts,
     min_D <- floor(rdist(r_ext[[1]][1:2,c("x","y")])[1,2])
   } ## End ifelse for projected points
 
-  cov.w <- vector('list', dim(pts)[1])
+  n_pts <- dim(pts)[1]
+  cov.w <- matrix(NA_real_,
+                  nrow = n_pts,
+                  ncol = nlyr(raster_stack))
+  colnames(cov.w) <- names(raster_stack)
   sigma <- sigma / unit_conv
 
   if(isTRUE(progress)){
@@ -218,29 +241,26 @@ kernel_prep <- function(pts,
                         style = 3)
   }
   # system.time(
-  for(i in 1:dim(pts)[1]){
+  for(i in seq_len(n_pts)){
     if(isTRUE(progress)){
       setTxtProgressBar(pb,i)
     }
 
-    cov.w[[i]] <- scale_type(d = D[[i]],
-                             kernel = kernel,
-                             sigma = sigma,
-                             shape = shape,
-                             r_stack.df = sparse_list[[i]])
+    cov.w[i,] <- scale_type(d = D[[i]],
+                            kernel = kernel,
+                            sigma = sigma,
+                            shape = shape,
+                            r_stack.df = sparse_list[[i]])
 
   }
   if(isTRUE(progress)){
     close(pb)
   }
 
+  scl_df <- scale(cov.w)
+  kernel_dat <- as.data.frame(scl_df)
 
-  df <- data.frame(do.call(rbind, cov.w))
-  colnames(df) <- names(raster_stack)
-
-  scl_df <- scale(df)
-
-  out <- list(kernel_dat = as.data.frame(scale(df)),
+  out <- list(kernel_dat = kernel_dat,
               d_list = D,
               raw_cov = sparse_list,
               kernel = kernel,

@@ -90,6 +90,29 @@ kernel_scale.raster <- function(raster_stack,
     }
   }
 
+  if(!inherits(raster_stack, "SpatRaster")){
+    stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
+  }
+  validate_scalar_logical(fft, "fft")
+  validate_scalar_logical(scale_center, "scale_center")
+  validate_scalar_logical(clamp, "clamp")
+  validate_scalar_logical(na.rm, "na.rm")
+  validate_scalar_logical(verbose, "verbose")
+  validate_scalar_numeric(pct_wt,
+                          "pct_wt",
+                          lower = 0,
+                          upper = 1,
+                          inclusive_lower = FALSE,
+                          inclusive_upper = FALSE)
+  validate_scalar_numeric(pct_mx,
+                          "pct_mx",
+                          lower = -0.99,
+                          upper = 0.99)
+
+  if(!is.null(multiScaleR)){
+    validate_multiScaleR_input(multiScaleR)
+  }
+
   if(!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")){
     covs <- rownames(multiScaleR$scale_est)
     sigma <- multiScaleR$scale_est[,1]
@@ -116,7 +139,7 @@ kernel_scale.raster <- function(raster_stack,
     shape <- multiScaleR$shape[c]
     kernel <- multiScaleR$kernel
 
-    if(isFALSE(covs %in% names(raster_stack))){
+    if(!all(covs %in% names(raster_stack))){
       stop('optimized covariate is not present in the provided SpatRaster!')
     } else {
       raster_stack <- subset(raster_stack, covs)
@@ -130,22 +153,30 @@ kernel_scale.raster <- function(raster_stack,
   if(is.null(sigma)){
     stop("sigma values must be specified\n")
   }
-
-  if(!inherits(raster_stack, "SpatRaster")){
-    stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
-  }
-
-  if(!is.logical(na.rm)){
-    stop("`na.rm` must be TRUE or FALSE")
-  }
-
-  if(!is.logical(fft)){
-    stop("`fft` must be TRUE or FALSE")
-  }
+  validate_numeric_vector(sigma,
+                          "sigma",
+                          positive = TRUE)
 
   if(length(sigma) != nlyr(raster_stack)){
     warning("Number of sigma values must equal the number of raster layers!!!  \n  All raster layers will be smoothed using the same sigma value")
     sigma <- rep(sigma[1], nlyr(raster_stack))
+  }
+
+  if(kernel == "expow"){
+    validate_numeric_vector(shape,
+                            "shape",
+                            length_ = length(sigma),
+                            positive = TRUE)
+  }
+
+  if(isTRUE(scale_center) && is.null(multiScaleR)){
+    warning("`scale_center = TRUE` was ignored because no `multiScaleR` object was provided.",
+            call. = FALSE)
+  }
+
+  if(isTRUE(clamp) && !isTRUE(scale_center)){
+    warning("`clamp = TRUE` was ignored because `scale_center` is FALSE.",
+            call. = FALSE)
   }
 
 

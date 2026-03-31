@@ -76,6 +76,19 @@ test_that("kernel_prep validates key inputs", {
     kernel_prep(pts = pts, raster_stack = r, max_D = 5, sigma = c(1, 2), verbose = FALSE),
     "Number of sigma values"
   )
+
+  expect_error(
+    kernel_prep(pts = pts, raster_stack = r, max_D = 0, verbose = FALSE),
+    "max_D"
+  )
+  expect_error(
+    kernel_prep(pts = pts, raster_stack = r, max_D = 5, sigma = -1, verbose = FALSE),
+    "sigma"
+  )
+  expect_error(
+    kernel_prep(pts = pts, raster_stack = r, max_D = 5, progress = NA, verbose = FALSE),
+    "progress"
+  )
 })
 
 test_that("print method for multiScaleR_data reports object metadata", {

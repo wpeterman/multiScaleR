@@ -91,22 +91,43 @@ sim_dat_unmarked <- function(alpha = 1,
 
   kernel <- match.arg(kernel)
   type <- match.arg(type)
+  validate_scalar_numeric(alpha, "alpha")
+  validate_scalar_numeric(StDev, "StDev", positive = TRUE)
+  validate_scalar_numeric(n_points, "n_points", integerish = TRUE, positive = TRUE)
+  validate_scalar_numeric(n_surv, "n_surv", integerish = TRUE, positive = TRUE)
+  validate_scalar_numeric(det, "det", lower = 0, upper = 1)
+
+  if(is.null(raster_stack) || !inherits(raster_stack, "SpatRaster")){
+    stop("`raster_stack` must be provided as a `SpatRaster` object.")
+  }
+
+  validate_numeric_vector(beta,
+                          "beta",
+                          length_ = nlyr(raster_stack))
+  validate_numeric_vector(sigma,
+                          "sigma",
+                          length_ = nlyr(raster_stack),
+                          positive = TRUE)
 
   if(!is.null(user_seed)){
+    validate_scalar_numeric(user_seed, "user_seed", integerish = TRUE)
     set.seed(user_seed)
   }
 
   if(is.null(min_D)){
     min_D <- 1.55 * max(sigma)
-  }
-
-  if(isFALSE((length(beta) <= nlyr(raster_stack)) &
-             (length(beta) <= length(sigma)))){
-    stop("The number of beta coefficients, sigma values and/or raster layers must be equal!!!")
+  } else {
+    validate_scalar_numeric(min_D, "min_D", positive = TRUE)
   }
 
   if(kernel == 'expow' & is.null(shape)){
     stop("Shape parameter(s) must be specified when using the `expow` kernel!")
+  }
+  if(kernel == 'expow'){
+    validate_numeric_vector(shape,
+                            "shape",
+                            length_ = nlyr(raster_stack),
+                            positive = TRUE)
   }
 
   s_ext <- as.vector(ext(raster_stack[[1]]))
@@ -129,9 +150,13 @@ sim_dat_unmarked <- function(alpha = 1,
 
   pts <- pts[sample(dim(pts)[1], n_points),]
 
-  max_D <- kernel_dist(kernel = kernel,
-                       prob = 0.99,
-                       sigma = max(sigma)) * 1.1
+  if(is.null(max_D)){
+    max_D <- kernel_dist(kernel = kernel,
+                         prob = 0.99,
+                         sigma = max(sigma)) * 1.1
+  } else {
+    validate_scalar_numeric(max_D, "max_D", positive = TRUE)
+  }
 
   kernel_out <- kernel_prep(pts = pts,
                             sigma = sigma,
