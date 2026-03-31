@@ -107,6 +107,11 @@ multiScale_optim <- function(fitted_mod,
                              n_cores = NULL,
                              PSOCK = FALSE,
                              verbose = TRUE){
+  if(is.null(fitted_mod)){
+    stop("`fitted_mod` must be a fitted model object.")
+  }
+  validate_scalar_logical(PSOCK, "PSOCK")
+  validate_scalar_logical(verbose, "verbose")
 
   # Check fitted_mod class
   # if (!inherits(fitted_mod, c("glm", "lm", "gls", "unmarked"))) {
@@ -132,6 +137,18 @@ multiScale_optim <- function(fitted_mod,
   if (!is.null(n_cores) && (!is.numeric(n_cores) || n_cores < 1)) {
     stop("n_cores must be a positive integer if provided.")
   }
+  if(!is.null(n_cores) && (length(n_cores) != 1 || is.na(n_cores) || n_cores != as.integer(n_cores))){
+    stop("n_cores must be a positive integer if provided.")
+  }
+  if(!is.list(kernel_inputs$raw_cov) || !is.list(kernel_inputs$d_list) ||
+     length(kernel_inputs$raw_cov) == 0 || length(kernel_inputs$d_list) == 0 ||
+     length(kernel_inputs$raw_cov) != length(kernel_inputs$d_list)){
+    stop("`kernel_inputs$raw_cov` and `kernel_inputs$d_list` must be non-empty lists of equal length.")
+  }
+  validate_scalar_numeric(kernel_inputs$min_D, "kernel_inputs$min_D", positive = TRUE)
+  validate_scalar_numeric(kernel_inputs$max_D, "kernel_inputs$max_D", positive = TRUE)
+  validate_scalar_numeric(kernel_inputs$unit_conv, "kernel_inputs$unit_conv", positive = TRUE)
+  kernel_inputs$kernel <- match.arg(kernel_inputs$kernel, c("gaussian", "exp", "expow", "fixed"))
 
   # Extract variables from fitted model
   if (any(class(fitted_mod) == 'gls')) {
@@ -162,7 +179,6 @@ multiScale_optim <- function(fitted_mod,
 
   # Determine if parallel optimization should be used
   use_parallel <- !is.null(n_cores) && n_cores > 1
-
 
   if(any(class(fitted_mod) == 'gls')){
     mod_class <- 'gls'
@@ -209,6 +225,9 @@ multiScale_optim <- function(fitted_mod,
     stop("\nYou have specified an Exponential Power kernel, which has starting values (`par`), for both the scale of effect and shape. The number of starting values should be 2x the number of covariates in the model. Please correct and run again. \n")
   }
 
+  opt_context <- build_opt_context(fitted_mod = fitted_mod,
+                                   cov_df = kernel_inputs$raw_cov,
+                                   join_by = join_by)
 
   if(kernel_inputs$kernel == 'expow'){
     lwr <- c(lwr, rep(0.75, n_covs))
@@ -260,6 +279,7 @@ multiScale_optim <- function(fitted_mod,
         cov_df = kernel_inputs$raw_cov,
         kernel = kernel_inputs$kernel,
         join_by = join_by,
+        opt_context = opt_context,
         control = list(maxit = 1000),
         parallel = list(forward = FALSE, loginfo = TRUE)
       ),
@@ -283,7 +303,10 @@ multiScale_optim <- function(fitted_mod,
         cat("Parallel optimization aborted.\n")
         cat("Try running with `n_cores = 1` to use standard optimization.\n\n")
       }
-      stop("Parallel optimization failed. See message above.")
+      if (!is.null(err_msg)) {
+        stop("Parallel optimization failed: ", conditionMessage(err_msg), call. = FALSE)
+      }
+      stop("Parallel optimization failed due to an unknown error.", call. = FALSE)
     }
 
   } else {
@@ -301,7 +324,8 @@ multiScale_optim <- function(fitted_mod,
         cov_df = kernel_inputs$raw_cov,
         control = list(maxit = 1000),
         kernel = kernel_inputs$kernel,
-        join_by = join_by
+        join_by = join_by,
+        opt_context = opt_context
       ),
       silent = TRUE
     )
@@ -317,7 +341,10 @@ multiScale_optim <- function(fitted_mod,
           cat("Unknown error occurred during standard optimization.\n")
         }
       }
-      stop("Standard optimization failed. See message above.")
+      if (!is.null(err_msg)) {
+        stop("Standard optimization failed: ", conditionMessage(err_msg), call. = FALSE)
+      }
+      stop("Standard optimization failed due to an unknown error.", call. = FALSE)
     }
   }
 
@@ -370,7 +397,8 @@ multiScale_optim <- function(fitted_mod,
                                  cov_df = kernel_inputs$raw_cov,
                                  fitted_mod = fitted_mod,
                                  join_by = join_by,
-                                 mod_return = TRUE)
+                                 mod_return = TRUE,
+                                 opt_context = opt_context)
 
     out <- list(scale_est = scale_est,
                 shape_est = shape_est,

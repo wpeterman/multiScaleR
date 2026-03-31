@@ -8,3 +8,5 @@
 ^vignettes/build_vignettes\.R$
 ^AGENTS\.Rmd$
 ^AGENTS\.md$
+^src/.*\.gcno$
+^src/.*\.gcda$

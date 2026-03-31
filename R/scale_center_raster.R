@@ -13,7 +13,21 @@ scale_center_raster <- function(r,
                                 multiScaleR,
                                 clamp = FALSE,
                                 pct_mx = 0){
+  if(!inherits(r, "SpatRaster")){
+    stop("`r` must be a `SpatRaster` object.")
+  }
+  validate_multiScaleR_input(multiScaleR)
+  validate_scalar_logical(clamp, "clamp")
+  validate_scalar_numeric(pct_mx,
+                          "pct_mx",
+                          lower = -0.99,
+                          upper = 0.99)
+
   covs <- names(r)
+  if(!is.list(multiScaleR$scl_params) ||
+     !all(c("mean", "sd") %in% names(multiScaleR$scl_params))){
+    stop("`multiScaleR` must contain `scl_params` with `mean` and `sd` elements.")
+  }
 
   if(inherits(multiScaleR, "multiScaleR_data")){
 
@@ -50,7 +64,17 @@ scale_center_raster <- function(r,
     }
   }
 
+  if(any(is.na(mns)) || any(is.na(sds))){
+    stop("Scaling parameters are missing for one or more raster layers in `r`.")
+  }
+  if(any(sds == 0)){
+    stop("One or more scaling standard deviations are zero; cannot scale raster values.")
+  }
+
   if(isTRUE(clamp)){
+    if(!all(covs %in% names(dat))){
+      stop("Original model data needed for clamping do not contain all raster layers in `r`.")
+    }
     min_vals <- apply(dat, 2, min) * (pct_mx + 1)
     max_vals <- apply(dat, 2, max) * (pct_mx + 1)
 

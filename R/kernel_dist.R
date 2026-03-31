@@ -44,15 +44,17 @@ kernel_dist <- function(model,
                         prob = 0.9,
                         ...){
   param_list <- list(...)
+  validate_scalar_numeric(prob,
+                          "prob",
+                          lower = 0,
+                          upper = 1,
+                          inclusive_lower = FALSE,
+                          inclusive_upper = FALSE)
 
   if(!missing("model")){
     if(!inherits(model, "multiScaleR")){
       stop("Provide a fitted `multiScaleR` model object")
     }
-  }
-
-  if((!is.numeric(prob) | prob < 0 | prob > 1)){
-    stop("`prob` must be a decimal between 0 and 1")
   }
 
   if(!missing("model")){
@@ -153,16 +155,17 @@ kernel_dist <- function(model,
     if(is.null(sig_)){
       stop('\nA value for `sigma` must be provided!\n')
     }
+    validate_scalar_numeric(sig_, "sigma", positive = TRUE)
     if(is.null(kern)){
       stop('\nYou must specify `kernel` function; See Details\n')
     }
+    kern <- match.arg(kern, c("gaussian", "exp", "expow", "fixed"))
     if(kern == 'expow' & is.null(shp_)){
       stop('\nBoth a `sigma` and `shape` parameter must be specified when using the `expow` kernel; See Details\n')
     }
 
     if (kern == "expow") {
-      if (is.null(shp_)) stop("beta must be specified for exponential power kernel")
-      if (shp_ <= 0) stop("beta must be positive")
+      validate_scalar_numeric(shp_, "beta", positive = TRUE)
     }
 
     # d <- seq(1, round(sig_*1000,0), length.out = round(sig_*1000,0))

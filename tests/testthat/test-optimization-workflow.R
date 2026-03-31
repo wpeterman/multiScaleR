@@ -11,6 +11,78 @@ test_that("multiScale_optim returns a valid optimized object", {
   expect_true(opt$scale_est[1, "Mean"] > 0)
 })
 
+test_that("multiScale_optim builds and forwards cached optimization context", {
+  fix <- make_core_fixture()
+  captured <- new.env(parent = emptyenv())
+
+  out <- with_mocked_bindings(
+    multiScale_optim(
+      fitted_mod = fix$fitted_mod,
+      kernel_inputs = fix$kernel_inputs,
+      par = 0.2,
+      verbose = FALSE
+    ),
+    optim = function(..., opt_context) {
+      captured$optim_context <- opt_context
+      list(par = 0.2, hessian = matrix(1, 1, 1))
+    },
+    kernel_scale_fn = function(..., opt_context, mod_return = NULL) {
+      captured$final_context <- opt_context
+      if (isTRUE(mod_return)) {
+        list(mod = fix$fitted_mod, scl_params = fix$kernel_inputs$scl_params)
+      } else {
+        0
+      }
+    },
+    kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
+    .package = "multiScaleR"
+  )
+
+  expect_s3_class(out, "multiScaleR")
+  expect_equal(captured$optim_context$mod_class, "glm")
+  expect_equal(captured$optim_context$covs, "cont1")
+  expect_equal(captured$optim_context$n_covs, 1)
+  expect_true(is.data.frame(captured$optim_context$data_template))
+  expect_identical(captured$final_context$covs, captured$optim_context$covs)
+  expect_identical(captured$final_context$cov_idx, captured$optim_context$cov_idx)
+})
+
+test_that("single-covariate models work when kernel inputs contain extra raster layers", {
+  set.seed(555)
+
+  pts <- terra::vect(cbind(c(5, 7, 9, 11, 13), c(13, 11, 9, 7, 5)))
+  rast_stack <- terra::rast(list(
+    r1 = terra::rast(matrix(rnorm(20^2), nrow = 20)),
+    r2 = terra::rast(matrix(rnorm(20^2), nrow = 20))
+  ))
+
+  kernel_inputs <- kernel_prep(
+    pts = pts,
+    raster_stack = rast_stack,
+    max_D = 5,
+    kernel = "gaussian",
+    verbose = FALSE
+  )
+
+  dat <- data.frame(y = rnorm(5), kernel_inputs$kernel_dat)
+  mod1 <- glm(y ~ r1, data = dat)
+
+  expect_s3_class(
+    suppressWarnings(
+      suppressMessages(
+        multiScale_optim(
+          fitted_mod = mod1,
+          kernel_inputs = kernel_inputs,
+          par = 0.5,
+          n_cores = NULL,
+          verbose = FALSE
+        )
+      )
+    ),
+    "multiScaleR"
+  )
+})
+
 test_that("summary and distance methods return structured outputs", {
   fix <- make_core_fixture()
 
@@ -61,6 +133,14 @@ test_that("multiScale_optim validates kernel inputs and parameter lengths", {
   expect_error(
     multiScale_optim(fitted_mod = fix$fitted_mod, kernel_inputs = fix$kernel_inputs, n_cores = 0, verbose = FALSE),
     "n_cores must be a positive integer"
+  )
+  expect_error(
+    multiScale_optim(fitted_mod = fix$fitted_mod, kernel_inputs = fix$kernel_inputs, PSOCK = NA, verbose = FALSE),
+    "PSOCK"
+  )
+  expect_error(
+    multiScale_optim(fitted_mod = fix$fitted_mod, kernel_inputs = fix$kernel_inputs, verbose = NA),
+    "verbose"
   )
 
   bad_ki <- fix$kernel_inputs
@@ -147,7 +227,7 @@ test_that("multiScale_optim covers singular hessian and failure branches via moc
       },
       .package = "multiScaleR"
     ),
-    "Standard optimization failed"
+    "mock standard failure"
   )
 })
 
@@ -202,7 +282,7 @@ test_that("multiScale_optim covers parallel and unmarked branches via mocks", {
       stopCluster = function(cl) invisible(NULL),
       .package = "multiScaleR"
     ),
-    "Parallel optimization failed"
+    "mock parallel failure"
   )
 
   unmark <- make_unmarked_fixture()

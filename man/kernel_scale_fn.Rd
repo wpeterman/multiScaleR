@@ -11,7 +11,8 @@ kernel_scale_fn(
   kernel,
   fitted_mod,
   join_by = NULL,
-  mod_return = NULL
+  mod_return = NULL,
+  opt_context = NULL
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ kernel_scale_fn(
 \item{join_by}{Data frame to join unmarked frame during optimization}
 
 \item{mod_return}{Default: NULL}
+
+\item{opt_context}{Cached optimization context created internally by `multiScale_optim()`}
 }
 \value{
 Either estimated parameters or the fitted model using provided parameters

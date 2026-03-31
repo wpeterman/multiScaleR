@@ -31,6 +31,21 @@ plot_marginal_effects <- function(x,
                                   length.out = 100,
                                   type = "state",
                                   link = FALSE) {
+  if(!inherits(x, "multiScaleR")){
+    stop("`x` must be a fitted `multiScaleR` object.")
+  }
+  validate_character_scalar(ylab, "ylab")
+  validate_scalar_numeric(length.out, "length.out", integerish = TRUE, positive = TRUE)
+  validate_scalar_logical(link, "link")
+
+  if(is.null(x$opt_mod)){
+    stop("`x` must contain an `opt_mod` fitted model.")
+  }
+  if(!is.list(x$scl_params) ||
+     !all(c("mean", "sd") %in% names(x$scl_params))){
+    stop("`x` must contain `scl_params` with `mean` and `sd` elements.")
+  }
+
   mod <- x$opt_mod
   scl <- x$scl_params
   namespace(mod)
@@ -51,7 +66,7 @@ plot_marginal_effects <- function(x,
     dat <- mod@data@siteCovs
     dat_ns <- dat[which(names(scl$mean) %in% vars)]
 
-    if(is.null(type)){
+    if(is.null(type) || !type %in% c("lambda", "state")){
       stop("`type` must be specified as either 'lambda' or 'state'.")
     }
 
@@ -69,7 +84,15 @@ plot_marginal_effects <- function(x,
       names(newdata) <- vars
       newdata[[v]] <- x_seq
 
-      preds <- predict(mod, newdata, type = type)
+      preds <- tryCatch(
+        predict(mod, newdata, type = type),
+        error = function(e) {
+          stop(
+            sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
+            call. = FALSE
+          )
+        }
+      )
 
       fit <- preds$Predicted
       se <- preds$SE
@@ -88,15 +111,22 @@ plot_marginal_effects <- function(x,
     # vars <- names(coef(mod))[-1]
     c_vars <- find_predictors(mod)[[1]]
     vars <- unlist(find_predictors(mod))
+    dat_all <- get_data(mod)
+    if(is.null(dat_all)){
+      dat_all <- extract_model_data(mod)
+    }
+    if(is.null(dat_all)){
+      stop("Could not recover the original model data needed to plot marginal effects.")
+    }
 
     plot_list <- lapply(c_vars, function(v) {
       if(!v %in% names(scl$mean)){
-        dat <- get_data(mod)[,-1]
+        dat <- dat_all[,-1, drop = FALSE]
         dat_ns <- dat[!vars %in% names(scl$mean)]
         x_unscaled <- x_seq <- seq(min(dat_ns[v]), max(dat_ns[v]), length.out = length.out)
       } else {
-        min <- suppressWarnings(apply(get_data(mod), 2, min)[-1])
-        max <- suppressWarnings(apply(get_data(mod), 2, max)[-1])
+        min <- suppressWarnings(apply(dat_all, 2, min)[-1])
+        max <- suppressWarnings(apply(dat_all, 2, max)[-1])
         x_seq <- seq(min[v], max[v], length.out = length.out)
         x_unscaled <- (x_seq * scl$sd[v]) + scl$mean[v]
       }
@@ -109,13 +139,37 @@ plot_marginal_effects <- function(x,
 
       # preds <- safe_predict(mod, newdata = newdata)
       if(inherits(mod, "HLfit")){
-        preds_ <- predict(mod, newdata = newdata, variances = list(respVar = TRUE), re.form = NA)
+        preds_ <- tryCatch(
+          predict(mod, newdata = newdata, variances = list(respVar = TRUE), re.form = NA),
+          error = function(e) {
+            stop(
+              sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
+              call. = FALSE
+            )
+          }
+        )
         preds <- list(preds = as.vector(preds_),
                       se = sqrt(attr(preds_, "fixefVar")))
       } else if(inherits(mod, "zeroinfl")) {
-        preds <- as.data.frame(get_predicted(mod, data = newdata))
+        preds <- tryCatch(
+          as.data.frame(get_predicted(mod, data = newdata)),
+          error = function(e) {
+            stop(
+              sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
+              call. = FALSE
+            )
+          }
+        )
       } else {
-        preds <- predict(mod, newdata = newdata, se.fit = T)
+        preds <- tryCatch(
+          predict(mod, newdata = newdata, se.fit = T),
+          error = function(e) {
+            stop(
+              sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
+              call. = FALSE
+            )
+          }
+        )
       }
 
       if(inherits(mod, "zeroinfl")) {

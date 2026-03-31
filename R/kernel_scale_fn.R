@@ -7,6 +7,7 @@
 #' @param fitted_mod fitted model object
 #' @param join_by Data frame to join unmarked frame during optimization
 #' @param mod_return Default: NULL
+#' @param opt_context Cached optimization context created internally by `multiScale_optim()`
 #' @return Either estimated parameters or the fitted model using provided parameters
 #' @details For internal use
 #' @rdname kernel_scale_fn
@@ -23,50 +24,21 @@ kernel_scale_fn <- function(par,
                             kernel,
                             fitted_mod,
                             join_by = NULL,
-                            mod_return = NULL){
+                            mod_return = NULL,
+                            opt_context = NULL){
 
   n_ind <- length(d_list)
-  mod <- fitted_mod
-
-  # browser()
-
-  if(any(class(mod) == 'gls')){
-    mod_class <- 'gls'
-    # covs <- find_predictors(mod)$conditional
-    covs <- unlist(find_predictors(mod))
-    dat <- get_data(mod)
-    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
-    n_covs <- length(covs)
-  } else if(any(grepl("^unmarked", class(mod)))) {
-    mod_class <- 'unmarked'
-    dat <- mod@data@siteCovs
-    covs <- all.vars(mod@formula)
-    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
-    n_covs <- length(covs)
-  } else if(any(class(mod) == 'glm')) {
-    mod_class <- 'glm'
-    # covs <- find_predictors(mod)$conditional
-    covs <- unlist(find_predictors(mod))
-    dat <- get_data(mod)
-    dat0 <- get_data(mod)
-    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
-    n_covs <- length(covs)
-  } else {
-    mod_class <- 'other'
-    dat <- get_data(mod, effects = 'all')
-    if(is.null(dat)){
-      dat <- extract_model_data(mod)
-    }
-    covs <- unlist(find_predictors(mod))
-    covs <- covs[which(covs %in% colnames(cov_df[[1]]))]
-    n_covs <- length(covs)
+  if(is.null(opt_context)){
+    opt_context <- build_opt_context(fitted_mod = fitted_mod,
+                                     cov_df = cov_df,
+                                     join_by = join_by)
   }
 
-  if(is.null(dat)){
-    stop("Data from original model not saved to data frame. Try using `glm`.\n UDPATE FUNCTION TO GENERALIZE!!!")
-  }
+  mod <- opt_context$fitted_mod
+  mod_class <- opt_context$mod_class
+  covs <- opt_context$covs
+  n_covs <- opt_context$n_covs
 
-  cov.w <- vector('list', n_ind)
   sigma <- par[1:n_covs]
   if(kernel == 'expow'){
     shape <- par[(n_covs + 1):(n_covs * 2)]
@@ -79,48 +51,47 @@ kernel_scale_fn <- function(par,
     return(obj)
   }
 
-  for(i in 1:n_ind){
-    if(n_covs == 1){
-      cov.w[[i]] <-
-        scale_type(d_list[[i]],
-                   kernel = kernel,
-                   sigma = sigma,
-                   shape = shape,
-                   r_stack.df = cov_df[[i]])
-    } else {
-      cov.w[[i]] <-
-        scale_type(d_list[[i]],
-                   kernel = kernel,
-                   sigma = sigma,
-                   shape = shape,
-                   r_stack.df = cov_df[[i]][,covs])
-    }
+  cov.w <- matrix(NA_real_, nrow = n_ind, ncol = n_covs)
+  colnames(cov.w) <- covs
+
+  for(i in seq_len(n_ind)){
+    cov.w[i, ] <-
+      scale_type(d_list[[i]],
+                 kernel = kernel,
+                 sigma = sigma,
+                 shape = shape,
+                 r_stack.df = cov_df[[i]][,covs,drop = FALSE])
   } ## End for loop
 
-  # browser()
+  scl_df <- scale(cov.w)
+  refit_error <- NULL
 
-  df <- data.frame(do.call(rbind, cov.w))
-  colnames(df) <- covs
   if(mod_class == 'unmarked'){
-    umf <- mod@data
-    scl_df <- scale(df)
-    # scl_df <- (df)
-    if(!is.null(join_by)){
-      drop_cols <- which(colnames(umf@siteCovs) %in% covs)
-      umf@siteCovs <- umf@siteCovs[,-drop_cols]
-      scl_df <- data.frame(scl_df, join_by)
-      umf@siteCovs <- merge(umf@siteCovs, scl_df, by = colnames(join_by))
-      mod_u <- update(mod, data = umf)
-    } else {
-      umf@siteCovs[,covs] <- scl_df
-      mod_u <- update(mod, data = umf)
-    }
+    umf <- opt_context$umf_template
+
+    mod_u <- tryCatch({
+      if(!is.null(join_by)){
+        scl_df_join <- data.frame(scl_df, join_by, check.names = FALSE)
+        umf@siteCovs <- merge(umf@siteCovs, scl_df_join, by = opt_context$join_cols)
+        update(mod, data = umf)
+      } else {
+        umf@siteCovs[opt_context$covs] <- as.data.frame(scl_df)
+        update(mod, data = umf)
+      }
+    }, error = function(e) {
+      refit_error <<- conditionMessage(e)
+      NULL
+    })
 
   } else {
-    scl_df <- scale(df)
-    # scl_df <- (df)
-    dat[,covs] <- as.data.frame(scl_df)
-    mod_u <- update(mod, data = dat)
+    dat <- opt_context$data_template
+    mod_u <- tryCatch({
+      dat[opt_context$covs] <- as.data.frame(scl_df)
+      update(mod, data = dat)
+    }, error = function(e) {
+      refit_error <<- conditionMessage(e)
+      NULL
+    })
 
     ## For DEBUGGING
     # mod_u <- try(update(mod, data = dat))
@@ -131,7 +102,20 @@ kernel_scale_fn <- function(par,
 
   }
 
-  # browser()
+  if (is.null(mod_u)) {
+    if (is.null(mod_return)) {
+      return(1e6^10)
+    }
+
+    stop(
+      paste0(
+        "Failed to refit the model with the optimized covariates. ",
+        "Make sure the fitted model can be updated with a modified data argument. ",
+        "Original error: ", refit_error
+      ),
+      call. = FALSE
+    )
+  }
 
   if(is.null(mod_return)){
     obj <- data.frame()
@@ -157,6 +141,84 @@ kernel_scale_fn <- function(par,
     #             scl_params = NULL)
   }
   return(obj)
+}
+
+
+build_opt_context <- function(fitted_mod,
+                              cov_df,
+                              join_by = NULL) {
+  mod <- fitted_mod
+  cov_names <- colnames(cov_df[[1]])
+
+  if(any(class(mod) == 'gls')){
+    mod_class <- 'gls'
+    mod_vars <- unname(unlist(find_predictors(mod)))
+    dat <- get_data(mod)
+  } else if(any(grepl("^unmarked", class(mod)))) {
+    mod_class <- 'unmarked'
+    mod_vars <- all.vars(mod@formula)
+    dat <- mod@data@siteCovs
+  } else if(any(class(mod) == 'glm')) {
+    mod_class <- 'glm'
+    mod_vars <- unname(unlist(find_predictors(mod)))
+    dat <- get_data(mod)
+  } else {
+    mod_class <- 'other'
+    mod_vars <- unname(unlist(find_predictors(mod)))
+    dat <- get_data(mod, effects = 'all')
+    if(is.null(dat)){
+      dat <- extract_model_data(mod)
+    }
+  }
+
+  if(is.null(dat)){
+    stop(
+      paste0(
+        "Could not recover the original model data needed to refit the model during optimization. ",
+        "Refit the model with an explicit `data = ...` argument and try again."
+      ),
+      call. = FALSE
+    )
+  }
+
+  covs <- unname(mod_vars[which(mod_vars %in% cov_names)])
+  n_covs <- length(covs)
+  if (n_covs == 0) {
+    stop(
+      "No raster covariates from `cov_df` were found in the fitted model. Check that raster layer names match the model terms.",
+      call. = FALSE
+    )
+  }
+
+  out <- list(fitted_mod = mod,
+              mod_class = mod_class,
+              covs = covs,
+              n_covs = n_covs)
+
+  if(mod_class == 'unmarked'){
+    umf_template <- mod@data
+    if(!is.null(join_by)){
+      if(!all(colnames(join_by) %in% colnames(umf_template@siteCovs))){
+        stop(
+          "Columns in `join_by` must also be present in the unmarked site covariates.",
+          call. = FALSE
+        )
+      }
+      drop_cols <- which(colnames(umf_template@siteCovs) %in% covs)
+      if(length(drop_cols) > 0){
+        umf_template@siteCovs <- umf_template@siteCovs[,-drop_cols,drop = FALSE]
+      }
+      out$join_cols <- colnames(join_by)
+    } else {
+      out$site_cov_idx <- match(covs, colnames(umf_template@siteCovs))
+    }
+    out$umf_template <- umf_template
+  } else {
+    out$data_template <- dat
+    out$cov_idx <- match(covs, colnames(dat))
+  }
+
+  return(out)
 }
 
 
@@ -194,10 +256,17 @@ extract_model_data <- function(model) {
     }
 
     # Fallback: Return NULL if no method worked
-    warning("Could not extract data from model object.")
+    warning(
+      "Could not extract data from the model object; optimization may fail unless the model was fit with an explicit `data = ...` argument."
+    )
     NULL
   }, error = function(e) {
-    warning("Failed to extract data: ", e$message)
+    warning(
+      paste0(
+        "Failed to extract model data needed for refitting: ",
+        e$message
+      )
+    )
     NULL
   })
 
