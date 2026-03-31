@@ -1,3 +1,7 @@
+multiScaleR 0.6.1
+---------
+* Fixed test error
+
 multiScaleR 0.6.0
 ---------
 * Added unit testing
