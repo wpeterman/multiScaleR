@@ -36,7 +36,7 @@ Returns a list of class `multiScaleR` containing scale estimates, shape estimate
 Function to conduct multiscale optimization
 }
 \details{
-Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
+Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided. Summary methods use profile-likelihood confidence intervals for `sigma` when feasible, while reported standard errors remain Hessian-based approximations from the outer optimization.
 
 To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.nb(y ~ x, data = df)`
 
