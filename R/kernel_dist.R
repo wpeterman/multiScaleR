@@ -78,10 +78,14 @@ kernel_dist <- function(model,
         names <- all.vars(formula(model$opt_mod)[-2])
       }
 
-      ci_ <- ci_func(model$scale_est,
-                     df = df,
-                     min_D = model$min_D,
-                     names = row.names(model$scale_est))
+      if(!is.null(model$profile_scale_est)){
+        ci_ <- model$profile_scale_est
+      } else {
+        ci_ <- ci_func(model$scale_est,
+                       df = df,
+                       min_D = model$min_D,
+                       names = row.names(model$scale_est))
+      }
 
       # browser()
 

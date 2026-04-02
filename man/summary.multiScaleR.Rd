@@ -12,7 +12,7 @@
 \item{...}{Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).}
 }
 \value{
-An object of class \code{summary_multiScaleR}.
+An object of class \code{summary_multiScaleR}. Confidence limits for `sigma` use profile likelihood when feasible; if profiling fails, the summary falls back to the package's existing Wald-style limits.
 }
 \description{
 Summarizes output from \code{multiScale_optim}.

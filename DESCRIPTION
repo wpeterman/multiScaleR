@@ -46,3 +46,5 @@ VignetteBuilder: knitr
 Authors@R: 
     person("Bill", "Peterman", , "Peterman.73@osu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-5229-9268"))
+Author: Bill Peterman [aut, cre] (<https://orcid.org/0000-0001-5229-9268>)
+Maintainer: Bill Peterman <Peterman.73@osu.edu>

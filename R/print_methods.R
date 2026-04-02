@@ -14,6 +14,11 @@ print.summary_multiScaleR <- function(x, ...){
 
   cat("\n\n***** Optimized Scale of Effect -- Sigma *****\n\n")
   print(x$opt_scale)
+  scale_ci_method <- attr(x$opt_scale, "interval_method")
+  if (!is.null(scale_ci_method) && any(scale_ci_method != "wald")) {
+    cat("\nProfile-likelihood confidence limits were used for `sigma` where available;\n")
+    cat("reported standard errors remain Hessian-based approximations.\n")
+  }
   cat("\n\n  ==================================== ")
 
   if(!is.null(x$opt_shape)){
@@ -67,7 +72,7 @@ print.summary_multiScaleR <- function(x, ...){
 #' @param object An object of class \code{multiScaleR}.
 #' @param ... Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).
 #'
-#' @return An object of class \code{summary_multiScaleR}.
+#' @return An object of class \code{summary_multiScaleR}. Confidence limits for `sigma` use profile likelihood when feasible; if profiling fails, the summary falls back to the package's existing Wald-style limits.
 #' @export
 #' @method summary multiScaleR
 summary.multiScaleR <- function(object,...){
@@ -87,10 +92,10 @@ summary.multiScaleR <- function(object,...){
     names <- all.vars(formula(object$opt_mod)[-2])
   }
 
-  tab_scale <- ci_func(object$scale_est,
-                       df = df,
-                       min_D = object$min_D,
-                       names = row.names(object$scale_est))
+  tab_scale <- scale_ci_table(object = object,
+                              df = df,
+                              min_D = object$min_D,
+                              names = row.names(object$scale_est))
 
   if(length(param_list) >= 1){
     if('prob' %in% names(param_list)){
@@ -103,6 +108,9 @@ summary.multiScaleR <- function(object,...){
   ## DEBUG
   # browser()
 
+  object_profile <- object
+  object_profile$profile_scale_est <- tab_scale
+
   if(!is.null(object$shape_est)){
     tab_shape <- ci_func(object$shape_est,
                          df = df,
@@ -111,7 +119,7 @@ summary.multiScaleR <- function(object,...){
 
     out <- list(opt_scale = tab_scale,
                 opt_shape = tab_shape,
-                opt_dist = kernel_dist(object, prob = prob),
+                opt_dist = kernel_dist(object_profile, prob = prob),
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
@@ -120,7 +128,7 @@ summary.multiScaleR <- function(object,...){
   } else {
     out <- list(opt_scale = tab_scale,
                 opt_shape = NULL,
-                opt_dist = kernel_dist(object, prob = prob),
+                opt_dist = kernel_dist(object_profile, prob = prob),
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,

@@ -8,7 +8,7 @@
 #' @param PSOCK Logical. If attempting to optimize in parallel on a Windows machine, a PSOCK cluster will be created. If using a Unix OS a FORK cluster will be created. You can force a Unix system to create a PSOCK cluster by setting to TRUE. Default: FALSE
 #' @param verbose Logical. Print status of optimization to the console. Default: TRUE
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
-#' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided.
+#' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided. Summary methods use profile-likelihood confidence intervals for `sigma` when feasible, while reported standard errors remain Hessian-based approximations from the outer optimization.
 #'
 #' To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.nb(y ~ x, data = df)`
 #'
@@ -404,9 +404,14 @@ multiScale_optim <- function(fitted_mod,
                 shape_est = shape_est,
                 optim_results = opt_results,
                 opt_mod = final_mod$mod,
+                fitted_mod_original = fitted_mod,
                 min_D = kernel_inputs$min_D,
+                max_D = kernel_inputs$max_D,
                 kernel_inputs = kernel_inputs[-c(2,3)],
                 scl_params = final_mod$scl_params,
+                join_by = join_by,
+                opt_context = opt_context,
+                profile_scale_est = NULL,
                 warn_message = 0,
                 call = match.call())
 
