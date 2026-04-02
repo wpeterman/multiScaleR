@@ -251,6 +251,7 @@ rast_opt <- kernel_scale.raster(raster_stack = land_rast,
                                 multiScaleR = opt2)
 plot(rast_opt)
 ```
+NOTE: Because site is not a spatial variable, a dummy raster is created. This will facilitate using this `spatRaster` object with `predict()` later on.
 
 ## Kernels
 
