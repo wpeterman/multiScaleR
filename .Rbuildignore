@@ -10,3 +10,4 @@
 ^AGENTS\.md$
 ^src/.*\.gcno$
 ^src/.*\.gcda$
+^src/.*\.(dll|o)$
