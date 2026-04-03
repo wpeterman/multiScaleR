@@ -44,6 +44,11 @@ Typical files and directories that may be relevant:
 - Do not remove failing tests merely to make checks pass unless explicitly instructed and justified.
 - If behavior changes intentionally, update tests to reflect the new contract and note that clearly.
 
+## Updating rules
+- Always update the NEWS file by increasing the version 0.0.1, unless a larger increment is specified.
+- Provide a succinct, minimal review of what the update contains in NEWS, congruent with the style of the document.
+- Correspondingly, update the version in the DESCRIPTION
+
 ## Validation expectations
 After making changes, recommend the relevant validation commands. Common commands include:
 
@@ -52,3 +57,10 @@ devtools::document()
 devtools::test()
 devtools::check()
 ```
+
+## Development workflow
+- Work on one feature or fix at a time, ideally on a dedicated branch.
+- Make code/doc/test changes first, then inspect `git status` and `git diff` before committing.
+- Run `devtools::document()`, `devtools::test()`, and `devtools::check(args = "--no-manual")` before a final commit when feasible.
+- If Pandoc is unavailable in the current shell, `devtools::check(args = "--no-manual", build_args = "--no-build-vignettes", document = FALSE)` can be used as a pre-check, but run one final vignette-enabled check in RStudio when vignette files changed.
+- After validation, bump the package version once, make one concise commit for the batch of related changes, and merge to `master` only after that branch is stable.

@@ -4,10 +4,13 @@
 #' @keywords internal
 #' @noRd
 
+.profile_scale_cache <- new.env(parent = emptyenv())
+
 scale_ci_table <- function(object,
                            df,
                            min_D = object$min_D,
-                           names = row.names(object$scale_est)) {
+                           names = row.names(object$scale_est),
+                           profile = FALSE) {
 
   tab <- ci_func(object$scale_est,
                  df = df,
@@ -17,7 +20,24 @@ scale_ci_table <- function(object,
   methods <- rep("wald", nrow(tab))
   names(methods) <- row.names(tab)
 
-  profile_tab <- try(profile_sigma_intervals(object), silent = TRUE)
+  if (!isTRUE(profile)) {
+    attr(tab, "interval_method") <- methods
+    return(tab)
+  }
+
+  cache_key <- profile_scale_cache_key(object = object,
+                                       min_D = min_D,
+                                       names = names)
+  if (exists(cache_key, envir = .profile_scale_cache, inherits = FALSE)) {
+    profile_tab <- get(cache_key, envir = .profile_scale_cache, inherits = FALSE)
+  } else {
+    profile_tab <- try(profile_sigma_intervals(object), silent = TRUE)
+    if (inherits(profile_tab, "try-error") || is.null(profile_tab)) {
+      profile_tab <- list(intervals = NULL, method = NULL)
+    }
+    assign(cache_key, profile_tab, envir = .profile_scale_cache)
+  }
+
   if (!inherits(profile_tab, "try-error") && !is.null(profile_tab$intervals)) {
     common_rows <- intersect(row.names(tab), row.names(profile_tab$intervals))
     if (length(common_rows) > 0) {
@@ -29,6 +49,27 @@ scale_ci_table <- function(object,
 
   attr(tab, "interval_method") <- methods
   tab
+}
+
+
+profile_scale_cache_key <- function(object,
+                                    min_D = object$min_D,
+                                    names = row.names(object$scale_est)) {
+
+  key_payload <- list(
+    call = deparse(object$call, width.cutoff = 500L),
+    kernel = object$kernel_inputs$kernel,
+    min_D = min_D,
+    max_D = object$max_D,
+    unit_conv = object$kernel_inputs$unit_conv,
+    scale_est = unclass(object$scale_est),
+    optim_par = object$optim_results$par,
+    optim_value = object$optim_results$value,
+    names = names
+  )
+
+  paste(as.character(serialize(key_payload, NULL, version = 2)),
+        collapse = "")
 }
 
 
@@ -236,6 +277,7 @@ profile_eval <- function(object,
 
   total_params <- seq_along(start_full)
   free_index <- total_params[-fixed_index]
+  profile_warnings <- character()
 
   objective <- function(par_free) {
     full_par <- inject_fixed_par(start_full = start_full,
@@ -244,7 +286,7 @@ profile_eval <- function(object,
                                  par_free = par_free,
                                  fixed_value = fixed_value)
 
-    value <- try(
+    value <- try(withCallingHandlers(
       kernel_scale_fn(par = full_par,
                       d_list = object$kernel_inputs$d_list,
                       cov_df = object$kernel_inputs$raw_cov,
@@ -252,8 +294,11 @@ profile_eval <- function(object,
                       fitted_mod = object$fitted_mod_original,
                       join_by = object$join_by,
                       opt_context = object$opt_context),
-      silent = TRUE
-    )
+      warning = function(w) {
+        profile_warnings <<- c(profile_warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    ), silent = TRUE)
 
     if (inherits(value, "try-error") || !is.finite(value)) {
       return(1e20)
@@ -268,7 +313,8 @@ profile_eval <- function(object,
     value <- objective(numeric(0))
     return(list(value = value,
                 par_full = full_par,
-                convergence = 0))
+                convergence = 0,
+                warnings = unique(profile_warnings)))
   }
 
   start_free <- pmin(pmax(start_full[free_index], lower[free_index]),
@@ -292,7 +338,8 @@ profile_eval <- function(object,
                                  fixed_value = fixed_value)
     return(list(value = 1e20,
                 par_full = full_par,
-                convergence = 1))
+                convergence = 1,
+                warnings = unique(profile_warnings)))
   }
 
   full_par <- inject_fixed_par(start_full = start_full,
@@ -303,7 +350,8 @@ profile_eval <- function(object,
 
   list(value = fit$value,
        par_full = full_par,
-       convergence = fit$convergence)
+       convergence = fit$convergence,
+       warnings = unique(profile_warnings))
 }
 
 
