@@ -4,15 +4,20 @@
 \alias{summary.multiScaleR}
 \title{Summarize multiScaleR objects}
 \usage{
-\method{summary}{multiScaleR}(object, ...)
+\method{summary}{multiScaleR}(object, profile = FALSE, ...)
 }
 \arguments{
 \item{object}{An object of class \code{multiScaleR}.}
 
+\item{profile}{Logical. If \code{TRUE}, use profile-likelihood confidence
+limits for `sigma` when feasible. Defaults to \code{FALSE} so summaries
+remain fast; profile results are cached for repeated calls on the same
+fitted object during the current R session.}
+
 \item{...}{Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).}
 }
 \value{
-An object of class \code{summary_multiScaleR}. Confidence limits for `sigma` use profile likelihood when feasible; if profiling fails, the summary falls back to the package's existing Wald-style limits.
+An object of class \code{summary_multiScaleR}. Confidence limits for `sigma` default to the package's existing Wald-style limits. If \code{profile = TRUE}, profile likelihood is used when feasible; if profiling fails, the summary falls back to Wald-style limits.
 }
 \description{
 Summarizes output from \code{multiScale_optim}.

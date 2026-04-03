@@ -11,3 +11,4 @@
 ^src/.*\.gcno$
 ^src/.*\.gcda$
 ^src/.*\.(dll|o)$
+^checks$

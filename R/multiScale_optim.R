@@ -407,7 +407,9 @@ multiScale_optim <- function(fitted_mod,
                 fitted_mod_original = fitted_mod,
                 min_D = kernel_inputs$min_D,
                 max_D = kernel_inputs$max_D,
-                kernel_inputs = kernel_inputs[-c(2,3)],
+                kernel_inputs = kernel_inputs[
+                  setdiff(names(kernel_inputs), c("min_D", "max_D"))
+                ],
                 scl_params = final_mod$scl_params,
                 join_by = join_by,
                 opt_context = opt_context,

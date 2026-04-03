@@ -1,4 +1,4 @@
-test_that("summary uses profile-based sigma intervals when available", {
+test_that("summary uses Wald intervals by default and profile intervals on request", {
   skip_if_not_installed("terra")
   skip_if_not_installed("sf")
 
@@ -21,11 +21,30 @@ test_that("summary uses profile-based sigma intervals when available", {
   opt <- multiScale_optim(fitted_mod = mod,
                           kernel_inputs = kernel_inputs,
                           verbose = FALSE)
-  smry <- summary(opt)
 
-  interval_method <- attr(smry$opt_scale, "interval_method")
+  cache_key <- profile_scale_cache_key(object = opt,
+                                       min_D = opt$min_D,
+                                       names = row.names(opt$scale_est))
+  if (exists(cache_key, envir = .profile_scale_cache, inherits = FALSE)) {
+    rm(list = cache_key, envir = .profile_scale_cache)
+  }
 
-  expect_identical(unname(interval_method), "profile")
-  expect_true(all(is.finite(as.matrix(smry$opt_scale[, c("2.5%", "97.5%")]))))
-  expect_true(all(is.finite(as.matrix(smry$opt_dist[, c("2.5%", "97.5%")]))))
+  smry_wald <- summary(opt)
+  interval_method_wald <- attr(smry_wald$opt_scale, "interval_method")
+
+  expect_identical(unname(interval_method_wald), "wald")
+
+  smry_profile <- summary(opt, profile = TRUE)
+  interval_method_profile <- attr(smry_profile$opt_scale, "interval_method")
+
+  expect_false(is.null(opt$kernel_inputs$d_list))
+  expect_false(is.null(opt$kernel_inputs$raw_cov))
+  expect_identical(unname(interval_method_profile), "profile")
+  expect_true(all(is.finite(as.matrix(smry_profile$opt_scale[, c("2.5%", "97.5%")]))))
+  expect_true(all(is.finite(as.matrix(smry_profile$opt_dist[, c("2.5%", "97.5%")]))))
+  expect_true(exists(cache_key, envir = .profile_scale_cache, inherits = FALSE))
+
+  smry_profile_cached <- summary(opt, profile = TRUE)
+  expect_equal(smry_profile_cached$opt_scale, smry_profile$opt_scale)
+  expect_equal(smry_profile_cached$opt_dist, smry_profile$opt_dist)
 })
