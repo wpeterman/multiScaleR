@@ -38,9 +38,27 @@ invisible(lapply(rdat, load, .GlobalEnv))
 
 # Background
 
-Many abiotic and ecological processes are a result of variables operating at multiple scales. Such multiscale ecological processes can be challenging to quantify, especially when the surrounding landscape contributes to the process. The extent and magnitude of contribution from the surrounding landscape is often referred to as the 'scale of effect'. Determining the scales of effect has long been the focus of ecologists seeking to address multiscale ecological questions, but until recently, methods to rigorously and can identify such scales have been lacking. With advanced coding skills, Bayesian analytical frameworks can be used (e.g., Stuber & Gruber 2020; Amirkhiz et al. 2023). More recently, user-friendly methods, implemented in R, have been developed (`Siland`: Carpentier & Martin 2021; `Scalescape`: Lowe et al. 2022). Both of these packages, like `multiScaleR`, estimate distance-weighted landscape effects (i.e. scales of effect). All take a similar approach to achieving this goal, but each works with different model classes and have different functions available to users.
+## The scale-of-effect problem
 
-`multiScaleR` is fully supported in handling models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and that is a supported class in the R package [insight](https://CRAN.R-project.org/package=insight). This package has been developed to provide an efficient modeling workflow, facilitating scaling of rasters and spatial projections of optimized models. Let me know if you encounter issues or would like to see support for other model classes.
+Many abiotic and ecological processes are shaped by variables that operate at multiple spatial scales. A central challenge in landscape ecology is determining the *scale of effect*: the spatial extent over which a landscape variable influences a biological response measured at a sampling location.
+
+Consider a practical example. You are modeling songbird abundance across a forested region, and you suspect that the proportion of forest cover in the surrounding landscape matters. But how large should that surrounding area be? Should you measure forest cover within 100 m of each survey point? 500 m? 2 km? The answer is not known in advance. It depends on how far an individual moves across the landscape, how far away habitat features can affect local conditions, and on the strength of the biological relationship itself.
+
+Traditional approaches test a fixed set of candidate buffer radii, fit a separate model for each, and compare them. This approach has two key limitations. First, the investigator must guess plausible scales in advance, and the true scale might fall between the tested values. Second, a fixed-width buffer treats every landscape cell within the radius equally, as if a forest patch 50 m away matters just as much as one at 499 m.
+
+`multiScaleR` addresses both limitations by representing landscape influence as a **distance-weighted kernel**: a weighting function that assigns higher weight to nearby landscape cells and smoothly decreasing weight to cells farther away. The width of that kernel, σ (sigma, in map units), controls how rapidly influence decays with distance. Crucially, σ is estimated from the data as a parameter of the statistical model, alongside the familiar regression coefficients. This means you do not need to pre-specify the scale; the data identify it for you.
+
+## What `multiScaleR` does
+
+With advanced coding skills, Bayesian analytical frameworks can be used to estimate scales of effect (e.g., Stuber & Gruber 2020; Amirkhiz et al. 2023). More recently, user-friendly R packages have been developed: `Siland` (Carpentier & Martin 2021) and `Scalescape` (Lowe et al. 2022) both estimate distance-weighted landscape effects. `multiScaleR` extends this family of tools with several practical advances:
+
+- Optimization is implemented in C++ with sparse matrix support, making it efficient for large landscapes and sample sizes.
+- Standard errors and confidence intervals on σ are reported alongside point estimates.
+- Raster surfaces can be smoothed at the optimized scale and used directly for spatial prediction with `terra::predict()`.
+- Model selection tables (AIC, BIC) account for the additional parameters estimated during scale optimization.
+- Functions to simulate rasters and response data facilitate power analysis and methods testing.
+
+`multiScaleR` is fully supported for models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and is a supported class in the R package [insight](https://CRAN.R-project.org/package=insight). Let me know if you encounter issues or would like to see support for other model classes.
 
 **References**
 
@@ -52,11 +70,79 @@ Many abiotic and ecological processes are a result of variables operating at mul
 
 -   Stuber, E. F., and L. F. Gruber. 2020. Recent methodological solutions to identifying scales of effect in multi-scale modeling. Current Landscape Ecology Reports 5:127--139.
 
+---
+
+# A Conceptual Road Map
+
+Before writing any code, it helps to see how the pieces fit together. The core workflow has four stages:
+
+```
+[Optional: simulate data]       [Your field data]
+  sim_rast()                  Spatial Point Data
+  sim_dat()                   (GPS coordinates)
+  sim_dat_unmarked()               +
+        |                    Raster Layers
+        |                  (habitat covariates)
+        |                          |
+        +--------> kernel_prep() <-+
+                        |
+                        |   Computes distance-weighted raster
+                        |   values at each sample point;
+                        |   output feeds directly into model
+                        v
+             [Fit initial regression model]
+              glm() / lme4::lmer() / gls()
+              pscl::zeroinfl() / unmarked / ...
+                        |
+                        v
+              multiScale_optim()
+              (simultaneously estimates sigma for
+               each raster layer and regression
+               coefficients via maximum likelihood)
+                        |
+         +--------------+--------------+-----------+
+         |              |              |            |
+      summary()      plot()    plot_marginal_   aic_tab()
+      (sigma CIs,    (kernel   effects()        bic_tab()
+       regression    weight    (covariate
+       output)       decay)    effect plots)
+         |
+         v
+   kernel_scale.raster()
+   (apply optimized kernel to full raster extent;
+    optionally scale/center and clamp values)
+         |
+         v
+   terra::predict()
+   (spatially explicit predictions across the landscape)
+```
+
+The key function is `multiScale_optim()`. It takes your fitted model and the `kernel_prep` output, then optimizes the kernel width (σ) for each spatial covariate. Everything else flows from that fitted object: model summaries, plots, model selection, and spatial projection.
+
+**Key concepts to keep in mind:**
+
+- **σ (sigma)**: The scale parameter of the kernel function (in map units, e.g., meters). A σ of 300 m with a Gaussian kernel means that landscape cells roughly 493 m away contribute 10% of the weight of the focal cell.
+- **`max_D`**: The maximum distance (in map units) to extract raster values for each sample point. This should exceed your expected scale of effect. If `multiScale_optim()` warns that an estimated σ is near `max_D`, re-run `kernel_prep()` with a larger value.
+- **Initial model**: The model you fit *before* optimization uses unsmoothed (initial σ) kernel-weighted covariate values. Its structure (formula, family, random effects) is inherited by the optimization. Get the model structure right before optimizing.
+
 # Distance-weighted Effects
 
-There are *many* different kernel transformations that could be used to quantify the contribution of environmental variables as a function of distance. Four kernel functions are implemented in `multiScaleR` . Experience with simulated data suggests that the Exponential Power kernel, while flexible, is prone to over fitting and optimization often fails to converge. The Gaussian kernel is the default with `multiScaleR`. Note: Figures in this document rendered poorly. Re-running code on your local machine will provide much better results!
+## Choosing a kernel
 
-1.  Gaussian (`gaus`) -- Decay in space governed by a single parameter (sigma)
+There are *many* different kernel transformations that could be used to quantify the contribution of environmental variables as a function of distance. The kernel function determines the *shape* of that decay: how quickly nearby cells lose influence relative to the focal point.
+
+Four kernel functions are implemented in `multiScaleR`. In each case, σ (sigma) is estimated during optimization and controls the spatial scale (width) of the kernel. All plots below show the weight assigned to a landscape cell as a function of its distance from a sample point, with a vertical line marking the distance that captures 90% of the total weight.
+
+- **Gaussian** (recommended for most uses): smooth, symmetric bell-curve decay. Governed by a single parameter σ.
+- **Negative Exponential**: faster initial decay than Gaussian; also governed by σ alone.
+- **Exponential Power**: flexible shape controlled by σ (scale) and β (shape). Experience with simulated data suggests this kernel is prone to overfitting and optimization can fail to converge; use with caution.
+- **Fixed buffer**: a hard-edged buffer. All cells within the buffer contribute equally; all beyond it contribute nothing. This replicates the traditional buffer-based approach.
+
+The Gaussian kernel is the default and performs well across a wide range of ecological scenarios. When in doubt, start with it.
+
+Note: Figures in this document may render at lower quality than running code locally.
+
+1.  Gaussian (`gaus`): Decay in space governed by a single parameter (sigma)
 
     ```{r echo=FALSE}
     plot_kernel(prob = 0.9, 
@@ -66,7 +152,7 @@ There are *many* different kernel transformations that could be used to quantify
                 add_label = F)
     ```
 
-2.  Negative Exponential (`exp`) -- Decay in space governed by a single parameter (sigma)
+2.  Negative Exponential (`exp`): Decay in space governed by a single parameter (sigma)
 
     ```{r echo=FALSE}
     plot_kernel(prob = 0.9, 
@@ -76,7 +162,7 @@ There are *many* different kernel transformations that could be used to quantify
                 add_label = F)
     ```
 
-3.  Exponential Power (`expow`) -- Decay in space governed by a scale parameter (sigma), and shape parameter (beta)
+3.  Exponential Power (`expow`): Decay in space governed by a scale parameter (sigma) and a shape parameter (beta)
 
     ```{r echo=FALSE}
     plot_kernel(prob = 0.9, 
@@ -87,7 +173,7 @@ There are *many* different kernel transformations that could be used to quantify
                 add_label = F)
     ```
 
-4.  Fixed width buffer (`fixed`) -- Effect does not decay with distance
+4.  Fixed width buffer (`fixed`): Effect does not decay with distance
 
     ```{r echo=FALSE}
     plot_kernel(prob = 0.9, 
@@ -160,7 +246,12 @@ plot(pts, add = T, pch = 19)
 
 ## `kernel_prep`
 
-To begin an analysis, the `kernel_prep` function must be run with the `spatRaster` layers and spatial point data. Additionally, it is necessary to specify the maximum distance (in raster map units) that you want to consider in the analysis. The greater the distance considered, the more computationally intensive the analysis will be, so some consideration and discretion is needed. If the maximum distance appears to be constraining the optimization results, you will receive a warning.
+`kernel_prep()` is the first step of every `multiScaleR` analysis. It does two things:
+
+1. For each sample point, it extracts raster values at every cell within `max_D` (the maximum search radius) and computes their distances. These are stored as sparse matrices for efficiency.
+2. It computes an initial set of distance-weighted covariate values at each sample point using a starting σ (by default, `max_D / 3`). These initial values are used to fit the starting regression model.
+
+**Choosing `max_D`**: Set `max_D` to a value you are confident exceeds the true scale of effect. If you are uncertain, err on the side of being too large; the optimization will find the right σ within that range. The tradeoff is computational: larger `max_D` means more cells to process, so keep it reasonable. If `multiScale_optim()` warns that a σ estimate is near `max_D`, increase `max_D` and re-run `kernel_prep()`.
 
 ```{r}
 kernel_inputs <- kernel_prep(pts = pts,
@@ -171,7 +262,9 @@ kernel_inputs <- kernel_prep(pts = pts,
 kernel_inputs
 ```
 
-Next, you need to fit the preliminary model that will serve as the starting point for optimizing scales of effect. We will pull raster values from the newly created `kernel_inputs` then fit a GLM. These raster value are scaled and centered weighted mean values for each layer, at each point.
+The `kernel_inputs` object holds the distance data and the initial kernel-weighted covariate values (in `kernel_inputs$kernel_dat`). These kernel-weighted values are scaled and centered (mean 0, SD 1 across sample points) so that regression coefficients are comparable across covariates.
+
+Next, combine the kernel-weighted covariate values with the response data to build the data frame for model fitting:
 
 ```{r}
 df <- data.frame(dat,
@@ -179,7 +272,7 @@ df <- data.frame(dat,
 str(df)
 ```
 
-Fit Poisson GLM
+**Fit the initial (starting) model.** This model uses the initial kernel-weighted values and establishes the model structure (formula, family, random effects) that will be inherited by `multiScale_optim()`. The coefficients from this model are only starting values; optimizing with `multiScale_optim()` will update both the regression coefficients and σ simultaneously.
 
 ```{r}
 mod0 <- glm(counts ~ site + land1 + land2 + land3,
@@ -192,22 +285,35 @@ summary(mod0)
 
 ## `multiScale_optim`
 
-We are now ready to use the `multiScale_optim` function. Note: for purposes of this vignette, the function is not being run in parallel. Optimization will be much quicker when parallelized by specifying the number of cores to use with `n_cores`. The optimization below takes \~50 seconds to complete.
+We are now ready to optimize the scales of effect with `multiScale_optim()`. This function searches over σ values for each raster layer (and simultaneously updates regression coefficients) to find the combination that maximizes the likelihood of the fitted model.
+
+> **Parallelization**: For this vignette, the function is run without parallelization. In practice, optimization will be substantially faster when you specify `n_cores` (e.g., `n_cores = 4`). The optimization below takes approximately 50 seconds on a single core.
 
 ```{r opt1, eval=FALSE}
 opt1 <- multiScale_optim(fitted_mod = mod0,
                          kernel_inputs = kernel_inputs)
 ```
 
-We get some helpful warning messages indicating the estimated scale of effect for one of our raster variables exceeds the `max_D` threshold we specified with the `kernel_prep` function and we get a suggestion of how to correct this. We also get a warning that the precision (standard error) for one or more sigma terms is large relative to the mean estimate. Let's first take a look at our results.
+We get two helpful warning messages:
+
+1. The estimated σ for one raster layer is near `max_D`, meaning the optimization is pushing against the boundary of the search space. This suggests that either the true scale of effect is large, or that the variable has a weak or absent relationship with the response and optimization is poorly constrained. The warning suggests increasing `max_D` in `kernel_prep()`.
+2. The standard error for one or more σ estimates is large relative to the point estimate: a sign of imprecision, often caused by weak signal or too small a sample size.
+
+Let's look at our results.
 
 ```{r}
 summary(opt1)
 ```
 
-At the bottom of the output is the standard `GLM` model summary output. We see that `site` appears to have no effect, `land1` a negative effect, `land2` a positive effect and `land3` a weak positive effect on the observed counts. At the top of the summary output are the estimated sigma terms related to the Gaussian kernel for each raster layer. The standard error and 95% confidence intervals are also reported. Below this, the actual distance effect is calculated. By default, the distance that encompasses 90% of the kernel weight is identified. From these summaries, we see that `land3` is the variable that may have a larger scale of effect than we anticipated, but that it is also being imprecisely estimated. This may be a red flag that the variable is not relevant to the analysis and/or should not be scaled.
+**How to read the `summary()` output:**
 
-We could update `max_D` by re-running `kernel_prep`, but we won't do that here. One thing to be aware of when optimizing scales of effect is that it is possible to have overfit models with parameters that don't have a strong relationship with your response. With this simulated data, we know that `land3` actually has no effect. Let's fit another model without this variable.
+The top of the output shows the estimated σ (scale parameter) for each raster layer, with standard errors and 95% confidence intervals. Below each σ estimate is the *effective distance*: the distance that captures a specified proportion (default: 90%) of the total kernel weight. This converts σ into an ecologically interpretable distance in map units (meters in this case). A Gaussian kernel with σ = 250 has 90% of its cumulative weight within approximately 412 m of the focal point.
+
+The bottom of the output is the standard model summary from your regression (GLM in this case), showing regression coefficients, standard errors, and p-values for each covariate, exactly as you would see from `summary(glm(...))`.
+
+For our full model: `site` has no apparent effect, `land1` has a negative effect, `land2` has a positive effect, and `land3` shows a weak positive effect. Crucially, the σ for `land3` is large *and* imprecisely estimated (wide CI). This is a red flag: when a variable has no true relationship with the response, the optimization often fails to find a well-defined σ and will wander toward large values.
+
+With this simulated data, we know that `land3` has no effect on counts. Let's fit a model without it.
 
 ```{r opt2}
 ## New model
@@ -228,7 +334,18 @@ No warnings! Let's look at our results.
 summary(opt2)
 ```
 
-Overall, we did a pretty good job recovering the data generating parameter values within the GLM as well as the sigma values for scaling the raster surfaces. We can further explore and visualize our results. Using the `plot` function, we can visualize how the weighted contribution of each variable decrease with distance. By default, the mean and 95% confidence interval of the 90% cumulative kernel weight is identified on the plot. This can be modified by changing `prob` within the plot function.
+The true data-generating values were (see section 3):
+
+| Parameter | True value | Recovered? |
+|-----------|-----------|------------|
+| `land1` σ | 250 m     | Check CI   |
+| `land2` σ | 500 m     | Check CI   |
+| `land1` β | −0.5      | Check CI   |
+| `land2` β | 0.7       | Check CI   |
+
+Overall, we do a good job recovering both the regression coefficients (β) and the scales of effect (σ) within reasonable uncertainty bounds. This is reassuring but also a good reminder: with real data, you will not have ground truth to check against. Careful model selection and biological reasoning are your guides.
+
+**Visualizing the kernel decay.** The `plot()` method shows how the influence of each landscape variable falls off with distance. The vertical line marks the distance enclosing 90% of the cumulative kernel weight (the *effective distance*).
 
 ```{r}
 ## Kernel function
@@ -238,27 +355,33 @@ plot(opt2)
 plot(opt2, prob = 0.99)
 ```
 
-In addition to the plotting the kernel function, effects plots from the fitted model object can also be generated using `plot_marginal_effects`
+**Visualizing marginal covariate effects.** `plot_marginal_effects()` shows the estimated effect of each covariate on the response, holding other covariates at their mean values. These are the standard partial effect plots from the regression model, applied to the optimally-scaled covariate values.
 
 ```{r}
 plot_marginal_effects(opt2)
 ```
 
-We can also apply the optimized kernel to the raster surfaces.
+We can also apply the optimized kernel to the full raster surfaces. This is a key step if you want to generate spatially explicit predictions across the landscape.
+
+`kernel_scale.raster()` smooths each raster layer using the estimated σ from the optimization. When `scale_center = TRUE`, the smoothed values are standardized using the mean and SD from the sample points, matching the scaling used during model fitting. This ensures that `terra::predict()` receives covariate values in the same space as the training data.
 
 ```{r kernel_raster}
 rast_opt <- kernel_scale.raster(raster_stack = land_rast,
                                 multiScaleR = opt2)
 plot(rast_opt)
 ```
-NOTE: Because site is not a spatial variable, a dummy raster is created. This will facilitate using this `spatRaster` object with `predict()` later on.
+
+> **Note**: Because `site` is a non-spatial covariate (a site-level variable, not a raster), a constant dummy raster is created for it. This allows the `spatRaster` object to be passed directly to `terra::predict()`, which requires all model covariates to be present. See the `Spatial Projection and Clamping` vignette for a detailed treatment of projection, including how to handle cases where projected covariate values fall outside the range of the training data.
 
 ## Kernels
 
 Data were simulated from a Gaussian kernel, but we can optimize using other kernels and compare model performance. Starting values had to be specified when using the exponential power kernel due to convergence issues.
 
-```{r other_kernel}
+```{r other_kernel, eval=FALSE}
 ## Negative Exponential
+## Note: these kernel_prep objects are pre-loaded in the setup chunk.
+## eval=FALSE keeps the vignette from re-running these computationally
+## intensive calls during knitting.
 exp_inputs <- kernel_prep(pts = pts,
                           raster_stack = land_rast,
                           max_D = 1700,
@@ -300,6 +423,10 @@ opt_fixed <- multiScale_optim(fitted_mod = mod0_2,
 If you explore each of the outputs, you'll see that we generally arrive at similar results. There are some warnings, but we won't worry about those right now. Next, we'll try to compare the relative support of these models using different weighted kernels.
 
 # Model Selection
+
+## Why standard AIC is not enough
+
+When you optimize σ, you are estimating an additional parameter beyond the regression coefficients. Standard AIC from the base model does not account for this extra complexity. `multiScaleR` uses AICc (corrected for small samples) and BIC tables that account for the σ parameters in the penalty term. This is important: comparing models with `aic_tab()` or `bic_tab()` gives a fair comparison across models with different numbers of spatial covariates.
 
 With `multiScaleR` it is possible to create AIC(c) or BIC tables from lists of fitted models.
 
