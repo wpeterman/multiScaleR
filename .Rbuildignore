@@ -12,3 +12,4 @@
 ^src/.*\.gcda$
 ^src/.*\.(dll|o)$
 ^checks$
+^\.claude$
