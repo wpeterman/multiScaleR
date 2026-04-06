@@ -123,16 +123,6 @@ plot.multiScaleR <- function(x,
                                wt = wt)
     mx_y <- max(wt)
 
-    if(isTRUE(scale_dist)){
-      if(min(prob) >= 0.8){
-        ax <- max(d) * 0.08
-        ay <- 0.08*max(wt)
-      } else {
-        ax <- max(d) * 0.8
-        ay <- 0.9*max(wt)
-      }
-    }
-
     # browser()
 
     plot_ <- ggplot(data = df_list[[i]], aes(x = dist, y = wt)) +
@@ -147,9 +137,10 @@ plot.multiScaleR <- function(x,
                    color = 'red')
       } +
       {if(isTRUE(scale_dist) & isTRUE(add_label))
-        annotate('text', x = ax, y = ay,
-                 label = paste0(prob*100,"% density \n Distance: ", round(scale_d, 0),
-                                "\n  ", " 95% CI: ",round(scale_lci, 0), " - ", round(scale_uci, 0)))
+        annotate('text', x = Inf, y = Inf,
+                 hjust = 1.1, vjust = 1.4,
+                 label = paste0(prob * 100, "% density\nDistance: ", round(scale_d, 0),
+                                "\n95% CI: ", round(scale_lci, 0), " - ", round(scale_uci, 0)))
       } +
       geom_line(linewidth = 1.25) +
       ggtitle(titles[i]) +

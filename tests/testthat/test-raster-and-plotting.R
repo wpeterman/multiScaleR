@@ -81,6 +81,20 @@ test_that("plot helpers return ggplot objects without error", {
   expect_true(all(vapply(marginal_plots, inherits, logical(1), what = "ggplot")))
 })
 
+test_that("plot.multiScaleR includes the updated corner annotation label", {
+  fix <- make_core_fixture()
+
+  open_null_device()
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  opt_plots <- plot(fix$opt, prob = 0.95, add_label = TRUE)
+  text_layer <- opt_plots[[1]]$layers[[3]]
+
+  expect_true(inherits(text_layer$geom, "GeomText"))
+  expect_match(text_layer$aes_params$label, "95% density")
+  expect_match(text_layer$aes_params$label, "95% CI")
+})
+
 test_that("plot_marginal_effects covers unmarked and zeroinfl models", {
   unmark <- make_unmarked_fixture()
   zi <- make_zeroinfl_fixture()
@@ -184,4 +198,82 @@ test_that("plot_marginal_effects reports prediction failures clearly", {
     ),
     "Failed to compute marginal effects for covariate 'x'"
   )
+})
+
+test_that("plot_marginal_effects annotates polynomial and interaction terms", {
+  set.seed(1)
+  dat <- data.frame(
+    y = rpois(40, lambda = 4),
+    x = seq(-1, 1, length.out = 40),
+    z = rep(seq(-0.5, 0.5, length.out = 10), each = 4)
+  )
+  dat$x2 <- dat$x^2
+
+  mod <- glm(y ~ x + I(x^2) + z + x:z, family = poisson(), data = dat)
+  obj <- structure(
+    list(
+      opt_mod = mod,
+      scl_params = list(mean = c(x = 0, z = 0), sd = c(x = 1, z = 1))
+    ),
+    class = "multiScaleR"
+  )
+
+  open_null_device()
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  expect_message(
+    plots <- plot_marginal_effects(obj, length.out = 6),
+    "Interaction term\\(s\\) detected"
+  )
+
+  expect_named(plots, c("x", "z"))
+  expect_match(plots$x$labels$subtitle, "Includes: I\\(x\\^2\\)")
+  expect_match(plots$x$labels$subtitle, "At mean of: z")
+  expect_match(plots$z$labels$subtitle, "At mean of: x")
+})
+
+test_that("profile_sigma returns complete profiles and validates inputs", {
+  fix <- make_core_fixture()
+
+  prof <- suppressWarnings(
+    suppressMessages(
+      profile_sigma(fix$opt, n_pts = 5, metric = "AICc", verbose = FALSE)
+    )
+  )
+  prof_ll <- suppressWarnings(
+    suppressMessages(
+      profile_sigma(fix$opt, n_pts = 4, metric = "LL", verbose = FALSE)
+    )
+  )
+
+  expect_s3_class(prof, "sigma_profile")
+  expect_equal(prof$metric, "AICc")
+  expect_equal(sort(unique(prof$profiles$variable)), rownames(fix$opt$scale_est))
+  expect_equal(nrow(prof$profiles), 5 * nrow(fix$opt$scale_est))
+  expect_true(all(c("variable", "sigma", "LL", "AICc") %in% names(prof$profiles)))
+  expect_true(all(is.finite(prof$profiles$sigma)))
+  expect_equal(prof_ll$metric, "LL")
+
+  expect_error(profile_sigma(structure(list(), class = "not_multiScaleR")), "multiScaleR")
+  expect_error(profile_sigma(fix$opt, n_pts = 2, verbose = FALSE), "n_pts")
+  expect_error(profile_sigma(fix$opt, n_pts = 5, verbose = NA), "verbose")
+})
+
+test_that("plot.sigma_profile returns named ggplots and rejects bad input", {
+  fix <- make_core_fixture()
+  prof <- suppressWarnings(
+    suppressMessages(
+      profile_sigma(fix$opt, n_pts = 4, metric = "LL", verbose = FALSE)
+    )
+  )
+
+  open_null_device()
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  plots <- plot(prof)
+
+  expect_length(plots, nrow(fix$opt$scale_est))
+  expect_named(plots, rownames(fix$opt$scale_est))
+  expect_true(all(vapply(plots, inherits, logical(1), what = "ggplot")))
+  expect_error(plot.sigma_profile(structure(list(), class = "not_sigma_profile")), "sigma_profile")
 })
