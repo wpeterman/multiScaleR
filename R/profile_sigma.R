@@ -194,7 +194,7 @@ profile_sigma <- function(x,
 
   out <- list(
     profiles  = profiles,
-    opt_sigma = setNames(scale_est$Mean, covs),
+    opt_sigma = stats::setNames(scale_est$Mean, covs),
     metric    = metric
   )
   class(out) <- "sigma_profile"
