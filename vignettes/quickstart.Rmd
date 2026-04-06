@@ -15,11 +15,27 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment  = "#>",
-  fig.width  = 5.75,
+  fig.width  = 6.5,
   fig.height = 4.25,
   warning  = FALSE,
   message  = FALSE
 )
+
+# pkg_extdata <- function(...) {
+#   src_path <- normalizePath(file.path("..", "inst", "extdata", ...),
+#                             winslash = "/",
+#                             mustWork = FALSE)
+#   if (file.exists(src_path)) {
+#     return(src_path)
+#   }
+# 
+#   inst_path <- system.file("extdata", ..., package = "multiScaleR")
+#   if (nzchar(inst_path) && file.exists(inst_path)) {
+#     return(inst_path)
+#   }
+# 
+#   stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
+# }
 ```
 
 # What is multiScaleR?
@@ -83,8 +99,7 @@ dat <- landscape_counts
 data("surv_pts")
 pts <- vect(surv_pts)
 
-land_rast <- rast(system.file("extdata", "landscape.tif",
-                              package = "multiScaleR"))
+land_rast <- rast(system.file("extdata", 'landscape.tif', package = "multiScaleR"))
 ```
 
 The `landscape_counts` data frame contains counts and a site-level covariate
@@ -93,7 +108,7 @@ The `landscape_counts` data frame contains counts and a site-level covariate
 `land1` (σ = 250 m, β = −0.5) and `land2` (σ = 500 m, β = 0.7) as true
 predictors; `land3` has no effect.
 
-```{r plot-data, fig.cap = "Landscape rasters with survey locations."}
+```{r plot-data, fig.cap = "***Landscape rasters with survey locations.***"}
 plot(land_rast)
 plot(land_rast$land1, main = "land1 with survey points")
 points(pts, pch = 19, cex = 0.6)
@@ -131,7 +146,7 @@ right before optimizing. The coefficient values at this stage are only starting
 values.
 
 ```{r fit-mod}
-mod <- glm(counts ~ land1 + land2,
+mod <- glm(counts ~ site + land1 + land2,
            family = poisson(),
            data   = df)
 ```
@@ -142,15 +157,14 @@ mod <- glm(counts ~ land1 + land2,
 simultaneously updating regression coefficients to maximize the model
 likelihood. Use `n_cores` to parallelize and speed up the search.
 
-```{r optim, eval = FALSE}
+```{r optim, eval = TRUE}
 opt <- multiScale_optim(fitted_mod    = mod,
-                        kernel_inputs = kernel_inputs,
-                        n_cores       = 2)
+                        kernel_inputs = kernel_inputs)
 ```
 
 ```{r load-opt, include = FALSE}
-load(system.file("extdata", "opt2.RData", package = "multiScaleR"))
-opt <- opt2
+# load(pkg_extdata("opt2.RData"))
+# opt <- opt2
 ```
 
 ## Examine results
@@ -174,14 +188,14 @@ should fall within the reported confidence intervals.
 with distance. The vertical line marks the distance enclosing 90% of the total
 kernel weight (the effective scale of effect).
 
-```{r plot-kernel, fig.cap = "Distance-decay of kernel weight for each covariate."}
+```{r plot-kernel, fig.cap = "***Distance-decay of kernel weight for each covariate.***"}
 plot(opt)
 ```
 
 `plot_marginal_effects()` shows the estimated effect of each covariate on the
 response, holding all other covariates at their mean values.
 
-```{r marginal, fig.cap = "Marginal effects of each spatial covariate on counts."}
+```{r marginal, fig.cap = "***Marginal effects of each spatial covariate on counts.***"}
 plot_marginal_effects(opt)
 ```
 
@@ -193,7 +207,7 @@ A clear trough centered near the optimized sigma confirms a well-identified
 scale of effect; a flat or monotone profile indicates the data do not
 strongly constrain sigma for that variable.
 
-```{r profile, fig.cap = "AICc profile across sigma. Red dashed line marks optimized sigma."}
+```{r profile, fig.cap = "***AICc profile across sigma. Red dashed line marks optimized sigma.***"}
 prof <- profile_sigma(opt, n_pts = 15, verbose = FALSE)
 plot(prof)
 ```
@@ -209,18 +223,22 @@ and, with `scale_center = TRUE`, standardizes the result using the same
 centering and scaling used during model fitting. The output can be passed
 directly to `terra::predict()`.
 
-```{r project, fig.cap = "Kernel-smoothed raster layers at optimized scales."}
+```{r project, fig.cap = "***Kernel-smoothed raster layers at optimized scales.***"}
 r_scaled <- kernel_scale.raster(raster_stack = land_rast,
                                 multiScaleR  = opt,
                                 scale_center = TRUE,
-                                clamp        = TRUE)
+                                clamp        = TRUE
+                                )
 plot(r_scaled)
 ```
 
-```{r predict, fig.cap = "Predicted counts across the landscape."}
+```{r predict, fig.cap = "***Predicted counts across the landscape.***"}
 pred <- terra::predict(r_scaled, opt$opt_mod, type = "response")
 plot(pred, main = "Predicted counts")
+plot(surv_pts, add = T, col = 'red')
 ```
+
+The nature of this toy example and simulated data is such that predicted counts go to zero at low levels of `land2`. In this example that is most of the border region. This results is simply an artifact of the small landscape and large scale of effect. 
 
 ---
 
@@ -233,8 +251,7 @@ library(terra)
 # 1. Load data
 data("landscape_counts"); data("surv_pts")
 pts      <- vect(surv_pts)
-land_rast <- rast(system.file("extdata", "landscape.tif",
-                               package = "multiScaleR"))
+land_rast <- rast(pkg_extdata("landscape.tif"))
 
 # 2. Prepare kernel inputs
 kernel_inputs <- kernel_prep(pts = pts, raster_stack = land_rast,

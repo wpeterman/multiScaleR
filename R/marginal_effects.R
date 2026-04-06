@@ -127,7 +127,7 @@ plot_marginal_effects <- function(x,
     # so no special prediction logic is needed. Detection is used only for plot
     # annotations and the interaction warning below.
     fterms <- tryCatch(
-      attr(terms(formula(mod)), "term.labels"),
+      attr(stats::terms(formula(mod)), "term.labels"),
       error = function(e) character(0)
     )
     poly_terms  <- fterms[grepl("^I\\(", fterms)]
@@ -159,7 +159,7 @@ plot_marginal_effects <- function(x,
     # held at their actual mean rather than zero. For kernel-scaled variables the
     # mean is already zero; for unscaled site covariates this is the true mean.
     available_vars <- vars[vars %in% names(dat_all)]
-    pred_means <- setNames(rep(0, length(vars)), vars)
+    pred_means <- stats::setNames(rep(0, length(vars)), vars)
     if(length(available_vars) > 0) {
       pred_means[available_vars] <- colMeans(
         dat_all[, available_vars, drop = FALSE], na.rm = TRUE
