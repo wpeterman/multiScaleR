@@ -121,7 +121,7 @@ The key function is `multiScale_optim()`. It takes your fitted model and the `ke
 
 **Key concepts to keep in mind:**
 
-- **σ (sigma)**: The scale parameter of the kernel function (in map units, e.g., meters). A σ of 300 m with a Gaussian kernel means that landscape cells roughly 493 m away contribute 10% of the weight of the focal cell.
+- **σ (sigma)**: The scale parameter of the kernel function (in map units, e.g., meters). It controls how quickly landscape influence decays with distance. With a Gaussian kernel and σ = 300 m, 90% of the distance-weighted landscape average at a sample point is drawn from cells within roughly 493 m; cells beyond that radius collectively account for the remaining 10%.
 - **`max_D`**: The maximum distance (in map units) to extract raster values for each sample point. This should exceed your expected scale of effect. If `multiScale_optim()` warns that an estimated σ is near `max_D`, re-run `kernel_prep()` with a larger value.
 - **Initial model**: The model you fit *before* optimization uses unsmoothed (initial σ) kernel-weighted covariate values. Its structure (formula, family, random effects) is inherited by the optimization. Get the model structure right before optimizing.
 
@@ -311,6 +311,27 @@ The top of the output shows the estimated σ (scale parameter) for each raster l
 
 The bottom of the output is the standard model summary from your regression (GLM in this case), showing regression coefficients, standard errors, and p-values for each covariate, exactly as you would see from `summary(glm(...))`.
 
+**Confidence intervals on σ: delta method vs. profile likelihood**
+
+By default, confidence intervals on σ are computed using the **delta method**: a first-order Taylor approximation that treats the log-likelihood surface as locally quadratic near the optimum and derives the CI from the curvature (Hessian) of that surface. Delta-method CIs are fast to compute and work well when the likelihood surface is smooth and roughly symmetric around the estimate. They are reported alongside the standard error in the default `summary()` output.
+
+However, the log-likelihood surface for σ is often asymmetric, especially when the scale parameter is near `max_D`, when sample sizes are small, or when the effect size is weak. In these situations the delta-method CI can be misleading: the lower and upper bounds may not accurately reflect the true uncertainty in each direction. **Profile-likelihood CIs** address this by tracing the likelihood surface directly: for each boundary value of σ, the optimizer finds the configuration of all other parameters that maximizes the likelihood, then identifies where that profile drops by the critical chi-squared quantile (1.92 log-likelihood units for a 95% CI). Profile CIs are therefore more reliable when the surface is irregular, at the cost of additional computation.
+
+To request profile-likelihood CIs, pass `profile = TRUE` to `summary()`:
+
+```{r eval=FALSE}
+summary(opt2, profile = TRUE)
+```
+
+Profile CIs are recommended whenever:
+
+- a delta-method CI is wide or asymmetric relative to the point estimate,
+- an estimated σ is near `max_D` (boundary constraint),
+- sample size is small (fewer than ~75 sites), or
+- you intend to report formal uncertainty bounds in a manuscript.
+
+Wide CIs on σ in either method indicate that the data do not strongly constrain the scale of effect for that variable. This may mean the variable has a weak relationship with the response, the sample size is insufficient, or the variable should be excluded from the model.
+
 For our full model: `site` has no apparent effect, `land1` has a negative effect, `land2` has a positive effect, and `land3` shows a weak positive effect. Crucially, the σ for `land3` is large *and* imprecisely estimated (wide CI). This is a red flag: when a variable has no true relationship with the response, the optimization often fails to find a well-defined σ and will wander toward large values.
 
 With this simulated data, we know that `land3` has no effect on counts. Let's fit a model without it.
@@ -332,6 +353,12 @@ No warnings! Let's look at our results.
 
 ```{r}
 summary(opt2)
+```
+
+The default `summary()` uses delta-method confidence intervals. Because this model is well-behaved (no boundary warnings, reasonable sample size), the delta-method CIs should be reliable here. For a more conservative check, you can compare them to profile-likelihood CIs:
+
+```{r eval=FALSE}
+summary(opt2, profile = TRUE)
 ```
 
 The true data-generating values were (see section 3):
@@ -360,6 +387,23 @@ plot(opt2, prob = 0.99)
 ```{r}
 plot_marginal_effects(opt2)
 ```
+
+**Profiling the likelihood surface.** `profile_sigma()` provides a diagnostic view of how the model fit changes as σ varies across its search range for each covariate, while all other σ values are held at their optimized values. Rather than reporting a single point estimate with an interval, it shows the full shape of the AICc (or log-likelihood) surface across the parameter space.
+
+This is useful in several situations:
+
+- **Verifying a well-defined optimum**: A clear trough in the AICc surface centered near the optimized σ suggests that the scale of effect is precisely estimated. A flat or monotone profile indicates the data do not strongly constrain σ for that variable.
+- **Asymmetry diagnostics**: If the surface drops steeply on one side and gradually on the other, the likelihood is asymmetric and delta-method CIs may not capture the uncertainty accurately. Profile-likelihood CIs (via `summary(..., profile = TRUE)`) are more appropriate in this case.
+- **Boundary concerns**: When the trough is near `max_D`, the surface may be truncated by the search boundary rather than identified by the data. This is a visual confirmation of the warning message from `multiScale_optim()`.
+
+Intervals are log-spaced so that evaluation is denser at smaller σ values, where the surface tends to change more rapidly, and sparser at larger values where it is typically flatter.
+
+```{r sigma-profile, fig.cap = "AICc profile across sigma for each spatial covariate. The red dashed line marks the optimized sigma."}
+prof2 <- profile_sigma(opt2, n_pts = 15, verbose = FALSE)
+plot(prof2)
+```
+
+For `opt2`, the profile confirms a clear, well-defined minimum in AICc near the optimized σ for both `land1` and `land2`, consistent with the absence of boundary warnings and the narrow confidence intervals reported by `summary()`. Compare this to the full model (`opt1`), which included the uninformative `land3` covariate: that profile would show a shallow or absent trough, reflecting the poor identifiability of σ when a variable has no true relationship with the response.
 
 We can also apply the optimized kernel to the full raster surfaces. This is a key step if you want to generate spatially explicit predictions across the landscape.
 

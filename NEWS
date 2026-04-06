@@ -1,3 +1,9 @@
+multiScaleR 0.6.4
+---------
+* Added sigma profiling and plot methods
+* Expanded plotting tests and updated vignettes
+* Streamlined GitHub Actions checks on direct pushes
+
 multiScaleR 0.6.3
 ---------
 * Made profile-likelihood CIs optional in `summary`
