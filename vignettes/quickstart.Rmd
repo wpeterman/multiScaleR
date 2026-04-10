@@ -12,6 +12,9 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
+library(multiScaleR)
+library(terra)
+
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment  = "#>",
@@ -21,21 +24,21 @@ knitr::opts_chunk$set(
   message  = FALSE
 )
 
-# pkg_extdata <- function(...) {
-#   src_path <- normalizePath(file.path("..", "inst", "extdata", ...),
-#                             winslash = "/",
-#                             mustWork = FALSE)
-#   if (file.exists(src_path)) {
-#     return(src_path)
-#   }
-# 
-#   inst_path <- system.file("extdata", ..., package = "multiScaleR")
-#   if (nzchar(inst_path) && file.exists(inst_path)) {
-#     return(inst_path)
-#   }
-# 
-#   stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
-# }
+pkg_extdata <- function(...) {
+  src_path <- normalizePath(file.path("..", "inst", "extdata", ...),
+                            winslash = "/",
+                            mustWork = FALSE)
+  if (file.exists(src_path)) {
+    return(src_path)
+  }
+
+  inst_path <- system.file("extdata", ..., package = "multiScaleR")
+  if (nzchar(inst_path) && file.exists(inst_path)) {
+    return(inst_path)
+  }
+
+  stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
+}
 ```
 
 # What is multiScaleR?
@@ -90,16 +93,13 @@ Every `multiScaleR` analysis follows four steps:
 locations and three landscape raster layers.
 
 ```{r load-data}
-library(multiScaleR)
-library(terra)
-
 data("landscape_counts")
 dat <- landscape_counts
 
 data("surv_pts")
 pts <- vect(surv_pts)
 
-land_rast <- rast(system.file("extdata", 'landscape.tif', package = "multiScaleR"))
+land_rast <- rast(pkg_extdata("landscape.tif"))
 ```
 
 The `landscape_counts` data frame contains counts and a site-level covariate
@@ -158,8 +158,8 @@ simultaneously updating regression coefficients to maximize the model
 likelihood. Use `n_cores` to parallelize and speed up the search.
 
 ```{r optim, eval = TRUE}
-opt <- multiScale_optim(fitted_mod    = mod,
-                        kernel_inputs = kernel_inputs)
+opt <- multiScaleR::multiScale_optim(fitted_mod    = mod,
+                                     kernel_inputs = kernel_inputs)
 ```
 
 ```{r load-opt, include = FALSE}

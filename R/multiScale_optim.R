@@ -1,3 +1,46 @@
+.empty_diagnostics <- function() {
+  list(
+    max_distance = NULL,
+    sigma_precision = NULL,
+    shape_precision = NULL
+  )
+}
+
+
+.max_distance_diagnostic <- function(scale_D, max_D) {
+  est_D <- scale_D[, 1]
+  ratio <- max_D / est_D
+  triggered <- ratio < 2
+
+  list(
+    code = "max_distance",
+    triggered = any(triggered, na.rm = TRUE),
+    threshold_ratio = 2,
+    variables = names(est_D)[which(triggered)],
+    effective_distance = est_D,
+    max_D = max_D,
+    ratio = ratio,
+    suggested_max_D = max(est_D * 2, na.rm = TRUE)
+  )
+}
+
+
+.precision_diagnostic <- function(est, code) {
+  ratio <- est[, 2] / est[, 1]
+  triggered <- ratio >= 0.5
+
+  list(
+    code = code,
+    triggered = any(triggered, na.rm = TRUE),
+    threshold_ratio = 0.5,
+    variables = row.names(est)[which(triggered)],
+    estimate = est[, 1],
+    se = est[, 2],
+    se_to_mean = ratio
+  )
+}
+
+
 #' @title Multiscale optimization
 #' @description Function to conduct multiscale optimization
 #' @param fitted_mod Model object of class glm, lm, gls, or unmarked
@@ -99,7 +142,6 @@
 #' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster clusterExport
 #' @importFrom crayon %+% green red bold blue
 #' @importFrom pscl zeroinfl
-
 multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
                              join_by = NULL,
@@ -414,32 +456,26 @@ multiScale_optim <- function(fitted_mod,
                 join_by = join_by,
                 opt_context = opt_context,
                 profile_scale_est = NULL,
+                diagnostics = .empty_diagnostics(),
                 warn_message = 0,
                 call = match.call())
 
     class(out) <- 'multiScaleR'
 
     scale_D <- kernel_dist(out)
-    if(dim(scale_D)[1] > 1){
-      est_D <- scale_D[,1]
-      suggest_D <-  max(scale_D[,1] * 2, na.rm = TRUE)
+    max_dist_diag <- .max_distance_diagnostic(scale_D = scale_D,
+                                              max_D = kernel_inputs$max_D)
+    out$diagnostics$max_distance <- max_dist_diag
 
-    } else {
-      est_D <- scale_D[[1]]
-      suggest_D <-  scale_D[[1]] * 2
-
-    }
-
-    # browser()
-
-    if(any((kernel_inputs$max_D / est_D) < 2, na.rm = T)){
+    if (isTRUE(max_dist_diag$triggered)) {
       out$warn_message <- c(out$warn_message, 1)
       cat(red("\n WARNING!!!\n",
               "The estimated scale of effect extends beyond the maximum distance specified.\n",
-              "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(suggest_D) %+% " to ensure accurate estimation of scale.\n\n"))
+              "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(max_dist_diag$suggested_max_D) %+% " to ensure accurate estimation of scale.\n\n"))
     }
 
     if(any((scale_est[,1] / scale_est[,2]) < 2, na.rm = T)){
+      out$diagnostics$sigma_precision <- .precision_diagnostic(scale_est, "sigma_precision")
       out$warn_message <- c(out$warn_message, 2)
       cat(red("\n WARNING!!!\n",
               "The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.\n",
@@ -447,6 +483,7 @@ multiScale_optim <- function(fitted_mod,
     }
 
     if(any((shape_est[,1] / shape_est[,2]) < 2, na.rm = T)){
+      out$diagnostics$shape_precision <- .precision_diagnostic(shape_est, "shape_precision")
       out$warn_message <- c(out$warn_message, 3)
       cat(red("\n WARNING!!!\n",
               "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
