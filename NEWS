@@ -1,3 +1,9 @@
+multiScaleR 0.6.5
+---------
+* Added structured optimization diagnostics and a `diagnostics()` accessor
+* Fixed complete-case alignment in multiscale optimization inputs
+* Updated vignettes and restored `multiScale_optim()` export handling
+
 multiScaleR 0.6.4
 ---------
 * Added sigma profiling and plot methods

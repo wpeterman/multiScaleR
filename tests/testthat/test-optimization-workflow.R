@@ -9,6 +9,68 @@ test_that("multiScale_optim returns a valid optimized object", {
   expect_true(is.list(opt$scl_params))
   expect_true(all(c("mean", "sd") %in% names(opt$scl_params)))
   expect_true(opt$scale_est[1, "Mean"] > 0)
+  expect_true(is.list(opt$diagnostics))
+})
+
+test_that("build_opt_context stores complete-case indices from model data", {
+  fake_mod <- structure(list(), class = "glm")
+  dat <- data.frame(y = c(1, 2, 3), x = c(0.1, NA, 0.3), z = c(1, 2, 3))
+
+  ctx <- with_mocked_bindings(
+    build_opt_context(
+      fitted_mod = fake_mod,
+      cov_df = list(data.frame(x = 1, other = 2))
+    ),
+    find_predictors = function(x) list(c("x")),
+    get_data = function(x, ...) dat,
+    .package = "multiScaleR"
+  )
+
+  expect_equal(ctx$complete_idx, c(1, 3))
+  expect_equal(nrow(ctx$data_template), 2)
+  expect_equal(ctx$data_template$y, c(1, 3))
+})
+
+test_that("kernel_scale_fn subsets covariate inputs to model complete cases", {
+  fake_mod <- structure(list(), class = "glm")
+  captured <- new.env(parent = emptyenv())
+  captured$seen <- numeric(0)
+
+  opt_context <- list(
+    fitted_mod = fake_mod,
+    mod_class = "glm",
+    covs = "x",
+    n_covs = 1,
+    data_template = data.frame(y = c(1, 3), x = c(0, 0)),
+    complete_idx = c(2, 4)
+  )
+
+  out <- with_mocked_bindings(
+    kernel_scale_fn(
+      par = 0.2,
+      d_list = as.list(1:4),
+      cov_df = list(
+        data.frame(x = 1),
+        data.frame(x = 2),
+        data.frame(x = 3),
+        data.frame(x = 4)
+      ),
+      kernel = "gaussian",
+      fitted_mod = fake_mod,
+      opt_context = opt_context
+    ),
+    scale_type = function(d, kernel, sigma, shape, r_stack.df) {
+      captured$seen <- c(captured$seen, r_stack.df$x[[1]])
+      r_stack.df$x[[1]]
+    },
+    update = function(object, data) structure(list(), class = "mock_fit"),
+    logLik = function(object) 0,
+    get_loglikelihood = function(object) 0,
+    .package = "multiScaleR"
+  )
+
+  expect_equal(captured$seen, c(2, 4))
+  expect_equal(out, 0)
 })
 
 test_that("multiScale_optim builds and forwards cached optimization context", {
@@ -45,6 +107,9 @@ test_that("multiScale_optim builds and forwards cached optimization context", {
   expect_true(is.data.frame(captured$optim_context$data_template))
   expect_identical(captured$final_context$covs, captured$optim_context$covs)
   expect_identical(captured$final_context$cov_idx, captured$optim_context$cov_idx)
+  expect_false(isTRUE(out$diagnostics$max_distance$triggered))
+  expect_equal(unname(out$diagnostics$max_distance$effective_distance[[1]]), 20)
+  expect_equal(out$diagnostics$max_distance$suggested_max_D, 40)
 })
 
 test_that("single-covariate models work when kernel inputs contain extra raster layers", {
@@ -93,13 +158,38 @@ test_that("summary and distance methods return structured outputs", {
   expect_equal(colnames(sum_opt$opt_scale), c("Mean", "SE", "2.5%", "97.5%"))
   expect_equal(colnames(dist_opt), c("Mean", "2.5%", "97.5%"))
   expect_true(dist_opt[1, "Mean"] > 0)
+  expect_identical(sum_opt$diagnostics, fix$opt$diagnostics)
+})
+
+test_that("diagnostics accessor returns structured warning metadata", {
+  fix <- make_core_fixture()
+
+  expect_identical(diagnostics(fix$opt), fix$opt$diagnostics)
+
+  legacy_obj <- structure(list(warn_message = c(0, 1)), class = "multiScaleR")
+  expect_identical(
+    diagnostics(legacy_obj),
+    list(
+      max_distance = NULL,
+      sigma_precision = NULL,
+      shape_precision = NULL
+    )
+  )
 })
 
 test_that("print methods emit readable summaries", {
   fix <- make_core_fixture()
+  warn_obj <- fix$opt
+  warn_obj$warn_message <- c(0, 1)
+  warn_obj$diagnostics$max_distance <- list(
+    triggered = TRUE,
+    variables = "cont1",
+    suggested_max_D = 123.45
+  )
 
   expect_output(print(fix$opt), "Optimized Scale of Effect")
   expect_output(print(summary(fix$opt)), "Fitted Model Summary")
+  expect_output(print(warn_obj), "123.45")
 })
 
 test_that("multiScale_optim validates kernel inputs and parameter lengths", {
@@ -181,6 +271,9 @@ test_that("multiScale_optim covers expow and warning branches via mocks", {
   expect_s3_class(out, "multiScaleR")
   expect_false(is.null(out$shape_est))
   expect_true(all(c(1, 2, 3) %in% out$warn_message))
+  expect_true(isTRUE(out$diagnostics$max_distance$triggered))
+  expect_true(isTRUE(out$diagnostics$sigma_precision$triggered))
+  expect_true(isTRUE(out$diagnostics$shape_precision$triggered))
 })
 
 test_that("multiScale_optim covers singular hessian and failure branches via mocks", {

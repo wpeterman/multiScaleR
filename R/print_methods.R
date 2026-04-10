@@ -1,3 +1,33 @@
+#' @keywords internal
+#' @noRd
+format_max_distance_warning <- function(diagnostics) {
+  if (is.null(diagnostics) || is.null(diagnostics$max_distance)) {
+    return(list(
+      headline = "The estimated scale of effect extends beyond the maximum distance specified.",
+      suggested_max_D = NA_real_
+    ))
+  }
+
+  diag <- diagnostics$max_distance
+
+  if (!isTRUE(diag$triggered)) {
+    return(list(
+      headline = "The estimated scale of effect extends beyond the maximum distance specified.",
+      suggested_max_D = diag$suggested_max_D
+    ))
+  }
+
+  vars <- paste(diag$variables, collapse = ", ")
+  list(
+    headline = paste0(
+      "The estimated scale of effect approaches or exceeds the current search extent",
+      if (nzchar(vars)) paste0(" for: ", vars) else "",
+      "."
+    ),
+    suggested_max_D = diag$suggested_max_D
+  )
+}
+
 #' @title Print method for summary_multiScaleR
 #' @description Print method for objects of class \code{summary_multiScaleR}.
 #' @param x A \code{summary_multiScaleR} object
@@ -46,9 +76,16 @@ print.summary_multiScaleR <- function(x, ...){
 
 
   if(1 %in% x$warn_message){
+    msg <- format_max_distance_warning(x$diagnostics)
+    suggest_txt <- if (is.finite(msg$suggested_max_D)) {
+      paste0(" to >= ", round(msg$suggested_max_D, 2))
+    } else {
+      ""
+    }
     cat(red("\n WARNING!!!\n",
-            "The estimated scale of effect extends beyond the maximum distance specified.\n",
-            "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to ensure accurate estimation of scale.\n\n"))
+            msg$headline, "\n",
+            "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep`" %+%
+              suggest_txt %+% " to ensure accurate estimation of scale.\n\n"))
   }
 
   if(2 %in% x$warn_message){
@@ -128,6 +165,7 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
+                diagnostics = object$diagnostics,
                 warn_message = object$warn_message,
                 call = object$call)
   } else {
@@ -137,6 +175,7 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
+                diagnostics = object$diagnostics,
                 warn_message = object$warn_message,
                 call = object$call)
   }
@@ -182,9 +221,16 @@ print.multiScaleR <- function(x, ...){
   # Warning Messages --------------------------------------------------------
 
   if(1 %in% x$warn_message){
+    msg <- format_max_distance_warning(x$diagnostics)
+    suggest_txt <- if (is.finite(msg$suggested_max_D)) {
+      paste0(" to >= ", round(msg$suggested_max_D, 2))
+    } else {
+      ""
+    }
     cat(red("\n WARNING!!!\n",
-            "The estimated scale of effect extends beyond the maximum distance specified.\n",
-            "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to ensure accurate estimation of scale.\n\n"))
+            msg$headline, "\n",
+            "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep`" %+%
+              suggest_txt %+% " to ensure accurate estimation of scale.\n\n"))
   }
 
   if(2 %in% x$warn_message){

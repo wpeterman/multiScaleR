@@ -27,12 +27,18 @@ kernel_scale_fn <- function(par,
                             mod_return = NULL,
                             opt_context = NULL){
 
-  n_ind <- length(d_list)
   if(is.null(opt_context)){
     opt_context <- build_opt_context(fitted_mod = fitted_mod,
                                      cov_df = cov_df,
                                      join_by = join_by)
   }
+
+  if (!is.null(opt_context$complete_idx)) {
+    d_list <- d_list[opt_context$complete_idx]
+    cov_df <- cov_df[opt_context$complete_idx]
+  }
+
+  n_ind <- length(d_list)
 
   mod <- opt_context$fitted_mod
   mod_class <- opt_context$mod_class
@@ -195,6 +201,8 @@ build_opt_context <- function(fitted_mod,
               covs = covs,
               n_covs = n_covs)
 
+  complete_idx <- which(stats::complete.cases(dat))
+
   if(mod_class == 'unmarked'){
     umf_template <- mod@data
     if(!is.null(join_by)){
@@ -212,9 +220,11 @@ build_opt_context <- function(fitted_mod,
     } else {
       out$site_cov_idx <- match(covs, colnames(umf_template@siteCovs))
     }
+    out$complete_idx <- complete_idx
     out$umf_template <- umf_template
   } else {
-    out$data_template <- dat
+    out$data_template <- dat[complete_idx, , drop = FALSE]
+    out$complete_idx <- complete_idx
     out$cov_idx <- match(covs, colnames(dat))
   }
 
