@@ -63,9 +63,8 @@ test_that("kernel_scale_fn subsets covariate inputs to model complete cases", {
       captured$seen <- c(captured$seen, r_stack.df$x[[1]])
       r_stack.df$x[[1]]
     },
-    update = function(object, data) structure(list(), class = "mock_fit"),
-    logLik = function(object) 0,
-    get_loglikelihood = function(object) 0,
+    .refit_model = function(model, data, opt_context) structure(list(), class = "mock_fit"),
+    .neg_loglik_model = function(model, mod_class) 0,
     .package = "multiScaleR"
   )
 
@@ -76,13 +75,15 @@ test_that("kernel_scale_fn subsets covariate inputs to model complete cases", {
 test_that("multiScale_optim builds and forwards cached optimization context", {
   fix <- make_core_fixture()
   captured <- new.env(parent = emptyenv())
+  refit_fn <- function(model, data, context) model
 
   out <- with_mocked_bindings(
     multiScale_optim(
       fitted_mod = fix$fitted_mod,
       kernel_inputs = fix$kernel_inputs,
       par = 0.2,
-      verbose = FALSE
+      verbose = FALSE,
+      refit_fn = refit_fn
     ),
     optim = function(..., opt_context) {
       captured$optim_context <- opt_context
@@ -104,12 +105,92 @@ test_that("multiScale_optim builds and forwards cached optimization context", {
   expect_equal(captured$optim_context$mod_class, "glm")
   expect_equal(captured$optim_context$covs, "cont1")
   expect_equal(captured$optim_context$n_covs, 1)
+  expect_identical(captured$optim_context$refit_fn, refit_fn)
   expect_true(is.data.frame(captured$optim_context$data_template))
   expect_identical(captured$final_context$covs, captured$optim_context$covs)
   expect_identical(captured$final_context$cov_idx, captured$optim_context$cov_idx)
   expect_false(isTRUE(out$diagnostics$max_distance$triggered))
   expect_equal(unname(out$diagnostics$max_distance$effective_distance[[1]]), 20)
   expect_equal(out$diagnostics$max_distance$suggested_max_D, 40)
+})
+
+test_that("kernel_scale_fn can use a custom refit function", {
+  fake_mod <- structure(list(), class = "custom_model")
+  captured <- new.env(parent = emptyenv())
+  captured$data <- NULL
+  captured$model_class <- NULL
+
+  opt_context <- list(
+    fitted_mod = fake_mod,
+    mod_class = "other",
+    covs = "x",
+    n_covs = 1,
+    data_template = data.frame(y = c(1, 2), x = c(0, 0)),
+    complete_idx = c(1, 2),
+    refit_fn = function(model, data, context) {
+      captured$data <- data
+      structure(list(data = data), class = "custom_fit")
+    }
+  )
+
+  out <- with_mocked_bindings(
+    kernel_scale_fn(
+      par = 0.2,
+      d_list = list(1, 1),
+      cov_df = list(data.frame(x = 2), data.frame(x = 4)),
+      kernel = "gaussian",
+      fitted_mod = fake_mod,
+      opt_context = opt_context
+    ),
+    scale_type = function(d, kernel, sigma, shape, r_stack.df) r_stack.df$x[[1]],
+    .neg_loglik_model = function(model, mod_class) {
+      captured$model_class <- class(model)
+      1.23
+    },
+    .package = "multiScaleR"
+  )
+
+  expect_equal(out, 1.23)
+  expect_equal(captured$model_class, "custom_fit")
+  expect_equal(names(captured$data), c("y", "x"))
+  expect_false(all(captured$data$x == 0))
+})
+
+test_that("kernel_scale_fn can refit survival models through stats generics", {
+  testthat::skip_if_not_installed("survival")
+
+  fix <- make_core_fixture()
+  n <- nrow(fix$kernel_inputs$kernel_dat)
+  dat <- data.frame(
+    time = seq_len(n),
+    status = rep(c(1, 1, 0), length.out = n),
+    cont1 = fix$kernel_inputs$kernel_dat$cont1
+  )
+
+  mod <- survival::coxph(survival::Surv(time, status) ~ cont1, data = dat)
+  opt_context <- build_opt_context(fitted_mod = mod, cov_df = fix$kernel_inputs$raw_cov)
+
+  neg_ll <- kernel_scale_fn(
+    par = 40 / fix$kernel_inputs$unit_conv,
+    d_list = fix$kernel_inputs$d_list,
+    cov_df = fix$kernel_inputs$raw_cov,
+    kernel = "gaussian",
+    fitted_mod = mod,
+    opt_context = opt_context
+  )
+
+  fit <- kernel_scale_fn(
+    par = 40 / fix$kernel_inputs$unit_conv,
+    d_list = fix$kernel_inputs$d_list,
+    cov_df = fix$kernel_inputs$raw_cov,
+    kernel = "gaussian",
+    fitted_mod = mod,
+    opt_context = opt_context,
+    mod_return = TRUE
+  )
+
+  expect_true(is.finite(neg_ll))
+  expect_s3_class(fit$mod, "coxph")
 })
 
 test_that("single-covariate models work when kernel inputs contain extra raster layers", {
@@ -231,6 +312,11 @@ test_that("multiScale_optim validates kernel inputs and parameter lengths", {
   expect_error(
     multiScale_optim(fitted_mod = fix$fitted_mod, kernel_inputs = fix$kernel_inputs, verbose = NA),
     "verbose"
+  )
+
+  expect_error(
+    multiScale_optim(fitted_mod = fix$fitted_mod, kernel_inputs = fix$kernel_inputs, refit_fn = 1, verbose = FALSE),
+    "`refit_fn` must be a function"
   )
 
   bad_ki <- fix$kernel_inputs
