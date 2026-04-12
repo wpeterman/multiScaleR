@@ -11,7 +11,8 @@ multiScale_optim(
   par = NULL,
   n_cores = NULL,
   PSOCK = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  refit_fn = NULL
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ multiScale_optim(
 \item{PSOCK}{Logical. If attempting to optimize in parallel on a Windows machine, a PSOCK cluster will be created. If using a Unix OS a FORK cluster will be created. You can force a Unix system to create a PSOCK cluster by setting to TRUE. Default: FALSE}
 
 \item{verbose}{Logical. Print status of optimization to the console. Default: TRUE}
+
+\item{refit_fn}{Optional function used to refit `fitted_mod` during optimization. If provided, it must accept named arguments `model`, `data`, and `context`, and return a fitted model object with a usable log-likelihood. See Details.}
 }
 \value{
 Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
@@ -41,6 +44,42 @@ Identifies the kernel scale, and uncertainty of that scale, for each raster with
 To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.nb(y ~ x, data = df)`
 
 There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
+
+During optimization, `multiScale_optim()` repeatedly replaces the scaled
+raster covariates in the original model data and refits the model. For most
+supported model classes, this is done internally with `stats::update()` for
+standard model objects or `unmarked::update()` for `unmarked` models. If a
+model class cannot be refit correctly by the default path, pass `refit_fn`.
+This function must have the form `function(model, data, context)` and return
+a fitted model object. The refitted object must work with `stats::logLik()`
+or `insight::get_loglikelihood()`, unless it is an `unmarked` model with a
+`negLogLike` slot.
+
+A minimal custom refit function is:
+
+```
+refit_fn <- function(model, data, context) {
+  stats::update(model, data = data)
+}
+```
+
+For models that need to be rebuilt from their original call, use
+namespace-qualified model-fitting calls inside `refit_fn` and make sure any
+required objects are available to the function:
+
+```
+refit_fn <- function(model, data, context) {
+  call <- model$call
+  call$data <- quote(data)
+  eval(call, envir = list(data = data), enclos = parent.frame())
+}
+```
+
+When using `n_cores` with a PSOCK cluster, `refit_fn` must be serializable
+and should avoid hidden dependencies on local workspace objects. Prefer
+namespace-qualified calls such as `stats::update()` or `survival::coxph()`.
+If the function closes over helper objects, those objects must also serialize
+cleanly to worker processes.
 }
 \examples{
 \donttest{
@@ -118,6 +157,17 @@ opt_hab.s_c <- kernel_scale.raster(raster_stack = hab,
 
 mod_pred <- predict(opt_hab.s_c, opt$opt_mod, type = 'response')
 plot(mod_pred)
+
+## Custom refit hook for model classes that need explicit control.
+## This example still uses glm(), but the same pattern can be used for
+## classes whose default update path is not sufficient.
+refit_glm <- function(model, data, context) {
+  stats::update(model, data = data)
+}
+
+opt_custom <- multiScale_optim(fitted_mod = mod,
+                               kernel_inputs = kernel_inputs,
+                               refit_fn = refit_glm)
 }
 }
 \seealso{

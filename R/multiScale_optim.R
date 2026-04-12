@@ -50,12 +50,49 @@
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
 #' @param PSOCK Logical. If attempting to optimize in parallel on a Windows machine, a PSOCK cluster will be created. If using a Unix OS a FORK cluster will be created. You can force a Unix system to create a PSOCK cluster by setting to TRUE. Default: FALSE
 #' @param verbose Logical. Print status of optimization to the console. Default: TRUE
+#' @param refit_fn Optional function used to refit `fitted_mod` during optimization. If provided, it must accept named arguments `model`, `data`, and `context`, and return a fitted model object with a usable log-likelihood. See Details.
 #' @return Returns a list of class `multiScaleR` containing scale estimates, shape estimates (if using kernel = 'expow'), optimization results, and the final optimized model.
 #' @details Identifies the kernel scale, and uncertainty of that scale, for each raster within the context of the fitted model provided. Summary methods use profile-likelihood confidence intervals for `sigma` when feasible, while reported standard errors remain Hessian-based approximations from the outer optimization.
 #'
 #' To ensure that fitted model function calls are properly parallelized, fit models directly from the packages. For example, fit a negative binomial distribution from the MASS package as `fitted_mod <- MASS::glm.nb(y ~ x, data = df)`
 #'
 #' There may situations when using `unmarked` where sites are sampled across multiple years, but spatial environmental values are relevant for all years. In this situation, you want to join the scaled landscape variables from each site to each observation at a site. This can be achieved by providing a data frame object containing the values (e.g. site names) that will be used to join spatial data to sites. The name of the column in the `join_by` data frame must match a column name in the data used to fit your `unmarked` model.
+#'
+#' During optimization, `multiScale_optim()` repeatedly replaces the scaled
+#' raster covariates in the original model data and refits the model. For most
+#' supported model classes, this is done internally with `stats::update()` for
+#' standard model objects or `unmarked::update()` for `unmarked` models. If a
+#' model class cannot be refit correctly by the default path, pass `refit_fn`.
+#' This function must have the form `function(model, data, context)` and return
+#' a fitted model object. The refitted object must work with `stats::logLik()`
+#' or `insight::get_loglikelihood()`, unless it is an `unmarked` model with a
+#' `negLogLike` slot.
+#'
+#' A minimal custom refit function is:
+#'
+#' ```
+#' refit_fn <- function(model, data, context) {
+#'   stats::update(model, data = data)
+#' }
+#' ```
+#'
+#' For models that need to be rebuilt from their original call, use
+#' namespace-qualified model-fitting calls inside `refit_fn` and make sure any
+#' required objects are available to the function:
+#'
+#' ```
+#' refit_fn <- function(model, data, context) {
+#'   call <- model$call
+#'   call$data <- quote(data)
+#'   eval(call, envir = list(data = data), enclos = parent.frame())
+#' }
+#' ```
+#'
+#' When using `n_cores` with a PSOCK cluster, `refit_fn` must be serializable
+#' and should avoid hidden dependencies on local workspace objects. Prefer
+#' namespace-qualified calls such as `stats::update()` or `survival::coxph()`.
+#' If the function closes over helper objects, those objects must also serialize
+#' cleanly to worker processes.
 #'
 #' @seealso \code{\link[multiScaleR]{kernel_dist}}
 #' @examples
@@ -134,6 +171,17 @@
 #'
 #' mod_pred <- predict(opt_hab.s_c, opt$opt_mod, type = 'response')
 #' plot(mod_pred)
+#'
+#' ## Custom refit hook for model classes that need explicit control.
+#' ## This example still uses glm(), but the same pattern can be used for
+#' ## classes whose default update path is not sufficient.
+#' refit_glm <- function(model, data, context) {
+#'   stats::update(model, data = data)
+#' }
+#'
+#' opt_custom <- multiScale_optim(fitted_mod = mod,
+#'                                kernel_inputs = kernel_inputs,
+#'                                refit_fn = refit_glm)
 #'}
 #' @rdname multiScale_optim
 #' @export
@@ -148,12 +196,16 @@ multiScale_optim <- function(fitted_mod,
                              par = NULL,
                              n_cores = NULL,
                              PSOCK = FALSE,
-                             verbose = TRUE){
+                             verbose = TRUE,
+                             refit_fn = NULL){
   if(is.null(fitted_mod)){
     stop("`fitted_mod` must be a fitted model object.")
   }
   validate_scalar_logical(PSOCK, "PSOCK")
   validate_scalar_logical(verbose, "verbose")
+  if(!is.null(refit_fn) && !is.function(refit_fn)){
+    stop("`refit_fn` must be a function if provided.", call. = FALSE)
+  }
 
   # Check fitted_mod class
   # if (!inherits(fitted_mod, c("glm", "lm", "gls", "unmarked"))) {
@@ -269,7 +321,8 @@ multiScale_optim <- function(fitted_mod,
 
   opt_context <- build_opt_context(fitted_mod = fitted_mod,
                                    cov_df = kernel_inputs$raw_cov,
-                                   join_by = join_by)
+                                   join_by = join_by,
+                                   refit_fn = refit_fn)
 
   if(kernel_inputs$kernel == 'expow'){
     lwr <- c(lwr, rep(0.75, n_covs))

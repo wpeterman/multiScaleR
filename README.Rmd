@@ -40,6 +40,6 @@ remotes::install_github("wpeterman/multiScaleR",
 library(multiScaleR) # Loads package and the other dependencies
 ```
 
-The package vignette walks through all available functions as well provides worked analyses of simulated data.
+The package vignette walks through all available functions as well as provides worked analyses of simulated data.
 
 <p align="center"> <img src="man/figures/logo.png" height="200"/> </p>

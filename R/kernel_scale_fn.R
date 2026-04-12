@@ -1,3 +1,55 @@
+.refit_model <- function(model, data, opt_context) {
+  if (!is.null(opt_context$refit_fn)) {
+    refit <- opt_context$refit_fn(model = model,
+                                  data = data,
+                                  context = opt_context)
+    if (is.null(refit)) {
+      stop("`refit_fn` must return a fitted model object, not NULL.", call. = FALSE)
+    }
+    return(refit)
+  }
+
+  if (identical(opt_context$mod_class, "unmarked")) {
+    return(unmarked::update(model, data = data))
+  }
+
+  stats::update(model, data = data)
+}
+
+
+.finite_first_numeric <- function(value) {
+  value <- suppressWarnings(as.numeric(value)[1])
+  length(value) == 1 && is.finite(value)
+}
+
+
+.neg_loglik_model <- function(model, mod_class) {
+  if (identical(mod_class, "unmarked")) {
+    value <- try(model@negLogLike, silent = TRUE)
+    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
+      return(as.numeric(value)[1])
+    }
+
+    value <- try(unmarked::logLik(model)[1] * -1, silent = TRUE)
+    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
+      return(as.numeric(value)[1])
+    }
+  }
+
+  value <- try(stats::logLik(model)[1] * -1, silent = TRUE)
+  if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
+    return(as.numeric(value)[1])
+  }
+
+  value <- try(insight::get_loglikelihood(model)[1] * -1, silent = TRUE)
+  if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
+    return(as.numeric(value)[1])
+  }
+
+  stop("Could not extract a finite log-likelihood from the refitted model.", call. = FALSE)
+}
+
+
 #' @title Kernel scaling function
 #' @description Function for internal use with optim
 #' @param par list of parameters
@@ -14,7 +66,6 @@
 #' @keywords internal
 #' @importFrom insight get_data get_loglikelihood find_predictors
 #' @importFrom stats formula logLik model.frame
-#' @importFrom unmarked logLik update
 #' @useDynLib multiScaleR, .registration=TRUE
 #' @importFrom Rcpp evalCpp
 #' @importFrom methods is
@@ -79,10 +130,10 @@ kernel_scale_fn <- function(par,
       if(!is.null(join_by)){
         scl_df_join <- data.frame(scl_df, join_by, check.names = FALSE)
         umf@siteCovs <- merge(umf@siteCovs, scl_df_join, by = opt_context$join_cols)
-        update(mod, data = umf)
+        .refit_model(mod, data = umf, opt_context = opt_context)
       } else {
         umf@siteCovs[opt_context$covs] <- as.data.frame(scl_df)
-        update(mod, data = umf)
+        .refit_model(mod, data = umf, opt_context = opt_context)
       }
     }, error = function(e) {
       refit_error <<- conditionMessage(e)
@@ -93,7 +144,7 @@ kernel_scale_fn <- function(par,
     dat <- opt_context$data_template
     mod_u <- tryCatch({
       dat[opt_context$covs] <- as.data.frame(scl_df)
-      update(mod, data = dat)
+      .refit_model(mod, data = dat, opt_context = opt_context)
     }, error = function(e) {
       refit_error <<- conditionMessage(e)
       NULL
@@ -124,21 +175,10 @@ kernel_scale_fn <- function(par,
   }
 
   if(is.null(mod_return)){
-    obj <- data.frame()
-    class(obj) <- 'try-error'
-
-    if(mod_class == 'unmarked'){
-      obj <- try(mod_u@negLogLike)
+    obj <- try(.neg_loglik_model(mod_u, mod_class), silent = TRUE)
+    if(inherits(obj, "try-error") || !is.finite(obj)){
+      return(1e6^10)
     }
-
-    if(inherits(obj, "try-error")){
-      obj <- try(logLik(mod_u)[1] * -1)
-    }
-
-    if(inherits(obj, "try-error")){
-      obj <- get_loglikelihood(mod_u)[1] * -1
-    }
-
   } else {
     obj <- list(mod = mod_u,
                 scl_params = list(mean = attr(scl_df, "scaled:center"),
@@ -152,7 +192,8 @@ kernel_scale_fn <- function(par,
 
 build_opt_context <- function(fitted_mod,
                               cov_df,
-                              join_by = NULL) {
+                              join_by = NULL,
+                              refit_fn = NULL) {
   mod <- fitted_mod
   cov_names <- colnames(cov_df[[1]])
 
@@ -199,7 +240,8 @@ build_opt_context <- function(fitted_mod,
   out <- list(fitted_mod = mod,
               mod_class = mod_class,
               covs = covs,
-              n_covs = n_covs)
+              n_covs = n_covs,
+              refit_fn = refit_fn)
 
   complete_idx <- which(stats::complete.cases(dat))
 

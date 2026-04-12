@@ -229,8 +229,7 @@ test_that("kernel_scale_fn covers glm, other, unmarked, fallback, and negative s
         kernel = fix$kernel_inputs$kernel,
         fitted_mod = fix$fitted_mod
       ),
-      logLik = function(x) stop("boom"),
-      get_loglikelihood = function(x) 7,
+      .neg_loglik_model = function(model, mod_class) -7,
       .package = "multiScaleR"
     ),
     -7
@@ -282,7 +281,7 @@ test_that("build_opt_context and kernel_scale_fn report user-facing setup failur
         fitted_mod = fix$fitted_mod,
         mod_return = TRUE
       ),
-      update = function(...) stop("mock refit failure"),
+      .refit_model = function(...) stop("mock refit failure"),
       .package = "multiScaleR"
     ),
     "Failed to refit the model with the optimized covariates"
