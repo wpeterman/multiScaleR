@@ -57,23 +57,23 @@ or `insight::get_loglikelihood()`, unless it is an `unmarked` model with a
 
 A minimal custom refit function is:
 
-```
-refit_fn <- function(model, data, context) {
+\preformatted{
+refit_fn <- function(model, data, context) \{
   stats::update(model, data = data)
+\}
 }
-```
 
 For models that need to be rebuilt from their original call, use
 namespace-qualified model-fitting calls inside `refit_fn` and make sure any
 required objects are available to the function:
 
-```
-refit_fn <- function(model, data, context) {
+\preformatted{
+refit_fn <- function(model, data, context) \{
   call <- model$call
   call$data <- quote(data)
   eval(call, envir = list(data = data), enclos = parent.frame())
+\}
 }
-```
 
 When using `n_cores` with a PSOCK cluster, `refit_fn` must be serializable
 and should avoid hidden dependencies on local workspace objects. Prefer

@@ -1,15 +1,29 @@
 ## Test environments
 
--   local Windows 11, R 4.5.2
+-   local Windows 11, R 4.4.3
 -   GitHub Actions (macOS, Windows, Ubuntu)
 
 ## R CMD check results
 
-0 errors \| 0 warnings \| 0 notes
+0 errors | 0 warnings | 1 note
+
+The local note was:
+
+- unable to verify current time
 
 ## Changes from Previous Submission
 
-Added a vignette, updated functions, fixed bugs.
+This update includes changes made since version 0.5.0:
+
+- expanded unit test coverage
+- improved error and diagnostic messaging
+- added optional profile-likelihood scale intervals
+- added sigma profiling and plot methods
+- made profile-likelihood confidence intervals opt-in
+- fixed complete-case alignment in multiscale optimization inputs
+- added structured optimization diagnostics and a `diagnostics()` accessor
+- added an optional custom refit hook for model classes that cannot use default model updates
+- updated vignettes and documentation
 
 ### Addressed CRAN feedback:
 
