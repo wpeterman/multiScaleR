@@ -23,6 +23,8 @@ This update includes changes made since version 0.5.0:
 - fixed complete-case alignment in multiscale optimization inputs
 - added structured optimization diagnostics and a `diagnostics()` accessor
 - added an optional custom refit hook for model classes that cannot use default model updates
+- fixed singular-Hessian fallback SE values to remain numeric
+- excluded missing raster cells from sparse kernel weighted averages
 - updated vignettes and documentation
 
 ### Addressed CRAN feedback:

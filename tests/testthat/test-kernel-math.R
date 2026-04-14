@@ -65,6 +65,33 @@ test_that("sparse and R kernel weighting implementations agree", {
   expect_equal(sum(r_wts), 1, tolerance = 1e-8)
 })
 
+test_that("sparse kernel scaling excludes NA cells from weighted averages", {
+  d <- c(0, 1, 2)
+  dense_mat <- matrix(c(1, NA, 3, NA, NA, NA), nrow = 3, ncol = 2)
+  sparse_mat <- Matrix::Matrix(dense_mat, sparse = TRUE)
+
+  wts <- multiScaleR:::scale_type_sparse(
+    d = d,
+    kernel = "gaussian",
+    sigma_ = 2,
+    r_stack_df = sparse_mat[, 1, drop = FALSE],
+    output = "wts"
+  )
+
+  expected <- sum(dense_mat[c(1, 3), 1] * drop(wts)[c(1, 3)]) /
+    sum(drop(wts)[c(1, 3)])
+
+  out <- multiScaleR:::scale_type(
+    d = d,
+    kernel = "gaussian",
+    sigma = c(2, 2),
+    r_stack.df = sparse_mat
+  )
+
+  expect_equal(out[[1]], expected, tolerance = 1e-8)
+  expect_true(is.na(out[[2]]))
+})
+
 test_that("ci function clamps lower bounds and preserves output schema", {
   x <- matrix(c(5, 10, 10, 1), ncol = 2, byrow = TRUE)
   out <- multiScaleR:::ci_func(x, df = 30, min_D = 2, names = c("a", "b"))

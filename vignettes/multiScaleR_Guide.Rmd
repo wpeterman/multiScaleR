@@ -1,10 +1,10 @@
 ---
 title: "multiScaleR User Guide"
 author: "Bill Peterman"
-output: 
+output:
   rmarkdown::html_vignette:
-    fig_width: 6.5  
-    fig_height: 4.25 
+    fig_width: 6.5
+    fig_height: 4.25
     number_sections: true
     toc: true
 vignette: >
@@ -19,8 +19,8 @@ library(multiScaleR)
 base_url <- "https://raw.githubusercontent.com/wpeterman/multiScaleR/master/inst/extdata/"
 
 f <- c("opt_exp.RData", "opt_expow.RData", "opt_fixed.RData",
-       "opt_umf_counts.RData", "opt_umf_occ.RData", "opt1.RData", 
-       "opt2.RData", "opt3.RData", "opt4.RData", "opt5.RData", 
+       "opt_umf_counts.RData", "opt_umf_occ.RData", "opt1.RData",
+       "opt2.RData", "opt3.RData", "opt4.RData", "opt5.RData",
        "opt6.RData", "sim_opt.RData", "zinb.RData")
 
 # Download each file
@@ -52,11 +52,11 @@ Traditional approaches test a fixed set of candidate buffer radii, fit a separat
 
 With advanced coding skills, Bayesian analytical frameworks can be used to estimate scales of effect (e.g., Stuber & Gruber 2020; Amirkhiz et al. 2023). More recently, user-friendly R packages have been developed: `Siland` (Carpentier & Martin 2021) and `Scalescape` (Lowe et al. 2022) both estimate distance-weighted landscape effects. `multiScaleR` extends this family of tools with several practical advances:
 
-- Optimization is implemented in C++ with sparse matrix support, making it efficient for large landscapes and sample sizes.
-- Standard errors and confidence intervals on σ are reported alongside point estimates.
-- Raster surfaces can be smoothed at the optimized scale and used directly for spatial prediction with `terra::predict()`.
-- Model selection tables (AIC, BIC) account for the additional parameters estimated during scale optimization.
-- Functions to simulate rasters and response data facilitate power analysis and methods testing.
+-   Optimization is implemented in C++ with sparse matrix support, making it efficient for large landscapes and sample sizes.
+-   Standard errors and confidence intervals on σ are reported alongside point estimates.
+-   Raster surfaces can be smoothed at the optimized scale and used directly for spatial prediction with `terra::predict()`.
+-   Model selection tables (AIC, BIC) account for the additional parameters estimated during scale optimization.
+-   Functions to simulate rasters and response data facilitate power analysis and methods testing.
 
 `multiScaleR` is fully supported for models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and is a supported class in the R package [insight](https://CRAN.R-project.org/package=insight). Let me know if you encounter issues or would like to see support for other model classes.
 
@@ -70,7 +70,7 @@ With advanced coding skills, Bayesian analytical frameworks can be used to estim
 
 -   Stuber, E. F., and L. F. Gruber. 2020. Recent methodological solutions to identifying scales of effect in multi-scale modeling. Current Landscape Ecology Reports 5:127--139.
 
----
+------------------------------------------------------------------------
 
 # A Conceptual Road Map
 
@@ -121,9 +121,9 @@ The key function is `multiScale_optim()`. It takes your fitted model and the `ke
 
 **Key concepts to keep in mind:**
 
-- **σ (sigma)**: The scale parameter of the kernel function (in map units, e.g., meters). It controls how quickly landscape influence decays with distance. With a Gaussian kernel and σ = 300 m, 90% of the distance-weighted landscape average at a sample point is drawn from cells within roughly 493 m; cells beyond that radius collectively account for the remaining 10%.
-- **`max_D`**: The maximum distance (in map units) to extract raster values for each sample point. This should exceed your expected scale of effect. If `multiScale_optim()` warns that an estimated σ is near `max_D`, re-run `kernel_prep()` with a larger value.
-- **Initial model**: The model you fit *before* optimization uses unsmoothed (initial σ) kernel-weighted covariate values. Its structure (formula, family, random effects) is inherited by the optimization. Get the model structure right before optimizing.
+-   **σ (sigma)**: The scale parameter of the kernel function (in map units, e.g., meters). It controls how quickly landscape influence decays with distance. With a Gaussian kernel and σ = 300 m, 90% of the distance-weighted landscape average at a sample point is drawn from cells within roughly 493 m; cells beyond that radius collectively account for the remaining 10%.
+-   **`max_D`**: The maximum distance (in map units) to extract raster values for each sample point. This should exceed your expected scale of effect. If `multiScale_optim()` warns that an estimated σ is near `max_D`, re-run `kernel_prep()` with a larger value.
+-   **Initial model**: The model you fit *before* optimization uses unsmoothed (initial σ) kernel-weighted covariate values. Its structure (formula, family, random effects) is inherited by the optimization. Get the model structure right before optimizing.
 
 # Distance-weighted Effects
 
@@ -133,10 +133,10 @@ There are *many* different kernel transformations that could be used to quantify
 
 Four kernel functions are implemented in `multiScaleR`. In each case, σ (sigma) is estimated during optimization and controls the spatial scale (width) of the kernel. All plots below show the weight assigned to a landscape cell as a function of its distance from a sample point, with a vertical line marking the distance that captures 90% of the total weight.
 
-- **Gaussian** (recommended for most uses): smooth, symmetric bell-curve decay. Governed by a single parameter σ.
-- **Negative Exponential**: faster initial decay than Gaussian; also governed by σ alone.
-- **Exponential Power**: flexible shape controlled by σ (scale) and β (shape). Experience with simulated data suggests this kernel is prone to overfitting and optimization can fail to converge; use with caution.
-- **Fixed buffer**: a hard-edged buffer. All cells within the buffer contribute equally; all beyond it contribute nothing. This replicates the traditional buffer-based approach.
+-   **Gaussian** (recommended for most uses): smooth, symmetric bell-curve decay. Governed by a single parameter σ.
+-   **Negative Exponential**: faster initial decay than Gaussian; also governed by σ alone.
+-   **Exponential Power**: flexible shape controlled by σ (scale) and β (shape). Experience with simulated data suggests this kernel is prone to overfitting and optimization can fail to converge; use with caution.
+-   **Fixed buffer**: a hard-edged buffer. All cells within the buffer contribute equally; all beyond it contribute nothing. This replicates the traditional buffer-based approach.
 
 The Gaussian kernel is the default and performs well across a wide range of ecological scenarios. When in doubt, start with it.
 
@@ -145,9 +145,9 @@ Note: Figures in this document may render at lower quality than running code loc
 1.  Gaussian (`gaus`): Decay in space governed by a single parameter (sigma)
 
     ```{r echo=FALSE}
-    plot_kernel(prob = 0.9, 
-                sigma = 100, 
-                kernel = "gaus", 
+    plot_kernel(prob = 0.9,
+                sigma = 100,
+                kernel = "gaus",
                 scale_dist = F,
                 add_label = F)
     ```
@@ -155,9 +155,9 @@ Note: Figures in this document may render at lower quality than running code loc
 2.  Negative Exponential (`exp`): Decay in space governed by a single parameter (sigma)
 
     ```{r echo=FALSE}
-    plot_kernel(prob = 0.9, 
-                sigma = 50, 
-                kernel = "exp", 
+    plot_kernel(prob = 0.9,
+                sigma = 50,
+                kernel = "exp",
                 scale_dist = F,
                 add_label = F)
     ```
@@ -165,10 +165,10 @@ Note: Figures in this document may render at lower quality than running code loc
 3.  Exponential Power (`expow`): Decay in space governed by a scale parameter (sigma) and a shape parameter (beta)
 
     ```{r echo=FALSE}
-    plot_kernel(prob = 0.9, 
-                sigma = 250, 
+    plot_kernel(prob = 0.9,
+                sigma = 250,
                 beta = 5,
-                kernel = "expow", 
+                kernel = "expow",
                 scale_dist = F,
                 add_label = F)
     ```
@@ -176,9 +176,9 @@ Note: Figures in this document may render at lower quality than running code loc
 4.  Fixed width buffer (`fixed`): Effect does not decay with distance
 
     ```{r echo=FALSE}
-    plot_kernel(prob = 0.9, 
-                sigma = 300, 
-                kernel = "fixed", 
+    plot_kernel(prob = 0.9,
+                sigma = 300,
+                kernel = "fixed",
                 scale_dist = F,
                 add_label = F)
     ```
@@ -197,8 +197,8 @@ dat <- landscape_counts
 data("surv_pts")
 pts <- vect(surv_pts)
 
-land_rast <- terra::rast(system.file("extdata", 
-                                     "landscape.tif", 
+land_rast <- terra::rast(system.file("extdata",
+                                     "landscape.tif",
                                      package = 'multiScaleR'))
 ```
 
@@ -240,7 +240,7 @@ land_rast
 plot(land_rast)
 
 ## Plot with points
-plot(land_rast$land1) 
+plot(land_rast$land1)
 plot(pts, add = T, pch = 19)
 ```
 
@@ -248,8 +248,8 @@ plot(pts, add = T, pch = 19)
 
 `kernel_prep()` is the first step of every `multiScaleR` analysis. It does two things:
 
-1. For each sample point, it extracts raster values at every cell within `max_D` (the maximum search radius) and computes their distances. These are stored as sparse matrices for efficiency.
-2. It computes an initial set of distance-weighted covariate values at each sample point using a starting σ (by default, `max_D / 3`). These initial values are used to fit the starting regression model.
+1.  For each sample point, it extracts raster values at every cell within `max_D` (the maximum search radius) and computes their distances. These are stored as sparse matrices for efficiency.
+2.  It computes an initial set of distance-weighted covariate values at each sample point using a starting σ (by default, `max_D / 3`). These initial values are used to fit the starting regression model.
 
 **Choosing `max_D`**: Set `max_D` to a value you are confident exceeds the true scale of effect. If you are uncertain, err on the side of being too large; the optimization will find the right σ within that range. The tradeoff is computational: larger `max_D` means more cells to process, so keep it reasonable. If `multiScale_optim()` warns that a σ estimate is near `max_D`, increase `max_D` and re-run `kernel_prep()`.
 
@@ -296,8 +296,8 @@ opt1 <- multiScale_optim(fitted_mod = mod0,
 
 We get two helpful warning messages:
 
-1. The estimated σ for one raster layer is near `max_D`, meaning the optimization is pushing against the boundary of the search space. This suggests that either the true scale of effect is large, or that the variable has a weak or absent relationship with the response and optimization is poorly constrained. The warning suggests increasing `max_D` in `kernel_prep()`.
-2. The standard error for one or more σ estimates is large relative to the point estimate: a sign of imprecision, often caused by weak signal or too small a sample size.
+1.  The estimated σ for one raster layer is near `max_D`, meaning the optimization is pushing against the boundary of the search space. This suggests that either the true scale of effect is large, or that the variable has a weak or absent relationship with the response and optimization is poorly constrained. The warning suggests increasing `max_D` in `kernel_prep()`.
+2.  The standard error for one or more σ estimates is large relative to the point estimate: a sign of imprecision, often caused by weak signal or too small a sample size.
 
 Let's look at our results.
 
@@ -320,15 +320,15 @@ However, the log-likelihood surface for σ is often asymmetric, especially when 
 To request profile-likelihood CIs, pass `profile = TRUE` to `summary()`:
 
 ```{r eval=FALSE}
-summary(opt2, profile = TRUE)
+summary(opt1, profile = TRUE)
 ```
 
 Profile CIs are recommended whenever:
 
-- a delta-method CI is wide or asymmetric relative to the point estimate,
-- an estimated σ is near `max_D` (boundary constraint),
-- sample size is small (fewer than ~75 sites), or
-- you intend to report formal uncertainty bounds in a manuscript.
+-   a delta-method CI is wide or asymmetric relative to the point estimate,
+-   an estimated σ is near `max_D` (boundary constraint),
+-   sample size is small (fewer than \~75 sites), or
+-   you intend to report formal uncertainty bounds in a manuscript.
 
 Wide CIs on σ in either method indicate that the data do not strongly constrain the scale of effect for that variable. This may mean the variable has a weak relationship with the response, the sample size is insufficient, or the variable should be excluded from the model.
 
@@ -363,12 +363,12 @@ summary(opt2, profile = TRUE)
 
 The true data-generating values were (see section 3):
 
-| Parameter | True value | Recovered? |
-|-----------|-----------|------------|
-| `land1` σ | 250 m     | Check CI   |
-| `land2` σ | 500 m     | Check CI   |
-| `land1` β | −0.5      | Check CI   |
-| `land2` β | 0.7       | Check CI   |
+| Parameter | True value | Recovery? |
+|-----------|------------|-----------|
+| `land1` σ | 250 m      | Check CI  |
+| `land2` σ | 500 m      | Check CI  |
+| `land1` β | −0.5       | Check CI  |
+| `land2` β | 0.7        | Check CI  |
 
 Overall, we do a good job recovering both the regression coefficients (β) and the scales of effect (σ) within reasonable uncertainty bounds. This is reassuring but also a good reminder: with real data, you will not have ground truth to check against. Careful model selection and biological reasoning are your guides.
 
@@ -392,9 +392,9 @@ plot_marginal_effects(opt2)
 
 This is useful in several situations:
 
-- **Verifying a well-defined optimum**: A clear trough in the AICc surface centered near the optimized σ suggests that the scale of effect is precisely estimated. A flat or monotone profile indicates the data do not strongly constrain σ for that variable.
-- **Asymmetry diagnostics**: If the surface drops steeply on one side and gradually on the other, the likelihood is asymmetric and delta-method CIs may not capture the uncertainty accurately. Profile-likelihood CIs (via `summary(..., profile = TRUE)`) are more appropriate in this case.
-- **Boundary concerns**: When the trough is near `max_D`, the surface may be truncated by the search boundary rather than identified by the data. This is a visual confirmation of the warning message from `multiScale_optim()`.
+-   **Verifying a well-defined optimum**: A clear trough in the AICc surface centered near the optimized σ suggests that the scale of effect is precisely estimated. A flat or monotone profile indicates the data do not strongly constrain σ for that variable.
+-   **Asymmetry diagnostics**: If the surface drops steeply on one side and gradually on the other, the likelihood is asymmetric and delta-method CIs may not capture the uncertainty accurately. Profile-likelihood CIs (via `summary(..., profile = TRUE)`) are more appropriate in this case.
+-   **Boundary concerns**: When the trough is near `max_D`, the surface may be truncated by the search boundary rather than identified by the data. This is a visual confirmation of the warning message from `multiScale_optim()`.
 
 Intervals are log-spaced so that evaluation is denser at smaller σ values, where the surface tends to change more rapidly, and sparser at larger values where it is typically flatter.
 
@@ -591,7 +591,7 @@ umf <- unmarkedFramePCount(y = s_dat$y,
 
 ## Base unmarked model
 mod0_umf.p <- unmarked::pcount(~1 ~bin1 + cont2,
-                               data = umf, 
+                               data = umf,
                                K = 100)
 ```
 
@@ -621,7 +621,7 @@ plot_marginal_effects(opt_umf.p)
 Finally, we may want to project our fitted model to the landscape to make spatial predictions. To do this, we need to scale and center our raster surfaces after applying our kernel transformations. The `spatRaster` object can then be used with the `terra::predict` function. Depending upon the spatial coverage of your sample points, you may find predicted values across a broader region unrealistic. In these instances, you may need to clamp the scaled rasters to be within a reasonable range of those observed in your sample data.
 
 ```{r}
-## Project model 
+## Project model
 rast_scale.center <- kernel_scale.raster(raster_stack = rs,
                                          multiScaleR = opt_umf.p,
                                          scale_center = TRUE,
@@ -631,8 +631,8 @@ rast_scale.center <- kernel_scale.raster(raster_stack = rs,
 plot(rast_scale.center)
 
 
-ab.mod_pred <- terra::predict(rast_scale.center, 
-                             opt_umf.p$opt_mod, 
+ab.mod_pred <- terra::predict(rast_scale.center,
+                             opt_umf.p$opt_mod,
                              type = 'state')
 
 plot(ab.mod_pred)
@@ -693,15 +693,15 @@ We did a decent job of recovering simulated values. Note that the sample size wa
 ### Project model
 
 ```{r}
-## Project model 
+## Project model
 rast_scale.center <- kernel_scale.raster(raster_stack = rs,
                                          multiScaleR = opt_umf.occ,
                                          scale_center = TRUE,
                                          clamp = T)
 plot(rast_scale.center)
 
-occ.mod_pred <- terra::predict(rast_scale.center, 
-                             opt_umf.occ$opt_mod, 
+occ.mod_pred <- terra::predict(rast_scale.center,
+                             opt_umf.occ$opt_mod,
                              type = 'state')
 
 plot(occ.mod_pred)
@@ -713,7 +713,7 @@ plot(occ.mod_pred)
 
 ```{r}
 set.seed(12345)
-rs <- sim_rast(user_seed = 999, 
+rs <- sim_rast(user_seed = 999,
                dim = 500, resolution = 30)
 rs <- terra::subset(rs, c(1,3))
 
@@ -731,8 +731,8 @@ StDev <- 2  # Negative binomial dispersion
 
 ## Generate random points
 bnd <- buffer(vect(ext(rs[[1]])), -1000)
-pts <- spatSample(x = rs[[1]], 
-                  size = n_points, 
+pts <- spatSample(x = rs[[1]],
+                  size = n_points,
                   method = 'random',
                   ext = ext(bnd),
                   replace = F,
@@ -750,7 +750,7 @@ zi_prob <- plogis(zi_alpha + zi_beta*kernel_out$kernel_dat$cont1)
 
 # Simulate zero-inflated counts
 # 1 = excess zero, 0 = from Poisson
-is_zero <- rbinom(length(zi_prob), size = 1, prob = zi_prob)  
+is_zero <- rbinom(length(zi_prob), size = 1, prob = zi_prob)
 
 obs <- exp(alpha + beta*kernel_out$kernel_dat$bin1)
 
@@ -782,7 +782,7 @@ kernel_inputs <- kernel_prep(pts = pts,
 **NOTE: It is highly encouraged to fit your model as `pscl::zeroinfl`.**
 
 ```{r eval=FALSE}
-zinb_opt <- multiScale_optim(zinb_mod, 
+zinb_opt <- multiScale_optim(zinb_mod,
                              kernel_inputs,
                              n_cores = 4)
 ```

@@ -88,11 +88,27 @@ NumericVector scale_type_sparse(NumericVector d,
   }
 
 
-  // Compute weighted raster values using sparse matrix operations
-  // Use sparse matrix multiplication instead of dense matrix operations
+  // Compute weighted raster values. Missing raster values are excluded from the
+  // weighted average, with weights re-normalized over finite cells for each
+  // layer. This prevents edge NAs from contaminating an entire site.
   NumericVector result(ncol);
   for (int j = 0; j < ncol; j++) {
-    result[j] = dot(r_stack.col(j), w0.col(j)); // Efficient sparse matrix-vector multiplication
+    double weighted_sum = 0.0;
+    double finite_weight_sum = 0.0;
+
+    for (int i = 0; i < n; i++) {
+      double value = r_stack(i, j);
+      if (std::isfinite(value)) {
+        weighted_sum += value * w0(i, j);
+        finite_weight_sum += w0(i, j);
+      }
+    }
+
+    if (finite_weight_sum > 0) {
+      result[j] = weighted_sum / finite_weight_sum;
+    } else {
+      result[j] = NA_REAL;
+    }
   }
 
   return result;
