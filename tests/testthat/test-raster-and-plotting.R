@@ -259,6 +259,43 @@ test_that("profile_sigma returns complete profiles and validates inputs", {
   expect_error(profile_sigma(fix$opt, n_pts = 5, verbose = NA), "verbose")
 })
 
+test_that("profile_sigma supports linear and custom sigma grids", {
+  fix <- make_core_fixture()
+
+  prof_linear <- suppressWarnings(
+    suppressMessages(
+      profile_sigma(fix$opt,
+                    n_pts = 3,
+                    spacing = "linear",
+                    sigma_range = c(10, 30),
+                    verbose = FALSE)
+    )
+  )
+  prof_custom <- suppressWarnings(
+    suppressMessages(
+      profile_sigma(fix$opt,
+                    sigma_values = c(30, 10, 20, 20),
+                    verbose = FALSE)
+    )
+  )
+
+  expect_equal(prof_linear$spacing, "linear")
+  expect_equal(prof_linear$sigma_grid, c(10, 20, 30))
+  expect_equal(unique(prof_linear$profiles$sigma), c(10, 20, 30))
+
+  expect_equal(prof_custom$spacing, "custom")
+  expect_equal(prof_custom$sigma_grid, c(10, 20, 30))
+  expect_equal(unique(prof_custom$profiles$sigma), c(10, 20, 30))
+
+  expect_error(profile_sigma(fix$opt, spacing = "equal", verbose = FALSE),
+               "should be one of")
+  expect_error(profile_sigma(fix$opt, sigma_range = c(10, 10), verbose = FALSE),
+               "distinct")
+  expect_error(profile_sigma(fix$opt, sigma_values = c(10, 10, 20),
+                             verbose = FALSE),
+               "at least 3 unique")
+})
+
 test_that("plot.sigma_profile returns named ggplots and rejects bad input", {
   fix <- make_core_fixture()
   prof <- suppressWarnings(

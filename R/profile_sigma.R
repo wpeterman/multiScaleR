@@ -7,10 +7,18 @@
 #'
 #' @param x A fitted \code{multiScaleR} object.
 #' @param n_pts Integer. Number of sigma values to evaluate for each covariate.
-#'   Default is 10.
+#'   Default is 10. Ignored when \code{sigma_values} is supplied.
 #' @param metric Character. Which metric to profile: \code{"AICc"} (default)
 #'   or \code{"LL"} (log-likelihood).
 #' @param verbose Logical. Print progress messages. Default is \code{TRUE}.
+#' @param spacing Character. How to space automatically generated sigma values:
+#'   \code{"log"} (default) or \code{"linear"}.
+#' @param sigma_values Optional numeric vector of sigma values to evaluate
+#'   directly. When supplied, \code{spacing}, \code{sigma_range}, and
+#'   \code{n_pts} are ignored.
+#' @param sigma_range Optional numeric vector of length 2 giving the minimum
+#'   and maximum sigma values for the generated profile grid. Defaults to the
+#'   optimization range stored in \code{x}.
 #'
 #' @return A list of class \code{sigma_profile} containing:
 #' \describe{
@@ -19,19 +27,28 @@
 #'   \item{opt_sigma}{A named numeric vector of the optimized sigma for each
 #'     covariate.}
 #'   \item{metric}{The metric used for profiling.}
+#'   \item{spacing}{The profile grid type: \code{"log"}, \code{"linear"}, or
+#'     \code{"custom"}.}
+#'   \item{sigma_grid}{The sigma values evaluated for each covariate.}
 #' }
 #'
 #' @details
-#' For each spatial covariate, sigma is varied across a log-spaced sequence from
-#' the minimum to maximum distance considered during optimization, while all
-#' other sigma values are held at their optimized values. At each evaluation
-#' point the model is refit and the log-likelihood extracted. AICc is computed
-#' from the log-likelihood, the number of regression parameters (including
-#' sigma), and the number of observations.
+#' For each spatial covariate, sigma is varied across a sequence of candidate
+#' values, while all other sigma values are held at their optimized values. By
+#' default this is a log-spaced sequence from the minimum to maximum distance
+#' considered during optimization. Users can instead request linear spacing with
+#' \code{spacing = "linear"} or supply exact values with \code{sigma_values}.
+#' At each evaluation point the model is refit and the log-likelihood extracted.
+#' AICc is computed from the log-likelihood, the number of regression parameters
+#' (including sigma), and the number of observations.
 #'
 #' Log-spacing concentrates evaluation points at smaller sigma values where the
 #' likelihood surface often changes more rapidly, and spaces them out at larger
 #' sigma values where the surface tends to be flatter.
+#'
+#' Linear spacing can be useful when the profile needs equal resolution across a
+#' specific sigma interval. User-supplied \code{sigma_values} are sorted and
+#' duplicate values are removed before profiling to avoid redundant refits.
 #'
 #' @seealso \code{\link{plot.sigma_profile}}, \code{\link{multiScale_optim}}
 #'
@@ -62,6 +79,15 @@
 #' prof <- profile_sigma(opt, n_pts = 20)
 #' plot(prof)
 #'
+#' ## Linearly spaced values between explicit limits
+#' prof <- profile_sigma(opt, n_pts = 8, spacing = "linear",
+#'                       sigma_range = c(25, 250))
+#' plot(prof)
+#'
+#' ## User-supplied sigma values
+#' prof <- profile_sigma(opt, sigma_values = c(25, 50, 100, 150, 250))
+#' plot(prof)
+#'
 #' ## Profile log-likelihood instead of AICc
 #' prof <- profile_sigma(opt, metric = "LL")
 #' plot(prof)
@@ -73,18 +99,17 @@
 profile_sigma <- function(x,
                           n_pts = 10,
                           metric = c("AICc", "LL"),
-                          verbose = TRUE) {
+                          verbose = TRUE,
+                          spacing = c("log", "linear"),
+                          sigma_values = NULL,
+                          sigma_range = NULL) {
 
   if (!inherits(x, "multiScaleR")) {
     stop("`x` must be a fitted `multiScaleR` object.", call. = FALSE)
   }
-  validate_scalar_numeric(n_pts, "n_pts", integerish = TRUE, positive = TRUE)
   validate_scalar_logical(verbose, "verbose")
   metric <- match.arg(metric)
-
-  if (n_pts < 3) {
-    stop("`n_pts` must be >= 3 for a meaningful profile.", call. = FALSE)
-  }
+  spacing <- match.arg(spacing)
 
   # Extract components from the multiScaleR object
   kernel_inputs <- x$kernel_inputs
@@ -123,11 +148,44 @@ profile_sigma <- function(x,
   k_total <- k_base + n_covs
   if (kernel == "expow") k_total <- k_total + n_covs
 
-  # Log-spaced sigma sequence from min_D to max_D
-  # Use a small offset above zero to avoid log(0)
-  log_min <- log(max(min_D, 1e-3))
-  log_max <- log(max_D)
-  sigma_seq <- exp(seq(log_min, log_max, length.out = n_pts))
+  if (!is.null(sigma_values)) {
+    validate_numeric_vector(sigma_values, "sigma_values", positive = TRUE)
+    sigma_seq <- sort(unique(sigma_values))
+
+    if (length(sigma_seq) < 3) {
+      stop("`sigma_values` must contain at least 3 unique values.", call. = FALSE)
+    }
+
+    grid_type <- "custom"
+  } else {
+    validate_scalar_numeric(n_pts, "n_pts", integerish = TRUE, positive = TRUE)
+
+    if (n_pts < 3) {
+      stop("`n_pts` must be >= 3 for a meaningful profile.", call. = FALSE)
+    }
+
+    if (is.null(sigma_range)) {
+      sigma_range <- c(min_D, max_D)
+      sigma_range[1] <- max(sigma_range[1], 1e-3)
+    } else {
+      validate_numeric_vector(sigma_range, "sigma_range", length_ = 2,
+                              positive = TRUE)
+      sigma_range <- sort(sigma_range)
+    }
+
+    if (sigma_range[1] >= sigma_range[2]) {
+      stop("`sigma_range` must contain two distinct values.", call. = FALSE)
+    }
+
+    sigma_seq <- if (spacing == "log") {
+      exp(seq(log(sigma_range[1]), log(sigma_range[2]), length.out = n_pts))
+    } else {
+      seq(sigma_range[1], sigma_range[2], length.out = n_pts)
+    }
+
+    grid_type <- spacing
+  }
+  n_grid <- length(sigma_seq)
 
   # Profile each covariate
   results <- vector("list", n_covs)
@@ -137,10 +195,10 @@ profile_sigma <- function(x,
       cat(sprintf("Profiling '%s' (%d of %d)...\n", covs[j], j, n_covs))
     }
 
-    ll_vec   <- numeric(n_pts)
-    aicc_vec <- numeric(n_pts)
+    ll_vec   <- numeric(n_grid)
+    aicc_vec <- numeric(n_grid)
 
-    for (i in seq_len(n_pts)) {
+    for (i in seq_len(n_grid)) {
       # Build parameter vector: replace j-th sigma, keep others at optimum
       par_i <- opt_par
       par_i[j] <- sigma_seq[i] / unit_conv  # scale to optim space
@@ -195,7 +253,9 @@ profile_sigma <- function(x,
   out <- list(
     profiles  = profiles,
     opt_sigma = stats::setNames(scale_est$Mean, covs),
-    metric    = metric
+    metric    = metric,
+    spacing   = grid_type,
+    sigma_grid = sigma_seq
   )
   class(out) <- "sigma_profile"
 

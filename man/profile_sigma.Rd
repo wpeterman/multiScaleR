@@ -4,18 +4,37 @@
 \alias{profile_sigma}
 \title{Profile Model Fit Across Sigma Parameter Space}
 \usage{
-profile_sigma(x, n_pts = 10, metric = c("AICc", "LL"), verbose = TRUE)
+profile_sigma(
+  x,
+  n_pts = 10,
+  metric = c("AICc", "LL"),
+  verbose = TRUE,
+  spacing = c("log", "linear"),
+  sigma_values = NULL,
+  sigma_range = NULL
+)
 }
 \arguments{
 \item{x}{A fitted \code{multiScaleR} object.}
 
 \item{n_pts}{Integer. Number of sigma values to evaluate for each covariate.
-Default is 10.}
+Default is 10. Ignored when \code{sigma_values} is supplied.}
 
 \item{metric}{Character. Which metric to profile: \code{"AICc"} (default)
 or \code{"LL"} (log-likelihood).}
 
 \item{verbose}{Logical. Print progress messages. Default is \code{TRUE}.}
+
+\item{spacing}{Character. How to space automatically generated sigma values:
+\code{"log"} (default) or \code{"linear"}.}
+
+\item{sigma_values}{Optional numeric vector of sigma values to evaluate
+directly. When supplied, \code{spacing}, \code{sigma_range}, and
+\code{n_pts} are ignored.}
+
+\item{sigma_range}{Optional numeric vector of length 2 giving the minimum
+and maximum sigma values for the generated profile grid. Defaults to the
+optimization range stored in \code{x}.}
 }
 \value{
 A list of class \code{sigma_profile} containing:
@@ -25,6 +44,9 @@ A list of class \code{sigma_profile} containing:
   \item{opt_sigma}{A named numeric vector of the optimized sigma for each
     covariate.}
   \item{metric}{The metric used for profiling.}
+  \item{spacing}{The profile grid type: \code{"log"}, \code{"linear"}, or
+    \code{"custom"}.}
+  \item{sigma_grid}{The sigma values evaluated for each covariate.}
 }
 }
 \description{
@@ -34,16 +56,22 @@ a diagnostic view of the likelihood surface and helps assess whether the
 optimized sigma is at a clear minimum or on a flat plateau.
 }
 \details{
-For each spatial covariate, sigma is varied across a log-spaced sequence from
-the minimum to maximum distance considered during optimization, while all
-other sigma values are held at their optimized values. At each evaluation
-point the model is refit and the log-likelihood extracted. AICc is computed
-from the log-likelihood, the number of regression parameters (including
-sigma), and the number of observations.
+For each spatial covariate, sigma is varied across a sequence of candidate
+values, while all other sigma values are held at their optimized values. By
+default this is a log-spaced sequence from the minimum to maximum distance
+considered during optimization. Users can instead request linear spacing with
+\code{spacing = "linear"} or supply exact values with \code{sigma_values}.
+At each evaluation point the model is refit and the log-likelihood extracted.
+AICc is computed from the log-likelihood, the number of regression parameters
+(including sigma), and the number of observations.
 
 Log-spacing concentrates evaluation points at smaller sigma values where the
 likelihood surface often changes more rapidly, and spaces them out at larger
 sigma values where the surface tends to be flatter.
+
+Linear spacing can be useful when the profile needs equal resolution across a
+specific sigma interval. User-supplied \code{sigma_values} are sorted and
+duplicate values are removed before profiling to avoid redundant refits.
 }
 \examples{
 \donttest{
@@ -70,6 +98,15 @@ plot(prof)
 
 ## More evaluation points
 prof <- profile_sigma(opt, n_pts = 20)
+plot(prof)
+
+## Linearly spaced values between explicit limits
+prof <- profile_sigma(opt, n_pts = 8, spacing = "linear",
+                      sigma_range = c(25, 250))
+plot(prof)
+
+## User-supplied sigma values
+prof <- profile_sigma(opt, sigma_values = c(25, 50, 100, 150, 250))
 plot(prof)
 
 ## Profile log-likelihood instead of AICc

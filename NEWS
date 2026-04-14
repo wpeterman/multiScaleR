@@ -1,3 +1,7 @@
+multiScaleR 0.6.8
+---------
+* Added linear and user-specified sigma grids to `profile_sigma()`
+
 multiScaleR 0.6.7
 ---------
 * Fixed singular-Hessian fallback SE values to remain numeric
