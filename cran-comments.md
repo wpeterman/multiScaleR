@@ -25,6 +25,7 @@ This update includes changes made since version 0.5.0:
 - added an optional custom refit hook for model classes that cannot use default model updates
 - fixed singular-Hessian fallback SE values to remain numeric
 - excluded missing raster cells from sparse kernel weighted averages
+- added linear and user-specified sigma grids to `profile_sigma()`
 - updated vignettes and documentation
 
 ### Addressed CRAN feedback:
