@@ -460,14 +460,15 @@ multiScale_optim <- function(fitted_mod,
     #                              opt_results$par[(n_covs + 1):(n_covs * 2)]^2)
     # opt_results$hessian_unscale <- opt_results$hessian #* kernel_inputs$unit_conv
 
-    i_hess <- try(solve(opt_results$hessian_unscale))
+    i_hess <- try(solve(opt_results$hessian_unscale), silent = TRUE)
 
-    if(class(i_hess)[1] != 'try-error'){
+    if(!inherits(i_hess, "try-error")){
       res <- c(sqrt(diag(i_hess)[1:n_covs]) * kernel_inputs$unit_conv,
                sqrt(diag(i_hess)[(n_covs + 1):(n_covs * 2)]))
 
     } else {
-      res <- rep('Inf', n_covs)
+      n_se <- if (kernel_inputs$kernel == "expow") n_covs * 2 else n_covs
+      res <- rep(Inf, n_se)
 
     }
 

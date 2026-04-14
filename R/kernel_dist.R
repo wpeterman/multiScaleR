@@ -89,7 +89,6 @@ kernel_dist <- function(model,
 
       # browser()
 
-      d <- seq(1, round(max(ci_, na.rm = T)*1000,0), length.out = round(max(ci_, na.rm = T)*1000,0))
       dist_list <- vector('list', nrow(ci_))
 
 
@@ -215,6 +214,7 @@ kernel_dist <- function(model,
 k_dist <- function(sigma, prob = 0.95, kernel = c("gaussian", "exp", "expow", "fixed"), beta = NULL) {
   kernel <- match.arg(kernel)
   if (prob <= 0 || prob >= 1) stop("prob must be between 0 and 1")
+  if (!is.finite(sigma)) return(sigma)
 
   if (kernel == "gaussian") {
     return(qnorm((1 + prob)/2, mean = 0, sd = sigma))

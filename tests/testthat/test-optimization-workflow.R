@@ -365,16 +365,47 @@ test_that("multiScale_optim covers expow and warning branches via mocks", {
 test_that("multiScale_optim covers singular hessian and failure branches via mocks", {
   fix <- make_core_fixture()
 
-  expect_error(
-    with_mocked_bindings(
+  singular_out <- with_mocked_bindings(
+    multiScale_optim(
+      fitted_mod = fix$fitted_mod,
+      kernel_inputs = fix$kernel_inputs,
+      par = 0.2,
+      verbose = FALSE
+    ),
+    optim = function(...) {
+      list(par = 0.2, hessian = matrix(0, 1, 1))
+    },
+    kernel_scale_fn = function(..., mod_return = NULL) {
+      if (isTRUE(mod_return)) {
+        list(mod = fix$fitted_mod, scl_params = fix$kernel_inputs$scl_params)
+      } else {
+        0
+      }
+    },
+    kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
+    .package = "multiScaleR"
+  )
+
+  expect_s3_class(singular_out, "multiScaleR")
+  expect_type(singular_out$scale_est$SE, "double")
+  expect_true(is.infinite(singular_out$scale_est$SE[[1]]))
+  singular_summary <- summary(singular_out)
+  expect_s3_class(singular_summary, "summary_multiScaleR")
+  expect_type(singular_summary$opt_scale$SE, "double")
+
+  expow_ki <- fix$kernel_inputs
+  expow_ki$kernel <- "expow"
+  expow_ki$shape <- 2
+
+  singular_expow <- with_mocked_bindings(
       multiScale_optim(
         fitted_mod = fix$fitted_mod,
-        kernel_inputs = fix$kernel_inputs,
-        par = 0.2,
+        kernel_inputs = expow_ki,
+        par = c(0.2, 2),
         verbose = FALSE
       ),
       optim = function(...) {
-        list(par = 0.2, hessian = matrix(0, 1, 1))
+        list(par = c(0.2, 2), hessian = matrix(0, 2, 2))
       },
       kernel_scale_fn = function(..., mod_return = NULL) {
         if (isTRUE(mod_return)) {
@@ -385,9 +416,17 @@ test_that("multiScale_optim covers singular hessian and failure branches via moc
       },
       kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
       .package = "multiScaleR"
-    ),
-    "non-numeric argument"
   )
+
+  expect_s3_class(singular_expow, "multiScaleR")
+  expect_type(singular_expow$scale_est$SE, "double")
+  expect_type(singular_expow$shape_est$SE, "double")
+  expect_true(is.infinite(singular_expow$scale_est$SE[[1]]))
+  expect_true(is.infinite(singular_expow$shape_est$SE[[1]]))
+  expow_summary <- summary(singular_expow)
+  expect_s3_class(expow_summary, "summary_multiScaleR")
+  expect_type(expow_summary$opt_scale$SE, "double")
+  expect_type(expow_summary$opt_shape$SE, "double")
 
   expect_error(
     with_mocked_bindings(
