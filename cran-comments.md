@@ -30,6 +30,7 @@ This update includes changes made since version 0.5.0:
 - preserved point row identities across `kernel_prep()` outputs used during optimization
 - ensured PSOCK workers use the same multiScaleR code as the main R session
 - fixed complete-case row alignment when fitted model frames retain original row names
+- fixed PSOCK optimization for unqualified model calls such as `glm.nb()` after `library(MASS)`
 - updated vignettes and documentation
 
 ### Addressed CRAN feedback:

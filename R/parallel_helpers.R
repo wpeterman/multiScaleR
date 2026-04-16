@@ -13,6 +13,10 @@
 cluster_prep <- function(model, cl) {
 
   pkg <- extract_namespace(model)
+  if(is.null(pkg)){
+    pkg <- extract_call_function_package(model)
+  }
+
   msr_path <- normalizePath(getNamespaceInfo("multiScaleR", "path"),
                             winslash = "/", mustWork = FALSE)
   msr_system_path <- normalizePath(system.file(package = "multiScaleR"),
@@ -150,4 +154,54 @@ extract_namespace <- function(x) {
     fc <- paste(fc, collapse = "")  # ensure single string
     if (grepl("::", fc)) sub("::.*", "", fc) else NULL
   }
+}
+
+
+extract_call_function_package <- function(x) {
+  fc <- tryCatch(
+    get_call(x),
+    error = function(e) NULL
+  )
+
+  if (is.null(fc) || !is.call(fc)) {
+    return(NULL)
+  }
+
+  fit_fun <- fc[[1]]
+  if (is.call(fit_fun) && identical(fit_fun[[1]], as.name("::"))) {
+    return(as.character(fit_fun[[2]]))
+  }
+
+  if (!is.symbol(fit_fun)) {
+    return(NULL)
+  }
+
+  fit_fun <- as.character(fit_fun)
+
+  attached <- tryCatch(
+    utils::find(fit_fun, mode = "function"),
+    error = function(e) character()
+  )
+  attached <- attached[grepl("^package:", attached)]
+  attached <- sub("^package:", "", attached)
+  attached <- attached[attached %in% loadedNamespaces()]
+  if (length(attached) > 0) {
+    return(attached[[1]])
+  }
+
+  loaded <- loadedNamespaces()
+  has_fun <- vapply(
+    loaded,
+    function(ns) {
+      exists(fit_fun, envir = asNamespace(ns), mode = "function",
+             inherits = FALSE)
+    },
+    logical(1)
+  )
+  loaded <- loaded[has_fun]
+  if (length(loaded) > 0) {
+    return(loaded[[1]])
+  }
+
+  NULL
 }
