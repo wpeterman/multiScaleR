@@ -88,23 +88,29 @@ NumericVector scale_type_sparse(NumericVector d,
   }
 
 
-  // Compute weighted raster values. Missing raster values are excluded from the
-  // weighted average, with weights re-normalized over finite cells for each
-  // layer. This prevents edge NAs from contaminating an entire site.
+  // Compute weighted raster values. For complete layers, preserve the original
+  // normalized dot-product behavior exactly. If a layer contains missing cells,
+  // exclude them and re-normalize only over the remaining finite cells so edge
+  // NAs do not contaminate an entire site.
   NumericVector result(ncol);
   for (int j = 0; j < ncol; j++) {
     double weighted_sum = 0.0;
     double finite_weight_sum = 0.0;
+    bool has_missing = false;
 
     for (int i = 0; i < n; i++) {
       double value = r_stack(i, j);
       if (std::isfinite(value)) {
         weighted_sum += value * w0(i, j);
         finite_weight_sum += w0(i, j);
+      } else {
+        has_missing = true;
       }
     }
 
-    if (finite_weight_sum > 0) {
+    if (!has_missing) {
+      result[j] = weighted_sum;
+    } else if (finite_weight_sum > 0) {
       result[j] = weighted_sum / finite_weight_sum;
     } else {
       result[j] = NA_REAL;

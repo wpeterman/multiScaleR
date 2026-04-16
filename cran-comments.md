@@ -26,6 +26,10 @@ This update includes changes made since version 0.5.0:
 - fixed singular-Hessian fallback SE values to remain numeric
 - excluded missing raster cells from sparse kernel weighted averages
 - added linear and user-specified sigma grids to `profile_sigma()`
+- preserved original sparse kernel dot-product behavior for complete raster layers
+- preserved point row identities across `kernel_prep()` outputs used during optimization
+- ensured PSOCK workers use the same multiScaleR code as the main R session
+- fixed complete-case row alignment when fitted model frames retain original row names
 - updated vignettes and documentation
 
 ### Addressed CRAN feedback:
