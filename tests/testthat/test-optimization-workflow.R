@@ -592,3 +592,47 @@ test_that("PSOCK workers load the same multiScaleR namespace as the main session
     expect_equal(worker_info$path, master_path)
   }
 })
+
+test_that("PSOCK optimization works for unqualified MASS model calls", {
+  skip_on_cran()
+  skip_if_not_installed("MASS")
+  skip_if_not_installed("pkgload")
+
+  fix <- make_core_fixture()
+  mass_attached <- "package:MASS" %in% search()
+  if (!isTRUE(mass_attached)) {
+    library(MASS)
+    on.exit(detach("package:MASS", unload = FALSE), add = TRUE)
+  }
+
+  nb_mod <- glm.nb(y ~ cont1 + site, data = fix$df)
+
+  serial <- suppressWarnings(
+    suppressMessages(
+      multiScale_optim(
+        fitted_mod = nb_mod,
+        kernel_inputs = fix$kernel_inputs,
+        par = 40 / fix$kernel_inputs$unit_conv,
+        n_cores = NULL,
+        verbose = FALSE
+      )
+    )
+  )
+
+  parallel <- suppressWarnings(
+    suppressMessages(
+      multiScale_optim(
+        fitted_mod = nb_mod,
+        kernel_inputs = fix$kernel_inputs,
+        par = 40 / fix$kernel_inputs$unit_conv,
+        n_cores = 2,
+        PSOCK = TRUE,
+        verbose = FALSE
+      )
+    )
+  )
+
+  expect_equal(parallel$scale_est$Mean, serial$scale_est$Mean,
+               tolerance = 1e-5)
+  expect_true(is.finite(parallel$scale_est$SE[[1]]))
+})

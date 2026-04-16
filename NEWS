@@ -1,3 +1,7 @@
+multiScaleR 0.6.11
+---------
+* Fixed PSOCK optimization for unqualified model calls such as `glm.nb()` after `library(MASS)`
+
 multiScaleR 0.6.10
 ---------
 * Preserved original sparse kernel dot-product behavior for complete raster layers

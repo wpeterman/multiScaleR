@@ -35,8 +35,13 @@ test_that("extract_namespace identifies namespaced calls and plain calls", {
 
   expect_equal(multiScaleR:::extract_namespace(nb_mod), "MASS")
 
+  nb_mod$call[[1]] <- quote(glm.nb)
+  expect_null(multiScaleR:::extract_namespace(nb_mod))
+  expect_equal(multiScaleR:::extract_call_function_package(nb_mod), "MASS")
+
   glm_mod <- glm(mpg ~ wt, data = mtcars)
   expect_null(multiScaleR:::extract_namespace(glm_mod))
+  expect_equal(multiScaleR:::extract_call_function_package(glm_mod), "stats")
 })
 
 test_that("cluster_prep covers direct, fallback, and error branches", {
@@ -47,6 +52,15 @@ test_that("cluster_prep covers direct, fallback, and error branches", {
 
   pkg1 <- multiScaleR:::cluster_prep(nb_mod, cl1)
   expect_equal(pkg1, "MASS")
+
+  nb_mod_unqualified <- nb_mod
+  nb_mod_unqualified$call[[1]] <- quote(glm.nb)
+  cl1b <- parallel::makeCluster(1)
+  on.exit(parallel::stopCluster(cl1b), add = TRUE)
+
+  pkg1b <- multiScaleR:::cluster_prep(nb_mod_unqualified, cl1b)
+  expect_equal(pkg1b, "MASS")
+  expect_true(parallel::clusterEvalQ(cl1b, exists("glm.nb", mode = "function"))[[1]])
 
   glm_mod <- glm(mpg ~ wt, data = mtcars)
   cl2 <- parallel::makeCluster(1)
