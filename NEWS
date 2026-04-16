@@ -1,3 +1,10 @@
+multiScaleR 0.6.10
+---------
+* Preserved original sparse kernel dot-product behavior for complete raster layers
+* Preserved point row identities across `kernel_prep()` outputs used during optimization
+* Ensured PSOCK workers use the same multiScaleR code as the main R session
+* Fixed complete-case row alignment when fitted model frames retain original row names
+
 multiScaleR 0.6.8
 ---------
 * Added linear and user-specified sigma grids to `profile_sigma()`

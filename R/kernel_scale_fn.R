@@ -84,9 +84,25 @@ kernel_scale_fn <- function(par,
                                      join_by = join_by)
   }
 
+  eval_idx <- NULL
   if (!is.null(opt_context$complete_idx)) {
-    d_list <- d_list[opt_context$complete_idx]
-    cov_df <- cov_df[opt_context$complete_idx]
+    eval_idx <- opt_context$complete_idx
+    if (length(eval_idx) == 0 ||
+        anyNA(eval_idx) ||
+        any(eval_idx < 1) ||
+        any(eval_idx > length(d_list))) {
+      eval_idx <- opt_context$data_idx
+    }
+
+    if (!is.null(eval_idx) && length(eval_idx) > 0 &&
+        !anyNA(eval_idx) &&
+        all(eval_idx >= 1) &&
+        all(eval_idx <= length(d_list))) {
+      d_list <- d_list[eval_idx]
+      cov_df <- cov_df[eval_idx]
+    } else {
+      eval_idx <- NULL
+    }
   }
 
   n_ind <- length(d_list)
@@ -110,6 +126,16 @@ kernel_scale_fn <- function(par,
 
   cov.w <- matrix(NA_real_, nrow = n_ind, ncol = n_covs)
   colnames(cov.w) <- covs
+  row_ids <- names(d_list)
+  if (is.null(row_ids) || length(row_ids) != n_ind ||
+      anyNA(row_ids) || any(!nzchar(row_ids)) || anyDuplicated(row_ids)) {
+    if (!is.null(eval_idx) && length(eval_idx) == n_ind) {
+      row_ids <- as.character(eval_idx)
+    } else {
+      row_ids <- as.character(seq_len(n_ind))
+    }
+  }
+  rownames(cov.w) <- row_ids
 
   for(i in seq_len(n_ind)){
     cov.w[i, ] <-
@@ -142,8 +168,11 @@ kernel_scale_fn <- function(par,
 
   } else {
     dat <- opt_context$data_template
+    scl_df_dat <- align_scaled_covariates(scl_df = scl_df,
+                                          dat = dat,
+                                          opt_context = opt_context)
     mod_u <- tryCatch({
-      dat[opt_context$covs] <- as.data.frame(scl_df)
+      dat[opt_context$covs] <- as.data.frame(scl_df_dat)
       .refit_model(mod, data = dat, opt_context = opt_context)
     }, error = function(e) {
       refit_error <<- conditionMessage(e)
@@ -187,6 +216,35 @@ kernel_scale_fn <- function(par,
     #             scl_params = NULL)
   }
   return(obj)
+}
+
+
+align_scaled_covariates <- function(scl_df, dat, opt_context) {
+  dat_rows <- row.names(dat)
+  scl_rows <- row.names(scl_df)
+
+  if (length(dat_rows) == nrow(dat) && length(scl_rows) == nrow(scl_df) &&
+      all(dat_rows %in% scl_rows)) {
+    return(scl_df[dat_rows, , drop = FALSE])
+  }
+
+  idx <- opt_context$complete_idx
+  if (!is.null(idx) && length(idx) == nrow(dat) &&
+      all(!is.na(idx)) && all(idx >= 1) && all(idx <= nrow(scl_df))) {
+    return(scl_df[idx, , drop = FALSE])
+  }
+
+  if (nrow(scl_df) == nrow(dat)) {
+    return(scl_df)
+  }
+
+  stop(
+    paste0(
+      "Could not align kernel-weighted covariates with the fitted model data. ",
+      "Make sure the model data rows correspond to the rows of `kernel_inputs`."
+    ),
+    call. = FALSE
+  )
 }
 
 
@@ -243,7 +301,10 @@ build_opt_context <- function(fitted_mod,
               n_covs = n_covs,
               refit_fn = refit_fn)
 
-  complete_idx <- which(stats::complete.cases(dat))
+  complete_cases <- .model_complete_indices(dat = dat,
+                                            n_sites = length(cov_df))
+  data_idx <- complete_cases$data_idx
+  complete_idx <- complete_cases$complete_idx
 
   if(mod_class == 'unmarked'){
     umf_template <- mod@data
@@ -265,12 +326,37 @@ build_opt_context <- function(fitted_mod,
     out$complete_idx <- complete_idx
     out$umf_template <- umf_template
   } else {
-    out$data_template <- dat[complete_idx, , drop = FALSE]
+    out$data_template <- dat[data_idx, , drop = FALSE]
     out$complete_idx <- complete_idx
+    out$data_idx <- data_idx
     out$cov_idx <- match(covs, colnames(dat))
   }
 
   return(out)
+}
+
+
+.model_complete_indices <- function(dat, n_sites) {
+  data_idx <- which(stats::complete.cases(dat))
+  complete_idx <- data_idx
+
+  row_ids <- row.names(dat)
+  has_numeric_row_ids <- length(row_ids) == nrow(dat) &&
+    all(grepl("^[0-9]+$", row_ids))
+
+  if (isTRUE(has_numeric_row_ids)) {
+    row_idx <- suppressWarnings(as.integer(row_ids))
+    valid_row_idx <- !anyNA(row_idx) &&
+      !anyDuplicated(row_idx) &&
+      all(row_idx >= 1) &&
+      all(row_idx <= n_sites)
+
+    if (isTRUE(valid_row_idx)) {
+      complete_idx <- row_idx[data_idx]
+    }
+  }
+
+  list(data_idx = data_idx, complete_idx = complete_idx)
 }
 
 

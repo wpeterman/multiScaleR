@@ -15,6 +15,9 @@ test_that("kernel_prep returns a complete multiScaleR_data object", {
   expect_true(all(c("kernel_dat", "d_list", "raw_cov", "kernel", "shape",
                     "min_D", "max_D", "n_covs", "unit_conv", "sigma", "scl_params") %in% names(out)))
   expect_equal(nrow(out$kernel_dat), length(pts))
+  expect_equal(row.names(out$kernel_dat), as.character(seq_len(length(pts))))
+  expect_equal(names(out$d_list), as.character(seq_len(length(pts))))
+  expect_equal(names(out$raw_cov), as.character(seq_len(length(pts))))
   expect_equal(colnames(out$kernel_dat), "hab")
   expect_equal(colnames(out$raw_cov[[1]]), "hab")
   expect_equal(out$kernel, "gaussian")

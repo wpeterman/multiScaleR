@@ -10,7 +10,7 @@
 #' @param progress Should progress bars be printed to console. Default: FALSE
 #' @param verbose Logical. Print preparation information to the console. Default: TRUE
 #' @return A list of class `multiscaleR` with necessary elements to conduct scale optimization using the `multiScale_optim` function
-#' @details Spatial point locations and raster layers should have a defined projection and be the same CRS. If providing starting values for `sigma` or `shape`, it must be a vector of length equal to the number of raster layers for which scale is being assessed and should be provided in the unit of the used projection. When specifying `max_D`, ensure that your raster layers adequately extend beyond the points provided so that the surrounding landscape can be meaningfully sampled during scale optimization.
+#' @details Spatial point locations and raster layers should have a defined projection and be the same CRS. If providing starting values for `sigma` or `shape`, it must be a vector of length equal to the number of raster layers for which scale is being assessed and should be provided in the unit of the used projection. When specifying `max_D`, ensure that your raster layers adequately extend beyond the points provided so that the surrounding landscape can be meaningfully sampled during scale optimization. Row names from `pts` are preserved in the returned kernel data, distance list, and raw covariate list so downstream model data can be aligned to the original point order.
 #' @examples
 #' library(terra)
 #' pts <- vect(cbind(c(3,5,7),
@@ -224,10 +224,19 @@ kernel_prep <- function(pts,
   } ## End ifelse for projected points
 
   n_pts <- dim(pts)[1]
+  point_ids <- row.names(pts)
+  if (is.null(point_ids) || length(point_ids) != n_pts ||
+      anyNA(point_ids) || any(!nzchar(point_ids)) || anyDuplicated(point_ids)) {
+    point_ids <- as.character(seq_len(n_pts))
+  }
+
   cov.w <- matrix(NA_real_,
                   nrow = n_pts,
                   ncol = nlyr(raster_stack))
   colnames(cov.w) <- names(raster_stack)
+  rownames(cov.w) <- point_ids
+  names(D) <- point_ids
+  names(sparse_list) <- point_ids
   sigma <- sigma / unit_conv
 
   if(isTRUE(progress)){
