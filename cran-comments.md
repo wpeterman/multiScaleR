@@ -11,6 +11,8 @@
 
 This update includes changes made since version 0.5.0:
 
+- added a Windows R-devel compatibility shim for Rcpp header compilation
+- forced C++17 compilation for compatibility with CRAN Windows R-devel checks
 - expanded unit test coverage
 - improved error and diagnostic messaging
 - added optional profile-likelihood scale intervals
@@ -31,7 +33,18 @@ This update includes changes made since version 0.5.0:
 
 ### Addressed CRAN feedback:
 
--   NA
+-   Version 0.6.11 failed the CRAN incoming Windows R-devel pretest during
+    package installation because the R-devel toolchain compiled the package
+    with C++20 and the installed Rcpp headers failed before package code was
+    compiled. Version 0.6.12 explicitly sets `CXX_STD = CXX17` in both
+    `src/Makevars` and `src/Makevars.win`.
+-   Version 0.6.12 still failed the CRAN incoming Windows R-devel pretest
+    during package installation because the Windows R-devel headers available
+    to win-builder did not declare `R_NamespaceRegistry`, while the installed
+    Rcpp headers still referenced it. Version 0.6.13 adds a small
+    Windows/R-devel-only compatibility header that declares the symbol before
+    Rcpp headers are included. Debian R-devel checks for 0.6.12 otherwise
+    passed with only the recent-update incoming note.
 
 ## Downstream Dependencies
 
