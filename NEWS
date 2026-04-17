@@ -1,3 +1,11 @@
+multiScaleR 0.6.13
+---------
+* Added a Windows R-devel compatibility shim for Rcpp header compilation
+
+multiScaleR 0.6.12
+---------
+* Forced C++17 compilation for compatibility with CRAN Windows R-devel checks
+
 multiScaleR 0.6.11
 ---------
 * Fixed PSOCK optimization for unqualified model calls such as `glm.nb()` after `library(MASS)`
