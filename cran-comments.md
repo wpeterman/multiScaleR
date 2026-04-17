@@ -1,15 +1,11 @@
 ## Test environments
 
--   local Windows 11, R 4.4.3
+-   local Windows 11, R 4.5.3
 -   GitHub Actions (macOS, Windows, Ubuntu)
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
-
-The local note was:
-
-- unable to verify current time
+0 errors | 0 warnings | 0 notes
 
 ## Changes from Previous Submission
 
