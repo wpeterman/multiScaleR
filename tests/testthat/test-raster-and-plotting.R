@@ -103,7 +103,7 @@ test_that("plot_marginal_effects covers unmarked and zeroinfl models", {
   on.exit(grDevices::dev.off(), add = TRUE)
 
   unmark_plots <- plot_marginal_effects(unmark$obj, type = "state", length.out = 5)
-  zi_plots <- plot_marginal_effects(zi$obj, length.out = 5)
+  zi_plots <- expect_no_warning(plot_marginal_effects(zi$obj, length.out = 5))
 
   expect_length(unmark_plots, 2)
   expect_length(zi_plots, 1)

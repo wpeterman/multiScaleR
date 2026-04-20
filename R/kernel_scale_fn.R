@@ -1,3 +1,102 @@
+.analysis_model <- function(model) {
+  if (inherits(model, "fit_clogit") &&
+      is.list(model) &&
+      !is.null(model$model)) {
+    return(model$model)
+  }
+
+  model
+}
+
+
+.has_nested_analysis_model <- function(model) {
+  !identical(.analysis_model(model), model)
+}
+
+
+.model_predictors <- function(model) {
+  vars <- tryCatch(
+    unname(unlist(find_predictors(model))),
+    error = function(e) character()
+  )
+
+  if (length(vars) > 0) {
+    return(vars)
+  }
+
+  formula <- try(stats::formula(model), silent = TRUE)
+  if (inherits(formula, "try-error") || length(formula) < 2) {
+    return(character())
+  }
+
+  response_vars <- if (length(formula) >= 3) {
+    all.vars(formula[[2]])
+  } else {
+    character()
+  }
+  setdiff(all.vars(formula), response_vars)
+}
+
+
+.model_data <- function(model, ...) {
+  suppressWarnings(tryCatch(
+    get_data(model, ...),
+    error = function(e) NULL
+  ))
+}
+
+
+.refit_from_call <- function(model, data) {
+  refit_call <- try(stats::getCall(model), silent = TRUE)
+  if (inherits(refit_call, "try-error") || is.null(refit_call)) {
+    refit_call <- model$call
+  }
+
+  if (is.null(refit_call) || !is.call(refit_call)) {
+    stop("The model does not contain a reusable fitting call.", call. = FALSE)
+  }
+
+  if (!is.null(refit_call$data)) {
+    refit_call$data <- quote(data)
+  }
+
+  fit_fun <- refit_call[[1]]
+  if (is.symbol(fit_fun)) {
+    fun_name <- as.character(fit_fun)
+    pkg <- extract_call_function_package(model)
+    if (is.null(pkg) && inherits(model, c("coxph", "clogit"))) {
+      pkg <- "survival"
+    }
+
+    if (!is.null(pkg) &&
+        requireNamespace(pkg, quietly = TRUE) &&
+        exists(fun_name, envir = asNamespace(pkg), mode = "function",
+               inherits = FALSE)) {
+      refit_call[[1]] <- as.call(
+        list(as.name("::"), as.name(pkg), as.name(fun_name))
+      )
+    }
+  }
+
+  eval(refit_call, envir = list(data = data), enclos = parent.frame())
+}
+
+
+.update_model_data <- function(model, data) {
+  refit <- try(stats::update(model, data = data), silent = TRUE)
+  if (!inherits(refit, "try-error")) {
+    return(refit)
+  }
+
+  call_refit <- try(.refit_from_call(model, data), silent = TRUE)
+  if (!inherits(call_refit, "try-error")) {
+    return(call_refit)
+  }
+
+  stop(conditionMessage(attr(refit, "condition")), call. = FALSE)
+}
+
+
 .refit_model <- function(model, data, opt_context) {
   if (!is.null(opt_context$refit_fn)) {
     refit <- opt_context$refit_fn(model = model,
@@ -13,7 +112,12 @@
     return(unmarked::update(model, data = data))
   }
 
-  stats::update(model, data = data)
+  if (.has_nested_analysis_model(model)) {
+    model$model <- .update_model_data(.analysis_model(model), data = data)
+    return(model)
+  }
+
+  .update_model_data(model, data = data)
 }
 
 
@@ -31,6 +135,19 @@
     }
 
     value <- try(unmarked::logLik(model)[1] * -1, silent = TRUE)
+    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
+      return(as.numeric(value)[1])
+    }
+  }
+
+  if (.has_nested_analysis_model(model)) {
+    value <- try(stats::logLik(.analysis_model(model))[1] * -1, silent = TRUE)
+    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
+      return(as.numeric(value)[1])
+    }
+
+    value <- try(insight::get_loglikelihood(.analysis_model(model))[1] * -1,
+                 silent = TRUE)
     if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
       return(as.numeric(value)[1])
     }
@@ -253,24 +370,25 @@ build_opt_context <- function(fitted_mod,
                               join_by = NULL,
                               refit_fn = NULL) {
   mod <- fitted_mod
+  analysis_mod <- .analysis_model(mod)
   cov_names <- colnames(cov_df[[1]])
 
   if(any(class(mod) == 'gls')){
     mod_class <- 'gls'
-    mod_vars <- unname(unlist(find_predictors(mod)))
-    dat <- get_data(mod)
+    mod_vars <- .model_predictors(analysis_mod)
+    dat <- .model_data(analysis_mod)
   } else if(any(grepl("^unmarked", class(mod)))) {
     mod_class <- 'unmarked'
     mod_vars <- all.vars(mod@formula)
     dat <- mod@data@siteCovs
   } else if(any(class(mod) == 'glm')) {
     mod_class <- 'glm'
-    mod_vars <- unname(unlist(find_predictors(mod)))
-    dat <- get_data(mod)
+    mod_vars <- .model_predictors(analysis_mod)
+    dat <- .model_data(analysis_mod)
   } else {
     mod_class <- 'other'
-    mod_vars <- unname(unlist(find_predictors(mod)))
-    dat <- get_data(mod, effects = 'all')
+    mod_vars <- .model_predictors(analysis_mod)
+    dat <- .model_data(analysis_mod, effects = 'all')
     if(is.null(dat)){
       dat <- extract_model_data(mod)
     }
@@ -360,43 +478,140 @@ build_opt_context <- function(fitted_mod,
 }
 
 
+.recover_surv_data <- function(response, response_vars) {
+  if (!inherits(response, "Surv") || length(response_vars) == 0) {
+    return(list())
+  }
+
+  response <- as.matrix(response)
+  response_data <- list()
+
+  if (length(response_vars) == 1) {
+    response_data[[response_vars[[1]]]] <- response[, ncol(response)]
+  } else if (length(response_vars) == 2) {
+    response_data[[response_vars[[1]]]] <- response[, 1]
+    response_data[[response_vars[[2]]]] <- response[, ncol(response)]
+  } else if (length(response_vars) >= 3 && ncol(response) >= 3) {
+    response_data[[response_vars[[1]]]] <- response[, 1]
+    response_data[[response_vars[[2]]]] <- response[, 2]
+    response_data[[response_vars[[3]]]] <- response[, ncol(response)]
+  }
+
+  response_data
+}
+
+
+.model_frame_to_data <- function(model, mf) {
+  if (is.null(mf) || !is.data.frame(mf)) {
+    return(NULL)
+  }
+
+  formula <- try(stats::formula(model), silent = TRUE)
+  if (inherits(formula, "try-error") || length(formula) < 2) {
+    return(mf)
+  }
+
+  vars <- all.vars(formula)
+  if (length(vars) == 0) {
+    return(mf)
+  }
+
+  response_vars <- character()
+  response_data <- list()
+  terms <- try(stats::terms(model), silent = TRUE)
+  response_idx <- 0
+  if (!inherits(terms, "try-error")) {
+    response_idx <- attr(terms, "response")
+  }
+
+  if (length(formula) >= 3 && isTRUE(response_idx > 0)) {
+    response_vars <- all.vars(formula[[2]])
+    response <- mf[[response_idx]]
+    response_data <- .recover_surv_data(response, response_vars)
+  }
+
+  out <- data.frame(row.names = row.names(mf), check.names = FALSE)
+  for (var in vars) {
+    if (var %in% names(mf)) {
+      out[[var]] <- mf[[var]]
+    } else if (var %in% names(response_data)) {
+      out[[var]] <- response_data[[var]]
+    } else {
+      strata_col <- paste0("strata(", var, ")")
+      if (strata_col %in% names(mf)) {
+        out[[var]] <- mf[[strata_col]]
+      }
+    }
+  }
+
+  if (all(vars %in% names(out))) {
+    return(out)
+  }
+
+  mf
+}
+
+
 ## Custom data extraction
 extract_model_data <- function(model) {
   # Try common extraction methods
   data <- tryCatch({
+    analysis_mod <- .analysis_model(model)
+
     # Method 1: model.frame() (works for most stats models)
-    mf <- model.frame(model)
-    if (!is.null(mf)) return(mf)
+    mf_error <- NULL
+    mf <- tryCatch(
+      model.frame(analysis_mod),
+      error = function(e) {
+        mf_error <<- conditionMessage(e)
+        NULL
+      }
+    )
+    if (!is.null(mf)) {
+      return(.model_frame_to_data(analysis_mod, mf))
+    }
 
     # Method 2: Check for @frame (lme4, glmmTMB)
-    if (is(model, "merMod") || is(model, "glmmTMB")) {
-      return(model@frame)
+    if (is(analysis_mod, "merMod") && !is.null(analysis_mod@frame)) {
+      return(analysis_mod@frame)
+    }
+    if (inherits(analysis_mod, "glmmTMB") && !is.null(analysis_mod$frame)) {
+      return(analysis_mod$frame)
     }
 
     # Method 3: Check for $data (some packages store it here)
-    if (!is.null(model$data)) {
-      return(model$data)
+    if (!is.null(analysis_mod$data)) {
+      return(analysis_mod$data)
     }
 
     # Method 4: Try eval(model$call$data) (if data was passed in the call)
-    if (!is.null(model$call$data)) {
-      data_name <- as.character(model$call$data)
+    if (!is.null(analysis_mod$call$data)) {
+      data_name <- as.character(analysis_mod$call$data)
       if (exists(data_name, envir = parent.frame())) {
         return(get(data_name, envir = parent.frame()))
       }
     }
 
     # Method 5: For spaMM models (specific checks)
-    if (inherits(model, "HLfit")) {
-      if (!is.null(model$data)) return(model$data)
+    if (inherits(analysis_mod, "HLfit")) {
+      if (!is.null(analysis_mod$data)) return(analysis_mod$data)
       # Alternative for spaMM: model$fr
-      if (!is.null(model$fr)) return(model$fr)
+      if (!is.null(analysis_mod$fr)) return(analysis_mod$fr)
     }
 
     # Fallback: Return NULL if no method worked
-    warning(
-      "Could not extract data from the model object; optimization may fail unless the model was fit with an explicit `data = ...` argument."
-    )
+    if (!is.null(mf_error)) {
+      warning(
+        paste0(
+          "Failed to extract model data needed for refitting: ",
+          mf_error
+        )
+      )
+    } else {
+      warning(
+        "Could not extract data from the model object; optimization may fail unless the model was fit with an explicit `data = ...` argument."
+      )
+    }
     NULL
   }, error = function(e) {
     warning(

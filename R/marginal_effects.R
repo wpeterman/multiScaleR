@@ -114,7 +114,7 @@ plot_marginal_effects <- function(x,
   } else {
     c_vars <- find_predictors(mod)[[1]]
     vars <- unlist(find_predictors(mod))
-    dat_all <- get_data(mod)
+    dat_all <- .model_data(mod)
     if(is.null(dat_all)){
       dat_all <- extract_model_data(mod)
     }

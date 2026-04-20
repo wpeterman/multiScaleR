@@ -13,8 +13,15 @@
 cluster_prep <- function(model, cl) {
 
   pkg <- extract_namespace(model)
+  analysis_mod <- .analysis_model(model)
+  if (is.null(pkg) && !identical(analysis_mod, model)) {
+    pkg <- extract_namespace(analysis_mod)
+  }
   if(is.null(pkg)){
     pkg <- extract_call_function_package(model)
+  }
+  if (is.null(pkg) && !identical(analysis_mod, model)) {
+    pkg <- extract_call_function_package(analysis_mod)
   }
 
   msr_path <- normalizePath(getNamespaceInfo("multiScaleR", "path"),

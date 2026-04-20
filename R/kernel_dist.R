@@ -65,17 +65,19 @@ kernel_dist <- function(model,
     if(!missing("model")){
       # ci_ <- summary(model)$opt_scale
 
-      if(any(class(model$opt_mod) == 'gls')){
-        df <- model$opt_mod$dims$N - model$opt_mod$dims$p
-        names <- all.vars(formula(model$opt_mod)[-2])
+      opt_mod <- .analysis_model(model$opt_mod)
 
-      } else if(any(grepl("^unmarked", class(model$opt_mod)))){
-        df <- dim(model$opt_mod@data@y)[1]
-        names <- all.vars(model$opt_mod@formula)
+      if(any(class(opt_mod) == 'gls')){
+        df <- opt_mod$dims$N - opt_mod$dims$p
+        names <- all.vars(formula(opt_mod)[-2])
+
+      } else if(any(grepl("^unmarked", class(opt_mod)))){
+        df <- dim(opt_mod@data@y)[1]
+        names <- all.vars(opt_mod@formula)
 
       } else {
-        df <- get_df(model$opt_mod, type = "residual")
-        names <- all.vars(formula(model$opt_mod)[-2])
+        df <- get_df(opt_mod, type = "residual")
+        names <- all.vars(formula(opt_mod)[-2])
       }
 
       if(!is.null(model$profile_scale_est)){

@@ -80,6 +80,13 @@ and should avoid hidden dependencies on local workspace objects. Prefer
 namespace-qualified calls such as `stats::update()` or `survival::coxph()`.
 If the function closes over helper objects, those objects must also serialize
 cleanly to worker processes.
+
+Some modeling packages return wrapper objects around another fitted model. For
+example, `amt::fit_clogit()` stores a `survival::clogit()` model in its
+`model` component. When possible, `multiScale_optim()` uses this nested model
+to recover predictors, refit the likelihood, and extract log-likelihoods. For
+`amt::fit_clogit()` fits, set `model = TRUE` so the nested `clogit` model
+retains enough model-frame information for the optimized data to be rebuilt.
 }
 \examples{
 \donttest{

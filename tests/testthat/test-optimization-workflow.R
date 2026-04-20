@@ -226,6 +226,68 @@ test_that("kernel_scale_fn can refit survival models through stats generics", {
   expect_s3_class(fit$mod, "coxph")
 })
 
+test_that("nested clogit wrappers can be optimized through their analysis model", {
+  testthat::skip_if_not_installed("survival")
+
+  fix <- make_core_fixture()
+  n <- nrow(fix$kernel_inputs$kernel_dat)
+  dat <- data.frame(
+    case_ = rep(c(TRUE, FALSE, FALSE), length.out = n),
+    cont1 = fix$kernel_inputs$kernel_dat$cont1,
+    site = seq_len(n) / 10,
+    stratum = factor(rep(seq_len(ceiling(n / 3)), each = 3, length.out = n))
+  )
+  coxph <- survival::coxph
+  strata <- survival::strata
+
+  inner <- suppressWarnings(
+    survival::clogit(
+      case_ ~ cont1 + site + strata(stratum),
+      data = dat,
+      model = TRUE
+    )
+  )
+  wrapped <- structure(
+    list(model = inner, sl_ = NULL, ta_ = NULL, more = NULL),
+    class = c("fit_clogit", "list")
+  )
+
+  opt_context <- build_opt_context(
+    fitted_mod = wrapped,
+    cov_df = fix$kernel_inputs$raw_cov
+  )
+
+  neg_ll <- suppressWarnings(
+    kernel_scale_fn(
+      par = 40 / fix$kernel_inputs$unit_conv,
+      d_list = fix$kernel_inputs$d_list,
+      cov_df = fix$kernel_inputs$raw_cov,
+      kernel = "gaussian",
+      fitted_mod = wrapped,
+      opt_context = opt_context
+    )
+  )
+
+  fit <- suppressWarnings(
+    kernel_scale_fn(
+      par = 40 / fix$kernel_inputs$unit_conv,
+      d_list = fix$kernel_inputs$d_list,
+      cov_df = fix$kernel_inputs$raw_cov,
+      kernel = "gaussian",
+      fitted_mod = wrapped,
+      opt_context = opt_context,
+      mod_return = TRUE
+    )
+  )
+
+  expect_equal(opt_context$covs, "cont1")
+  expect_true(all(c("case_", "cont1", "site", "stratum") %in%
+                    names(opt_context$data_template)))
+  expect_true(is.finite(neg_ll))
+  expect_s3_class(fit$mod, "fit_clogit")
+  expect_s3_class(fit$mod$model, "coxph")
+})
+
 test_that("single-covariate models work when kernel inputs contain extra raster layers", {
   set.seed(555)
 
@@ -635,4 +697,63 @@ test_that("PSOCK optimization works for unqualified MASS model calls", {
   expect_equal(parallel$scale_est$Mean, serial$scale_est$Mean,
                tolerance = 1e-5)
   expect_true(is.finite(parallel$scale_est$SE[[1]]))
+})
+
+test_that("PSOCK optimization works for nested clogit wrappers", {
+  skip_on_cran()
+  skip_if_not_installed("survival")
+  skip_if_not_installed("pkgload")
+
+  fix <- make_core_fixture()
+  n <- nrow(fix$kernel_inputs$kernel_dat)
+  dat <- data.frame(
+    case_ = rep(c(TRUE, FALSE, FALSE), length.out = n),
+    cont1 = fix$kernel_inputs$kernel_dat$cont1,
+    site = seq_len(n) / 10,
+    stratum = factor(rep(seq_len(ceiling(n / 3)), each = 3, length.out = n))
+  )
+  coxph <- survival::coxph
+  strata <- survival::strata
+
+  inner <- suppressWarnings(
+    survival::clogit(
+      case_ ~ cont1 + site + strata(stratum),
+      data = dat,
+      model = TRUE
+    )
+  )
+  wrapped <- structure(
+    list(model = inner, sl_ = NULL, ta_ = NULL, more = NULL),
+    class = c("fit_clogit", "list")
+  )
+
+  serial <- suppressWarnings(
+    suppressMessages(
+      multiScale_optim(
+        fitted_mod = wrapped,
+        kernel_inputs = fix$kernel_inputs,
+        par = 40 / fix$kernel_inputs$unit_conv,
+        n_cores = NULL,
+        verbose = FALSE
+      )
+    )
+  )
+
+  parallel <- suppressWarnings(
+    suppressMessages(
+      multiScale_optim(
+        fitted_mod = wrapped,
+        kernel_inputs = fix$kernel_inputs,
+        par = 40 / fix$kernel_inputs$unit_conv,
+        n_cores = 2,
+        PSOCK = TRUE,
+        verbose = FALSE
+      )
+    )
+  )
+
+  expect_equal(parallel$scale_est$Mean, serial$scale_est$Mean,
+               tolerance = 1e-5)
+  expect_s3_class(parallel$opt_mod, "fit_clogit")
+  expect_s3_class(parallel$opt_mod$model, "coxph")
 })

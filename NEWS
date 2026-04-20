@@ -1,3 +1,9 @@
+multiScaleR 0.6.14
+---------
+* Improved model-data, predictor, and log-likelihood handling for wrapped model objects
+* Added regression coverage for nested `clogit` wrappers in serial and PSOCK optimization
+* Avoided recoverable model-data warnings in marginal effect plots
+
 multiScaleR 0.6.13
 ---------
 * Added a Windows R-devel compatibility shim for Rcpp header compilation

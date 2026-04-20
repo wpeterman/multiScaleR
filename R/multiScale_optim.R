@@ -94,6 +94,13 @@
 #' If the function closes over helper objects, those objects must also serialize
 #' cleanly to worker processes.
 #'
+#' Some modeling packages return wrapper objects around another fitted model. For
+#' example, `amt::fit_clogit()` stores a `survival::clogit()` model in its
+#' `model` component. When possible, `multiScale_optim()` uses this nested model
+#' to recover predictors, refit the likelihood, and extract log-likelihoods. For
+#' `amt::fit_clogit()` fits, set `model = TRUE` so the nested `clogit` model
+#' retains enough model-frame information for the optimized data to be rebuilt.
+#'
 #' @seealso \code{\link[multiScaleR]{kernel_dist}}
 #' @examples
 #' \donttest{
@@ -243,16 +250,17 @@ multiScale_optim <- function(fitted_mod,
   validate_scalar_numeric(kernel_inputs$max_D, "kernel_inputs$max_D", positive = TRUE)
   validate_scalar_numeric(kernel_inputs$unit_conv, "kernel_inputs$unit_conv", positive = TRUE)
   kernel_inputs$kernel <- match.arg(kernel_inputs$kernel, c("gaussian", "exp", "expow", "fixed"))
+  analysis_mod <- .analysis_model(fitted_mod)
 
   # Extract variables from fitted model
   if (any(class(fitted_mod) == 'gls')) {
     # mod_vars <- find_predictors(fitted_mod)[[1]]
-    mod_vars <- unlist(find_predictors(fitted_mod))
+    mod_vars <- .model_predictors(analysis_mod)
   } else if (any(grepl("^unmarked", class(fitted_mod)))) {
     mod_vars <- all.vars(formula(fitted_mod@formula))
   } else {
     # mod_vars <- find_predictors(fitted_mod)[[1]]
-    mod_vars <- unlist(find_predictors(fitted_mod))
+    mod_vars <- .model_predictors(analysis_mod)
   }
 
   # Ensure model variables are in kernel_inputs
@@ -277,7 +285,7 @@ multiScale_optim <- function(fitted_mod,
   if(any(class(fitted_mod) == 'gls')){
     mod_class <- 'gls'
     # mod_vars <- find_predictors(fitted_mod)[[1]]
-    mod_vars <- unlist(find_predictors(fitted_mod))
+    mod_vars <- .model_predictors(analysis_mod)
     r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
     n_covs <- length(r_vars)
   } else if(any(grepl("^unmarked", class(fitted_mod)))) {
@@ -289,7 +297,7 @@ multiScale_optim <- function(fitted_mod,
   } else {
     mod_class <- 'other'
     # mod_vars <- find_predictors(fitted_mod)[[1]]
-    mod_vars <- unlist(find_predictors(fitted_mod))
+    mod_vars <- .model_predictors(analysis_mod)
     r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
     n_covs <- length(r_vars)
   }
