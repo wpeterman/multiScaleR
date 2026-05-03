@@ -4,6 +4,11 @@
 #' @param raster_stack Raster layer(s) of class `SpatRaster`
 #' @param max_D The maximum distance to consider during the scale optimization
 #' @param kernel Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')
+#' @param scale_vars Optional variable specifications created with `msr_vars()`.
+#' If omitted, each raster layer is treated as one optimized kernel-weighted
+#' covariate, preserving the historical behavior. Use `kernel_var()` and
+#' `landscape_var()` inside `msr_vars()` to explicitly define derived model
+#' covariates from source raster layers.
 #' @param sigma Initial values for optimizing the scale parameter. Default: NULL, initial values will be automatically generated. This is recommended.
 #' @param shape Initial values for optimizing the shape parameter if using exponential power kernel. Default: NULL, starting values will be automatically generated. This is recommended.
 #' @param projected Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected. Default: TRUE
@@ -41,6 +46,7 @@ kernel_prep <- function(pts,
                         raster_stack,
                         max_D,
                         kernel = c('gaussian', 'exp', 'expow', 'fixed'),
+                        scale_vars = NULL,
                         sigma = NULL,
                         shape = NULL,
                         projected = TRUE,
@@ -58,16 +64,30 @@ kernel_prep <- function(pts,
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
   }
 
+  scale_vars <- .msr_validate_scale_vars(scale_vars = scale_vars,
+                                         raster_stack = raster_stack,
+                                         kernel = kernel)
+  opt_scale_vars <- .msr_optimized_scale_vars(scale_vars)
+  n_optimized <- nrow(opt_scale_vars)
+
+  if (any(scale_vars$type == "landscape")) {
+    raster_res <- terra::res(raster_stack)
+    if (!isTRUE(all.equal(raster_res[[1]], raster_res[[2]]))) {
+      stop("Landscape metric variables require square raster cells.",
+           call. = FALSE)
+    }
+  }
+
   if(is.null(sigma)){
-    sigma <- rep(max_D/2, nlyr(raster_stack)) ## Need to set to minimum distance...no scale
-    if(verbose){
+    sigma <- rep(max_D/2, n_optimized) ## Need to set to minimum distance...no scale
+    if(verbose && n_optimized > 0){
       cat(paste("\nNo sigma values provided...",
                 "Creating necessary elements to optimize sigma\n", sep = '\n'))
     }
   }
 
-  if(is.null(shape) & kernel == 'expow'){
-    shape <- rep(2, nlyr(raster_stack)) ## Need to set shape
+  if(is.null(shape) & kernel == 'expow' & n_optimized > 0){
+    shape <- rep(2, n_optimized) ## Need to set shape
     if(verbose){
       cat(paste("\nNo shape values provided...",
                 "Creating necessary elements to optimize shape\n", sep = '\n'))
@@ -75,18 +95,20 @@ kernel_prep <- function(pts,
   }
 
 
-  if(length(sigma) != nlyr(raster_stack)){
-    stop("Number of sigma values must equal the number of raster layers!!!")
+  if(length(sigma) != n_optimized){
+    stop("Number of sigma values must equal the number of optimized covariates!!!")
   }
-  validate_numeric_vector(sigma,
-                          "sigma",
-                          length_ = nlyr(raster_stack),
-                          positive = TRUE)
+  if(n_optimized > 0){
+    validate_numeric_vector(sigma,
+                            "sigma",
+                            length_ = n_optimized,
+                            positive = TRUE)
+  }
 
-  if(kernel == 'expow'){
+  if(kernel == 'expow' && n_optimized > 0){
     validate_numeric_vector(shape,
                             "shape",
-                            length_ = nlyr(raster_stack),
+                            length_ = n_optimized,
                             positive = TRUE)
   }
 
@@ -173,6 +195,7 @@ kernel_prep <- function(pts,
                            # full_colnames = T,
                            # force_df = T,
                            include_xy = T,
+                           include_cell = .msr_needs_cells(scale_vars),
                            progress = progress)
 
     # Convert to list of sparse matrices
@@ -232,8 +255,8 @@ kernel_prep <- function(pts,
 
   cov.w <- matrix(NA_real_,
                   nrow = n_pts,
-                  ncol = nlyr(raster_stack))
-  colnames(cov.w) <- names(raster_stack)
+                  ncol = nrow(scale_vars))
+  colnames(cov.w) <- scale_vars$covariate
   rownames(cov.w) <- point_ids
   names(D) <- point_ids
   names(sparse_list) <- point_ids
@@ -255,11 +278,17 @@ kernel_prep <- function(pts,
       setTxtProgressBar(pb,i)
     }
 
-    cov.w[i,] <- scale_type(d = D[[i]],
-                            kernel = kernel,
-                            sigma = sigma,
-                            shape = shape,
-                            r_stack.df = sparse_list[[i]])
+    cov.w[i,] <- .msr_eval_scale_vars(
+      d = D[[i]],
+      cov_df = sparse_list[[i]],
+      scale_vars = scale_vars,
+      sigma = sigma,
+      shape = shape,
+      kernel = kernel,
+      unit_conv = unit_conv,
+      resolution = terra::res(raster_stack)[[1]],
+      n_cols = terra::ncol(raster_stack)
+    )
 
   }
   if(isTRUE(progress)){
@@ -276,9 +305,12 @@ kernel_prep <- function(pts,
               shape = shape,
               min_D = min_D,
               max_D = max_D,
-              n_covs = nlyr(raster_stack),
+              n_covs = n_optimized,
               unit_conv = unit_conv,
               sigma = sigma,
+              scale_vars = scale_vars,
+              resolution = terra::res(raster_stack)[[1]],
+              n_cols = terra::ncol(raster_stack),
               scl_params = list(mean = attr(scl_df, "scaled:center"),
                                 sd = attr(scl_df, "scaled:scale")))
 
@@ -288,6 +320,11 @@ kernel_prep <- function(pts,
 
 # Function to convert a data frame to a sparse matrix
 df_to_sparse <- function(df) {
-  df <- df[, seq_len(ncol(df) - 3), drop = FALSE]  # Drop last three columns
-  as(as.matrix(df), "sparseMatrix")
+  cells <- if ("cell" %in% names(df)) df$cell else NULL
+  value_cols <- setdiff(names(df), c("x", "y", "cell", "coverage_fraction"))
+  out <- as(as.matrix(df[, value_cols, drop = FALSE]), "sparseMatrix")
+  if (!is.null(cells)) {
+    attr(out, "cell") <- cells
+  }
+  out
 }

@@ -10,6 +10,7 @@ kernel_scale.raster(
   multiScaleR = NULL,
   shape = NULL,
   kernel = c("gaussian", "exp", "expow", "fixed"),
+  scale_vars = NULL,
   pct_wt = 0.975,
   fft = TRUE,
   scale_center = FALSE,
@@ -34,6 +35,10 @@ provide the `multiScaleR` object here. You can also pass an object of class
 
 \item{kernel}{Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow';
 Default: 'gaussian')}
+
+\item{scale_vars}{Optional variable specifications created with `msr_vars()`.
+Use this when projecting explicitly defined `kernel_var()` and
+`landscape_var()` covariates without passing a fitted `multiScaleR` object.}
 
 \item{pct_wt}{The percentage of the weighted density to include when applying the
 kernel smoothing function, Default: 0.975}

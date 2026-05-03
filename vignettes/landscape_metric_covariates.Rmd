@@ -1,0 +1,243 @@
+---
+title: "Landscape Metric Covariates"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Landscape Metric Covariates}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+library(multiScaleR)
+library(terra)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6.5,
+  fig.height = 4.25,
+  warning = FALSE,
+  message = FALSE
+)
+
+pkg_extdata <- function(...) {
+  src_path <- normalizePath(file.path("..", "inst", "extdata", ...),
+                            winslash = "/",
+                            mustWork = FALSE)
+  if (file.exists(src_path)) {
+    return(src_path)
+  }
+
+  inst_path <- system.file("extdata", ..., package = "multiScaleR")
+  if (nzchar(inst_path) && file.exists(inst_path)) {
+    return(inst_path)
+  }
+
+  stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
+}
+```
+
+# Why explicit covariate specifications?
+
+Traditional `multiScaleR` workflows assume that each raster layer becomes one
+optimized, kernel-weighted covariate. That remains the default behavior. For
+landscape metrics, however, the relationship between raster layers and model
+covariates is no longer one-to-one.
+
+For example, the same binary forest raster might be used to calculate:
+
+- a distance-weighted proportion of forest cover,
+- edge density within a fixed buffer, and
+- edge density at an optimized scale.
+
+Those are different covariates, even though they come from the same source
+raster. The `msr_vars()` interface lets you name those derived covariates
+explicitly.
+
+---
+
+# Load example data
+
+This example uses the simulated count data and survey locations included with
+`multiScaleR`. The data contain 100 spatial sample points, which is large enough
+to demonstrate the workflow without making the vignette expensive to build.
+
+```{r load-data}
+data("landscape_counts")
+dat <- landscape_counts
+
+data("surv_pts")
+pts <- vect(surv_pts)
+
+land_rast <- rast(pkg_extdata("landscape.tif"))
+```
+
+The raster layer `land1` is a binary habitat layer. To demonstrate a categorical
+landscape-diversity metric, we also create a simple three-class land-cover layer
+from the continuous `land2` raster. In a real analysis, this would usually be a
+mapped categorical land-cover product.
+
+```{r build-landcover}
+landcover <- classify(
+  land_rast$land2,
+  rcl = matrix(
+    c(-Inf, -0.5, 1,
+      -0.5,  0.5, 2,
+       0.5,  Inf, 3),
+    ncol = 3,
+    byrow = TRUE
+  )
+)
+names(landcover) <- "landcover"
+
+metric_rasters <- c(land_rast$land1, landcover)
+```
+
+```{r plot-inputs, fig.cap = "***Source rasters used to derive model covariates.***"}
+plot(metric_rasters)
+plot(metric_rasters$land1, main = "land1 with survey points")
+points(pts, pch = 19, cex = 0.6, col = "red")
+```
+
+---
+
+# Define derived covariates
+
+Use `msr_vars()` to define model covariates as transformations of source raster
+layers. Here, `land1_prop` is optimized as a kernel-weighted covariate, while
+`land1_ed_500` and `landcover_shdi_500` are fixed-radius landscape metrics
+calculated within 500 m of each point.
+
+```{r define-vars}
+scale_vars <- msr_vars(
+  land1_prop = kernel_var("land1"),
+  land1_ed_500 = landscape_var("land1", metric = "ed", radius = 500),
+  landcover_shdi_500 = landscape_var("landcover", metric = "shdi", radius = 500)
+)
+
+scale_vars
+```
+
+This is the key distinction:
+
+- `land1` and `landcover` are source raster layers.
+- `land1_prop`, `land1_ed_500`, and `landcover_shdi_500` are model covariates.
+- Only `land1_prop` receives an optimized sigma parameter in this example.
+
+---
+
+# Prepare model data
+
+Pass the covariate specification to `kernel_prep()`. The returned
+`kernel_dat` data frame contains the derived covariates, not merely the original
+raster layer names.
+
+```{r kernel-prep}
+kernel_inputs <- kernel_prep(
+  pts = pts,
+  raster_stack = metric_rasters,
+  max_D = 1200,
+  kernel = "gaussian",
+  scale_vars = scale_vars,
+  verbose = FALSE
+)
+
+head(kernel_inputs$kernel_dat)
+```
+
+Combine the derived covariates with the response data and fit the starting
+model.
+
+```{r fit-model}
+df <- data.frame(dat, kernel_inputs$kernel_dat)
+
+mod <- glm(
+  counts ~ site + land1_prop + land1_ed_500 + landcover_shdi_500,
+  family = poisson(),
+  data = df
+)
+```
+
+---
+
+# Optimize the kernel covariate
+
+Because the two landscape metrics were defined with fixed radii, only
+`land1_prop` is optimized. This keeps the example fast while still showing how
+kernel-scaled and landscape-metric covariates can be included in the same model.
+
+```{r optimize}
+opt <- multiScale_optim(
+  fitted_mod = mod,
+  kernel_inputs = kernel_inputs,
+  verbose = FALSE
+)
+```
+
+```{r summary}
+summary(opt)
+```
+
+---
+
+# Project derived covariates to rasters
+
+`kernel_scale.raster()` also understands `scale_vars`. When a fitted
+`multiScaleR` object is supplied, optimized covariates use their fitted scale
+and fixed-radius landscape metrics use their specified radius.
+
+```{r project, fig.cap = "***Projected derived covariates.***"}
+projected <- kernel_scale.raster(
+  raster_stack = metric_rasters,
+  multiScaleR = opt,
+  scale_center = TRUE,
+  clamp = TRUE,
+  verbose = FALSE
+)
+
+plot(projected)
+```
+
+The resulting raster names match the model covariates:
+
+```{r projected-names}
+names(projected)
+```
+
+---
+
+# Optimizing landscape metric radii
+
+To optimize the scale of a landscape metric, omit `radius` from
+`landscape_var()`. For example:
+
+```{r optimized-landscape-vars, eval = FALSE}
+scale_vars_opt <- msr_vars(
+  land1_prop = kernel_var("land1"),
+  land1_ed = landscape_var("land1", metric = "ed"),
+  landcover_shdi = landscape_var("landcover", metric = "shdi")
+)
+```
+
+This is statistically meaningful, but it is more computationally expensive than
+optimizing a kernel-weighted mean. At each candidate radius, the landscape metric
+must be recalculated for every sample point. For moderate or large data sets,
+consider first testing the workflow with a subset of points or using
+precomputed results in reproducible documents.
+
+---
+
+# Practical guidance
+
+Use fixed-radius landscape metrics when you have a biologically motivated buffer
+distance or when the metric is expensive to recompute. Use optimized landscape
+metric radii when the scale itself is a central question and computation time is
+acceptable.
+
+At present, optimized landscape metrics are not supported with
+`kernel = "expow"` because the exponential-power shape parameter does not apply
+cleanly to fixed-buffer landscape metrics.

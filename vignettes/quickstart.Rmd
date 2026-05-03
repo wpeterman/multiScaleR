@@ -56,7 +56,10 @@ For conceptual background, full model-selection workflows, alternative kernel
 functions, and integration with `unmarked`, see
 `vignette("multiScaleR_Guide", package = "multiScaleR")`. For guidance on
 spatial projection and clamping, see
-`vignette("spatial_projection_clamping", package = "multiScaleR")`.
+`vignette("spatial_projection_clamping", package = "multiScaleR")`. For
+explicit derived covariates such as edge density, landscape shape index, and
+Shannon diversity, see
+`vignette("landscape_metric_covariates", package = "multiScaleR")`.
 
 ---
 

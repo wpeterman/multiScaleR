@@ -14,3 +14,4 @@
 ^checks$
 ^\.claude$
 ^\.positai$
+^tools/landscape_metrics_exploration\.R$
