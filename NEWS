@@ -1,3 +1,30 @@
+multiScaleR 0.6.17
+---------
+* Added a landscape metric covariates vignette demonstrating explicit
+  `msr_vars()` specifications with 100 spatial sample points
+* Linked the quick-start guide to the landscape metric covariate workflow
+
+multiScaleR 0.6.16
+---------
+* Added `msr_vars()`, `kernel_var()`, and `landscape_var()` specifications for
+  explicit derived raster covariates
+* Allowed multiple covariate transformations, such as kernel means and fixed
+  landscape metrics, to be derived from the same source raster layer
+* Added exploratory raster projection support for specified landscape metric
+  covariates
+
+multiScaleR 0.6.15
+---------
+* Added internal fixed-buffer SHDI helpers for exploratory landscape metric support
+* Added FFT-based SHDI raster projection prototype and reference tests
+* Added internal fixed-buffer and FFT projection prototypes for edge density
+* Expanded exploratory landscape metric helpers to composition/diversity, total edge,
+  landscape shape, percentage-like-adjacency, and contagion metrics
+* Added compiled fixed-buffer metric primitives to improve repeated point-level
+  landscape metric calculations
+* Added FFT raster projection support for exploratory landscape shape index
+  calculations
+
 multiScaleR 0.6.14
 ---------
 * Improved model-data, predictor, and log-likelihood handling for wrapped model objects

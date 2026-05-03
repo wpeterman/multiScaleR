@@ -228,6 +228,7 @@ kernel_scale_fn <- function(par,
   mod_class <- opt_context$mod_class
   covs <- opt_context$covs
   n_covs <- opt_context$n_covs
+  scale_vars <- opt_context$scale_vars
 
   sigma <- par[1:n_covs]
   if(kernel == 'expow'){
@@ -255,12 +256,27 @@ kernel_scale_fn <- function(par,
   rownames(cov.w) <- row_ids
 
   for(i in seq_len(n_ind)){
-    cov.w[i, ] <-
-      scale_type(d_list[[i]],
-                 kernel = kernel,
-                 sigma = sigma,
-                 shape = shape,
-                 r_stack.df = cov_df[[i]][,covs,drop = FALSE])
+    if (is.null(scale_vars)) {
+      cov.w[i, ] <-
+        scale_type(d_list[[i]],
+                   kernel = kernel,
+                   sigma = sigma,
+                   shape = shape,
+                   r_stack.df = cov_df[[i]][,covs,drop = FALSE])
+    } else {
+      cov.w[i, ] <- .msr_eval_scale_vars(
+        d = d_list[[i]],
+        cov_df = cov_df[[i]],
+        scale_vars = scale_vars,
+        sigma = sigma,
+        shape = shape,
+        kernel = kernel,
+        unit_conv = opt_context$unit_conv,
+        resolution = opt_context$resolution,
+        n_cols = opt_context$n_cols,
+        covariates = covs
+      )
+    }
   } ## End for loop
 
   scl_df <- scale(cov.w)
@@ -368,10 +384,14 @@ align_scaled_covariates <- function(scl_df, dat, opt_context) {
 build_opt_context <- function(fitted_mod,
                               cov_df,
                               join_by = NULL,
-                              refit_fn = NULL) {
+                              refit_fn = NULL,
+                              scale_vars = NULL,
+                              unit_conv = 1,
+                              resolution = NULL,
+                              n_cols = NULL) {
   mod <- fitted_mod
   analysis_mod <- .analysis_model(mod)
-  cov_names <- colnames(cov_df[[1]])
+  cov_names <- .msr_optimized_covariates(scale_vars, cov_df = cov_df)
 
   if(any(class(mod) == 'gls')){
     mod_class <- 'gls'
@@ -417,7 +437,11 @@ build_opt_context <- function(fitted_mod,
               mod_class = mod_class,
               covs = covs,
               n_covs = n_covs,
-              refit_fn = refit_fn)
+              refit_fn = refit_fn,
+              scale_vars = scale_vars,
+              unit_conv = unit_conv,
+              resolution = resolution,
+              n_cols = n_cols)
 
   complete_cases <- .model_complete_indices(dat = dat,
                                             n_sites = length(cov_df))

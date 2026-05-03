@@ -9,6 +9,9 @@
 #' `'expow'` kernel. Default: NULL
 #' @param kernel Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow';
 #' Default: 'gaussian')
+#' @param scale_vars Optional variable specifications created with `msr_vars()`.
+#' Use this when projecting explicitly defined `kernel_var()` and
+#' `landscape_var()` covariates without passing a fitted `multiScaleR` object.
 #' @param pct_wt The percentage of the weighted density to include when applying the
 #' kernel smoothing function, Default: 0.975
 #' @param fft Logical. If TRUE (Default), a fast Fourier transformation will be used
@@ -72,6 +75,7 @@ kernel_scale.raster <- function(raster_stack,
                                 multiScaleR = NULL,
                                 shape = NULL,
                                 kernel = c('gaussian', 'exp', 'expow', 'fixed'),
+                                scale_vars = NULL,
                                 pct_wt = 0.975,
                                 fft = TRUE,
                                 scale_center = FALSE,
@@ -113,6 +117,103 @@ kernel_scale.raster <- function(raster_stack,
     validate_multiScaleR_input(multiScaleR)
   }
 
+  kernel <- match.arg(kernel)
+
+  if (is.null(scale_vars) && !is.null(multiScaleR)) {
+    if (inherits(multiScaleR, "multiScaleR") &&
+        !is.null(multiScaleR$kernel_inputs$scale_vars)) {
+      scale_vars <- multiScaleR$kernel_inputs$scale_vars
+    } else if (inherits(multiScaleR, "multiScaleR_data") &&
+               !is.null(multiScaleR$scale_vars)) {
+      scale_vars <- multiScaleR$scale_vars
+    }
+  }
+
+  if (!is.null(scale_vars)) {
+    if (!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")) {
+      kernel <- multiScaleR$kernel_inputs$kernel
+    } else if (!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR_data")) {
+      kernel <- multiScaleR$kernel
+    }
+
+    scale_vars <- .msr_validate_scale_vars(scale_vars = scale_vars,
+                                           raster_stack = raster_stack,
+                                           kernel = kernel)
+    opt_vars <- .msr_optimized_scale_vars(scale_vars)
+    n_optimized <- nrow(opt_vars)
+
+    if (!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")) {
+      sigma <- multiScaleR$scale_est[opt_vars$covariate, "Mean"]
+      shape <- if (!is.null(multiScaleR$shape_est)) {
+        multiScaleR$shape_est[opt_vars$covariate, "Mean"]
+      } else {
+        NULL
+      }
+    } else if (!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR_data")) {
+      sigma <- multiScaleR$sigma * multiScaleR$unit_conv
+      shape <- multiScaleR$shape
+    } else if (n_optimized == 0 && is.null(sigma)) {
+      sigma <- numeric(0)
+    }
+
+    if (n_optimized > 0 && is.null(sigma)) {
+      stop("sigma values must be specified for optimized `scale_vars`.\n",
+           call. = FALSE)
+    }
+    if (n_optimized > 0) {
+      validate_numeric_vector(sigma,
+                              "sigma",
+                              length_ = n_optimized,
+                              positive = TRUE)
+    }
+    if (kernel == "expow" && n_optimized > 0) {
+      validate_numeric_vector(shape,
+                              "shape",
+                              length_ = n_optimized,
+                              positive = TRUE)
+    }
+
+    if(isTRUE(scale_center) && is.null(multiScaleR)){
+      warning("`scale_center = TRUE` was ignored because no `multiScaleR` object was provided.",
+              call. = FALSE)
+    }
+
+    if(isTRUE(clamp) && !isTRUE(scale_center)){
+      warning("`clamp = TRUE` was ignored because `scale_center` is FALSE.",
+              call. = FALSE)
+    }
+
+    smooth_stack <- .msr_scale_vars_raster(
+      raster_stack = raster_stack,
+      scale_vars = scale_vars,
+      sigma = sigma,
+      shape = shape,
+      kernel = kernel,
+      pct_wt = pct_wt,
+      fft = fft,
+      na.rm = na.rm,
+      verbose = verbose
+    )
+
+    if (isTRUE(scale_center) &&
+        (inherits(multiScaleR, "multiScaleR_data") || inherits(multiScaleR, "multiScaleR"))) {
+      smooth_stack <- scale_center_raster(r = smooth_stack,
+                                          multiScaleR = multiScaleR,
+                                          clamp = clamp,
+                                          pct_mx = pct_mx)
+    }
+
+    if (!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")) {
+      smooth_stack <- .add_site_covariate_rasters(
+        smooth_stack = smooth_stack,
+        multiScaleR = multiScaleR,
+        raster_covs = names(smooth_stack)
+      )
+    }
+
+    return(smooth_stack)
+  }
+
   if(!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")){
     covs <- rownames(multiScaleR$scale_est)
     sigma <- multiScaleR$scale_est[,1]
@@ -147,8 +248,6 @@ kernel_scale.raster <- function(raster_stack,
   } else {
     covs <- var <- names(raster_stack)
   }
-
-  kernel <- match.arg(kernel)
 
   if(is.null(sigma)){
     stop("sigma values must be specified\n")

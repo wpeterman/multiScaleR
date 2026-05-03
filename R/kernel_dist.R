@@ -92,10 +92,26 @@ kernel_dist <- function(model,
       # browser()
 
       dist_list <- vector('list', nrow(ci_))
+      scale_var_types <- NULL
+      if (!is.null(model$kernel_inputs$scale_vars)) {
+        scale_var_types <- stats::setNames(
+          model$kernel_inputs$scale_vars$type,
+          model$kernel_inputs$scale_vars$covariate
+        )
+      }
 
 
       for(i in 1:nrow(ci_)){
         if(!is.nan(ci_[i,2])){
+          is_landscape <- !is.null(scale_var_types) &&
+            identical(scale_var_types[[rownames(ci_)[[i]]]], "landscape")
+
+          if (isTRUE(is_landscape)) {
+            scale_mn <- ci_[i, 1]
+            scale_l <- ci_[i, 3]
+            scale_u <- ci_[i, 4]
+          } else {
+            shape_i <- if (!is.null(model$shape_est)) model$shape_est[i,1] else NULL
           # wt_mn <- scale_type_r(d = d,
           #                       kernel = model$kernel_inputs$kernel,
           #                       sigma = ci_[i, 1],
@@ -127,15 +143,16 @@ kernel_dist <- function(model,
           scale_mn <- k_dist(sigma = ci_[i, 1],
                              prob = prob,
                              kernel = model$kernel_inputs$kernel,
-                             beta = model$shape_est[i,1])
+                             beta = shape_i)
           scale_l <- k_dist(sigma = ci_[i, 3],
                             prob = prob,
                             kernel = model$kernel_inputs$kernel,
-                            beta = model$shape_est[i,1])
+                            beta = shape_i)
           scale_u <- k_dist(sigma = ci_[i, 4],
                             prob = prob,
                             kernel = model$kernel_inputs$kernel,
-                            beta = model$shape_est[i,1])
+                            beta = shape_i)
+          }
         } else {
           scale_mn <- NaN
           scale_l <- NaN

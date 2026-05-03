@@ -25,6 +25,57 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// landscape_composition_metric_cpp
+NumericVector landscape_composition_metric_cpp(NumericVector d, NumericMatrix values, double radius, std::string metric, Nullable<NumericVector> weights_, double base, Nullable<double> resolution_, Nullable<double> classes_max_);
+RcppExport SEXP _multiScaleR_landscape_composition_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP radiusSEXP, SEXP metricSEXP, SEXP weights_SEXP, SEXP baseSEXP, SEXP resolution_SEXP, SEXP classes_max_SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type d(dSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< double >::type radius(radiusSEXP);
+    Rcpp::traits::input_parameter< std::string >::type metric(metricSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type weights_(weights_SEXP);
+    Rcpp::traits::input_parameter< double >::type base(baseSEXP);
+    Rcpp::traits::input_parameter< Nullable<double> >::type resolution_(resolution_SEXP);
+    Rcpp::traits::input_parameter< Nullable<double> >::type classes_max_(classes_max_SEXP);
+    rcpp_result_gen = Rcpp::wrap(landscape_composition_metric_cpp(d, values, radius, metric, weights_, base, resolution_, classes_max_));
+    return rcpp_result_gen;
+END_RCPP
+}
+// landscape_edge_metric_cpp
+NumericVector landscape_edge_metric_cpp(NumericVector d, NumericMatrix values, NumericVector cells, double radius, double resolution, int n_cols, std::string metric);
+RcppExport SEXP _multiScaleR_landscape_edge_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP cellsSEXP, SEXP radiusSEXP, SEXP resolutionSEXP, SEXP n_colsSEXP, SEXP metricSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type d(dSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type cells(cellsSEXP);
+    Rcpp::traits::input_parameter< double >::type radius(radiusSEXP);
+    Rcpp::traits::input_parameter< double >::type resolution(resolutionSEXP);
+    Rcpp::traits::input_parameter< int >::type n_cols(n_colsSEXP);
+    Rcpp::traits::input_parameter< std::string >::type metric(metricSEXP);
+    rcpp_result_gen = Rcpp::wrap(landscape_edge_metric_cpp(d, values, cells, radius, resolution, n_cols, metric));
+    return rcpp_result_gen;
+END_RCPP
+}
+// landscape_adjacency_metric_cpp
+NumericVector landscape_adjacency_metric_cpp(NumericVector d, NumericMatrix values, NumericVector cells, double radius, int n_cols, std::string metric);
+RcppExport SEXP _multiScaleR_landscape_adjacency_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP cellsSEXP, SEXP radiusSEXP, SEXP n_colsSEXP, SEXP metricSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type d(dSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type cells(cellsSEXP);
+    Rcpp::traits::input_parameter< double >::type radius(radiusSEXP);
+    Rcpp::traits::input_parameter< int >::type n_cols(n_colsSEXP);
+    Rcpp::traits::input_parameter< std::string >::type metric(metricSEXP);
+    rcpp_result_gen = Rcpp::wrap(landscape_adjacency_metric_cpp(d, values, cells, radius, n_cols, metric));
+    return rcpp_result_gen;
+END_RCPP
+}
 // scale_type_cpp
 NumericVector scale_type_cpp(NumericVector d, std::string kernel, Nullable<NumericVector> sigma_, Nullable<NumericVector> shape_, Nullable<NumericMatrix> r_stack_df, Nullable<int> output);
 RcppExport SEXP _multiScaleR_scale_type_cpp(SEXP dSEXP, SEXP kernelSEXP, SEXP sigma_SEXP, SEXP shape_SEXP, SEXP r_stack_dfSEXP, SEXP outputSEXP) {

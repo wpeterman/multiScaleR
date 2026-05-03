@@ -9,6 +9,7 @@ kernel_prep(
   raster_stack,
   max_D,
   kernel = c("gaussian", "exp", "expow", "fixed"),
+  scale_vars = NULL,
   sigma = NULL,
   shape = NULL,
   projected = TRUE,
@@ -24,6 +25,12 @@ kernel_prep(
 \item{max_D}{The maximum distance to consider during the scale optimization}
 
 \item{kernel}{Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')}
+
+\item{scale_vars}{Optional variable specifications created with `msr_vars()`.
+If omitted, each raster layer is treated as one optimized kernel-weighted
+covariate, preserving the historical behavior. Use `kernel_var()` and
+`landscape_var()` inside `msr_vars()` to explicitly define derived model
+covariates from source raster layers.}
 
 \item{sigma}{Initial values for optimizing the scale parameter. Default: NULL, initial values will be automatically generated. This is recommended.}
 

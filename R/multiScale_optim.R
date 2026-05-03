@@ -263,8 +263,22 @@ multiScale_optim <- function(fitted_mod,
     mod_vars <- .model_predictors(analysis_mod)
   }
 
+  if (!is.null(kernel_inputs$scale_vars)) {
+    missing_sources <- setdiff(kernel_inputs$scale_vars$source,
+                               colnames(kernel_inputs$raw_cov[[1]]))
+    if (length(missing_sources) > 0) {
+      stop("The raster surfaces provided do not match the variables used in your fitted model. Ensure names of surfaces match model variable names.",
+           call. = FALSE)
+    }
+  }
+
+  optimized_covariates <- .msr_optimized_covariates(
+    kernel_inputs$scale_vars,
+    cov_df = kernel_inputs$raw_cov
+  )
+
   # Ensure model variables are in kernel_inputs
-  r_vars <- mod_vars[mod_vars %in% colnames(kernel_inputs$raw_cov[[1]])]
+  r_vars <- mod_vars[mod_vars %in% optimized_covariates]
   if (length(r_vars) == 0) {
     stop("The raster surfaces provided do not match the variables used in your fitted model. Ensure names of surfaces match model variable names.")
   }
@@ -286,19 +300,19 @@ multiScale_optim <- function(fitted_mod,
     mod_class <- 'gls'
     # mod_vars <- find_predictors(fitted_mod)[[1]]
     mod_vars <- .model_predictors(analysis_mod)
-    r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
+    r_vars <- mod_vars[which(mod_vars %in% optimized_covariates)]
     n_covs <- length(r_vars)
   } else if(any(grepl("^unmarked", class(fitted_mod)))) {
     mod_class <- 'unmarked'
     mod_vars <- all.vars(formula(fitted_mod@formula))
-    r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
+    r_vars <- mod_vars[which(mod_vars %in% optimized_covariates)]
     n_covs <- length(r_vars)
     fitType <- fitted_mod@fitType
   } else {
     mod_class <- 'other'
     # mod_vars <- find_predictors(fitted_mod)[[1]]
     mod_vars <- .model_predictors(analysis_mod)
-    r_vars <- mod_vars[which(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]]))]
+    r_vars <- mod_vars[which(mod_vars %in% optimized_covariates)]
     n_covs <- length(r_vars)
   }
 
@@ -314,7 +328,7 @@ multiScale_optim <- function(fitted_mod,
 
   ## Modify to only confirm used variables in formula are present in stack
 
-  if(!(any(mod_vars %in% colnames(kernel_inputs$raw_cov[[1]])))){
+  if(!(any(mod_vars %in% optimized_covariates))){
     stop("\nThe raster surfaces provided do not match the variables used in your fitted model!\n\nMake sure raster surfaces being used in fitted model are included,\nand make sure names of surfaces match the names of variables in the model.\n")
   }
 
@@ -330,7 +344,11 @@ multiScale_optim <- function(fitted_mod,
   opt_context <- build_opt_context(fitted_mod = fitted_mod,
                                    cov_df = kernel_inputs$raw_cov,
                                    join_by = join_by,
-                                   refit_fn = refit_fn)
+                                   refit_fn = refit_fn,
+                                   scale_vars = kernel_inputs$scale_vars,
+                                   unit_conv = kernel_inputs$unit_conv,
+                                   resolution = kernel_inputs$resolution,
+                                   n_cols = kernel_inputs$n_cols)
 
   if(kernel_inputs$kernel == 'expow'){
     lwr <- c(lwr, rep(0.75, n_covs))
@@ -504,6 +522,9 @@ multiScale_optim <- function(fitted_mod,
                                  mod_return = TRUE,
                                  opt_context = opt_context)
 
+    scl_params <- .msr_merge_scl_params(primary = final_mod$scl_params,
+                                        fallback = kernel_inputs$scl_params)
+
     out <- list(scale_est = scale_est,
                 shape_est = shape_est,
                 optim_results = opt_results,
@@ -514,7 +535,7 @@ multiScale_optim <- function(fitted_mod,
                 kernel_inputs = kernel_inputs[
                   setdiff(names(kernel_inputs), c("min_D", "max_D"))
                 ],
-                scl_params = final_mod$scl_params,
+                scl_params = scl_params,
                 join_by = join_by,
                 opt_context = opt_context,
                 profile_scale_est = NULL,
@@ -544,7 +565,7 @@ multiScale_optim <- function(fitted_mod,
               "Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.\n\n"))
     }
 
-    if(any((shape_est[,1] / shape_est[,2]) < 2, na.rm = T)){
+    if(!is.null(shape_est) && any((shape_est[,1] / shape_est[,2]) < 2, na.rm = T)){
       out$diagnostics$shape_precision <- .precision_diagnostic(shape_est, "shape_precision")
       out$warn_message <- c(out$warn_message, 3)
       cat(red("\n WARNING!!!\n",
