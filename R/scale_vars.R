@@ -234,6 +234,32 @@ print.multiScaleR_vars <- function(x, ...) {
 }
 
 
+.msr_scale_vars_in_model <- function(scale_vars, multiScaleR) {
+  if (is.null(scale_vars) ||
+      is.null(multiScaleR) ||
+      !inherits(multiScaleR, "multiScaleR")) {
+    return(scale_vars)
+  }
+
+  used_covariates <- tryCatch(
+    intersect(scale_vars$covariate,
+              .model_predictors(.analysis_model(multiScaleR$opt_mod))),
+    error = function(e) character(0)
+  )
+
+  if (length(used_covariates) == 0 && !is.null(multiScaleR$scale_est)) {
+    used_covariates <- intersect(scale_vars$covariate,
+                                 row.names(multiScaleR$scale_est))
+  }
+
+  if (length(used_covariates) == 0) {
+    return(scale_vars)
+  }
+
+  scale_vars[scale_vars$covariate %in% used_covariates, , drop = FALSE]
+}
+
+
 .msr_optimized_covariates <- function(scale_vars, cov_df = NULL) {
   if (is.null(scale_vars)) {
     return(colnames(cov_df[[1]]))

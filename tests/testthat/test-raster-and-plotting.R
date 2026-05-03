@@ -48,6 +48,42 @@ test_that("kernel_scale.raster adds numeric site covariates as dummy rasters", {
   expect_lte(max(cont1_vals, na.rm = TRUE), train_range[2] + 1e-8)
 })
 
+test_that("kernel_scale.raster ignores unused default scale specs in fitted models", {
+  r <- terra::rast(list(
+    a = terra::rast(matrix(runif(20 * 20), 20, 20)),
+    b = terra::rast(matrix(runif(20 * 20), 20, 20)),
+    c = terra::rast(matrix(runif(20 * 20), 20, 20))
+  ))
+  names(r) <- c("a", "b", "c")
+
+  dat <- data.frame(y = rnorm(10), a = rnorm(10), b = rnorm(10))
+  mod <- glm(y ~ a + b, data = dat)
+
+  obj <- structure(
+    list(
+      scale_est = data.frame(Mean = c(a = 25, b = 40),
+                             SE = c(a = 5, b = 6)),
+      shape_est = NULL,
+      kernel_inputs = list(
+        kernel = "gaussian",
+        scale_vars = multiScaleR:::.msr_default_scale_vars(r)
+      ),
+      opt_mod = mod
+    ),
+    class = "multiScaleR"
+  )
+
+  scaled <- kernel_scale.raster(
+    raster_stack = r,
+    multiScaleR = obj,
+    scale_center = FALSE,
+    verbose = FALSE
+  )
+
+  expect_true(inherits(scaled, "SpatRaster"))
+  expect_equal(names(scaled), c("a", "b"))
+})
+
 test_that("kernel_scale.raster warns and skips categorical site covariates", {
   fix <- make_core_fixture()
 

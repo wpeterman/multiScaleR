@@ -136,6 +136,11 @@ kernel_scale.raster <- function(raster_stack,
       kernel <- multiScaleR$kernel
     }
 
+    if (!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")) {
+      scale_vars <- .msr_scale_vars_in_model(scale_vars = scale_vars,
+                                             multiScaleR = multiScaleR)
+    }
+
     scale_vars <- .msr_validate_scale_vars(scale_vars = scale_vars,
                                            raster_stack = raster_stack,
                                            kernel = kernel)

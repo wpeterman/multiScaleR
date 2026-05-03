@@ -1,3 +1,10 @@
+multiScaleR 0.6.18
+---------
+* Reconciled the merged landscape metric branch with a projection fix for
+  fitted models that use only a subset of cached raster covariates
+* Added regression coverage for `kernel_scale.raster()` when stored
+  `scale_vars` include unused source layers
+
 multiScaleR 0.6.17
 ---------
 * Added a landscape metric covariates vignette demonstrating explicit
