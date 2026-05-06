@@ -94,6 +94,7 @@
 #' plot(s_dat$df$y ~ s_dat$df$bin1)
 #' plot(s_dat$df$y ~ s_dat$df$cont1)
 #'
+#' @export
 #' @importFrom terra as.polygons ext nlyr rast
 #' @importFrom sf  st_as_sf st_make_grid
 

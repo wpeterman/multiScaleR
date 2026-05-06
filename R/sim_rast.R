@@ -61,6 +61,7 @@
 #' When \code{user_seed} is provided, independent but reproducible seeds are
 #' derived for each surface as multiples of \code{user_seed}.
 #'
+#' @export
 #' @rdname sim_rast
 #' @importFrom terra as.int rast plot minmax ext<- values<- crs<-
 #' @importFrom stats rpois rnbinom plogis rbinom dist predict

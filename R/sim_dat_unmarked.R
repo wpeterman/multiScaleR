@@ -114,6 +114,7 @@
 #'
 #' summary(opt1)
 #'}
+#' @export
 #' @importFrom terra as.polygons ext nlyr rast
 #' @importFrom sf  st_as_sf st_make_grid
 

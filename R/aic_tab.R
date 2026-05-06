@@ -268,7 +268,8 @@
   mod_dims
 }
 
-
+#' @rdname aic_tab
+#' @export
 aic_tab <- function(mod_list,
                     AICc = TRUE,
                     mod_names = NULL,
@@ -362,6 +363,7 @@ aic_tab <- function(mod_list,
 #' than AIC as sample size grows, and is often preferred when the goal is
 #' identifying the single best-supported model rather than model averaging.
 #' Sigma (and shape for \code{"expow"}) is counted in K.
+#' @export
 #'
 #' @usage
 #' bic_tab(mod_list,

@@ -1,3 +1,9 @@
+multiScaleR 0.6.22
+---------
+* Restored missing exports for model-selection and simulation helpers used in
+  package vignettes, including `aic_tab()`, `bic_tab()`, `sim_rast()`,
+  `sim_dat()`, and `sim_dat_unmarked()`
+
 multiScaleR 0.6.21
 ---------
 * Added an opt-in screened start strategy for `multiScale_optim()` that scouts
