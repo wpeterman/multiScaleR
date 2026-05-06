@@ -13,30 +13,96 @@ plot_marginal_effects(
 )
 }
 \arguments{
-\item{x}{A `multiScaleR` object containing at least the elements `opt_mod` (the fitted model)
-and `scl_params` (a list with `mean` and `sd` for each covariate used for scaling).}
+\item{x}{A fitted \code{multiScaleR} object returned by
+\code{\link{multiScale_optim}}. Must contain \code{opt_mod} (the optimized
+fitted model) and \code{scl_params} (a list with \code{mean} and \code{sd}
+elements for each covariate, used to back-transform scaled covariates to
+their original units for the x-axis).}
 
-\item{ylab}{Character. Y-axis label for the marginal effect plots. Default is `"Estimated response"`.}
+\item{ylab}{Character scalar. Y-axis label for all marginal effect panels.
+Default: \code{"Estimated response"}.}
 
-\item{length.out}{Integer. Number of points at which to evaluate the marginal effect curve.
-Default is 100.}
+\item{length.out}{Positive integer. Number of equally spaced points at which
+to evaluate the marginal effect curve for each covariate. Default: \code{100}.}
 
-\item{type}{For `unmarked` models, Default is `"state"`}
+\item{type}{Character. Prediction type for \code{unmarked} models. One of
+\code{"state"} (default) or \code{"lambda"}. Ignored for non-unmarked
+models.}
 
-\item{link}{Logical. An optional switch to predict values on the response scale. Default = `FALSE`. If predicted values seem incorrect, try switching to `TRUE`}
+\item{link}{Logical. If \code{TRUE}, predictions are passed through the
+model's inverse link function before plotting (i.e., plotted on the
+response scale). For \code{glm} objects this is applied automatically.
+Set to \code{TRUE} manually if predicted values appear to be on the link
+scale. Default: \code{FALSE}.}
 }
 \value{
-A named list of `ggplot` objects, one for each covariate, showing the predicted
-  response and 95% confidence interval across the observed range of that covariate
-  while holding other covariates at their mean values.
+A named list of \code{ggplot2} objects, one per covariate. Plots are
+  printed as a side effect and the list is returned invisibly. Each plot
+  shows:
+  \itemize{
+    \item The predicted response (solid line) across the observed covariate
+      range, with x-axis values back-transformed to the original (unscaled)
+      units.
+    \item A shaded ribbon for the 95\% confidence interval (when available
+      from the model's \code{predict} method).
+    \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
+      terms that involve the covariate.
+  }
 }
 \description{
-Generates marginal effect plots with 95% confidence intervals for each covariate
-in a fitted model stored within a `multiScaleR` object.
+Generates marginal effect plots with 95\% confidence intervals for each
+covariate in the optimized model stored within a \code{multiScaleR} object.
+Each panel sweeps one covariate across its observed range while holding all
+others at their sample mean.
 }
 \details{
-For `unmarked` models, predictions are made using `type = "state"` and
-  the `predict` method for state variables. For other models (e.g., `lm`, `glm`),
-  predictions are made using the standard `predict(..., se.fit = TRUE)` call and
-  transformed by the model's inverse link function .
+Marginal effects are computed by constructing a \code{newdata} data frame
+where the focal covariate sweeps from its minimum to maximum observed value
+and all other predictors are held at their sample mean. For kernel-scaled
+covariates, whose scaled mean is 0, this is equivalent to holding them at
+their average landscape value.
+
+For \code{glm} and most GLM-family models, predictions are transformed via
+the inverse link function automatically (e.g., \code{exp()} for Poisson
+log-link models). Confidence intervals are constructed from
+\code{predict(..., se.fit = TRUE)} using \eqn{\pm 1.96 \times SE}.
+
+For \code{unmarked} models, \code{predict(mod, newdata, type = type)} is
+used, and lower/upper bounds come from the \code{lower} and \code{upper}
+columns of the returned data frame.
+
+For models with interaction terms, a message is printed explaining that each
+panel represents a conditional slice (at the mean of the interacting
+variable) rather than the full interaction surface.
+
+\code{HLfit} (spaMM) and \code{zeroinfl} (pscl) models are handled with
+class-specific prediction calls.
+When \code{x$opt_mod} is a wrapper object around another fitted model,
+\code{plot_marginal_effects()} uses the nested analysis model for predictor
+discovery, data recovery, and prediction when possible.
+}
+\examples{
+\donttest{
+data('pts')
+data('count_data')
+hab <- terra::rast(system.file('extdata', 'hab.tif', package = 'multiScaleR'))
+
+kernel_inputs <- kernel_prep(pts = pts,
+                             raster_stack = hab,
+                             max_D = 250,
+                             kernel = 'gaussian')
+
+mod <- glm(y ~ hab, family = poisson, data = count_data)
+opt <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs)
+
+## Default marginal effect plot on the response scale
+plot_marginal_effects(opt)
+
+## Custom y-axis label
+plot_marginal_effects(opt, ylab = "Predicted abundance")
+
+## Finer evaluation grid
+plot_marginal_effects(opt, length.out = 200)
+}
+
 }

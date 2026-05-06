@@ -595,6 +595,12 @@ extract_model_data <- function(model) {
       return(.model_frame_to_data(analysis_mod, mf))
     }
 
+    # Some wrapped survival fits retain the original model frame here when
+    # model.frame() cannot be reconstructed cleanly outside the fitting call.
+    if (is.data.frame(analysis_mod$model)) {
+      return(.model_frame_to_data(analysis_mod, analysis_mod$model))
+    }
+
     # Method 2: Check for @frame (lme4, glmmTMB)
     if (is(analysis_mod, "merMod") && !is.null(analysis_mod@frame)) {
       return(analysis_mod@frame)

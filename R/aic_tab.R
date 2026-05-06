@@ -111,6 +111,164 @@
 #'  aic_tab(mod_list = mod_list,
 #'          AICc = TRUE,
 #'          mod_names = c('mod1', 'mod2', 'mod3'))
+.msr_selection_model <- function(model) {
+  if (inherits(model, "multiScaleR")) {
+    return(model$opt_mod)
+  }
+
+  model
+}
+
+
+.msr_kernel_label <- function(model) {
+  if (inherits(model, "multiScaleR")) {
+    return(model$kernel_inputs$kernel)
+  }
+
+  "NA"
+}
+
+
+.msr_model_nobs <- function(model) {
+  analysis_mod <- .analysis_model(model)
+
+  if (any(grepl("^unmarked", class(analysis_mod)))) {
+    return(dim(analysis_mod@data@siteCovs)[1])
+  }
+
+  as.integer(n_obs(analysis_mod)[1])
+}
+
+
+.msr_parameter_count <- function(model) {
+  analysis_mod <- .analysis_model(model)
+
+  params <- tryCatch(
+    get_parameters(analysis_mod),
+    error = function(e) NULL
+  )
+  if (is.data.frame(params) && nrow(params) > 0) {
+    return(nrow(params))
+  }
+
+  coefs <- tryCatch(
+    stats::coef(analysis_mod),
+    error = function(e) NULL
+  )
+  if (length(coefs) > 0) {
+    return(length(coefs))
+  }
+
+  loglik_df <- tryCatch(
+    attr(stats::logLik(analysis_mod), "df"),
+    error = function(e) NULL
+  )
+  if (length(loglik_df) == 1 && is.finite(loglik_df)) {
+    return(as.integer(loglik_df))
+  }
+
+  if (any(grepl("^unmarked", class(analysis_mod)))) {
+    return(length(all.vars(formula(analysis_mod@formula))))
+  }
+
+  stop("Could not determine the number of fitted parameters for one or more models.",
+       call. = FALSE)
+}
+
+
+.msr_selection_parameter_count <- function(model) {
+  if (!inherits(model, "multiScaleR")) {
+    return(.msr_parameter_count(model))
+  }
+
+  extra_k <- 0L
+  if (!is.null(model$scale_est)) {
+    extra_k <- extra_k + nrow(model$scale_est)
+  }
+  if (!is.null(model$shape_est)) {
+    extra_k <- extra_k + nrow(model$shape_est)
+  }
+
+  .msr_parameter_count(model$opt_mod) + extra_k
+}
+
+
+.msr_valid_observation_ids <- function(ids, n_obs) {
+  length(ids) == n_obs &&
+    !anyNA(ids) &&
+    all(nzchar(ids)) &&
+    !anyDuplicated(ids)
+}
+
+
+.msr_observation_ids <- function(model) {
+  analysis_mod <- .analysis_model(model)
+  mod_n <- .msr_model_nobs(model)
+
+  if (any(grepl("^unmarked", class(analysis_mod)))) {
+    dat <- analysis_mod@data@siteCovs
+    ids <- row.names(dat)
+    if (.msr_valid_observation_ids(ids, mod_n)) {
+      return(as.character(ids))
+    }
+    return(as.character(seq_len(mod_n)))
+  }
+
+  dat <- .model_data(analysis_mod, effects = "all")
+  if (is.null(dat)) {
+    dat <- extract_model_data(model)
+  }
+
+  if (is.data.frame(dat)) {
+    ids <- row.names(dat)
+    if (.msr_valid_observation_ids(ids, nrow(dat))) {
+      return(as.character(ids))
+    }
+  }
+
+  residual_ids <- tryCatch(
+    names(stats::residuals(analysis_mod)),
+    error = function(e) NULL
+  )
+  if (.msr_valid_observation_ids(residual_ids, mod_n)) {
+    return(as.character(residual_ids))
+  }
+
+  fitted_ids <- tryCatch(
+    names(stats::fitted(analysis_mod)),
+    error = function(e) NULL
+  )
+  if (.msr_valid_observation_ids(fitted_ids, mod_n)) {
+    return(as.character(fitted_ids))
+  }
+
+  NULL
+}
+
+
+.msr_validate_comparable_models <- function(mod_list) {
+  mod_dims <- vapply(mod_list, .msr_model_nobs, integer(1))
+  if (length(unique.default(mod_dims)) != 1L) {
+    stop("\nYou are attempting to compare models with different number of sample locations. These are not valid comparisons.\n")
+  }
+
+  obs_ids <- lapply(mod_list, .msr_observation_ids)
+  if (all(vapply(obs_ids, Negate(is.null), logical(1)))) {
+    ref_ids <- sort(obs_ids[[1]])
+    same_obs <- vapply(
+      obs_ids[-1],
+      function(x) identical(sort(x), ref_ids),
+      logical(1)
+    )
+    if (length(same_obs) > 0 && !all(same_obs)) {
+      stop("\nYou are attempting to compare models fit to different observation sets. These are not valid comparisons.\n")
+    }
+  }
+
+  mod_dims
+}
+
+
 aic_tab <- function(mod_list,
                     AICc = TRUE,
                     mod_names = NULL,
@@ -119,44 +277,11 @@ aic_tab <- function(mod_list,
 
   p <- list(...)
 
-  class_list <- lapply(mod_list, function(x) class(x))
-  msclr <- which(class_list == 'multiScaleR')
-  opt_list <- lapply(mod_list[msclr], function(x) x$opt_mod)
-
-  if(length(msclr) != length(mod_list)){
-    opt_list <- c(opt_list, mod_list[-msclr])
-  }
-
-  ## All models comparable
-  mod_dims <- as.vector(lapply(opt_list, function(x) n_obs(x)))
-  if(length(unique.default(mod_dims)) != 1L) {
-    stop("\nYou are attempting to compare models with different number of sample locations. These are not valid comparisons.\n")
-  }
-
+  opt_list <- lapply(mod_list, .msr_selection_model)
+  mod_df <- .msr_validate_comparable_models(opt_list)
   mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))
-  mod_kernel <- as.vector(sapply(mod_list[msclr], function(x) x$kernel_inputs$kernel))
-  if(length(msclr) != length(mod_list)){
-    mod_kernel <- c(mod_kernel, rep('NA', length(mod_list) - length(msclr)))
-  }
-  if(any(sapply(opt_list, function(x) any(grepl("^unmarked", class(x)))))){
-    k <- as.vector(sapply(opt_list[msclr], function(x) length(all.vars(formula(x@formula)))+1))
-    mod_df <- as.vector(sapply(opt_list, function(x) dim(x@data@siteCovs)[1]))
-    if(length(msclr) != length(mod_list)){
-      k2 <- as.vector(sapply(opt_list[-msclr], function(x) length(all.vars(formula(x@formula)))))
-      k <- c(k, k2)
-
-    }
-  } else {
-    k <- as.vector(sapply(opt_list[msclr], function(x) nrow(get_parameters(x))[1])+1)
-    mod_df <- as.vector(sapply(opt_list, function(x) n_obs(x)))
-    if(length(msclr) != length(mod_list)){
-      k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(get_parameters(x))[1]))
-      k <- c(k, k2)
-
-    }
-  }
-
-  k[(mod_kernel %in% 'expow')] <- k[(mod_kernel %in% 'expow')] + 1
+  mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
+  k <- vapply(mod_list, .msr_selection_parameter_count, integer(1))
 
   if(is.null(mod_names)){
     mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
@@ -308,53 +433,17 @@ bic_tab <- function(mod_list,
 
   p <- list(...)
 
-  class_list <- lapply(mod_list, function(x) class(x))
-  msclr <- which(class_list == 'multiScaleR')
-  opt_list <- lapply(mod_list[msclr], function(x) x$opt_mod)
-
-  if(length(msclr) != length(mod_list)){
-    opt_list <- c(opt_list, mod_list[-msclr])
-  }
-
-  ## All models comparable
-  mod_dims <- as.vector(lapply(opt_list, function(x) n_obs(x)))
-  if(length(unique.default(mod_dims)) != 1L) {
-    stop("\nYou are attempting to compare models with different number of sample locations. These are not valid comparisons.\n")
-  }
-
+  opt_list <- lapply(mod_list, .msr_selection_model)
+  mod_df <- .msr_validate_comparable_models(opt_list)
   mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))
-  mod_kernel <- as.vector(sapply(mod_list[msclr], function(x) x$kernel_inputs$kernel))
-  if(length(msclr) != length(mod_list)){
-    mod_kernel <- c(mod_kernel, rep('NA', length(mod_list) - length(msclr)))
-  }
-
-
-  if(any(sapply(opt_list, function(x) any(grepl("^unmarked", class(x)))))){
-    k <- as.vector(sapply(opt_list[msclr], function(x) length(all.vars(formula(x@formula)))+1))
-    mod_df <- as.vector(sapply(opt_list, function(x) dim(x@data@siteCovs)[1]))
-    if(length(msclr) != length(mod_list)){
-      k2 <- as.vector(sapply(opt_list[-msclr], function(x) length(all.vars(formula(x@formula)))))
-      k <- c(k, k2)
-
-    }
-  } else {
-    k <- as.vector(sapply(opt_list[msclr], function(x) nrow(get_parameters(x))[1])+1)
-    mod_df <- as.vector(sapply(opt_list, function(x) n_obs(x)))
-    if(length(msclr) != length(mod_list)){
-      k2 <- as.vector(sapply(opt_list[-msclr], function(x) nrow(get_parameters(x))[1]))
-      k <- c(k, k2)
-
-    }
-  }
-  k[(mod_kernel %in% 'expow')] <- k[(mod_kernel %in% 'expow')] + 1
+  mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
+  k <- vapply(mod_list, .msr_selection_parameter_count, integer(1))
 
   if(is.null(mod_names)){
     mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
   }
 
   mod_loglik <- as.vector(sapply(opt_list, function(x) logLik(x)))
-  mod_df <- as.vector(sapply(opt_list, function(x) n_obs(x)))
-
   # * BIC ---------------------------------------------------------------------
 
   tab <- bictabCustom(logL = mod_loglik,

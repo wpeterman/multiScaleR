@@ -1,0 +1,19 @@
+size,family,method,mean_sec,median_sec
+100,Adjacency,FFT,0.1230,0.1100
+100,Composition,FFT,0.0264,0.0300
+100,Edge,FFT,0.0170,0.0200
+100,Adjacency,Moving window,1.9735,1.9550
+100,Composition,Moving window,0.7112,0.7050
+100,Edge,Moving window,0.7560,0.7600
+250,Adjacency,FFT,0.4105,0.4700
+250,Composition,FFT,0.0783,0.0800
+250,Edge,FFT,0.0650,0.0600
+250,Adjacency,Moving window,10.9265,11.0550
+250,Composition,Moving window,3.5469,3.5200
+250,Edge,Moving window,4.1067,4.1100
+500,Adjacency,FFT,2.2135,1.8050
+500,Composition,FFT,0.2691,0.2600
+500,Edge,FFT,0.2153,0.2150
+500,Adjacency,Moving window,38.2335,35.8200
+500,Composition,Moving window,12.1147,11.5000
+500,Edge,Moving window,13.9507,13.5150

@@ -24,4 +24,9 @@ Useful links:
 \author{
 \strong{Maintainer}: Bill Peterman \email{Peterman.73@osu.edu} (\href{https://orcid.org/0000-0001-5229-9268}{ORCID})
 
+Authors:
+\itemize{
+  \item Bill Peterman \email{Peterman.73@osu.edu} (\href{https://orcid.org/0000-0001-5229-9268}{ORCID})
+}
+
 }

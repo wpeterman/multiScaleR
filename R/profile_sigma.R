@@ -150,13 +150,8 @@ profile_sigma <- function(x,
 
   # Compute K (number of model parameters) for AICc
   mod <- x$opt_mod
-  if (any(grepl("^unmarked", class(mod)))) {
-    k_base <- length(all.vars(formula(mod@formula))) + 1
-    n <- dim(mod@data@siteCovs)[1]
-  } else {
-    k_base <- nrow(get_parameters(mod)) + 1
-    n <- n_obs(mod)
-  }
+  k_base <- .msr_parameter_count(mod)
+  n <- .msr_model_nobs(mod)
   # Add sigma parameters (and shape if expow)
   k_total <- k_base + n_covs
   if (kernel == "expow") k_total <- k_total + n_covs

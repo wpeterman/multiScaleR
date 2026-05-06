@@ -58,6 +58,9 @@
 #'
 #' \code{HLfit} (spaMM) and \code{zeroinfl} (pscl) models are handled with
 #' class-specific prediction calls.
+#' When \code{x$opt_mod} is a wrapper object around another fitted model,
+#' \code{plot_marginal_effects()} uses the nested analysis model for predictor
+#' discovery, data recovery, and prediction when possible.
 #'
 #' @examples
 #' \donttest{
@@ -111,10 +114,11 @@ plot_marginal_effects <- function(x,
   }
 
   mod <- x$opt_mod
+  analysis_mod <- .analysis_model(mod)
   scl <- x$scl_params
-  namespace(mod)
+  namespace(analysis_mod)
 
-  if(inherits(mod, "glm")){
+  if(inherits(analysis_mod, "glm")){
     link <- TRUE
   }
 
@@ -176,11 +180,11 @@ plot_marginal_effects <- function(x,
     })
 
   } else {
-    c_vars <- find_predictors(mod)[[1]]
-    vars <- unlist(find_predictors(mod))
-    dat_all <- .model_data(mod)
+    c_vars <- find_predictors(analysis_mod)[[1]]
+    vars <- unlist(find_predictors(analysis_mod))
+    dat_all <- .model_data(analysis_mod)
     if(is.null(dat_all)){
-      dat_all <- extract_model_data(mod)
+      dat_all <- extract_model_data(analysis_mod)
     }
     if(is.null(dat_all)){
       stop("Could not recover the original model data needed to plot marginal effects.")
@@ -191,7 +195,7 @@ plot_marginal_effects <- function(x,
     # so no special prediction logic is needed. Detection is used only for plot
     # annotations and the interaction warning below.
     fterms <- tryCatch(
-      attr(stats::terms(formula(mod)), "term.labels"),
+      attr(stats::terms(formula(analysis_mod)), "term.labels"),
       error = function(e) character(0)
     )
     poly_terms  <- fterms[grepl("^I\\(", fterms)]
@@ -219,15 +223,24 @@ plot_marginal_effects <- function(x,
       )
     }
 
-    # Compute sample means of all predictor columns so non-varied covariates are
-    # held at their actual mean rather than zero. For kernel-scaled variables the
-    # mean is already zero; for unscaled site covariates this is the true mean.
-    available_vars <- vars[vars %in% names(dat_all)]
-    pred_means <- stats::setNames(rep(0, length(vars)), vars)
-    if(length(available_vars) > 0) {
-      pred_means[available_vars] <- colMeans(
-        dat_all[, available_vars, drop = FALSE], na.rm = TRUE
-      )
+    # Hold non-focal predictors at representative observed values. Numeric
+    # columns use their sample mean; non-numeric columns keep the first
+    # non-missing observed value so special terms like strata() can still be
+    # evaluated during prediction.
+    pred_defaults <- stats::setNames(vector("list", length(vars)), vars)
+    for (var in vars) {
+      if (!var %in% names(dat_all)) {
+        pred_defaults[[var]] <- 0
+        next
+      }
+
+      values <- dat_all[[var]]
+      if (is.numeric(values)) {
+        pred_defaults[[var]] <- mean(values, na.rm = TRUE)
+      } else {
+        keep <- which(!is.na(values))[1]
+        pred_defaults[[var]] <- if (is.na(keep)) values[1] else values[keep]
+      }
     }
 
     plot_list <- lapply(c_vars, function(v) {
@@ -246,14 +259,14 @@ plot_marginal_effects <- function(x,
       # R's predict() evaluates I(x^2), log(x), etc. from the base column, so
       # newdata only needs to contain the base variable names.
       newdata <- as.data.frame(
-        matrix(rep(pred_means, each = length.out), nrow = length.out, byrow = FALSE)
+        lapply(pred_defaults, function(value) rep(value, length.out)),
+        stringsAsFactors = FALSE
       )
-      names(newdata) <- vars
       newdata[[v]] <- x_seq
 
-      if(inherits(mod, "HLfit")){
+      if(inherits(analysis_mod, "HLfit")){
         preds_ <- tryCatch(
-          predict(mod, newdata = newdata, variances = list(respVar = TRUE), re.form = NA),
+          predict(analysis_mod, newdata = newdata, variances = list(respVar = TRUE), re.form = NA),
           error = function(e) {
             stop(
               sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
@@ -263,9 +276,9 @@ plot_marginal_effects <- function(x,
         )
         preds <- list(preds = as.vector(preds_),
                       se = sqrt(attr(preds_, "fixefVar")))
-      } else if(inherits(mod, "zeroinfl")) {
+      } else if(inherits(analysis_mod, "zeroinfl")) {
         preds <- tryCatch(
-          as.data.frame(get_predicted(mod, data = newdata)),
+          as.data.frame(get_predicted(analysis_mod, data = newdata)),
           error = function(e) {
             stop(
               sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
@@ -275,7 +288,7 @@ plot_marginal_effects <- function(x,
         )
       } else {
         preds <- tryCatch(
-          predict(mod, newdata = newdata, se.fit = TRUE),
+          predict(analysis_mod, newdata = newdata, se.fit = TRUE),
           error = function(e) {
             stop(
               sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
@@ -285,20 +298,20 @@ plot_marginal_effects <- function(x,
         )
       }
 
-      if(inherits(mod, "zeroinfl")) {
+      if(inherits(analysis_mod, "zeroinfl")) {
         fit_ <- preds$Predicted
         lwr  <- preds$CI_low
         upr  <- preds$CI_high
         if(is.null(lwr) && is.null(upr)) lwr <- upr <- NA
 
-      } else if(!is.null(link_inverse(mod)) && link){
+      } else if(!is.null(link_inverse(analysis_mod)) && link){
         if(!inherits(preds, 'list') || (is.list(preds) && length(preds) == 1)){
-          fit_ <- link_inverse(mod)(as.data.frame(preds)[, 1])
+          fit_ <- link_inverse(analysis_mod)(as.data.frame(preds)[, 1])
           lwr  <- upr <- NA
         } else {
-          fit_ <- link_inverse(mod)(preds[[1]])
-          lwr  <- link_inverse(mod)(preds[[1]] + qnorm(0.025) * preds[[2]])
-          upr  <- link_inverse(mod)(preds[[1]] + qnorm(0.975) * preds[[2]])
+          fit_ <- link_inverse(analysis_mod)(preds[[1]])
+          lwr  <- link_inverse(analysis_mod)(preds[[1]] + qnorm(0.025) * preds[[2]])
+          upr  <- link_inverse(analysis_mod)(preds[[1]] + qnorm(0.975) * preds[[2]])
         }
 
       } else {
@@ -413,8 +426,10 @@ safe_predict <- function(mod, newdata) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
     stop("Package '", pkg, "' is required but not installed.")
   }
-  if (!isNamespaceLoaded(pkg)) {
-    attachNamespace(pkg)
+  if (!paste0("package:", pkg) %in% search()) {
+    suppressPackageStartupMessages(
+      library(pkg, character.only = TRUE)
+    )
   }
 
   # Dispatch predict
@@ -462,12 +477,13 @@ namespace <- function(x) {
   }
 
   # Check if namespace is already loaded
-  if (!isNamespaceLoaded(pkg)) {
-    # Load namespace if needed
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-      stop("Package '", pkg, "' is required but not installed.")
-    }
-    attachNamespace(pkg)
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    stop("Package '", pkg, "' is required but not installed.")
+  }
+  if (!paste0("package:", pkg) %in% search()) {
+    suppressPackageStartupMessages(
+      library(pkg, character.only = TRUE)
+    )
   }
 
   invisible(pkg)

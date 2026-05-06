@@ -30,6 +30,9 @@ cluster_prep <- function(model, cl) {
                                    winslash = "/", mustWork = FALSE)
   msr_version <- as.character(utils::packageVersion("multiScaleR"))
   msr_load_all <- nzchar(msr_system_path) && !identical(msr_path, msr_system_path)
+  lib_paths <- .libPaths()
+  r_libs_user <- Sys.getenv("R_LIBS_USER", unset = "")
+  r_libs <- Sys.getenv("R_LIBS", unset = "")
 
   if(is.null(pkg)){
     model_classes <- class(model)
@@ -69,7 +72,8 @@ cluster_prep <- function(model, cl) {
 
   # Export package metadata to workers
   clusterExport(cl,
-                varlist = c("pkg", "msr_path", "msr_version", "msr_load_all"),
+                varlist = c("pkg", "msr_path", "msr_version", "msr_load_all",
+                            "lib_paths", "r_libs_user", "r_libs"),
                 envir = environment())
 
   # Load required packages on each worker. In development sessions, the master
@@ -77,6 +81,14 @@ cluster_prep <- function(model, cl) {
   # use that same source tree rather than silently loading an older installed
   # multiScaleR from .libPaths().
   worker_info <- clusterEvalQ(cl, {
+    if (nzchar(r_libs_user)) {
+      Sys.setenv(R_LIBS_USER = r_libs_user)
+    }
+    if (nzchar(r_libs)) {
+      Sys.setenv(R_LIBS = r_libs)
+    }
+    .libPaths(unique(c(lib_paths, .libPaths())))
+
     if (!is.null(pkg) && !identical(pkg, "multiScaleR")) {
       library(pkg, character.only = TRUE)
     }
