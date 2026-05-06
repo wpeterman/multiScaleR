@@ -1,3 +1,8 @@
+multiScaleR 0.6.23
+---------
+* Added a regression test that asserts the package's expected public exports
+  remain available in the installed namespace
+
 multiScaleR 0.6.22
 ---------
 * Restored missing exports for model-selection and simulation helpers used in

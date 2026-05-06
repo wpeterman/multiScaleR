@@ -18,6 +18,29 @@ test_that("simulation helpers return expected structures", {
   expect_false(anyNA(fix$sim_umf$df))
 })
 
+test_that("expected public helpers remain exported", {
+  expected_exports <- c(
+    "aic_tab",
+    "bic_tab",
+    "diagnostics",
+    "kernel_dist",
+    "kernel_prep",
+    "kernel_scale.raster",
+    "kernel_var",
+    "landscape_var",
+    "msr_vars",
+    "multiScale_optim",
+    "plot_kernel",
+    "plot_marginal_effects",
+    "profile_sigma",
+    "sim_dat",
+    "sim_dat_unmarked",
+    "sim_rast"
+  )
+
+  expect_setequal(getNamespaceExports("multiScaleR"), expected_exports)
+})
+
 test_that("aic_tab and bic_tab compare optimized and standard models", {
   fix <- make_core_fixture()
 
