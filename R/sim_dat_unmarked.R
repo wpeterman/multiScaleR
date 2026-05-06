@@ -1,35 +1,80 @@
 # Data sim function -------------------------------------------------------
 #' @title Simulate data for optimizing scales of effect with `unmarked`
-#' @description
-#'  Function to simulate data with known scales of effect from spatial spatRaster variables for analysis with the R package `unmarked`
 #'
-#' @param alpha Intercept term for GLM (Default = 1)
-#' @param beta Slope term(s) for GLM. Should be vector equal in length to number of spatRaster surfaces provided
-#' @param kernel Type of kernel transformation. Valid options are 'gaussian', 'exp' (negative exponential), 'expow' (exponential power), and 'fixed' fixed width buffer. (Default = 'gaussian')
-#' @param type Type of response data to simulate in `unmarked`. Valid options are 'count' for Poisson distributed count; 'count_nb' for negative binomial counts; and 'occ' for binomial response.(Default = 'count')
-#' @param StDev If specifying 'count_nb' or 'gaus' for type, this is the dispersion term for those respective processes (Default = 0.5)
-#' @param n_points Number of spatial sample points (Default = 50).
-#' @param n_surv Number of surveys to simulate in `unmarked` (Default = 3).
-#' @param det The probability of detection. (Default = 0.5)
-#' @param min_D Minimum distance between points. Function will attempt to create the number of sample points specified while honoring this minimum distance.
-#' @param raster_stack A spatRaster object
-#' @param sigma The scale term dictating the rate of decay with distance
-#' @param shape If using an exponential power function, the shape parameter must also be specified. Values between 1-50 are generally valid
-#' @param max_D The maximum distance surrounding spatial points to consider. This typically needs to be >= 2.5x greater than sigma
-#' @param user_seed Optional seed to reproduce simulation
-#' @param ... Additional arguments. Not currently used
+#' @description Generates simulated replicated detection/non-detection or count
+#' data formatted for use with the \code{unmarked} package, with known
+#' kernel-weighted landscape covariates at a controlled scale of effect.
 #'
-#' @return
-#' Returns a list containing:
-#' \tabular{ll}{
-#' \tab * y --> The simulated observation matrix for use in an unmarkedFrame \cr
-#' \tab * df --> A data frame with the simulated response (obs) as well as the true kernel weighted mean values for each raster surface included \cr
-#' \tab * pts --> An `sf` object with the simulated spatial point locations \cr
+#' @param alpha Numeric scalar. Intercept for the abundance/occupancy linear
+#'   predictor. Default: \code{1}.
+#' @param beta Numeric vector of slope coefficients, one per raster layer in
+#'   \code{raster_stack}. Length must equal \code{nlyr(raster_stack)}.
+#' @param kernel Character. Kernel function used to weight raster values by
+#'   distance. One of \code{"gaussian"} (default), \code{"exp"} (negative
+#'   exponential), \code{"expow"} (exponential power), or \code{"fixed"}
+#'   (fixed-radius buffer).
+#' @param type Character. Response type to simulate. One of:
+#'   \describe{
+#'     \item{\code{"count"}}{(Default) Poisson-distributed abundance with
+#'       binomial thinning to simulate detection probability \code{det}.}
+#'     \item{\code{"count_nb"}}{Negative binomial abundance with dispersion
+#'       \code{StDev}, then binomial thinning.}
+#'     \item{\code{"occ"}}{Bernoulli occupancy data; occupancy is generated
+#'       from a logistic model and detections follow
+#'       \code{Bernoulli(occ * det)}.}
 #'   }
-#' @export
+#' @param StDev Positive numeric. Dispersion (size) parameter for
+#'   \code{"count_nb"}. Default: \code{0.5}.
+#' @param n_points Positive integer. Number of spatial sample sites. Points are
+#'   placed on a hexagonal grid and randomly subsampled. Default: \code{50}.
+#' @param n_surv Positive integer. Number of repeated surveys per site, forming
+#'   the columns of the returned observation matrix. Default: \code{3}.
+#' @param det Numeric between 0 and 1. Per-survey detection probability applied
+#'   via binomial thinning of the true abundance/occupancy. Default: \code{0.5}.
+#' @param min_D Positive numeric. Minimum inter-point spacing on the hexagonal
+#'   grid. If \code{NULL} (default), set automatically to
+#'   \code{1.55 * max(sigma)}.
+#' @param raster_stack A \code{SpatRaster} object. Layer names become covariate
+#'   names in the returned data frame.
+#' @param sigma Positive numeric vector. True kernel scale parameters, one per
+#'   raster layer. Must be in the same units as the raster projection.
+#' @param shape Positive numeric vector. Shape parameters for
+#'   \code{kernel = "expow"}, one per raster layer. Required when using the
+#'   exponential power kernel.
+#' @param max_D Positive numeric. Maximum buffer radius for
+#'   \code{\link{kernel_prep}} during simulation. If \code{NULL} (default),
+#'   set automatically to 110\% of the distance enclosing 99\% of the kernel
+#'   weight at \code{max(sigma)}.
+#' @param user_seed Optional integer seed for reproducibility. Default:
+#'   \code{NULL}.
+#' @param ... Additional arguments. Not currently used.
+#'
+#' @return A named list with three elements:
+#' \describe{
+#'   \item{\code{y}}{Integer matrix of dimensions \code{n_points x n_surv}
+#'     containing the simulated replicated observations. Pass as the \code{y}
+#'     argument when constructing an \code{unmarkedFrame}.}
+#'   \item{\code{df}}{Data frame with \code{n_points} rows. The \code{y} column
+#'     contains the simulated true abundance/occupancy (before detection
+#'     thinning). Remaining columns are the true kernel-weighted covariate
+#'     values, scaled to zero mean and unit variance.}
+#'   \item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
+#'     An \code{obs} column is appended containing the true
+#'     abundance/occupancy values. Pass to \code{\link{kernel_prep}} as
+#'     \code{pts}.}
+#' }
 #'
 #' @details
-#' This function distributes sample points across the landscape on a hexagonal grid, then subsamples to the specified number. The weighted values of each landscape are determined according to the simulation parameters, then the specified response is generated.
+#' Sites are distributed on a hexagonal grid across the interior of the raster
+#' extent (85\% of the x/y range) and then randomly subsampled. The true
+#' abundance or occupancy at each site is a function of the kernel-weighted
+#' landscape covariates at the specified scale. Repeated surveys introduce
+#' imperfect detection controlled by \code{det}.
+#'
+#' Use the returned \code{y} matrix and \code{df} (as \code{siteCovs}) to
+#' construct an \code{unmarkedFrame}, fit a model, and then pass both the
+#' fitted model and fresh \code{\link{kernel_prep}} output to
+#' \code{\link{multiScale_optim}}.
 #'
 #' @examples
 #' \donttest{

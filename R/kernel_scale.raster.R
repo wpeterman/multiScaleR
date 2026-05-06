@@ -1,60 +1,103 @@
-#' @title Create scaled rasters
-#' @description Function to create scaled rasters
-#' @param raster_stack Stack of combined `SpatRaster` layers
-#' @param sigma Vector of parameters listed in order to scale each raster
-#' @param multiScaleR If scale optimization with `multiScale_optim` has been completed,
-#' provide the `multiScaleR` object here. You can also pass an object of class
-#' `"multiScaleR_data"` created using `kernel_prep`. Default: NULL
-#' @param shape Vector of parameters listed in order to scale each raster if using
-#' `'expow'` kernel. Default: NULL
-#' @param kernel Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow';
-#' Default: 'gaussian')
-#' @param scale_vars Optional variable specifications created with `msr_vars()`.
-#' Use this when projecting explicitly defined `kernel_var()` and
-#' `landscape_var()` covariates without passing a fitted `multiScaleR` object.
-#' @param pct_wt The percentage of the weighted density to include when applying the
-#' kernel smoothing function, Default: 0.975
-#' @param fft Logical. If TRUE (Default), a fast Fourier transformation will be used
-#' to smooth the raster surface. See details.
-#' @param scale_center Logical. If `TRUE`, raster values are scaled and centered
-#' according to the data used to fit the model. Necessary when predicting model
-#' results across the landscape.
-#' @param clamp Logical. If `TRUE`, scaled values are clamped to the covariate range
-#' in the model data.
-#' @param pct_mx Numeric. If `clamp` is `TRUE`, this value specifies the amount
-#' (percentage; positive or negative) by which to expand or contract the min/max
-#' range when clamping. Can range from -0.99–0.99 (Default = 0).
-#' @param na.rm Logical. If TRUE (Default), NA values are removed from the weighted
-#' mean calculation.
-#' @param verbose Logical. Print status of raster scaling to the console. Default: TRUE
-#' @param ... Not used
+#' @title Apply kernel smoothing to raster layers
 #'
-#' @return A `SpatRaster` object containing scaled rasters. If a `multiScaleR` object
-#' is provided and the fitted model includes additional site-level covariates that are
-#' not represented in `raster_stack`, constant ("dummy") raster layers will be added
-#' for those covariates to facilitate spatial prediction.
+#' @description Applies a kernel smoothing function to one or more raster
+#' layers, producing a spatially weighted mean (or landscape metric) at the
+#' scale identified by \code{\link{multiScale_optim}}. Primarily used to
+#' generate prediction rasters for spatial model projection.
+#'
+#' @param raster_stack A \code{SpatRaster} object containing the source raster
+#'   layer(s) to be smoothed. Layer names must match the covariate names used
+#'   during model fitting (or the \code{source} names in \code{scale_vars}).
+#' @param sigma Numeric vector of kernel scale parameter(s) in the same units
+#'   as the raster projection (e.g., metres). One value per raster layer.
+#'   Ignored when \code{multiScaleR} is provided — sigma values are extracted
+#'   from the fitted object automatically.
+#' @param multiScaleR A fitted object of class \code{"multiScaleR"} (from
+#'   \code{\link{multiScale_optim}}) or class \code{"multiScaleR_data"} (from
+#'   \code{\link{kernel_prep}}). When provided, sigma, shape, kernel, and
+#'   scale_vars are all extracted automatically. Default: \code{NULL}.
+#' @param shape Numeric vector of shape parameters for the exponential power
+#'   kernel (\code{kernel = "expow"}), one per raster layer. Ignored when
+#'   \code{multiScaleR} is provided. Default: \code{NULL}.
+#' @param kernel Character. Kernel function used for smoothing. One of
+#'   \code{"gaussian"} (default), \code{"exp"}, \code{"fixed"}, or
+#'   \code{"expow"}. Ignored when \code{multiScaleR} is provided.
+#' @param scale_vars Optional variable specifications created with
+#'   \code{\link{msr_vars}}. Use when projecting landscape metrics or
+#'   explicitly defined covariates without passing a fitted \code{multiScaleR}
+#'   object. When \code{multiScaleR} is provided, \code{scale_vars} is
+#'   extracted automatically.
+#' @param pct_wt Numeric between 0 and 1 (exclusive). Cumulative kernel density
+#'   cutoff used to determine the focal window size for smoothing. A larger
+#'   value (e.g., \code{0.99}) captures more of the kernel tail but increases
+#'   computation time. Default: \code{0.975}.
+#' @param fft Logical. If \code{TRUE} (default), smoothing is performed via
+#'   Fast Fourier Transform (FFT) convolution, which is substantially faster
+#'   for large rasters and wide kernels. Some edge effects may occur at raster
+#'   boundaries. Set to \code{FALSE} to use \code{terra::focal}, which avoids
+#'   edge effects but is slower.
+#' @param scale_center Logical. If \code{TRUE}, the smoothed raster values are
+#'   centered and scaled using the mean and standard deviation from the model
+#'   fitting data (extracted from \code{multiScaleR$scl_params}). Required
+#'   when using the output with \code{terra::predict} and a fitted model that
+#'   was trained on scaled covariates. Requires \code{multiScaleR} to be
+#'   provided. Default: \code{FALSE}.
+#' @param clamp Logical. If \code{TRUE}, scaled raster values are clamped to
+#'   the observed covariate range from the model fitting data, preventing
+#'   extrapolation beyond the training range. Only active when
+#'   \code{scale_center = TRUE}. Default: \code{FALSE}.
+#' @param pct_mx Numeric between -0.99 and 0.99. When \code{clamp = TRUE},
+#'   expands (\code{> 0}) or contracts (\code{< 0}) the clamping range
+#'   relative to the observed min/max by this proportion. Default: \code{0}
+#'   (exact training range).
+#' @param na.rm Logical. If \code{TRUE} (default), \code{NA} cells are excluded
+#'   from the kernel-weighted mean calculation. If \code{FALSE}, any window
+#'   containing a \code{NA} cell will produce a \code{NA} output.
+#' @param verbose Logical. Print layer-level progress messages. Default:
+#'   \code{TRUE}.
+#' @param ... Reserved for deprecated arguments. Currently only \code{scale_opt}
+#'   (deprecated alias for \code{multiScaleR}) is handled.
+#'
+#' @return A \code{SpatRaster} with one layer per covariate defined in
+#' \code{scale_vars} (or per raster layer when \code{scale_vars} is not used).
+#' Layer names match the covariate names from the model. When a fitted
+#' \code{multiScaleR} object is provided and the model contains site-level
+#' predictors (i.e., predictors not derived from raster layers), constant
+#' ("dummy") raster layers filled with zeros are appended to make the output
+#' compatible with \code{terra::predict}.
 #'
 #' @details
-#' The fast Fourier transformation is substantially faster when scaling large raster
-#' surfaces with large kernel areas. There will be some edge effects on the outer boundaries.
+#' \strong{Typical usage} after running \code{\link{multiScale_optim}}:
+#' \preformatted{
+#' opt_hab <- kernel_scale.raster(raster_stack = hab, multiScaleR = opt)
+#' plot(c(hab, opt_hab))
 #'
-#' When a fitted `multiScaleR` object is supplied, `kernel_scale.raster` inspects the
-#' underlying model to identify all predictors used during model fitting. If the model
-#' includes site-level covariates (i.e., predictors not associated with raster layers),
-#' these variables are not spatially explicit and therefore cannot be directly projected.
+#' ## Scale and center for prediction
+#' opt_hab_sc <- kernel_scale.raster(raster_stack = hab,
+#'                                   multiScaleR = opt,
+#'                                   scale_center = TRUE)
+#' preds <- terra::predict(opt_hab_sc, opt$opt_mod, type = "response")
+#' }
 #'
-#' In such cases, the function automatically creates constant raster layers for these
-#' covariates. By default, these layers are filled with a value of 0, which corresponds
-#' to the reference value for centered and scaled predictors. This ensures compatibility
-#' with the fitted model during prediction (e.g., when using `terra::predict`).
+#' \strong{FFT vs. focal smoothing}
 #'
-#' Users should be aware that these dummy rasters do not represent spatial variation in
-#' the covariate. Instead, they define a fixed projection scenario (e.g., predictions
-#' conditional on the covariate being equal to 0). For non-centered variables or
-#' alternative projection scenarios, users should manually modify or replace these layers.
+#' The FFT convolution (\code{fft = TRUE}) is substantially faster for large
+#' rasters or wide kernels. It produces minor edge artefacts near raster
+#' boundaries — typically within one kernel-width of the edge. For analyses
+#' focused on interior areas this is usually negligible. Use
+#' \code{fft = FALSE} for exact focal smoothing when edge accuracy matters.
 #'
-#' Categorical (factor) covariates are not automatically converted to raster layers.
-#' If present in the model, a warning is issued and no dummy raster is created.
+#' \strong{Dummy rasters for site-level covariates}
+#'
+#' When a fitted \code{multiScaleR} object is supplied, the function inspects
+#' the model frame to find any predictors that are not represented by raster
+#' layers (e.g., survey effort, habitat type measured in the field). These
+#' cannot be projected spatially and are therefore assigned constant zero
+#' rasters, which correspond to the reference value for centered and scaled
+#' covariates. These dummy layers are required for \code{terra::predict} to
+#' work but do not represent real spatial variation. Replace them manually for
+#' non-zero projection scenarios. Categorical predictors are skipped with a
+#' warning.
 #'
 #' @examples
 #' ## Not Run

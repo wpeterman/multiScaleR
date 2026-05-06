@@ -5,20 +5,33 @@
 #' a diagnostic view of the likelihood surface and helps assess whether the
 #' optimized sigma is at a clear minimum or on a flat plateau.
 #'
-#' @param x A fitted \code{multiScaleR} object.
-#' @param n_pts Integer. Number of sigma values to evaluate for each covariate.
-#'   Default is 10. Ignored when \code{sigma_values} is supplied.
-#' @param metric Character. Which metric to profile: \code{"AICc"} (default)
-#'   or \code{"LL"} (log-likelihood).
-#' @param verbose Logical. Print progress messages. Default is \code{TRUE}.
-#' @param spacing Character. How to space automatically generated sigma values:
-#'   \code{"log"} (default) or \code{"linear"}.
-#' @param sigma_values Optional numeric vector of sigma values to evaluate
-#'   directly. When supplied, \code{spacing}, \code{sigma_range}, and
-#'   \code{n_pts} are ignored.
-#' @param sigma_range Optional numeric vector of length 2 giving the minimum
-#'   and maximum sigma values for the generated profile grid. Defaults to the
-#'   optimization range stored in \code{x}.
+#' @param x A fitted \code{multiScaleR} object returned by
+#'   \code{\link{multiScale_optim}}.
+#' @param n_pts Positive integer (>= 3). Number of sigma values to evaluate
+#'   for each covariate along the profile grid. More points give a smoother
+#'   profile at the cost of additional model refits. Default: \code{10}.
+#'   Ignored when \code{sigma_values} is supplied.
+#' @param metric Character. Metric to display on the y-axis of the profile.
+#'   One of \code{"AICc"} (default) or \code{"LL"} (log-likelihood). The
+#'   optimized sigma minimizes negative log-likelihood, so the \code{"LL"}
+#'   profile should peak at the optimized value and \code{"AICc"} should
+#'   show a minimum.
+#' @param verbose Logical. Print per-covariate progress messages. Default:
+#'   \code{TRUE}.
+#' @param spacing Character. Spacing of the automatically generated sigma grid.
+#'   \code{"log"} (default) concentrates evaluation points at small sigma
+#'   values where the likelihood surface typically changes more rapidly.
+#'   \code{"linear"} provides equal spacing across the range.
+#' @param sigma_values Optional positive numeric vector of sigma values (in the
+#'   original projection units) to evaluate directly. When supplied,
+#'   \code{spacing}, \code{sigma_range}, and \code{n_pts} are ignored. Duplicate
+#'   values are removed and remaining values are sorted before profiling.
+#'   Must contain at least 3 unique values.
+#' @param sigma_range Optional positive numeric vector of length 2 giving the
+#'   minimum and maximum sigma values (in projection units) for the generated
+#'   profile grid. Defaults to the optimization range stored in \code{x}
+#'   (\code{min_D} to \code{max_D}). Ignored when \code{sigma_values} is
+#'   supplied.
 #'
 #' @return A list of class \code{sigma_profile} containing:
 #' \describe{
