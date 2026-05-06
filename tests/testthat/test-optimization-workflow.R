@@ -147,6 +147,100 @@ test_that("multiScale_optim builds and forwards cached optimization context", {
   expect_equal(out$diagnostics$max_distance$suggested_max_D, 40)
 })
 
+test_that("multiScale_optim can prescreen sigma starts with marginal scans only", {
+  fix <- make_core_fixture()
+  captured <- new.env(parent = emptyenv())
+  sigma_grid <- exp(seq(
+    log(fix$kernel_inputs$min_D / fix$kernel_inputs$unit_conv),
+    log(fix$kernel_inputs$max_D / fix$kernel_inputs$unit_conv),
+    length.out = 5
+  ))
+  target <- sigma_grid[4]
+
+  out <- with_mocked_bindings(
+    multiScale_optim(
+      fitted_mod = fix$fitted_mod,
+      kernel_inputs = fix$kernel_inputs,
+      start_strategy = "screen",
+      screen_n_sigma = 5,
+      screen_n_jitter = 0,
+      verbose = FALSE
+    ),
+    optim = function(par, fn, hessian, ...) {
+      captured$full_par <- par
+      list(
+        par = par,
+        hessian = matrix(1, 1, 1),
+        value = fn(par, ...)
+      )
+    },
+    kernel_scale_fn = function(par, mod_return = NULL, ...) {
+      if (isTRUE(mod_return)) {
+        list(mod = fix$fitted_mod, scl_params = fix$kernel_inputs$scl_params)
+      } else {
+        (par[1] - target)^2
+      }
+    },
+    kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
+    .package = "multiScaleR"
+  )
+
+  expect_s3_class(out, "multiScaleR")
+  expect_equal(captured$full_par[1], target, tolerance = 1e-10)
+})
+
+test_that("multiScale_optim screening keeps exactly one full optimization", {
+  fix <- make_core_fixture()
+  captured <- new.env(parent = emptyenv())
+  captured$screen_calls <- 0L
+  captured$full_calls <- 0L
+  target <- 0.3
+
+  out <- with_mocked_bindings(
+    multiScale_optim(
+      fitted_mod = fix$fitted_mod,
+      kernel_inputs = fix$kernel_inputs,
+      start_strategy = "screen",
+      screen_n_sigma = 4,
+      screen_n_jitter = 4,
+      screen_maxit = 3,
+      verbose = FALSE
+    ),
+    optim = function(par, fn, hessian, ...) {
+      if (isTRUE(hessian)) {
+        captured$full_calls <- captured$full_calls + 1L
+        captured$full_par <- par
+        return(list(
+          par = par,
+          hessian = matrix(1, 1, 1),
+          value = fn(par, ...)
+        ))
+      }
+
+      captured$screen_calls <- captured$screen_calls + 1L
+      list(
+        par = c(target),
+        value = fn(c(target), ...),
+        convergence = 0L
+      )
+    },
+    kernel_scale_fn = function(par, mod_return = NULL, ...) {
+      if (isTRUE(mod_return)) {
+        list(mod = fix$fitted_mod, scl_params = fix$kernel_inputs$scl_params)
+      } else {
+        (par[1] - target)^2
+      }
+    },
+    kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
+    .package = "multiScaleR"
+  )
+
+  expect_s3_class(out, "multiScaleR")
+  expect_gt(captured$screen_calls, 0L)
+  expect_equal(captured$full_calls, 1L)
+  expect_equal(captured$full_par[1], target, tolerance = 1e-10)
+})
+
 test_that("kernel_scale_fn can use a custom refit function", {
   fake_mod <- structure(list(), class = "custom_model")
   captured <- new.env(parent = emptyenv())
@@ -334,6 +428,7 @@ test_that("summary and distance methods return structured outputs", {
   expect_equal(colnames(sum_opt$opt_scale), c("Mean", "SE", "2.5%", "97.5%"))
   expect_equal(colnames(dist_opt), c("Mean", "2.5%", "97.5%"))
   expect_true(dist_opt[1, "Mean"] > 0)
+  expect_identical(sum_opt$opt_distance, sum_opt$opt_dist)
   expect_identical(sum_opt$diagnostics, fix$opt$diagnostics)
 })
 
@@ -653,6 +748,35 @@ test_that("PSOCK workers load the same multiScaleR namespace as the main session
   if (isTRUE(master_load_all)) {
     expect_equal(worker_info$path, master_path)
   }
+})
+
+test_that("cluster_prep exports library paths for PSOCK workers", {
+  fix <- make_core_fixture()
+  captured <- new.env(parent = emptyenv())
+
+  with_mocked_bindings(
+    cluster_prep(fix$fitted_mod, cl = "cl"),
+    clusterExport = function(cl, varlist, envir) {
+      captured$varlist <- varlist
+      captured$lib_paths <- get("lib_paths", envir = envir)
+      captured$r_libs_user <- get("r_libs_user", envir = envir)
+      captured$r_libs <- get("r_libs", envir = envir)
+      invisible(NULL)
+    },
+    clusterEvalQ = function(cl, expr) {
+      list(list(
+        version = as.character(utils::packageVersion("multiScaleR")),
+        path = normalizePath(getNamespaceInfo("multiScaleR", "path"),
+                             winslash = "/", mustWork = FALSE)
+      ))
+    },
+    .package = "multiScaleR"
+  )
+
+  expect_true(all(c("lib_paths", "r_libs_user", "r_libs") %in% captured$varlist))
+  expect_true(length(captured$lib_paths) >= 1)
+  expect_equal(captured$r_libs_user, Sys.getenv("R_LIBS_USER", unset = ""))
+  expect_equal(captured$r_libs, Sys.getenv("R_LIBS", unset = ""))
 })
 
 test_that("PSOCK optimization works for unqualified MASS model calls", {

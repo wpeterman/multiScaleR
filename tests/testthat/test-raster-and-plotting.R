@@ -146,6 +146,48 @@ test_that("plot_marginal_effects covers unmarked and zeroinfl models", {
   expect_error(plot_marginal_effects(unmark$obj, type = NULL, length.out = 5), "must be specified")
 })
 
+test_that("plot_marginal_effects uses nested analysis models for wrapped clogit fits", {
+  testthat::skip_if_not_installed("survival")
+
+  fix <- make_core_fixture()
+  n <- nrow(fix$kernel_inputs$kernel_dat)
+  dat <- data.frame(
+    case_ = rep(c(TRUE, FALSE, FALSE), length.out = n),
+    cont1 = fix$kernel_inputs$kernel_dat$cont1,
+    site = seq_len(n) / 10,
+    stratum = factor(rep(seq_len(ceiling(n / 3)), each = 3, length.out = n))
+  )
+  coxph <- survival::coxph
+  strata <- survival::strata
+
+  inner <- suppressWarnings(
+    survival::clogit(
+      case_ ~ cont1 + site + strata(stratum),
+      data = dat,
+      model = TRUE
+    )
+  )
+  wrapped <- structure(
+    list(model = inner, sl_ = NULL, ta_ = NULL, more = NULL),
+    class = c("fit_clogit", "list")
+  )
+  obj <- structure(
+    list(
+      opt_mod = wrapped,
+      scl_params = fix$kernel_inputs$scl_params
+    ),
+    class = "multiScaleR"
+  )
+
+  open_null_device()
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  plots <- expect_no_warning(plot_marginal_effects(obj, length.out = 5))
+
+  expect_named(plots, c("cont1", "site"))
+  expect_true(all(vapply(plots, inherits, logical(1), what = "ggplot")))
+})
+
 test_that("plot_marginal_effects mocked branches cover HLfit, missing CI, and numeric predictions", {
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
@@ -330,6 +372,31 @@ test_that("profile_sigma supports linear and custom sigma grids", {
   expect_error(profile_sigma(fix$opt, sigma_values = c(10, 10, 20),
                              verbose = FALSE),
                "at least 3 unique")
+})
+
+test_that("profile_sigma uses the same parameter count logic as model selection", {
+  fix <- make_core_fixture()
+  opt_multi <- fix$opt
+  opt_multi$scale_est <- data.frame(
+    Mean = c(40, 80),
+    SE = c(1, 1),
+    row.names = c("cont1", "site")
+  )
+
+  prof <- with_mocked_bindings(
+    profile_sigma(opt_multi, n_pts = 3, verbose = FALSE),
+    kernel_scale_fn = function(...) 10,
+    .package = "multiScaleR"
+  )
+
+  expected_k <- nrow(insight::get_parameters(opt_multi$opt_mod)) +
+    nrow(opt_multi$scale_est)
+  expected_aic <- -2 * (-10) + 2 * expected_k
+  expected_aicc <- expected_aic +
+    (2 * expected_k * (expected_k + 1)) /
+    (.msr_model_nobs(opt_multi$opt_mod) - expected_k - 1)
+
+  expect_equal(unique(prof$profiles$AICc), expected_aicc)
 })
 
 test_that("plot.sigma_profile returns named ggplots and rejects bad input", {

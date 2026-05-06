@@ -9,6 +9,11 @@ multiScale_optim(
   kernel_inputs,
   join_by = NULL,
   par = NULL,
+  start_strategy = c("single", "screen"),
+  screen_n_sigma = 5,
+  screen_n_jitter = 6,
+  screen_maxit = 8,
+  screen_jitter_sd = 0.5,
   n_cores = NULL,
   PSOCK = FALSE,
   verbose = TRUE,
@@ -23,6 +28,25 @@ multiScale_optim(
 \item{join_by}{Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)}
 
 \item{par}{Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL}
+
+\item{start_strategy}{Character. How to choose starting values when `par` is
+`NULL`: `"single"` (default) uses one shared default start, while
+`"screen"` performs a low-cost prescreen of sigma values and short
+screening optimizations before launching one full optimization.}
+
+\item{screen_n_sigma}{Integer. Number of log-spaced sigma values evaluated
+per covariate during the prescreen when `start_strategy = "screen"`.
+Default is `5`.}
+
+\item{screen_n_jitter}{Integer. Number of jittered candidate starts evaluated
+with short screening optimizations after the marginal prescreen. Default is
+`6`. Set to `0` to skip the short jittered runs.}
+
+\item{screen_maxit}{Integer. Maximum iterations used for each short screening
+optimization. Default is `8`.}
+
+\item{screen_jitter_sd}{Numeric. Standard deviation of multiplicative sigma
+jitter on the log scale during screening. Default is `0.5`.}
 
 \item{n_cores}{If attempting to optimize in parallel, the number of cores to use. Default: NULL}
 
@@ -87,6 +111,14 @@ example, `amt::fit_clogit()` stores a `survival::clogit()` model in its
 to recover predictors, refit the likelihood, and extract log-likelihoods. For
 `amt::fit_clogit()` fits, set `model = TRUE` so the nested `clogit` model
 retains enough model-frame information for the optimized data to be rebuilt.
+
+When `start_strategy = "screen"` and `par` is left as `NULL`,
+`multiScale_optim()` first scouts the sigma space with one-dimensional
+log-spaced scans, then optionally tests a few jittered starts using short,
+Hessian-free optimizations. These screening steps are always run serially and
+are used only to choose one starting vector for the single full optimization.
+For reproducible screened starts, call `set.seed()` before
+`multiScale_optim()`.
 }
 \examples{
 \donttest{

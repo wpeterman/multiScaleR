@@ -41,12 +41,210 @@
 }
 
 
+.msr_log_sequence <- function(lower, upper, n) {
+  if (n <= 1 || isTRUE(all.equal(lower, upper))) {
+    return(rep(lower, max(1, n)))
+  }
+
+  exp(seq(log(lower), log(upper), length.out = n))
+}
+
+
+.msr_objective_value <- function(par,
+                                 fitted_mod,
+                                 kernel_inputs,
+                                 join_by,
+                                 opt_context) {
+  value <- try(
+    kernel_scale_fn(
+      par = par,
+      d_list = kernel_inputs$d_list,
+      cov_df = kernel_inputs$raw_cov,
+      kernel = kernel_inputs$kernel,
+      fitted_mod = fitted_mod,
+      join_by = join_by,
+      opt_context = opt_context
+    ),
+    silent = TRUE
+  )
+
+  if (inherits(value, "try-error") || length(value) != 1 || !is.finite(value)) {
+    return(Inf)
+  }
+
+  as.numeric(value)
+}
+
+
+.msr_screen_run <- function(par,
+                            lwr,
+                            uppr,
+                            fitted_mod,
+                            kernel_inputs,
+                            join_by,
+                            opt_context,
+                            screen_maxit) {
+  out <- try(
+    optim(
+      par = par,
+      fn = kernel_scale_fn,
+      hessian = FALSE,
+      lower = lwr,
+      upper = uppr,
+      method = "L-BFGS-B",
+      fitted_mod = fitted_mod,
+      d_list = kernel_inputs$d_list,
+      cov_df = kernel_inputs$raw_cov,
+      control = list(maxit = screen_maxit),
+      kernel = kernel_inputs$kernel,
+      join_by = join_by,
+      opt_context = opt_context
+    ),
+    silent = TRUE
+  )
+
+  if (inherits(out, "try-error")) {
+    return(list(
+      par = par,
+      value = .msr_objective_value(
+        par = par,
+        fitted_mod = fitted_mod,
+        kernel_inputs = kernel_inputs,
+        join_by = join_by,
+        opt_context = opt_context
+      ),
+      convergence = 1L
+    ))
+  }
+
+  out
+}
+
+
+.msr_prescreen_start <- function(par,
+                                 n_covs,
+                                 lwr,
+                                 uppr,
+                                 fitted_mod,
+                                 kernel_inputs,
+                                 join_by,
+                                 opt_context,
+                                 screen_n_sigma,
+                                 screen_n_jitter,
+                                 screen_maxit,
+                                 screen_jitter_sd,
+                                 verbose) {
+  if (isTRUE(verbose)) {
+    cat("Prescreening starting values with log-spaced sigma scans.\n")
+  }
+
+  sigma_lwr <- lwr[seq_len(n_covs)]
+  sigma_uppr <- uppr[seq_len(n_covs)]
+  marginal_par <- par
+
+  for (j in seq_len(n_covs)) {
+    sigma_grid <- .msr_log_sequence(sigma_lwr[j], sigma_uppr[j], screen_n_sigma)
+    obj_vals <- vapply(
+      sigma_grid,
+      function(candidate) {
+        par_j <- marginal_par
+        par_j[j] <- candidate
+        .msr_objective_value(
+          par = par_j,
+          fitted_mod = fitted_mod,
+          kernel_inputs = kernel_inputs,
+          join_by = join_by,
+          opt_context = opt_context
+        )
+      },
+      numeric(1)
+    )
+
+    finite_idx <- which(is.finite(obj_vals))
+    if (length(finite_idx) > 0) {
+      marginal_par[j] <- sigma_grid[finite_idx[which.min(obj_vals[finite_idx])]]
+    }
+  }
+
+  if (screen_n_jitter < 1 || screen_maxit < 1) {
+    return(marginal_par)
+  }
+
+  if (isTRUE(verbose)) {
+    cat("Running short screening optimizations around the prescreened start.\n")
+  }
+
+  candidates <- vector("list", screen_n_jitter + 1L)
+  candidates[[1]] <- marginal_par
+
+  for (i in seq_len(screen_n_jitter)) {
+    candidate <- marginal_par
+    candidate[seq_len(n_covs)] <- exp(
+      log(marginal_par[seq_len(n_covs)]) +
+        stats::rnorm(n_covs, mean = 0, sd = screen_jitter_sd)
+    )
+    candidate[seq_len(n_covs)] <- pmin(
+      pmax(candidate[seq_len(n_covs)], sigma_lwr),
+      sigma_uppr
+    )
+    candidates[[i + 1L]] <- candidate
+  }
+
+  candidate_mat <- unique(as.data.frame(do.call(rbind, candidates)))
+  candidates <- lapply(
+    seq_len(nrow(candidate_mat)),
+    function(i) as.numeric(candidate_mat[i, ])
+  )
+
+  screened <- lapply(
+    candidates,
+    .msr_screen_run,
+    lwr = lwr,
+    uppr = uppr,
+    fitted_mod = fitted_mod,
+    kernel_inputs = kernel_inputs,
+    join_by = join_by,
+    opt_context = opt_context,
+    screen_maxit = screen_maxit
+  )
+
+  screen_values <- vapply(
+    screened,
+    function(x) {
+      value <- x$value[1]
+      if (length(value) != 1 || !is.finite(value)) Inf else as.numeric(value)
+    },
+    numeric(1)
+  )
+
+  if (!any(is.finite(screen_values))) {
+    return(marginal_par)
+  }
+
+  screened[[which.min(screen_values)]]$par
+}
+
+
 #' @title Multiscale optimization
 #' @description Function to conduct multiscale optimization
 #' @param fitted_mod Model object of class glm, lm, gls, or unmarked
 #' @param kernel_inputs Object created from running \code{\link[multiScaleR]{kernel_prep}}
 #' @param join_by Default: NULL. A data frame containing the variable used to join spatial point data with observation data (see Details)
 #' @param par Optional starting values for parameter estimation. If provided, should be divided by the `max_D` value to be appropriately scaled. Default: NULL
+#' @param start_strategy Character. How to choose starting values when `par` is
+#'   `NULL`: `"single"` (default) uses one shared default start, while
+#'   `"screen"` performs a low-cost prescreen of sigma values and short
+#'   screening optimizations before launching one full optimization.
+#' @param screen_n_sigma Integer. Number of log-spaced sigma values evaluated
+#'   per covariate during the prescreen when `start_strategy = "screen"`.
+#'   Default is `5`.
+#' @param screen_n_jitter Integer. Number of jittered candidate starts evaluated
+#'   with short screening optimizations after the marginal prescreen. Default is
+#'   `6`. Set to `0` to skip the short jittered runs.
+#' @param screen_maxit Integer. Maximum iterations used for each short screening
+#'   optimization. Default is `8`.
+#' @param screen_jitter_sd Numeric. Standard deviation of multiplicative sigma
+#'   jitter on the log scale during screening. Default is `0.5`.
 #' @param n_cores If attempting to optimize in parallel, the number of cores to use. Default: NULL
 #' @param PSOCK Logical. If attempting to optimize in parallel on a Windows machine, a PSOCK cluster will be created. If using a Unix OS a FORK cluster will be created. You can force a Unix system to create a PSOCK cluster by setting to TRUE. Default: FALSE
 #' @param verbose Logical. Print status of optimization to the console. Default: TRUE
@@ -100,6 +298,14 @@
 #' to recover predictors, refit the likelihood, and extract log-likelihoods. For
 #' `amt::fit_clogit()` fits, set `model = TRUE` so the nested `clogit` model
 #' retains enough model-frame information for the optimized data to be rebuilt.
+#'
+#' When `start_strategy = "screen"` and `par` is left as `NULL`,
+#' `multiScale_optim()` first scouts the sigma space with one-dimensional
+#' log-spaced scans, then optionally tests a few jittered starts using short,
+#' Hessian-free optimizations. These screening steps are always run serially and
+#' are used only to choose one starting vector for the single full optimization.
+#' For reproducible screened starts, call `set.seed()` before
+#' `multiScale_optim()`.
 #'
 #' @seealso \code{\link[multiScaleR]{kernel_dist}}
 #' @examples
@@ -201,6 +407,11 @@ multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
                              join_by = NULL,
                              par = NULL,
+                             start_strategy = c("single", "screen"),
+                             screen_n_sigma = 5,
+                             screen_n_jitter = 6,
+                             screen_maxit = 8,
+                             screen_jitter_sd = 0.5,
                              n_cores = NULL,
                              PSOCK = FALSE,
                              verbose = TRUE,
@@ -208,8 +419,25 @@ multiScale_optim <- function(fitted_mod,
   if(is.null(fitted_mod)){
     stop("`fitted_mod` must be a fitted model object.")
   }
+  user_supplied_par <- !is.null(par)
+  start_strategy <- match.arg(start_strategy)
   validate_scalar_logical(PSOCK, "PSOCK")
   validate_scalar_logical(verbose, "verbose")
+  validate_scalar_numeric(screen_n_sigma,
+                          "screen_n_sigma",
+                          lower = 3,
+                          integerish = TRUE)
+  validate_scalar_numeric(screen_n_jitter,
+                          "screen_n_jitter",
+                          lower = 0,
+                          integerish = TRUE)
+  validate_scalar_numeric(screen_maxit,
+                          "screen_maxit",
+                          positive = TRUE,
+                          integerish = TRUE)
+  validate_scalar_numeric(screen_jitter_sd,
+                          "screen_jitter_sd",
+                          lower = 0)
   if(!is.null(refit_fn) && !is.function(refit_fn)){
     stop("`refit_fn` must be a function if provided.", call. = FALSE)
   }
@@ -372,6 +600,24 @@ multiScale_optim <- function(fitted_mod,
     par <- c(par, rep(2, n_covs))
     # par <- exp(rep(par_starts[2], n_covs))
     # par <- c(par, sqrt(rep(2, n_covs)))
+  }
+
+  if (!user_supplied_par && identical(start_strategy, "screen")) {
+    par <- .msr_prescreen_start(
+      par = par,
+      n_covs = n_covs,
+      lwr = lwr,
+      uppr = uppr,
+      fitted_mod = fitted_mod,
+      kernel_inputs = kernel_inputs,
+      join_by = join_by,
+      opt_context = opt_context,
+      screen_n_sigma = screen_n_sigma,
+      screen_n_jitter = screen_n_jitter,
+      screen_maxit = screen_maxit,
+      screen_jitter_sd = screen_jitter_sd,
+      verbose = verbose
+    )
   }
 
   opt_results <- data.frame()

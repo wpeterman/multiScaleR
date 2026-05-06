@@ -1,0 +1,6 @@
+metric,moving_mean_sec,fft_mean_sec,speedup_x
+shdi,11.9920,0.2850,42.1
+ed,13.4400,0.2140,62.8
+te,14.0360,0.2000,70.2
+pladj,39.3650,0.5350,73.6
+contag,37.1020,3.8920,9.5

@@ -1,3 +1,26 @@
+multiScaleR 0.6.21
+---------
+* Added an opt-in screened start strategy for `multiScale_optim()` that scouts
+  sigma values with log-spaced prescreening and short serial screening runs
+  before a single full optimization
+
+multiScaleR 0.6.20
+---------
+* Hardened `plot_marginal_effects()` for wrapped/nested fitted models such as
+  `amt::fit_clogit()`-style objects
+* Added regression coverage for marginal effect plots built from nested
+  `clogit` analysis models
+
+multiScaleR 0.6.19
+---------
+* Counted one optimized parameter per fitted `sigma`/shape term in `aic_tab()`,
+  `bic_tab()`, and `profile_sigma()` AICc calculations
+* Rejected AIC/BIC comparisons when models use different observation sets,
+  even if the sample sizes match
+* Propagated `.libPaths()` and `R_LIBS*` settings to PSOCK workers for more
+  reliable project-local parallel optimization on Windows
+* Added an `opt_distance` summary alias alongside the existing `opt_dist`
+
 multiScaleR 0.6.18
 ---------
 * Reconciled the merged landscape metric branch with a projection fix for

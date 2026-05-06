@@ -152,6 +152,7 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
 
   object_profile <- object
   object_profile$profile_scale_est <- tab_scale
+  opt_distance <- kernel_dist(object_profile, prob = prob)
 
   if(!is.null(object$shape_est)){
     tab_shape <- ci_func(object$shape_est,
@@ -161,7 +162,8 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
 
     out <- list(opt_scale = tab_scale,
                 opt_shape = tab_shape,
-                opt_dist = kernel_dist(object_profile, prob = prob),
+                opt_dist = opt_distance,
+                opt_distance = opt_distance,
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
@@ -171,7 +173,8 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
   } else {
     out <- list(opt_scale = tab_scale,
                 opt_shape = NULL,
-                opt_dist = kernel_dist(object_profile, prob = prob),
+                opt_dist = opt_distance,
+                opt_distance = opt_distance,
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,

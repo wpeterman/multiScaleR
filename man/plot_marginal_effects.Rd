@@ -38,5 +38,8 @@ in a fitted model stored within a `multiScaleR` object.
 For `unmarked` models, predictions are made using `type = "state"` and
   the `predict` method for state variables. For other models (e.g., `lm`, `glm`),
   predictions are made using the standard `predict(..., se.fit = TRUE)` call and
-  transformed by the model's inverse link function .
+  transformed by the model's inverse link function. When `x$opt_mod` is a
+  wrapper object around another fitted model, `plot_marginal_effects()`
+  uses the nested analysis model for predictor discovery, data recovery,
+  and prediction when possible.
 }
