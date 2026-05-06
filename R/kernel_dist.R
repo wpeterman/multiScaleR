@@ -1,10 +1,59 @@
 #' @title Scale Distance
-#' @description Function to estimate the effective distance encompassing a specified cumulative probability density of the kernel function
-#' @param model \code{\link{multiScale_optim}} object of class 'multiScaleR'
-#' @param prob Density probability cutoff for calculating distance, Default: 0.9
-#' @param ... Parameters to be used if not providing a 'multiScaleR' fitted object. See Details
-#' @return Numeric. Distance at which the cumulative kernel density reaches the specified proportion.
-#' @details This function is used to determine the distance at which kernel density distributions have influence. If not providing a fitted model, you can plot kernel distributions by specifying (1) sigma, (2) beta (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+#'
+#' @description Estimates the distance at which a specified cumulative proportion
+#' of the kernel density function is reached. Can be used with a fitted
+#' \code{multiScaleR} object to report optimized scale distances, or with
+#' manually supplied kernel parameters to explore kernel behavior.
+#'
+#' @param model A fitted \code{multiScaleR} object from \code{\link{multiScale_optim}}.
+#'   When provided, scale distances and 95\% confidence intervals are returned for
+#'   all optimized covariates. When omitted, \code{sigma}, \code{kernel}, and
+#'   (for \code{expow}) \code{beta} must be supplied via \code{...}.
+#' @param prob Numeric between 0 and 1 (exclusive). Cumulative kernel density
+#'   threshold used to define the effective distance. Default: \code{0.9}, meaning
+#'   the distance enclosing 90\% of the kernel weight.
+#' @param ... Additional parameters used when \code{model} is not supplied:
+#'   \describe{
+#'     \item{\code{sigma}}{Numeric (positive). The kernel scale parameter in the
+#'       same units as the projection of \code{pts} and \code{raster_stack} passed
+#'       to \code{\link{kernel_prep}}. For Gaussian kernels this is the standard
+#'       deviation; for negative exponential kernels this is the decay rate.}
+#'     \item{\code{kernel}}{Character. The kernel function to use. One of
+#'       \code{"gaussian"}, \code{"exp"} (negative exponential),
+#'       \code{"fixed"} (fixed-radius buffer), or \code{"expow"} (exponential
+#'       power). Required when \code{model} is not provided.}
+#'     \item{\code{beta}}{Numeric (positive). Shape parameter for the exponential
+#'       power kernel. Required when \code{kernel = "expow"} and \code{model} is
+#'       not provided. Ignored for all other kernels.}
+#'   }
+#'
+#' @return
+#' When \code{model} is provided: a data frame with one row per optimized
+#' covariate and three columns — \code{Mean} (distance at the estimated sigma),
+#' \code{Lower} (distance at the lower 95\% CI of sigma), and \code{Upper}
+#' (distance at the upper 95\% CI of sigma). Values are rounded to two decimal
+#' places.
+#'
+#' When kernel parameters are supplied directly via \code{...}: a single numeric
+#' value giving the distance at which the cumulative kernel density first reaches
+#' \code{prob}.
+#'
+#' @details
+#' The effective distance depends on both the kernel type and the scale parameter
+#' \code{sigma}:
+#' \itemize{
+#'   \item \strong{Gaussian}: uses the inverse normal CDF, so the 90\% distance
+#'     is approximately 1.65 sigma.
+#'   \item \strong{Negative exponential}: uses \code{-sigma * log(1 - prob)}.
+#'   \item \strong{Fixed buffer}: returns \code{sigma * prob} (the fraction of
+#'     the buffer radius).
+#'   \item \strong{Exponential power}: integrates the density numerically; both
+#'     \code{sigma} and \code{beta} (shape) must be specified.
+#' }
+#'
+#' Confidence intervals for the fitted \code{model} case are derived from the
+#' Hessian-based standard errors (or profile-likelihood intervals when
+#' \code{\link{profile_sigma}} has been run and stored on the object).
 #' @seealso \code{\link{plot.multiScaleR}}
 #' @examples
 #' \donttest{

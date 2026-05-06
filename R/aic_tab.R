@@ -1,18 +1,48 @@
 # AIC table ---------------------------------------------------------------
 #' @author Bill Peterman
 #' @title multiScaleR model selection
-#' @description Function to create AIC(c) table of fitted models
-#' @param mod_list List containing fitted `multiScaleR` objects
-#' @param AICc Use second order AIC in ranking models (Default = TRUE). See Details
-#' @param mod_names Optional. Specify names for fitted model objects. By default, the right hand side of the fitted `multiScaleR` model, in combination with the kernel, will be used as the model name.
-#' @param verbose (Default = FALSE) Should the table be printed to the console
-#' @param ... Additional arguments (Not used)
 #'
-#' @return Data frame of class `aictab` with AIC summary table for provided models
-#' @export
+#' @description Creates a model selection table ranked by AIC or AICc for a
+#' list of fitted models. Mixed lists containing both \code{multiScaleR}
+#' objects and plain model objects (e.g., \code{glm}) are supported, allowing
+#' comparison of scale-optimized models against fixed-scale alternatives.
+#'
+#' @param mod_list List containing fitted \code{multiScaleR} objects (from
+#'   \code{\link{multiScale_optim}}) and/or plain fitted model objects (e.g.,
+#'   \code{glm}, \code{lm}). All models must have been fit to the same set of
+#'   observations; an error is raised if sample sizes differ.
+#' @param AICc Logical. If \code{TRUE} (default), the second-order corrected
+#'   AIC (AICc) is used. Set to \code{FALSE} for standard AIC. AICc is
+#'   recommended when the ratio of observations to parameters is small
+#'   (n / K < 40 is a common rule of thumb).
+#' @param mod_names Optional character vector of model names. Length must equal
+#'   \code{length(mod_list)}. By default, names are constructed as
+#'   \code{[kernel]right-hand-side-formula} for \code{multiScaleR} objects.
+#' @param verbose Logical. If \code{TRUE}, the table is also printed to the
+#'   console. Default: \code{FALSE}.
+#' @param ... Additional arguments (not used).
+#'
+#' @return A data frame of class \code{"aictab"} (from the \code{AICcmodavg}
+#' package) sorted by ascending AIC(c), containing:
+#' \describe{
+#'   \item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
+#'   \item{\code{K}}{Number of estimated parameters (regression coefficients +
+#'     sigma, + shape for \code{"expow"} kernel).}
+#'   \item{\code{AICc} or \code{AIC}}{Information criterion value.}
+#'   \item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}
+#'   \item{\code{ModelLik}}{Relative likelihood (\code{exp(-0.5 * Delta)}).}
+#'   \item{\code{AICcWt} or \code{AICWt}}{Akaike weight.}
+#'   \item{\code{LL}}{Log-likelihood.}
+#'   \item{\code{Cum.Wt}}{Cumulative Akaike weight.}
+#' }
 #'
 #' @details
-#' aic_tab creates a model selection table using \code{\link[AICcmodavg]{aictabCustom}} from the `AICcmodavg` package
+#' The table is constructed using \code{\link[AICcmodavg]{aictabCustom}} from
+#' the \code{AICcmodavg} package. For \code{multiScaleR} objects, the optimized
+#' (refitted) model stored in \code{opt_mod} is used for log-likelihood and
+#' parameter count. The sigma parameter (and shape for \code{"expow"}) is added
+#' to K automatically. For plain model objects in a mixed list, sigma is not
+#' added to K.
 #'
 #' @usage
 #' aic_tab(mod_list,
@@ -173,17 +203,40 @@ aic_tab <- function(mod_list,
 # BIC table ---------------------------------------------------------------
 #' @author Bill Peterman
 #' @title multiScaleR model selection
-#' @description Function to create BIC table of fitted models
-#' @param mod_list List containing fitted `multiScaleR` objects
-#' @param mod_names Optional. Specify names for fitted model objects. By default, the right hand side of the fitted `multiScaleR` model, in combination with the kernel, will be used as the model name.
-#' @param verbose (Default = FALSE) Should the table be printed to the console
-#' @param ... Additional arguments (Not used)
 #'
-#' @return Data frame of class `bictab` with BIC summary table for provided models
-#' @export
+#' @description Creates a model selection table ranked by BIC for a list of
+#' fitted models. Mixed lists containing both \code{multiScaleR} objects and
+#' plain model objects are supported.
+#'
+#' @param mod_list List containing fitted \code{multiScaleR} objects (from
+#'   \code{\link{multiScale_optim}}) and/or plain fitted model objects. All
+#'   models must have been fit to the same number of observations.
+#' @param mod_names Optional character vector of model names. Length must equal
+#'   \code{length(mod_list)}. By default, names are constructed as
+#'   \code{[kernel]right-hand-side-formula} for \code{multiScaleR} objects.
+#' @param verbose Logical. If \code{TRUE}, the table is also printed to the
+#'   console. Default: \code{FALSE}.
+#' @param ... Additional arguments (not used).
+#'
+#' @return A data frame of class \code{"bictab"} (from the \code{AICcmodavg}
+#' package) sorted by ascending BIC, containing:
+#' \describe{
+#'   \item{\code{Modnames}}{Model name.}
+#'   \item{\code{K}}{Number of estimated parameters (regression coefficients +
+#'     sigma, + shape for \code{"expow"} kernel).}
+#'   \item{\code{BIC}}{Bayesian information criterion value.}
+#'   \item{\code{Delta_BIC}}{Difference from the top model.}
+#'   \item{\code{BICWt}}{BIC weight.}
+#'   \item{\code{Cum.Wt}}{Cumulative BIC weight.}
+#'   \item{\code{LL}}{Log-likelihood.}
+#' }
 #'
 #' @details
-#' bic_tab creates a model selection table using \code{\link[AICcmodavg]{bictabCustom}} from the `AICcmodavg` package
+#' The table is constructed using \code{\link[AICcmodavg]{bictabCustom}} from
+#' the \code{AICcmodavg} package. BIC penalizes model complexity more heavily
+#' than AIC as sample size grows, and is often preferred when the goal is
+#' identifying the single best-supported model rather than model averaging.
+#' Sigma (and shape for \code{"expow"}) is counted in K.
 #'
 #' @usage
 #' bic_tab(mod_list,

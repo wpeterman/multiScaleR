@@ -1,28 +1,65 @@
 # Raster simulation -------------------------------------------------------
-#' Function to simulate raster surfaces
+#' Simulate spatially autocorrelated raster surfaces
+#'
 #' @description
-#' Function to create four spatRaster surfaces
-#' @param dim Dimension (number of cells) on a side a square raster (Default = 100)
-#' @param resolution Resolution of raster cells (Default = 10)
-#' @param autocorr_range1 Optional, Numeric. Spatial correlation range in map cells. Controls the decay of the exponential covariance. If NULL (default), autocorrelation range will be 5\% of specified dimension.
-#' @param autocorr_range2 Optional, Numeric. Spatial correlation range in map cells. Controls the decay of the exponential covariance. If NULL (default), autocorrelation range will be 25\% of specified dimension.
-#' @param sill Numeric. Variance (partial sill) of the random field (default = 10).
-#' @param plot Logical. If TRUE, the spatRaster stack will be plotted following the simulation
-#' @param user_seed Optional seed to replicate simulated surfaces
-#' @param ... Additional arguments. Not currently used
-#' @return
-#' Four spatRaster surfaces. Two 1/0 binary surfaces and two continuous surfaces.
-#' @export
-#' @examples
+#' Creates a \code{SpatRaster} stack of four simulated landscape surfaces for
+#' use with \code{\link{sim_dat}} and \code{\link{sim_dat_unmarked}}. The stack
+#' contains two binary (0/1) and two continuous (0–1) surfaces with differing
+#' spatial autocorrelation ranges, allowing simulation of multiscale ecological
+#' processes.
 #'
-#' sim1 <- sim_rast()
+#' @param dim Positive integer. Number of cells on each side of the square
+#'   raster. The output will be a \code{dim x dim} grid. Default: \code{100}.
+#' @param resolution Positive numeric. Cell size (edge length) in map units.
+#'   The raster extent will be \code{dim * resolution} in each direction.
+#'   Default: \code{10}.
+#' @param autocorr_range1 Optional positive numeric. Spatial autocorrelation
+#'   range (in map cells) for surfaces 1 and 3 (\code{bin1}, \code{cont1}).
+#'   Controls the decay rate of the exponential covariance: larger values
+#'   produce smoother, more broadly correlated patterns. If \code{NULL}
+#'   (default), set to 5\% of \code{dim} (fine-scale autocorrelation).
+#' @param autocorr_range2 Optional positive numeric. Autocorrelation range for
+#'   surfaces 2 and 4 (\code{bin2}, \code{cont2}). If \code{NULL} (default),
+#'   set to 25\% of \code{dim} (broad-scale autocorrelation).
+#' @param sill Positive numeric. Partial sill (variance) of the Gaussian
+#'   random field used for all four surfaces. Default: \code{10}.
+#' @param plot Logical. If \code{TRUE}, the raster stack is plotted using
+#'   \code{terra::plot} after simulation. Default: \code{FALSE}.
+#' @param user_seed Optional integer seed for reproducibility. Different
+#'   transformations of \code{user_seed} are applied to each of the four
+#'   surfaces so they are independent but fully reproducible. Default:
+#'   \code{NULL}.
+#' @param ... Additional arguments. Not currently used.
 #'
-#' sim2 <- sim_rast(dim = 150,
-#'                  resolution = 25)
-#'
+#' @return A \code{SpatRaster} with four named layers:
+#' \describe{
+#'   \item{\code{bin1}}{Binary (0/1) surface with fine-scale autocorrelation
+#'     (\code{autocorr_range1}). Values of 1 where the underlying continuous
+#'     field exceeds its 55th percentile.}
+#'   \item{\code{bin2}}{Binary (0/1) surface with broad-scale autocorrelation
+#'     (\code{autocorr_range2}). Values of 1 where the underlying continuous
+#'     field falls below its 40th percentile.}
+#'   \item{\code{cont1}}{Continuous surface rescaled to [0, 1] with fine-scale
+#'     autocorrelation (75\% of \code{autocorr_range1}).}
+#'   \item{\code{cont2}}{Continuous surface rescaled to [0, 1] with broad-scale
+#'     autocorrelation (125\% of \code{autocorr_range2}).}
+#' }
+#' All layers span the same spatial extent:
+#' \code{[0, dim * resolution] x [0, dim * resolution]}.
 #'
 #' @details
-#' This is a simple wrapper to create four different raster surfaces. Surfaces differ in the range of autocorrelation. Binary surfaces are created by thresholding continuous values of the Gaussian random surface.
+#' Each surface is generated as a Gaussian random field using a fast Fourier
+#' transform (FFT) circulant embedding approach with an exponential covariance
+#' function. The underlying continuous fields are normalized to [0, 1] before
+#' thresholding (binary surfaces) or returning directly (continuous surfaces).
+#'
+#' The two autocorrelation ranges allow simulation of covariates that operate
+#' at different spatial scales — a common scenario in landscape ecology where
+#' some resources are patchily distributed at fine scales and others vary
+#' broadly across the study area.
+#'
+#' When \code{user_seed} is provided, independent but reproducible seeds are
+#' derived for each surface as multiples of \code{user_seed}.
 #'
 #' @rdname sim_rast
 #' @importFrom terra as.int rast plot minmax ext<- values<- crs<-

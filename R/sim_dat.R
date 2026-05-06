@@ -1,34 +1,84 @@
 # Data sim function -------------------------------------------------------
 #' @title Simulate data for optimizing scales of effect
-#' @description
-#'  Function to simulate data with known scales of effect from spatial spatRaster variables
 #'
-#' @param alpha Intercept term for GLM (Default = 1)
-#' @param beta Slope term(s) for GLM. Should be vector equal in length to number of spatRaster surfaces provided
-#' @param kernel Type of kernel transformation. Valid options are 'gaussian', 'exp' (negative exponential), 'expow' (exponential power), and 'fixed' fixed width buffer. (Default = 'gaussian')
-#' @param type Type of response data to simulate. Valid options are 'count' for Poisson distributed count; 'count_nb' for negative binomial counts; 'occ' for binomial response; and 'gaussian' for normally distributed response.
-#' 'count' for normally distributed response (Default = 'count')
-#' @param StDev If specifying 'count_nb' or 'gaus' for type, this is the dispersion term for those respective processes (Default = 0.5)
-#' @param n_points Number of spatial sample points (Default = 50). Alternatively, provide a spatVector point file.
-#' @param min_D Minimum distance between points. Function will attempt to create the number of sample points specified while honoring this minimum distance.
-#' @param raster_stack A spatRaster object
-#' @param sigma The scale term dictating the rate of decay with distance
-#' @param shape If using an exponential power function, the shape parameter must also be specified. Values between 1-50 are generally valid
-#' @param max_D The maximum distance surrounding spatial points to consider. This typically needs to be >= 2.5x greater than sigma
-#' @param user_seed Optional seed to reproduce simulation
-#' @param ... Additional arguments. Not currently used
+#' @description Generates simulated response data with known kernel-weighted
+#' landscape covariates at a controlled scale of effect. Useful for testing and
+#' demonstrating \code{\link{multiScale_optim}} with data where the true
+#' parameters are known.
 #'
-#' @return
-#' Returns a list containing:
-#' \tabular{ll}{
-#' \tab * obs --> The simulated response variable \cr
-#' \tab * df --> A data frame with the simulated response (obs) as well as the true kernel weighted mean values for each raster surface included \cr
-#' \tab * pts --> An `sf` object with the simulated spatial point locations \cr
+#' @param alpha Numeric scalar. Intercept term for the linear predictor.
+#'   Default: \code{1}.
+#' @param beta Numeric vector of slope coefficients, one per raster layer in
+#'   \code{raster_stack}. Length must equal \code{nlyr(raster_stack)}.
+#' @param kernel Character. Kernel function used to weight raster values by
+#'   distance when generating the true covariate values. One of
+#'   \code{"gaussian"} (default), \code{"exp"} (negative exponential),
+#'   \code{"expow"} (exponential power), or \code{"fixed"} (fixed-radius
+#'   buffer).
+#' @param type Character. Distribution of the simulated response variable. One
+#'   of:
+#'   \describe{
+#'     \item{\code{"count"}}{(Default) Poisson-distributed counts.}
+#'     \item{\code{"count_nb"}}{Negative binomial counts with dispersion
+#'       \code{StDev}.}
+#'     \item{\code{"occ"}}{Bernoulli (0/1) occupancy data via a logistic
+#'       link.}
+#'     \item{\code{"gaussian"}}{Normally distributed continuous response with
+#'       standard deviation \code{StDev}.}
 #'   }
-#' @export
+#' @param StDev Positive numeric. Dispersion parameter for \code{"count_nb"}
+#'   (the \code{size} argument of \code{rnbinom}) or the standard deviation for
+#'   \code{"gaussian"} responses. Default: \code{0.5}.
+#' @param n_points Positive integer or a \code{SpatVector}/\code{sf} point
+#'   object. When an integer, that many points are placed on a hexagonal grid
+#'   covering the raster extent (trimmed to 85\% of the x/y range) and then
+#'   randomly subsampled. When a spatial object is supplied, those points are
+#'   used directly. Default: \code{50}.
+#' @param min_D Positive numeric. Minimum inter-point spacing on the hexagonal
+#'   grid. If \code{NULL} (default), set automatically to
+#'   \code{1.55 * max(sigma)}.
+#' @param raster_stack A \code{SpatRaster} object. Layer names become covariate
+#'   names in the returned data frame.
+#' @param sigma Positive numeric vector. True kernel scale parameters, one per
+#'   raster layer. These are the values that \code{\link{multiScale_optim}}
+#'   should recover. Must be in the same units as the raster projection.
+#' @param shape Positive numeric vector. Shape parameters for the exponential
+#'   power kernel (\code{kernel = "expow"}), one per raster layer. Values
+#'   between 1 and 50 are typical. Required when \code{kernel = "expow"}.
+#' @param max_D Positive numeric. Maximum buffer radius for
+#'   \code{\link{kernel_prep}} during simulation. If \code{NULL} (default), set
+#'   automatically to 110\% of the distance enclosing 99\% of the kernel weight
+#'   at \code{max(sigma)}.
+#' @param user_seed Optional integer seed for reproducibility. Default:
+#'   \code{NULL}.
+#' @param ... Additional arguments. Not currently used.
+#'
+#' @return A named list with three elements:
+#' \describe{
+#'   \item{\code{obs}}{Numeric vector of length \code{n_points} containing the
+#'     simulated response values.}
+#'   \item{\code{df}}{Data frame with \code{n_points} rows and one column per
+#'     raster layer plus a \code{y} column. The raster columns contain the
+#'     true kernel-weighted mean values, scaled to zero mean and unit variance.
+#'     This data frame can be used to fit a model for
+#'     \code{\link{multiScale_optim}}.}
+#'   \item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
+#'     An \code{obs} column is appended containing the simulated response
+#'     values. Pass this to \code{\link{kernel_prep}} as the \code{pts}
+#'     argument.}
+#' }
 #'
 #' @details
-#' This function distributes sample points across the landscape on a hexagonal grid, then subsamples to the specified number. The weighted values of each landscape are determined according to the simulation parameters, then the specified response is generated.
+#' Points are distributed on a hexagonal grid across the interior of the raster
+#' extent (85\% of the range in each direction to avoid edge effects), then
+#' randomly subsampled to \code{n_points}. The \code{min_D} spacing controls
+#' the grid resolution; if the grid produces fewer points than \code{n_points},
+#' \code{min_D} is reduced iteratively by 3\% until enough points are generated.
+#'
+#' Kernel-weighted covariate values are computed using
+#' \code{\link{kernel_prep}} at the specified \code{sigma} (and \code{shape})
+#' values. These represent the "true" covariate values that the optimization
+#' should recover.
 #'
 #' @examples
 #' rs <- sim_rast()
