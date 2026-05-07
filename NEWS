@@ -1,3 +1,8 @@
+multiScaleR 0.6.24
+---------
+* Corrected `aic_tab()` roxygen registration so package checks generate the
+  proper help alias and no longer warn about missing documentation entries
+
 multiScaleR 0.6.23
 ---------
 * Added a regression test that asserts the package's expected public exports
