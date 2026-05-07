@@ -427,9 +427,7 @@ safe_predict <- function(mod, newdata) {
     stop("Package '", pkg, "' is required but not installed.")
   }
   if (!paste0("package:", pkg) %in% search()) {
-    suppressPackageStartupMessages(
-      library(pkg, character.only = TRUE)
-    )
+    .msr_attach_package(pkg)
   }
 
   # Dispatch predict
@@ -481,12 +479,18 @@ namespace <- function(x) {
     stop("Package '", pkg, "' is required but not installed.")
   }
   if (!paste0("package:", pkg) %in% search()) {
-    suppressPackageStartupMessages(
-      library(pkg, character.only = TRUE)
-    )
+    .msr_attach_package(pkg)
   }
 
   invisible(pkg)
+}
+
+.msr_attach_package <- function(pkg) {
+  suppressWarnings(
+    suppressPackageStartupMessages(
+      library(pkg, character.only = TRUE)
+    )
+  )
 }
 
 utils::globalVariables(c("fit", "lwr", "upr"))

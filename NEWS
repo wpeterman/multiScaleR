@@ -1,3 +1,9 @@
+multiScaleR 0.6.25
+---------
+* Suppressed benign package attach warnings in marginal-effect and PSOCK
+  helper fallback loads so local checks do not fail on R patch-version
+  mismatches alone
+
 multiScaleR 0.6.24
 ---------
 * Corrected `aic_tab()` roxygen registration so package checks generate the

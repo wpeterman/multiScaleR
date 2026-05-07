@@ -81,6 +81,14 @@ cluster_prep <- function(model, cl) {
   # use that same source tree rather than silently loading an older installed
   # multiScaleR from .libPaths().
   worker_info <- clusterEvalQ(cl, {
+    attach_pkg_quietly <- function(pkg) {
+      suppressWarnings(
+        suppressPackageStartupMessages(
+          library(pkg, character.only = TRUE)
+        )
+      )
+    }
+
     if (nzchar(r_libs_user)) {
       Sys.setenv(R_LIBS_USER = r_libs_user)
     }
@@ -90,7 +98,7 @@ cluster_prep <- function(model, cl) {
     .libPaths(unique(c(lib_paths, .libPaths())))
 
     if (!is.null(pkg) && !identical(pkg, "multiScaleR")) {
-      library(pkg, character.only = TRUE)
+      attach_pkg_quietly(pkg)
     }
 
     if (isTRUE(msr_load_all)) {
@@ -106,7 +114,7 @@ cluster_prep <- function(model, cl) {
       }
       pkgload::load_all(msr_path, quiet = TRUE)
     } else {
-      library("multiScaleR")
+      attach_pkg_quietly("multiScaleR")
     }
 
     list(
