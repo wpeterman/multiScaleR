@@ -13,34 +13,145 @@ kernel_var(source)
 landscape_var(source, metric, radius = NULL, base = exp(1), classes_max = NULL)
 }
 \arguments{
-\item{...}{Named `kernel_var()` or `landscape_var()` specifications.}
+\item{...}{Named \code{kernel_var()} or \code{landscape_var()} specifications.
+Each argument must be named; the name becomes the covariate column name in
+the model data frame. All names must be unique. At least one specification
+is required.}
 
-\item{source}{Character. Name of the source raster layer.}
+\item{source}{Character scalar. Name of the source raster layer in
+\code{raster_stack} from which the covariate is derived. Must exactly match
+a layer name in the raster stack provided to \code{\link{kernel_prep}}.}
 
-\item{metric}{Character. Landscape metric to calculate for `landscape_var()`.}
+\item{metric}{Character scalar. Landscape metric to compute within the
+circular buffer for \code{landscape_var()}. Must be one of the supported
+metrics (see Details). Matched case-insensitively.}
 
-\item{radius}{Optional fixed buffer radius. If omitted, the radius is optimized.}
+\item{radius}{Optional positive numeric. Fixed buffer radius in the same
+units as the projection. When \code{NULL} (default), the radius is treated
+as a free parameter and optimized alongside the model. When supplied, the
+landscape metric is computed at this fixed radius and no scale optimization
+is performed for this covariate.}
 
-\item{base}{Logarithm base for diversity metrics.}
+\item{base}{Positive numeric (not equal to 1). Logarithm base used when
+computing diversity metrics (\code{"shdi"}, \code{"shei"}, \code{"msidi"},
+\code{"msiei"}). Default: \code{exp(1)} (natural log). Use \code{2} for
+bits or \code{10} for Hartley units.}
 
-\item{classes_max}{Optional maximum number of classes for relative patch
-richness (`rpr`).}
+\item{classes_max}{Optional positive numeric. Maximum number of possible
+patch types in the landscape, used only for relative patch richness
+(\code{"rpr"}). If \code{NULL} (default), the observed number of classes
+within each buffer is used as the denominator.}
 }
 \value{
-`msr_vars()` returns a data frame of class `"multiScaleR_vars"` describing
-the requested covariate transformations.
+\describe{
+  \item{\code{msr_vars()}}{A data frame of class \code{"multiScaleR_vars"}
+    with one row per covariate. Columns are \code{covariate} (the name
+    assigned in \code{...}), \code{source} (source raster layer name),
+    \code{type} (\code{"kernel"} or \code{"landscape"}), \code{metric}
+    (landscape metric or \code{NA}), \code{radius} (fixed radius or
+    \code{NA} when optimized), \code{optimize} (logical indicating whether
+    the scale is estimated), \code{base}, and \code{classes_max}.}
+  \item{\code{kernel_var()}}{An internal list of class
+    \code{"multiScaleR_var"} representing a kernel-weighted mean covariate.
+    Pass one or more of these inside \code{msr_vars()}.}
+  \item{\code{landscape_var()}}{An internal list of class
+    \code{"multiScaleR_var"} representing a landscape metric covariate.
+    Pass one or more of these inside \code{msr_vars()}.}
+}
 }
 \description{
-These helpers define named model covariates as transformations of one or more
-source raster layers. They are optional; if omitted, `kernel_prep()` preserves
-the historical behavior where each raster layer becomes one optimized
-kernel-weighted covariate with the same name as the raster layer.
+These helpers define named model covariates as transformations of one or
+more source raster layers. They are optional; if omitted,
+\code{\link{kernel_prep}} preserves the default behavior where each raster
+layer becomes one optimized kernel-weighted covariate with the same name.
+
+Use \code{msr_vars()} to collect one or more \code{kernel_var()} or
+\code{landscape_var()} specifications into a single object that is passed to
+the \code{scale_vars} argument of \code{\link{kernel_prep}} and
+\code{\link{kernel_scale.raster}}.
+}
+\details{
+\strong{Kernel vs. landscape covariates}
+
+\code{kernel_var(source)} defines a kernel-weighted mean of the continuous
+raster values within a circular neighborhood. The neighborhood radius (sigma)
+is optimized by \code{\link{multiScale_optim}}.
+
+\code{landscape_var(source, metric)} derives a landscape ecology metric from
+a categorical (or thresholded) raster layer within a circular buffer. The
+buffer radius can be fixed or optimized.
+
+\strong{Supported landscape metrics}
+
+Composition metrics (require a categorical raster):
+\describe{
+  \item{\code{"shdi"}}{Shannon diversity index.}
+  \item{\code{"shei"}}{Shannon evenness index.}
+  \item{\code{"sidi"}}{Simpson diversity index.}
+  \item{\code{"siei"}}{Simpson evenness index.}
+  \item{\code{"msidi"}}{Modified Simpson diversity index.}
+  \item{\code{"msiei"}}{Modified Simpson evenness index.}
+  \item{\code{"pr"}}{Patch richness (number of distinct classes).}
+  \item{\code{"prd"}}{Patch richness density (pr per 100 ha).}
+  \item{\code{"rpr"}}{Relative patch richness (pr / classes_max * 100).}
+  \item{\code{"ta"}}{Total area of the buffer (ha).}
+}
+
+Edge metrics (require adjacency information; cell IDs are cached internally):
+\describe{
+  \item{\code{"ed"}}{Edge density (m/ha).}
+  \item{\code{"te"}}{Total edge length (m).}
+  \item{\code{"lsi"}}{Landscape shape index.}
+}
+
+Adjacency metrics:
+\describe{
+  \item{\code{"pladj"}}{Proportion of like adjacencies (\%).}
+  \item{\code{"contag"}}{Contagion index (\%).}
+}
+
+\strong{Mixing covariate types}
+
+Multiple covariate types can be combined in one \code{msr_vars()} call. For
+example, a kernel-weighted mean of forest cover and a fixed-radius edge
+density metric can both be defined and passed together to
+\code{\link{kernel_prep}}:
+
+\preformatted{
+vars <- msr_vars(
+  forest_mean  = kernel_var("forest"),
+  forest_ed500 = landscape_var("forest", metric = "ed", radius = 500)
+)
+kernel_inputs <- kernel_prep(pts, rasters, max_D = 1000,
+                             scale_vars = vars)
+}
+
+Covariates with a fixed \code{radius} are computed once and not re-evaluated
+during optimization, which can meaningfully reduce computation time.
 }
 \examples{
+## Kernel-weighted mean only (equivalent to default behavior)
+vars <- msr_vars(
+  forest_prop = kernel_var("forest")
+)
+
+## Combining kernel and landscape covariates
 vars <- msr_vars(
   forest_prop = kernel_var("forest"),
-  forest_ed = landscape_var("forest", metric = "ed"),
+  forest_ed   = landscape_var("forest", metric = "ed"),
   cover_shdi_500 = landscape_var("landcover", metric = "shdi", radius = 500)
 )
 
+## landscape_var with natural-log Shannon diversity (the default)
+landscape_var("landcover", metric = "shdi")
+
+## landscape_var with log2 Shannon diversity and a fixed 250 m radius
+landscape_var("landcover", metric = "shdi", radius = 250, base = 2)
+
+## Define a single optimized kernel-weighted mean covariate
+kv <- kernel_var("forest")
+}
+\seealso{
+\code{\link{kernel_prep}}, \code{\link{multiScale_optim}},
+  \code{\link{kernel_scale.raster}}
 }

@@ -15,28 +15,62 @@ plot_kernel(
 )
 }
 \arguments{
-\item{prob}{Cumulative kernel density to identify scale of effect distance, Default: 0.9}
+\item{prob}{Numeric between 0 and 1 (exclusive). Cumulative density threshold
+used to mark the effective distance on the plot. Default: \code{0.9} (90\%
+of the kernel weight falls within the marked distance).}
 
-\item{sigma}{Value of scaling parameter, sigma}
+\item{sigma}{Positive numeric. The scale parameter of the kernel, in the
+same units as the projection used with \code{\link{kernel_prep}} (e.g.,
+metres when using a metric CRS). Controls the width of the kernel: larger
+values spread influence over greater distances.}
 
-\item{beta}{Numeric. Shape parameter for exponential power kernel. Ignored unless kernel = "expow". Values between 1-50 are typically valid. (Default = NULL)}
+\item{beta}{Positive numeric. Shape parameter for the exponential power
+kernel (\code{kernel = "expow"}). Controls kernel shape: values near 1
+approximate a Laplace (double-exponential) shape; values near 2 approximate
+Gaussian; larger values approach a flat-top (platykurtic) shape. Typical
+range is 1–50. Ignored for all other kernel types. Default: \code{NULL}.}
 
-\item{kernel}{Kernel function to use. Valid functions are c('exp', 'gaussian', fixed', 'expow'). See details}
+\item{kernel}{Character. The kernel function to visualize. One of:
+\describe{
+  \item{\code{"gaussian"}}{Gaussian (normal) decay; weights follow a
+    half-normal density with standard deviation \code{sigma}.}
+  \item{\code{"exp"}}{Negative exponential decay; weights follow
+    \code{exp(-d / sigma)}.}
+  \item{\code{"fixed"}}{Fixed-radius step function; all distances up to
+    \code{sigma} receive equal weight.}
+  \item{\code{"expow"}}{Exponential power kernel parameterized by
+    \code{sigma} and \code{beta}.}
+}}
 
-\item{scale_dist}{Logical. If TRUE (Default), the distance at which the specified density probability is achieved is added to the plot along with 95\% confidence interval}
+\item{scale_dist}{Logical. If \code{TRUE} (default), a vertical dashed line
+is added to the plot at the distance where the cumulative density equals
+\code{prob}.}
 
-\item{add_label}{Logical. If TRUE (Default), the distance value calculated for 'scale_dist' is added as an annotation to the plot.}
+\item{add_label}{Logical. If \code{TRUE} (default), an annotation showing
+the cumulative percentage and the effective distance value is added to the
+plot. Requires \code{scale_dist = TRUE}.}
 
-\item{...}{Not used}
+\item{...}{Not used.}
 }
 \value{
-ggplot2 objects of kernel density distributions
+A \code{ggplot2} object showing kernel weight (y-axis) as a function
+  of distance (x-axis). The object is printed as a side effect and returned
+  invisibly.
 }
 \description{
-Generic function to plot kernels
+Visualizes the weight (density) of a kernel function as a
+function of distance, without requiring a fitted \code{multiScaleR} object.
+Useful for exploring how different kernel types and sigma values translate
+into spatial influence zones before running \code{\link{multiScale_optim}}.
+To plot the kernel from a fitted model, use \code{plot(opt)} instead.
 }
 \details{
-This function is used to visualize kernel density distributions without having a fitted multiScaleR optimized object. Requires (1) sigma, (2) beta (if using exponential power), and (3) the kernel transformation ('exp' = negative exponential, 'gaussian', 'fixed' = fixed buffer, and 'expow' = exponential power)
+The x-axis range is set to cover 99.9\% of the cumulative density so that
+the tails of the distribution are visible. The \code{prob} marker is rounded
+to the nearest 10 distance units for display purposes.
+
+For fitted-model kernel plots (with confidence intervals), use
+\code{plot(multiScaleR_object)} instead.
 }
 \examples{
 #' ## General use of plot method

@@ -60,6 +60,55 @@ explicitly.
 
 ---
 
+# Landscape metric reference
+
+`landscape_var()` supports 15 metrics grouped into three categories. All metrics
+are computed within a circular buffer centered on each sample point (or on each
+raster cell when projecting with `kernel_scale.raster()`). Metrics that operate
+on categorical rasters expect integer class values; continuous rasters should
+be classified before use.
+
+## Composition metrics
+
+These metrics describe the diversity and abundance of patch types within the
+buffer. They require a categorical (integer-valued) raster.
+
+| Code | Name | Description |
+|------|------|-------------|
+| `shdi` | Shannon Diversity Index | $-\sum p_i \ln p_i$, where $p_i$ is the proportion of class $i$. Increases with richness and evenness. The `base` argument controls the logarithm base (default: natural log). |
+| `shei` | Shannon Evenness Index | SHDI / ln(richness). Ranges from 0 (one dominant class) to 1 (perfectly even). |
+| `sidi` | Simpson Diversity Index | $1 - \sum p_i^2$. Probability that two randomly selected cells belong to different classes. Ranges from 0 to 1. |
+| `siei` | Simpson Evenness Index | SIDI / (1 − 1/richness). Standardizes SIDI against maximum possible diversity; requires ≥ 2 classes. |
+| `msidi` | Modified Simpson Diversity | $-\ln \sum p_i^2$. Logarithmic transformation of Simpson concentration; unbounded above. |
+| `msiei` | Modified Simpson Evenness | MSIDI / ln(richness). Evenness analogue of MSIDI. |
+| `pr` | Patch Richness | Count of distinct classes present in the buffer. |
+| `prd` | Patch Richness Density | PR per 100 ha of buffer area. |
+| `rpr` | Relative Patch Richness | (PR / `classes_max`) × 100. Requires the `classes_max` argument. |
+| `ta` | Total Area | Total area of the buffer in hectares. |
+
+## Edge metrics
+
+These metrics quantify the amount and complexity of boundaries between classes.
+They require a categorical raster and use cell adjacency information.
+
+| Code | Name | Description |
+|------|------|-------------|
+| `ed` | Edge Density | Total internal edge length (m) per hectare of buffer area. Higher values indicate a more fragmented landscape. |
+| `te` | Total Edge | Total internal edge length in metres. |
+| `lsi` | Landscape Shape Index | Total perimeter / minimum possible perimeter for the same number of cells. LSI = 1 for a perfectly compact (circular) patch; increases with irregularity. |
+
+## Adjacency metrics
+
+These metrics describe how often similar or dissimilar classes occur next to one
+another. They require a categorical raster and use cell-pair counts.
+
+| Code | Name | Description |
+|------|------|-------------|
+| `pladj` | Proportion of Like Adjacencies | Percentage of cell-pair boundaries shared between cells of the *same* class. High values indicate a clumped or aggregated landscape. |
+| `contag` | Contagion | Measures the degree of clumping across all class pairs. Ranges from 0 (maximum interspersion) to 100 (single class). Requires ≥ 2 classes. |
+
+---
+
 # Load example data
 
 This example uses the simulated count data and survey locations included with
@@ -206,6 +255,79 @@ The resulting raster names match the model covariates:
 
 ```{r projected-names}
 names(projected)
+```
+
+---
+
+# Producing landscape metric rasters without a fitted model
+
+`kernel_scale.raster()` can generate landscape metric raster surfaces directly,
+without having fitted a model at all. This is useful when you want to explore
+how a metric varies across the landscape at a given scale, compare metrics
+side-by-side before committing to a model structure, or simply produce a
+covariate map from a classified raster.
+
+Pass a `scale_vars` object in which all covariates have a fixed `radius` (i.e.,
+`radius` is not `NULL` in `landscape_var()`). No `sigma` argument is needed
+because no scale is being optimized.
+
+```{r standalone-metric-rasters, fig.cap = "***Landscape metric surfaces computed directly from the source rasters at a fixed 500 m radius.***", fig.height = 7}
+## Define several metrics at a fixed 500 m radius
+standalone_vars <- msr_vars(
+  land1_ed    = landscape_var("land1",    metric = "ed",    radius = 500),
+  land1_lsi   = landscape_var("land1",    metric = "lsi",   radius = 500),
+  land1_pladj = landscape_var("land1",    metric = "pladj", radius = 500),
+  cover_shdi  = landscape_var("landcover", metric = "shdi",  radius = 500),
+  cover_pr    = landscape_var("landcover", metric = "pr",    radius = 500),
+  cover_sidi  = landscape_var("landcover", metric = "sidi",  radius = 500)
+)
+
+## Apply directly — no multiScaleR object or sigma values required
+metric_surfaces <- kernel_scale.raster(
+  raster_stack = metric_rasters,
+  scale_vars   = standalone_vars,
+  verbose      = FALSE
+)
+
+plot(metric_surfaces)
+```
+
+Each output layer is named after the covariate defined in `msr_vars()`:
+
+```{r standalone-names}
+names(metric_surfaces)
+```
+
+You can also compute a single metric in one line without defining a `msr_vars()`
+object — simply wrap a single `landscape_var()` call:
+
+```{r standalone-single, fig.cap = "***Edge density within a 300 m radius.***"}
+ed_300 <- kernel_scale.raster(
+  raster_stack = metric_rasters["land1"],
+  scale_vars   = msr_vars(ed_300m = landscape_var("land1", metric = "ed", radius = 300)),
+  verbose      = FALSE
+)
+
+plot(ed_300, main = "Edge density (m/ha) within 300 m")
+```
+
+Different radii produce notably different surfaces for the same metric. The
+example below computes edge density at three scales and plots them together for
+comparison:
+
+```{r standalone-multiscale, fig.cap = "***Edge density at three spatial scales.***", fig.height = 3.5}
+ed_multi <- kernel_scale.raster(
+  raster_stack = metric_rasters["land1"],
+  scale_vars   = msr_vars(
+    ed_200m = landscape_var("land1", metric = "ed", radius = 200),
+    ed_500m = landscape_var("land1", metric = "ed", radius = 500),
+    ed_900m = landscape_var("land1", metric = "ed", radius = 900)
+  ),
+  verbose = FALSE
+)
+
+plot(ed_multi,
+     main = c("ED — 200 m", "ED — 500 m", "ED — 900 m"))
 ```
 
 ---

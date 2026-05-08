@@ -7,23 +7,32 @@
 \method{plot}{multiScaleR}(x, ...)
 }
 \arguments{
-\item{x}{An object of class \code{multiScaleR}.}
+\item{x}{A fitted \code{multiScaleR} object returned by
+\code{\link{multiScale_optim}}.}
 
-\item{...}{Arguments to modify the plot. See Details.}
+\item{...}{Optional named arguments to customize the plot:
+\describe{
+  \item{\code{prob}}{Numeric between 0 and 1 (exclusive). Cumulative kernel
+    density threshold used to mark the effective distance. Default:
+    \code{0.9} (90\% of the kernel weight falls within the annotated
+    distance).}
+  \item{\code{scale_dist}}{Logical. If \code{TRUE} (default), a vertical
+    dashed line is drawn at the effective distance, and a shaded rectangle
+    spans the 95\% confidence interval.}
+  \item{\code{add_label}}{Logical. If \code{TRUE} (default), an annotation
+    in the upper-right corner reports the cumulative percentage, the
+    effective distance, and the 95\% CI bounds (in projection units).}
+}}
 }
 \value{
-A list of ggplot2 objects.
+A list of \code{ggplot2} objects (one per covariate with a
+  non-\code{NaN} standard error), returned invisibly. Plots are printed as
+  a side effect.
 }
 \description{
-Plot kernel weight distributions from optimized \code{multiScaleR} objects.
-}
-\details{
-Supported arguments include:
-\itemize{
-  \item \code{prob}: Cumulative weight cutoff for distance scale (default = 0.9).
-  \item \code{scale_dist}: Logical; add vertical line for distance scale (default = TRUE).
-  \item \code{add_label}: Logical; annotate scale distance and CI (default = TRUE).
-}
+Plots the optimized kernel weight distribution for each spatial covariate in
+a fitted \code{multiScaleR} object, with optional annotations showing the
+effective scale of effect and its 95\% confidence interval.
 }
 \examples{
 \donttest{

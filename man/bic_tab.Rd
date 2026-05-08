@@ -10,22 +10,44 @@ bic_tab(mod_list,
         ...)
 }
 \arguments{
-\item{mod_list}{List containing fitted `multiScaleR` objects}
+\item{mod_list}{List containing fitted \code{multiScaleR} objects (from
+\code{\link{multiScale_optim}}) and/or plain fitted model objects. All
+models must have been fit to the same number of observations.}
 
-\item{mod_names}{Optional. Specify names for fitted model objects. By default, the right hand side of the fitted `multiScaleR` model, in combination with the kernel, will be used as the model name.}
+\item{mod_names}{Optional character vector of model names. Length must equal
+\code{length(mod_list)}. By default, names are constructed as
+\code{[kernel]right-hand-side-formula} for \code{multiScaleR} objects.}
 
-\item{verbose}{(Default = FALSE) Should the table be printed to the console}
+\item{verbose}{Logical. If \code{TRUE}, the table is also printed to the
+console. Default: \code{FALSE}.}
 
-\item{...}{Additional arguments (Not used)}
+\item{...}{Additional arguments (not used).}
 }
 \value{
-Data frame of class `bictab` with BIC summary table for provided models
+A data frame of class \code{"bictab"} (from the \code{AICcmodavg}
+package) sorted by ascending BIC, containing:
+\describe{
+  \item{\code{Modnames}}{Model name.}
+  \item{\code{K}}{Number of estimated parameters (regression coefficients +
+    sigma, + shape for \code{"expow"} kernel).}
+  \item{\code{BIC}}{Bayesian information criterion value.}
+  \item{\code{Delta_BIC}}{Difference from the top model.}
+  \item{\code{BICWt}}{BIC weight.}
+  \item{\code{Cum.Wt}}{Cumulative BIC weight.}
+  \item{\code{LL}}{Log-likelihood.}
+}
 }
 \description{
-Function to create BIC table of fitted models
+Creates a model selection table ranked by BIC for a list of
+fitted models. Mixed lists containing both \code{multiScaleR} objects and
+plain model objects are supported.
 }
 \details{
-bic_tab creates a model selection table using \code{\link[AICcmodavg]{bictabCustom}} from the `AICcmodavg` package
+The table is constructed using \code{\link[AICcmodavg]{bictabCustom}} from
+the \code{AICcmodavg} package. BIC penalizes model complexity more heavily
+than AIC as sample size grows, and is often preferred when the goal is
+identifying the single best-supported model rather than model averaging.
+Sigma (and shape for \code{"expow"}) is counted in K.
 }
 \examples{
 ## Simulate data

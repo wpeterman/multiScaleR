@@ -18,38 +18,124 @@ kernel_prep(
 )
 }
 \arguments{
-\item{pts}{Point locations provided as `SpatVector` or `sf` objects}
+\item{pts}{Spatial point locations as a \code{SpatVector} (terra) or \code{sf}
+object. Points must be in a projected coordinate system that shares units
+with \code{max_D}.}
 
-\item{raster_stack}{Raster layer(s) of class `SpatRaster`}
+\item{raster_stack}{One or more raster layers of class \code{SpatRaster}
+(terra). Layer names must match the variable names in the model formula
+used with \code{\link{multiScale_optim}}, unless \code{scale_vars} is
+provided to define derived covariates.}
 
-\item{max_D}{The maximum distance to consider during the scale optimization}
+\item{max_D}{Positive numeric. The maximum radius (in the same units as the
+projection of \code{pts} and \code{raster_stack}) around each point to
+sample from the raster. Should be at least 2–3 times the largest expected
+sigma value. Raster layers must extend far enough beyond the points to
+fully cover buffers of this radius.}
 
-\item{kernel}{Kernel function to be used ('gaussian', 'exp', 'fixed', 'expow'; Default: 'gaussian')}
+\item{kernel}{Kernel function to be used for weighting raster values by
+distance. One of:
+\describe{
+  \item{\code{"gaussian"}}{(Default) Gaussian (normal) decay: weights fall
+    off as a normal distribution with standard deviation \code{sigma}.}
+  \item{\code{"exp"}}{Negative exponential decay: weights fall off as
+    \code{exp(-d / sigma)}.}
+  \item{\code{"fixed"}}{Fixed-radius (step) buffer: all cells within
+    \code{sigma} receive equal weight; cells beyond receive zero.}
+  \item{\code{"expow"}}{Exponential power kernel parameterized by both
+    \code{sigma} (scale) and \code{shape} (shape). Requires \code{shape}
+    to be specified.}
+}}
 
-\item{scale_vars}{Optional variable specifications created with `msr_vars()`.
-If omitted, each raster layer is treated as one optimized kernel-weighted
-covariate, preserving the historical behavior. Use `kernel_var()` and
-`landscape_var()` inside `msr_vars()` to explicitly define derived model
-covariates from source raster layers.}
+\item{scale_vars}{Optional variable specifications created with
+\code{\link{msr_vars}}. When omitted, each raster layer becomes one
+kernel-weighted covariate with the same name, preserving historical
+behavior. Provide \code{scale_vars} to define derived model covariates —
+for example, combining a kernel-weighted mean with landscape composition
+or edge metrics from the same source layer. See \code{\link{kernel_var}}
+and \code{\link{landscape_var}}.}
 
-\item{sigma}{Initial values for optimizing the scale parameter. Default: NULL, initial values will be automatically generated. This is recommended.}
+\item{sigma}{Optional numeric vector of initial sigma values for
+optimization. Length must equal the number of covariates with
+\code{optimize = TRUE} in \code{scale_vars} (or the number of raster
+layers when \code{scale_vars} is not provided). Values must be in the same
+units as the projection. Default: \code{NULL} — initial values are
+generated automatically as \code{max_D / 2}, which is recommended.}
 
-\item{shape}{Initial values for optimizing the shape parameter if using exponential power kernel. Default: NULL, starting values will be automatically generated. This is recommended.}
+\item{shape}{Optional numeric vector of initial shape values when
+\code{kernel = "expow"}. Length requirements same as \code{sigma}. Default:
+\code{NULL} — starting values of 2 are generated automatically.}
 
-\item{projected}{Logical. Are `pts` and `raster_stack` projected. Function currently requires that both are projected. Default: TRUE}
+\item{projected}{Logical. Whether \code{pts} and \code{raster_stack} are in a
+projected (planar) coordinate system. Currently only projected coordinates
+are supported. Default: \code{TRUE}.}
 
-\item{progress}{Should progress bars be printed to console. Default: FALSE}
+\item{progress}{Logical. Print progress bars to the console during extraction
+and distance calculations. Default: \code{FALSE}.}
 
-\item{verbose}{Logical. Print preparation information to the console. Default: TRUE}
+\item{verbose}{Logical. Print status messages during preparation. Default:
+\code{TRUE}.}
 }
 \value{
-A list of class `multiscaleR` with necessary elements to conduct scale optimization using the `multiScale_optim` function
+A list of class \code{"multiScaleR_data"} containing:
+\describe{
+  \item{\code{kernel_dat}}{Data frame of scaled (mean-centered, unit-variance)
+    initial kernel-weighted covariate values, one row per point and one column
+    per covariate. Row names match \code{pts} row names or sequential integers.
+    Use this directly to fit the initial model passed to
+    \code{\link{multiScale_optim}}.}
+  \item{\code{d_list}}{Named list (one element per point) of numeric distance
+    vectors from the point to every raster cell within the buffer.}
+  \item{\code{raw_cov}}{Named list (one element per point) of sparse matrices
+    containing raw raster cell values within the buffer, aligned with
+    \code{d_list}.}
+  \item{\code{kernel}}{Character string identifying the kernel used.}
+  \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
+    (scaled) parameter space.}
+  \item{\code{shape}}{Numeric vector of initial shape values, or \code{NULL}.}
+  \item{\code{min_D}}{Numeric. Approximate minimum inter-cell distance,
+    used as the lower bound for sigma during optimization.}
+  \item{\code{max_D}}{Numeric. The \code{max_D} value supplied by the user.}
+  \item{\code{n_covs}}{Integer. Number of covariates with scale being
+    optimized.}
+  \item{\code{unit_conv}}{Numeric. Internal distance scaling factor (equals
+    \code{max_D}).}
+  \item{\code{scale_vars}}{Data frame of class \code{"multiScaleR_vars"}
+    describing all covariate specifications.}
+  \item{\code{resolution}}{Numeric. Raster cell resolution.}
+  \item{\code{n_cols}}{Integer. Number of raster columns (used for adjacency
+    landscape metrics).}
+  \item{\code{scl_params}}{Named list with elements \code{mean} and \code{sd}
+    — the centering and scaling parameters applied to \code{kernel_dat}.
+    Stored for use by \code{\link{kernel_scale.raster}} when
+    \code{scale_center = TRUE}.}
+}
 }
 \description{
-Function to prepare data inputs for kernel scale analysis
+Prepares the data inputs required for multiscale kernel
+optimization. Extracts raster values within a buffer around each point,
+computes pairwise distances, and calculates initial kernel-weighted covariate
+values. The result is passed directly to \code{\link{multiScale_optim}}.
 }
 \details{
-Spatial point locations and raster layers should have a defined projection and be the same CRS. If providing starting values for `sigma` or `shape`, it must be a vector of length equal to the number of raster layers for which scale is being assessed and should be provided in the unit of the used projection. When specifying `max_D`, ensure that your raster layers adequately extend beyond the points provided so that the surrounding landscape can be meaningfully sampled during scale optimization. Row names from `pts` are preserved in the returned kernel data, distance list, and raw covariate list so downstream model data can be aligned to the original point order.
+Point locations and raster layers must share a defined CRS and both must be
+projected. All units (including \code{max_D} and any user-supplied
+\code{sigma}) must be in the same linear unit as the projection (typically
+metres or feet).
+
+The \code{max_D} buffer should be large enough to encompass the plausible
+range of the true scale of effect. A common rule of thumb is to set
+\code{max_D} to at least 2–3 times the largest expected sigma. After running
+\code{\link{multiScale_optim}}, the \code{max_distance} diagnostic will warn
+if the estimated scale approaches \code{max_D}.
+
+Initial \code{sigma} values do not need to be precise — the optimizer will
+refine them. Provide explicit starting values only if the default
+(\code{max_D / 2}) leads to convergence problems.
+
+Row names from \code{pts} are preserved throughout the returned object so
+that downstream model data frames can be joined back to the original point
+order.
 }
 \examples{
 library(terra)

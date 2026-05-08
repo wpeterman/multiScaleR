@@ -15,26 +15,39 @@ profile_sigma(
 )
 }
 \arguments{
-\item{x}{A fitted \code{multiScaleR} object.}
+\item{x}{A fitted \code{multiScaleR} object returned by
+\code{\link{multiScale_optim}}.}
 
-\item{n_pts}{Integer. Number of sigma values to evaluate for each covariate.
-Default is 10. Ignored when \code{sigma_values} is supplied.}
+\item{n_pts}{Positive integer (>= 3). Number of sigma values to evaluate
+for each covariate along the profile grid. More points give a smoother
+profile at the cost of additional model refits. Default: \code{10}.
+Ignored when \code{sigma_values} is supplied.}
 
-\item{metric}{Character. Which metric to profile: \code{"AICc"} (default)
-or \code{"LL"} (log-likelihood).}
+\item{metric}{Character. Metric to display on the y-axis of the profile.
+One of \code{"AICc"} (default) or \code{"LL"} (log-likelihood). The
+optimized sigma minimizes negative log-likelihood, so the \code{"LL"}
+profile should peak at the optimized value and \code{"AICc"} should
+show a minimum.}
 
-\item{verbose}{Logical. Print progress messages. Default is \code{TRUE}.}
+\item{verbose}{Logical. Print per-covariate progress messages. Default:
+\code{TRUE}.}
 
-\item{spacing}{Character. How to space automatically generated sigma values:
-\code{"log"} (default) or \code{"linear"}.}
+\item{spacing}{Character. Spacing of the automatically generated sigma grid.
+\code{"log"} (default) concentrates evaluation points at small sigma
+values where the likelihood surface typically changes more rapidly.
+\code{"linear"} provides equal spacing across the range.}
 
-\item{sigma_values}{Optional numeric vector of sigma values to evaluate
-directly. When supplied, \code{spacing}, \code{sigma_range}, and
-\code{n_pts} are ignored.}
+\item{sigma_values}{Optional positive numeric vector of sigma values (in the
+original projection units) to evaluate directly. When supplied,
+\code{spacing}, \code{sigma_range}, and \code{n_pts} are ignored. Duplicate
+values are removed and remaining values are sorted before profiling.
+Must contain at least 3 unique values.}
 
-\item{sigma_range}{Optional numeric vector of length 2 giving the minimum
-and maximum sigma values for the generated profile grid. Defaults to the
-optimization range stored in \code{x}.}
+\item{sigma_range}{Optional positive numeric vector of length 2 giving the
+minimum and maximum sigma values (in projection units) for the generated
+profile grid. Defaults to the optimization range stored in \code{x}
+(\code{min_D} to \code{max_D}). Ignored when \code{sigma_values} is
+supplied.}
 }
 \value{
 A list of class \code{sigma_profile} containing:
