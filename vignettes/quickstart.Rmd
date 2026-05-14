@@ -228,8 +228,14 @@ A clear trough centered near the optimized sigma confirms a well-identified
 scale of effect; a flat or monotone profile indicates the data do not
 strongly constrain sigma for that variable.
 
+You can parallelize this step with `n_cores`. A practical rule is to use up to
+the number of scaled surfaces (spatial covariates), which is often the most
+efficient setting when computer resources permit.
+
 ```{r profile, fig.cap = "***AICc profile across sigma. Red dashed line marks optimized sigma.***"}
-prof <- profile_sigma(opt, n_pts = 15, verbose = FALSE)
+n_profile_cores <- min(length(opt$scale_est$Mean),
+                       max(1L, parallel::detectCores(logical = FALSE)))
+prof <- profile_sigma(opt, n_pts = 15, n_cores = n_profile_cores, verbose = FALSE)
 plot(prof)
 ```
 
@@ -303,6 +309,12 @@ plot(opt)                           # kernel decay curves
 plot_marginal_effects(opt)          # covariate effect plots
 prof <- profile_sigma(opt)          # AICc/LL surface across sigma space
 plot(prof)                          # plot profile with optimized sigma marked
+
+# Optional: profile in parallel. Using up to the number of scaled surfaces
+# is often the most efficient when resources allow.
+n_profile_cores <- min(length(opt$scale_est$Mean),
+                       max(1L, parallel::detectCores(logical = FALSE)))
+prof_parallel <- profile_sigma(opt, n_cores = n_profile_cores)
 
 # 6. Project to landscape
 r_scaled <- kernel_scale.raster(land_rast, multiScaleR = opt,

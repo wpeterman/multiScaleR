@@ -9,6 +9,7 @@ profile_sigma(
   n_pts = 10,
   metric = c("AICc", "LL"),
   verbose = TRUE,
+  n_cores = NULL,
   spacing = c("log", "linear"),
   sigma_values = NULL,
   sigma_range = NULL
@@ -31,6 +32,10 @@ show a minimum.}
 
 \item{verbose}{Logical. Print per-covariate progress messages. Default:
 \code{TRUE}.}
+
+\item{n_cores}{Optional positive integer. Number of CPU cores to use when
+profiling covariates in parallel. Parallel profiling is applied across
+covariates with a PSOCK cluster. Default: \code{NULL} (serial profiling).}
 
 \item{spacing}{Character. Spacing of the automatically generated sigma grid.
 \code{"log"} (default) concentrates evaluation points at small sigma

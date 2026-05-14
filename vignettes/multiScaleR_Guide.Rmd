@@ -414,6 +414,8 @@ plot_marginal_effects(opt2)
 
 **Profiling the likelihood surface.** `profile_sigma()` provides a diagnostic view of how the model fit changes as σ varies across its search range for each covariate, while all other σ values are held at their optimized values. Rather than reporting a single point estimate with an interval, it shows the full shape of the AICc (or log-likelihood) surface across the parameter space.
 
+`profile_sigma()` can evaluate covariate profiles in parallel via `n_cores`. Because each scaled surface (spatial covariate) is profiled independently, setting `n_cores` to the number of scaled surfaces is often the most efficient choice when your computer has enough available resources.
+
 This is useful in several situations:
 
 -   **Verifying a well-defined optimum**: A clear trough in the AICc surface centered near the optimized σ suggests that the scale of effect is precisely estimated. A flat or monotone profile indicates the data do not strongly constrain σ for that variable.
@@ -423,7 +425,9 @@ This is useful in several situations:
 Intervals are log-spaced so that evaluation is denser at smaller σ values, where the surface tends to change more rapidly, and sparser at larger values where it is typically flatter.
 
 ```{r sigma-profile, fig.cap = "AICc profile across sigma for each spatial covariate. The red dashed line marks the optimized sigma."}
-prof2 <- profile_sigma(opt2, n_pts = 15, verbose = FALSE)
+n_profile_cores <- min(length(opt2$scale_est$Mean),
+                       max(1L, parallel::detectCores(logical = FALSE)))
+prof2 <- profile_sigma(opt2, n_pts = 15, n_cores = n_profile_cores, verbose = FALSE)
 plot(prof2)
 ```
 

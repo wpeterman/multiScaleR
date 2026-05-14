@@ -335,6 +335,8 @@ test_that("profile_sigma returns complete profiles and validates inputs", {
   expect_error(profile_sigma(structure(list(), class = "not_multiScaleR")), "multiScaleR")
   expect_error(profile_sigma(fix$opt, n_pts = 2, verbose = FALSE), "n_pts")
   expect_error(profile_sigma(fix$opt, n_pts = 5, verbose = NA), "verbose")
+  expect_error(profile_sigma(fix$opt, n_cores = 0, verbose = FALSE), "n_cores")
+  expect_error(profile_sigma(fix$opt, n_cores = 1.5, verbose = FALSE), "n_cores")
 })
 
 test_that("profile_sigma supports linear and custom sigma grids", {
@@ -372,6 +374,32 @@ test_that("profile_sigma supports linear and custom sigma grids", {
   expect_error(profile_sigma(fix$opt, sigma_values = c(10, 10, 20),
                              verbose = FALSE),
                "at least 3 unique")
+})
+
+test_that("profile_sigma parallel output matches serial output", {
+  cores <- suppressWarnings(parallel::detectCores(logical = FALSE))
+  if (is.na(cores) || cores < 2) {
+    skip("Parallel parity test requires at least 2 physical cores.")
+  }
+
+  fix <- make_core_fixture()
+
+  prof_serial <- suppressWarnings(
+    suppressMessages(
+      profile_sigma(fix$opt, n_pts = 4, verbose = FALSE)
+    )
+  )
+  prof_parallel <- suppressWarnings(
+    suppressMessages(
+      profile_sigma(fix$opt, n_pts = 4, n_cores = 2, verbose = FALSE)
+    )
+  )
+
+  expect_identical(prof_parallel$metric, prof_serial$metric)
+  expect_identical(prof_parallel$spacing, prof_serial$spacing)
+  expect_equal(prof_parallel$sigma_grid, prof_serial$sigma_grid)
+  expect_equal(prof_parallel$opt_sigma, prof_serial$opt_sigma)
+  expect_equal(prof_parallel$profiles, prof_serial$profiles, tolerance = 1e-10)
 })
 
 test_that("profile_sigma uses the same parameter count logic as model selection", {

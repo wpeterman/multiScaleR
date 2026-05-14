@@ -1,3 +1,12 @@
+multiScaleR 0.6.27
+---------
+* Expanded the landscape metric vignette workflow with release-ready examples,
+  including fixed-radius metric projection guidance
+* Added optional parallel covariate profiling in `profile_sigma()` via
+  `n_cores` and documented practical core-selection guidance in vignettes
+* Added regression coverage for standalone fixed-radius landscape metric
+  projection and serial-versus-parallel sigma profile parity
+
 multiScaleR 0.6.26
 ---------
 * Refined optimization diagnostics and next-run restart messaging in

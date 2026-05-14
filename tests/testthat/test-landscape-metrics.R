@@ -554,6 +554,44 @@ test_that("optimized landscape specs evaluate during model refits", {
 })
 
 
+test_that("kernel_scale.raster supports standalone fixed-radius landscape scale_vars without sigma", {
+  forest <- landscape_test_raster(910, 0:1, name = "forest")
+  pts <- landscape_test_points(forest)
+  radius <- 80
+  vars <- msr_vars(
+    forest_ed = landscape_var("forest", metric = "ed", radius = radius)
+  )
+
+  cached_ed <- landscape_cached_metric(
+    raster = forest,
+    pts = pts,
+    radius = radius,
+    metric_fun = function(d, values, cells) {
+      .landscape_edge_by_buffer(
+        d = d,
+        r_stack.df = values,
+        cells = cells,
+        radius = radius,
+        resolution = terra::res(forest)[[1]],
+        n_cols = terra::ncol(forest),
+        metric = "ed"
+      )[[1]]
+    }
+  )
+
+  projected <- kernel_scale.raster(
+    raster_stack = forest,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+
+  expect_named(projected, "forest_ed")
+  expect_equal(terra::extract(projected[["forest_ed"]], pts)[, 2],
+               cached_ed,
+               tolerance = 25)
+})
+
+
 test_that("composition helpers validate inputs and handle empty buffers", {
   expect_equal(.landscape_shdi(c(1, 1, 2, 2)), log(2))
   expect_equal(.landscape_composition_metric(c(1, 1, 2, 2), "sidi"), 0.5)

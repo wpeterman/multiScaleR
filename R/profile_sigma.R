@@ -18,6 +18,9 @@
 #'   show a minimum.
 #' @param verbose Logical. Print per-covariate progress messages. Default:
 #'   \code{TRUE}.
+#' @param n_cores Optional positive integer. Number of CPU cores to use when
+#'   profiling covariates in parallel. Parallel profiling is applied across
+#'   covariates with a PSOCK cluster. Default: \code{NULL} (serial profiling).
 #' @param spacing Character. Spacing of the automatically generated sigma grid.
 #'   \code{"log"} (default) concentrates evaluation points at small sigma
 #'   values where the likelihood surface typically changes more rapidly.
@@ -113,6 +116,7 @@ profile_sigma <- function(x,
                           n_pts = 10,
                           metric = c("AICc", "LL"),
                           verbose = TRUE,
+                          n_cores = NULL,
                           spacing = c("log", "linear"),
                           sigma_values = NULL,
                           sigma_range = NULL) {
@@ -121,6 +125,9 @@ profile_sigma <- function(x,
     stop("`x` must be a fitted `multiScaleR` object.", call. = FALSE)
   }
   validate_scalar_logical(verbose, "verbose")
+  if (!is.null(n_cores)) {
+    validate_scalar_numeric(n_cores, "n_cores", integerish = TRUE, positive = TRUE)
+  }
   metric <- match.arg(metric)
   spacing <- match.arg(spacing)
 
@@ -136,6 +143,10 @@ profile_sigma <- function(x,
   covs      <- rownames(scale_est)
   n_covs    <- length(covs)
   opt_par   <- scale_est$Mean / unit_conv  # back to scaled space
+
+  if (n_covs < 1) {
+    stop("`x` does not contain any optimized sigma values to profile.", call. = FALSE)
+  }
 
   # Shape parameters if expow kernel
   if (kernel == "expow" && !is.null(x$shape_est)) {
@@ -195,14 +206,7 @@ profile_sigma <- function(x,
   }
   n_grid <- length(sigma_seq)
 
-  # Profile each covariate
-  results <- vector("list", n_covs)
-
-  for (j in seq_len(n_covs)) {
-    if (isTRUE(verbose)) {
-      cat(sprintf("Profiling '%s' (%d of %d)...\n", covs[j], j, n_covs))
-    }
-
+  profile_one_covariate <- function(j) {
     ll_vec   <- numeric(n_grid)
     aicc_vec <- numeric(n_grid)
 
@@ -246,7 +250,7 @@ profile_sigma <- function(x,
       aicc_vec[i] <- aicc_val
     }
 
-    results[[j]] <- data.frame(
+    data.frame(
       variable = covs[j],
       sigma    = sigma_seq,
       LL       = ll_vec,
@@ -255,14 +259,59 @@ profile_sigma <- function(x,
     )
   }
 
+  # Profile each covariate
+  results <- vector("list", n_covs)
+  use_parallel <- !is.null(n_cores) && n_cores > 1 && n_covs > 1
+
+  if (use_parallel) {
+    if (isTRUE(verbose)) {
+      cat(sprintf("Profiling %d covariates in parallel using %d cores...\n",
+                  n_covs, n_cores))
+    }
+
+    cl <- parallel::makeCluster(n_cores)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    cluster_prep(mod, cl)
+
+    results_try <- try(
+      parallel::parLapply(cl = cl,
+                          X = seq_len(n_covs),
+                          fun = profile_one_covariate),
+      silent = TRUE
+    )
+
+    if (inherits(results_try, "try-error")) {
+      err_msg <- attr(results_try, "condition")
+      if (!is.null(err_msg)) {
+        stop("Parallel sigma profiling failed: ",
+             conditionMessage(err_msg),
+             call. = FALSE)
+      }
+      stop("Parallel sigma profiling failed due to an unknown error.",
+           call. = FALSE)
+    }
+
+    results <- results_try
+  } else {
+    if (!is.null(n_cores) && n_cores > 1 && n_covs == 1 && isTRUE(verbose)) {
+      cat("Only one covariate was available; using serial profiling.\n")
+    }
+    for (j in seq_len(n_covs)) {
+      if (isTRUE(verbose)) {
+        cat(sprintf("Profiling '%s' (%d of %d)...\n", covs[j], j, n_covs))
+      }
+      results[[j]] <- profile_one_covariate(j)
+    }
+  }
+
   profiles <- do.call(rbind, results)
   rownames(profiles) <- NULL
 
   out <- list(
-    profiles  = profiles,
-    opt_sigma = stats::setNames(scale_est$Mean, covs),
-    metric    = metric,
-    spacing   = grid_type,
+    profiles   = profiles,
+    opt_sigma  = stats::setNames(scale_est$Mean, covs),
+    metric     = metric,
+    spacing    = grid_type,
     sigma_grid = sigma_seq
   )
   class(out) <- "sigma_profile"
