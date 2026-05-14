@@ -11,6 +11,7 @@ This repository contains an R package. The goal of any automated coding work is 
 - Do not silently change numerical behavior, defaults, or return values.
 - When touching package code, also inspect tests, documentation, and examples that may need updating.
 
+
 ## Package structure
 Typical files and directories that may be relevant:
 - `DESCRIPTION`
@@ -25,6 +26,7 @@ Typical files and directories that may be relevant:
 ## Coding expectations
 - Follow the existing code style in the repository.
 - Keep functions focused and avoid unnecessary abstraction.
+- Add moderate annotation to code and functions for future understanding
 - Prefer readable base R unless the repository already uses tidyverse-style conventions in that part of the codebase.
 - Avoid introducing new dependencies unless clearly justified.
 - If a new dependency is necessary, explain why and update:
@@ -37,6 +39,16 @@ Typical files and directories that may be relevant:
 - If function behavior, arguments, defaults, return values, or examples change, update the roxygen comments in `R/`.
 - Do not edit generated `.Rd` files directly unless explicitly instructed.
 - Keep examples lightweight and CRAN-safe.
+- Do not use em-dashes within sentences. Reserve use for headings, tables, bullet lists.
+- Use American English.
+- Do not create or fabricate references in support of methods.
+
+## Vignette rules
+- Be as descriptive in text as possible to make the document educational.
+- Provide annotation of code.
+- Do not use em-dashes within sentences. Reserve use for headings, tables, bullet lists.
+- Use American English.
+- Do not create or fabricate references in support of methods.
 
 ## Testing rules
 - For any nontrivial code change, add or update tests in `tests/testthat/`.
@@ -45,9 +57,18 @@ Typical files and directories that may be relevant:
 - If behavior changes intentionally, update tests to reflect the new contract and note that clearly.
 
 ## Updating rules
-- Always update the NEWS file by increasing the version 0.0.1, unless a larger increment is specified.
-- Provide a succinct, minimal review of what the update contains in NEWS, congruent with the style of the document.
-- Correspondingly, update the version in the DESCRIPTION
+- When making a commit, increase the version by 0.0.1, unless a larger increment is specified.
+- Provide a succinct, minimal review of what the update contains.
+- Correspondingly, update the version in `DESCRIPTION`.
+- If `NEWS`exists, add entry with new version numbers a brief, bullet description of the changes.
+- Do not commit changes until explicitly asked. Minor related edits can accumulate into one commit.
+
+## Development workflow
+- Work on one feature or fix at a time, ideally on a dedicated branch.
+- Make code/doc/test changes first, then inspect `git status` and `git diff` before committing.
+- Run `devtools::document()`, `devtools::test()`, and `devtools::check(args = "--no-manual")` before a final commit when feasible.
+- If Pandoc is unavailable in the current shell, `devtools::check(args = "--no-manual", build_args = "--no-build-vignettes", document = FALSE)` can be used as a pre-check, but run one final vignette-enabled check in RStudio when vignette files changed.
+- After validation, bump the package version once, make one concise commit for the batch of related changes, and merge to `master` only after that branch is stable.
 
 ## Validation expectations
 After making changes, recommend the relevant validation commands. Common commands include:
@@ -57,10 +78,3 @@ devtools::document()
 devtools::test()
 devtools::check()
 ```
-
-## Development workflow
-- Work on one feature or fix at a time, ideally on a dedicated branch.
-- Make code/doc/test changes first, then inspect `git status` and `git diff` before committing.
-- Run `devtools::document()`, `devtools::test()`, and `devtools::check(args = "--no-manual")` before a final commit when feasible.
-- If Pandoc is unavailable in the current shell, `devtools::check(args = "--no-manual", build_args = "--no-build-vignettes", document = FALSE)` can be used as a pre-check, but run one final vignette-enabled check in RStudio when vignette files changed.
-- After validation, bump the package version once, make one concise commit for the batch of related changes, and merge to `master` only after that branch is stable.

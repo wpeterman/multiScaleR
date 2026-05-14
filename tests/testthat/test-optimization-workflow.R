@@ -10,6 +10,12 @@ test_that("multiScale_optim returns a valid optimized object", {
   expect_true(all(c("mean", "sd") %in% names(opt$scl_params)))
   expect_true(opt$scale_est[1, "Mean"] > 0)
   expect_true(is.list(opt$diagnostics))
+  expect_true(is.list(opt$next_run))
+  expect_equal(unname(opt$next_run$start_sigma),
+               unname(opt$scale_est[, "Mean"]))
+  expect_equal(opt$next_run$max_D, opt$max_D)
+  expect_equal(unname(opt$next_run$start_par),
+               unname(opt$next_run$start_sigma / opt$next_run$max_D))
 })
 
 test_that("build_opt_context stores complete-case indices from model data", {
@@ -145,6 +151,9 @@ test_that("multiScale_optim builds and forwards cached optimization context", {
   expect_false(isTRUE(out$diagnostics$max_distance$triggered))
   expect_equal(unname(out$diagnostics$max_distance$effective_distance[[1]]), 20)
   expect_equal(out$diagnostics$max_distance$suggested_max_D, 40)
+  expect_equal(out$next_run$max_D, fix$kernel_inputs$max_D)
+  expect_equal(unname(out$next_run$start_sigma), 0.2 * fix$kernel_inputs$unit_conv)
+  expect_equal(unname(out$next_run$start_par), 0.2)
 })
 
 test_that("multiScale_optim can prescreen sigma starts with marginal scans only", {
@@ -550,6 +559,12 @@ test_that("multiScale_optim covers expow and warning branches via mocks", {
   expect_true(isTRUE(out$diagnostics$max_distance$triggered))
   expect_true(isTRUE(out$diagnostics$sigma_precision$triggered))
   expect_true(isTRUE(out$diagnostics$shape_precision$triggered))
+  expect_equal(out$next_run$max_D, 400)
+  expect_equal(unname(out$next_run$start_sigma), 0.2 * fix$kernel_inputs$unit_conv)
+  expect_equal(unname(out$next_run$start_shape), 2)
+  expect_equal(unname(out$next_run$start_par), c(50 / 400, 2))
+  expect_equal(out$next_run$flags,
+               c("max_distance", "sigma_precision", "shape_precision"))
 })
 
 test_that("multiScale_optim covers singular hessian and failure branches via mocks", {

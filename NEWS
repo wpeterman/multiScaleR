@@ -1,5 +1,13 @@
+multiScaleR 0.6.26
+---------
+* Refined optimization diagnostics and next-run restart messaging in
+  `multiScale_optim()` documentation and tests
+* Updated vignette guidance for iterative optimization workflows
+
 multiScaleR 0.6.25
 ---------
+* Added `next_run` recommendations to `multiScale_optim()` output with
+  follow-up starting values and a diagnostic-informed `max_D` suggestion
 * Suppressed benign package attach warnings in marginal-effect and PSOCK
   helper fallback loads so local checks do not fail on R patch-version
   mismatches alone

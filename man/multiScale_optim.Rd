@@ -120,6 +120,12 @@ A list of class \code{"multiScaleR"} containing:
     \code{NULL} until \code{\link{profile_sigma}} has been run.}
   \item{\code{diagnostics}}{List of diagnostic objects; see
     \code{\link{diagnostics}}.}
+  \item{\code{next_run}}{List of recommended values for a follow-up fit.
+    Includes \code{max_D} for the next \code{\link{kernel_prep}} call,
+    optimized \code{start_sigma} values in map units, optional
+    \code{start_shape} values for \code{kernel = "expow"}, and
+    \code{start_par} on the internal scaled parameter space expected by
+    \code{multiScale_optim}.}
   \item{\code{warn_message}}{Integer vector of triggered warning codes:
     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
   \item{\code{call}}{The matched call.}

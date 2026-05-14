@@ -294,6 +294,30 @@ opt1 <- multiScale_optim(fitted_mod = mod0,
                          kernel_inputs = kernel_inputs)
 ```
 
+When the likelihood surface is broad or the model includes several landscape
+covariates, a single default start can occasionally settle on a local optimum.
+The screened start strategy provides a lightweight diagnostic alternative. It
+scouts log-spaced σ values, optionally runs a few short screening
+optimizations, and then launches one full optimization from the best candidate.
+Use `set.seed()` before screened starts when you want reproducible jittered
+candidates.
+
+```{r opt1-screened-start, eval=FALSE}
+set.seed(1)
+opt1_screen <- multiScale_optim(
+  fitted_mod = mod0,
+  kernel_inputs = kernel_inputs,
+  start_strategy = "screen",
+  screen_n_sigma = 4,
+  screen_n_jitter = 2,
+  screen_maxit = 5
+)
+```
+
+The reduced screening settings above are useful for quick checks and examples.
+For final analyses, the defaults provide a broader screen while still running
+only one full optimization.
+
 We get two helpful warning messages:
 
 1.  The estimated σ for one raster layer is near `max_D`, meaning the optimization is pushing against the boundary of the search space. This suggests that either the true scale of effect is large, or that the variable has a weak or absent relationship with the response and optimization is poorly constrained. The warning suggests increasing `max_D` in `kernel_prep()`.

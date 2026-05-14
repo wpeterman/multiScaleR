@@ -41,6 +41,58 @@
 }
 
 
+.next_run_recommendation <- function(scale_est,
+                                     shape_est,
+                                     max_D,
+                                     diagnostics) {
+  start_sigma <- scale_est[, "Mean"]
+  names(start_sigma) <- row.names(scale_est)
+
+  recommended_max_D <- max_D
+  max_distance_diag <- diagnostics$max_distance
+  if (isTRUE(max_distance_diag$triggered) &&
+      is.finite(max_distance_diag$suggested_max_D) &&
+      max_distance_diag$suggested_max_D > recommended_max_D) {
+    recommended_max_D <- max_distance_diag$suggested_max_D
+  }
+
+  start_par_sigma <- start_sigma / recommended_max_D
+  names(start_par_sigma) <- names(start_sigma)
+
+  start_shape <- NULL
+  start_par <- start_par_sigma
+  if (!is.null(shape_est)) {
+    start_shape <- shape_est[, "Mean"]
+    names(start_shape) <- row.names(shape_est)
+    start_par <- c(start_par_sigma, start_shape)
+    names(start_par) <- c(
+      paste0(names(start_par_sigma), "_sigma"),
+      paste0(names(start_shape), "_shape")
+    )
+  }
+
+  flags <- vapply(diagnostics,
+                  function(x) is.list(x) && isTRUE(x$triggered),
+                  logical(1))
+  flags <- names(flags)[flags]
+
+  action <- if (length(flags) == 0) {
+    "Use the optimized parameters as efficient starting values if refitting."
+  } else {
+    "Refit from the optimized parameters and address the flagged diagnostics."
+  }
+
+  list(
+    max_D = recommended_max_D,
+    start_sigma = start_sigma,
+    start_shape = start_shape,
+    start_par = start_par,
+    flags = flags,
+    action = action
+  )
+}
+
+
 .msr_log_sequence <- function(lower, upper, n) {
   if (n <= 1 || isTRUE(all.equal(lower, upper))) {
     return(rep(lower, max(1, n)))
@@ -318,6 +370,12 @@
 #'     \code{NULL} until \code{\link{profile_sigma}} has been run.}
 #'   \item{\code{diagnostics}}{List of diagnostic objects; see
 #'     \code{\link{diagnostics}}.}
+#'   \item{\code{next_run}}{List of recommended values for a follow-up fit.
+#'     Includes \code{max_D} for the next \code{\link{kernel_prep}} call,
+#'     optimized \code{start_sigma} values in map units, optional
+#'     \code{start_shape} values for \code{kernel = "expow"}, and
+#'     \code{start_par} on the internal scaled parameter space expected by
+#'     \code{multiScale_optim}.}
 #'   \item{\code{warn_message}}{Integer vector of triggered warning codes:
 #'     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
 #'   \item{\code{call}}{The matched call.}
@@ -873,6 +931,7 @@ multiScale_optim <- function(fitted_mod,
                 opt_context = opt_context,
                 profile_scale_est = NULL,
                 diagnostics = .empty_diagnostics(),
+                next_run = NULL,
                 warn_message = 0,
                 call = match.call())
 
@@ -886,7 +945,7 @@ multiScale_optim <- function(fitted_mod,
     if (isTRUE(max_dist_diag$triggered)) {
       out$warn_message <- c(out$warn_message, 1)
       cat(red("\n WARNING!!!\n",
-              "The estimated scale of effect extends beyond the maximum distance specified.\n",
+              "The estimated scale of effect approaches or exceeds the current search extent.\n",
               "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(max_dist_diag$suggested_max_D) %+% " to ensure accurate estimation of scale.\n\n"))
     }
 
@@ -905,6 +964,14 @@ multiScale_optim <- function(fitted_mod,
               "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
               "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
     }
+
+    out$next_run <- .next_run_recommendation(
+      scale_est = scale_est,
+      shape_est = shape_est,
+      max_D = kernel_inputs$max_D,
+      diagnostics = out$diagnostics
+    )
+
     return(out)
   }
 }

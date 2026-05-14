@@ -165,6 +165,24 @@ opt <- multiScaleR::multiScale_optim(fitted_mod    = mod,
                                      kernel_inputs = kernel_inputs)
 ```
 
+If optimization is sensitive to the initial σ values, use the screened start
+strategy. This first scouts a small set of σ candidates, then launches one full
+optimization from the best candidate. It is most helpful when models have
+multiple landscape covariates, weak scale signal, or evidence that a single
+starting value is settling on a local optimum.
+
+```{r optim-screened-start, eval = FALSE}
+set.seed(1)
+opt_screen <- multiScaleR::multiScale_optim(
+  fitted_mod = mod,
+  kernel_inputs = kernel_inputs,
+  start_strategy = "screen",
+  screen_n_sigma = 4,
+  screen_n_jitter = 2,
+  screen_maxit = 5
+)
+```
+
 ```{r load-opt, include = FALSE}
 # load(pkg_extdata("opt2.RData"))
 # opt <- opt2
@@ -267,6 +285,16 @@ mod <- glm(counts ~ land1 + land2, family = poisson(), data = df)
 # 4. Optimize scales of effect
 opt <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs,
                         n_cores = 2)
+
+# Optional: screen candidate starts before the full optimization when a model
+# is sensitive to starting values.
+set.seed(1)
+opt_screen <- multiScale_optim(fitted_mod = mod,
+                               kernel_inputs = kernel_inputs,
+                               start_strategy = "screen",
+                               screen_n_sigma = 4,
+                               screen_n_jitter = 2,
+                               screen_maxit = 5)
 
 # 5. Summarize and visualize
 summary(opt)                        # sigma estimates + regression table
