@@ -1,3 +1,11 @@
+multiScaleR 0.6.28
+---------
+* Parallelized short screened-start optimization attempts in
+  `multiScale_optim()` using the same `n_cores` allocation as the main
+  optimization when `start_strategy = "screen"`
+* Added a serial fallback path if parallel screening fails, and added
+  regression coverage for core allocation behavior in screening
+
 multiScaleR 0.6.27
 ---------
 * Expanded the landscape metric vignette workflow with release-ready examples,

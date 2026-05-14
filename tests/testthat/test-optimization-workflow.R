@@ -250,6 +250,63 @@ test_that("multiScale_optim screening keeps exactly one full optimization", {
   expect_equal(captured$full_par[1], target, tolerance = 1e-10)
 })
 
+test_that("screening attempts use allocated multiScale_optim cores when available", {
+  fix <- make_core_fixture()
+  captured <- new.env(parent = emptyenv())
+  captured$parallel_used <- FALSE
+  captured$cluster_n <- NA_integer_
+  captured$n_candidates <- NA_integer_
+  captured$cluster_stopped <- FALSE
+
+  set.seed(20260514)
+  start <- with_mocked_bindings(
+    multiScaleR:::.msr_prescreen_start(
+      par = c(0.2),
+      n_covs = 1,
+      lwr = c(0.05),
+      uppr = c(0.8),
+      fitted_mod = fix$fitted_mod,
+      kernel_inputs = fix$kernel_inputs,
+      join_by = NULL,
+      opt_context = fix$opt$opt_context,
+      screen_n_sigma = 4,
+      screen_n_jitter = 3,
+      screen_maxit = 2,
+      screen_jitter_sd = 0.5,
+      n_cores = 4,
+      PSOCK = TRUE,
+      verbose = FALSE
+    ),
+    .msr_objective_value = function(par, ...) (par[1] - 0.4)^2,
+    .msr_screen_run = function(par, ...) {
+      list(par = par, value = sum(par^2), convergence = 0L)
+    },
+    makeCluster = function(n) {
+      captured$cluster_n <- as.integer(n)
+      structure(list(n = n), class = "cluster")
+    },
+    cluster_prep = function(model, cl) {
+      invisible(NULL)
+    },
+    parLapply = function(cl, X, fun, ...) {
+      captured$parallel_used <- TRUE
+      captured$n_candidates <- length(X)
+      lapply(X, fun, ...)
+    },
+    stopCluster = function(cl) {
+      captured$cluster_stopped <- TRUE
+      invisible(NULL)
+    },
+    .package = "multiScaleR"
+  )
+
+  expect_true(isTRUE(captured$parallel_used))
+  expect_true(isTRUE(captured$cluster_stopped))
+  expect_equal(captured$cluster_n, min(4L, captured$n_candidates))
+  expect_type(start, "double")
+  expect_length(start, 1)
+})
+
 test_that("kernel_scale_fn can use a custom refit function", {
   fake_mod <- structure(list(), class = "custom_model")
   captured <- new.env(parent = emptyenv())

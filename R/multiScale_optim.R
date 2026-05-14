@@ -185,6 +185,8 @@
                                  screen_n_jitter,
                                  screen_maxit,
                                  screen_jitter_sd,
+                                 n_cores,
+                                 PSOCK,
                                  verbose) {
   if (isTRUE(verbose)) {
     cat("Prescreening starting values with log-spaced sigma scans.\n")
@@ -248,17 +250,65 @@
     function(i) as.numeric(candidate_mat[i, ])
   )
 
-  screened <- lapply(
-    candidates,
-    .msr_screen_run,
-    lwr = lwr,
-    uppr = uppr,
-    fitted_mod = fitted_mod,
-    kernel_inputs = kernel_inputs,
-    join_by = join_by,
-    opt_context = opt_context,
-    screen_maxit = screen_maxit
-  )
+  screen_cores <- if (is.null(n_cores)) 1L else as.integer(n_cores)
+  use_parallel_screen <- screen_cores > 1L && length(candidates) > 1L
+
+  run_screen_serial <- function() {
+    lapply(
+      candidates,
+      .msr_screen_run,
+      lwr = lwr,
+      uppr = uppr,
+      fitted_mod = fitted_mod,
+      kernel_inputs = kernel_inputs,
+      join_by = join_by,
+      opt_context = opt_context,
+      screen_maxit = screen_maxit
+    )
+  }
+
+  if (use_parallel_screen) {
+    n_screen_cores <- min(screen_cores, length(candidates))
+    if (isTRUE(verbose)) {
+      cat(sprintf("Running %d screening attempts in parallel using %d cores.\n",
+                  length(candidates), n_screen_cores))
+    }
+
+    cl <- if (.Platform$OS.type == "unix" && isFALSE(PSOCK)) {
+      makeForkCluster(n_screen_cores)
+    } else {
+      makeCluster(n_screen_cores)
+    }
+    on.exit(stopCluster(cl), add = TRUE)
+    cluster_prep(fitted_mod, cl)
+
+    screened_try <- try(
+      parLapply(
+        cl = cl,
+        X = candidates,
+        fun = .msr_screen_run,
+        lwr = lwr,
+        uppr = uppr,
+        fitted_mod = fitted_mod,
+        kernel_inputs = kernel_inputs,
+        join_by = join_by,
+        opt_context = opt_context,
+        screen_maxit = screen_maxit
+      ),
+      silent = TRUE
+    )
+
+    if (inherits(screened_try, "try-error")) {
+      if (isTRUE(verbose)) {
+        cat("Parallel screening failed; retrying screening attempts serially.\n")
+      }
+      screened <- run_screen_serial()
+    } else {
+      screened <- screened_try
+    }
+  } else {
+    screened <- run_screen_serial()
+  }
 
   screen_values <- vapply(
     screened,
@@ -322,9 +372,11 @@
 #'   multiplicative sigma jitter on the log scale during screening. Default:
 #'   \code{0.5}.
 #' @param n_cores Positive integer. Number of cores for parallel optimization
-#'   via \code{optimParallel}. Default: \code{NULL} (single-threaded). Parallel
-#'   optimization is beneficial for models with many covariates or slow
-#'   log-likelihood evaluations.
+#'   via \code{optimParallel}. Default: \code{NULL} (single-threaded). When
+#'   \code{start_strategy = "screen"}, the same \code{n_cores} setting is also
+#'   used for short screening attempts before the full optimization.
+#'   Parallel optimization is beneficial for models with many covariates or
+#'   slow log-likelihood evaluations.
 #' @param PSOCK Logical. On Windows, a PSOCK cluster is always used. On Unix,
 #'   a FORK cluster is used by default (faster). Set \code{TRUE} to force a
 #'   PSOCK cluster on Unix. Default: \code{FALSE}.
@@ -545,7 +597,7 @@
 #' @export
 #' @importFrom optimParallel optimParallel
 #' @importFrom stats optim
-#' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster clusterExport
+#' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster clusterExport parLapply
 #' @importFrom crayon %+% green red bold blue
 #' @importFrom pscl zeroinfl
 multiScale_optim <- function(fitted_mod,
@@ -761,6 +813,8 @@ multiScale_optim <- function(fitted_mod,
       screen_n_jitter = screen_n_jitter,
       screen_maxit = screen_maxit,
       screen_jitter_sd = screen_jitter_sd,
+      n_cores = n_cores,
+      PSOCK = PSOCK,
       verbose = verbose
     )
   }

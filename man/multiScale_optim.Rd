@@ -68,9 +68,11 @@ multiplicative sigma jitter on the log scale during screening. Default:
 \code{0.5}.}
 
 \item{n_cores}{Positive integer. Number of cores for parallel optimization
-via \code{optimParallel}. Default: \code{NULL} (single-threaded). Parallel
-optimization is beneficial for models with many covariates or slow
-log-likelihood evaluations.}
+via \code{optimParallel}. Default: \code{NULL} (single-threaded). When
+\code{start_strategy = "screen"}, the same \code{n_cores} setting is also
+used for short screening attempts before the full optimization.
+Parallel optimization is beneficial for models with many covariates or
+slow log-likelihood evaluations.}
 
 \item{PSOCK}{Logical. On Windows, a PSOCK cluster is always used. On Unix,
 a FORK cluster is used by default (faster). Set \code{TRUE} to force a
