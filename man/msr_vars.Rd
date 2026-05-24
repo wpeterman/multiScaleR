@@ -106,6 +106,7 @@ Edge metrics (require adjacency information; cell IDs are cached internally):
 
 Adjacency metrics:
 \describe{
+  \item{\code{"ai"}}{Aggregation index (\%).}
   \item{\code{"pladj"}}{Proportion of like adjacencies (\%).}
   \item{\code{"contag"}}{Contagion index (\%).}
 }

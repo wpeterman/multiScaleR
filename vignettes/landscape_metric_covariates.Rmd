@@ -62,7 +62,7 @@ explicitly.
 
 # Landscape metric reference
 
-`landscape_var()` supports 15 metrics grouped into three categories. All metrics
+`landscape_var()` supports 16 metrics grouped into three categories. All metrics
 are computed within a circular buffer centered on each sample point (or on each
 raster cell when projecting with `kernel_scale.raster()`). Metrics that operate
 on categorical rasters expect integer class values; continuous rasters should
@@ -104,6 +104,7 @@ another. They require a categorical raster and use cell-pair counts.
 
 | Code | Name | Description |
 |------|------|-------------|
+| `ai` | Aggregation Index | Area-weighted aggregation of like adjacencies within classes. Higher values indicate that classes are more aggregated. |
 | `pladj` | Proportion of Like Adjacencies | Percentage of cell-pair boundaries shared between cells of the *same* class. High values indicate a clumped or aggregated landscape. |
 | `contag` | Contagion | Measures the degree of clumping across all class pairs. Ranges from 0 (maximum interspersion) to 100 (single class). Requires ≥ 2 classes. |
 
@@ -274,6 +275,7 @@ because no scale is being optimized.
 ```{r standalone-metric-rasters, fig.cap = "***Landscape metric surfaces computed directly from the source rasters at a fixed 500 m radius.***", fig.height = 7}
 ## Define several metrics at a fixed 500 m radius
 standalone_vars <- msr_vars(
+  land1_ai    = landscape_var("land1",    metric = "ai",    radius = 500),
   land1_ed    = landscape_var("land1",    metric = "ed",    radius = 500),
   land1_lsi   = landscape_var("land1",    metric = "lsi",   radius = 500),
   land1_pladj = landscape_var("land1",    metric = "pladj", radius = 500),

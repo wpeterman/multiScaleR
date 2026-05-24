@@ -169,7 +169,11 @@ If optimization is sensitive to the initial σ values, use the screened start
 strategy. This first scouts a small set of σ candidates, then launches one full
 optimization from the best candidate. It is most helpful when models have
 multiple landscape covariates, weak scale signal, or evidence that a single
-starting value is settling on a local optimum.
+starting value is settling on a local optimum. The marginal σ scans are serial,
+but the short screening attempts also use `n_cores` when you request parallel
+optimization. On Windows, that means screened starts use PSOCK workers in the
+same way as the full optimization, so the same `refit_fn` serialization advice
+applies.
 
 ```{r optim-screened-start, eval = FALSE}
 set.seed(1)

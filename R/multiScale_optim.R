@@ -499,10 +499,13 @@
 #' When `start_strategy = "screen"` and `par` is left as `NULL`,
 #' `multiScale_optim()` first scouts the sigma space with one-dimensional
 #' log-spaced scans, then optionally tests a few jittered starts using short,
-#' Hessian-free optimizations. These screening steps are always run serially and
-#' are used only to choose one starting vector for the single full optimization.
-#' For reproducible screened starts, call `set.seed()` before
-#' `multiScale_optim()`.
+#' Hessian-free optimizations. The marginal sigma scans are serial, but the
+#' short screening attempts use `n_cores` when parallel optimization is
+#' requested. These screening steps are used only to choose one starting vector
+#' for the single full optimization. On Windows, those parallel screening
+#' attempts use PSOCK workers, so the same PSOCK serialization guidance applies
+#' as in the full optimization. For reproducible screened starts, call
+#' `set.seed()` before `multiScale_optim()`.
 #'
 #' @seealso \code{\link[multiScaleR]{kernel_dist}}
 #' @examples

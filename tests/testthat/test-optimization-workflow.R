@@ -498,6 +498,26 @@ test_that("summary and distance methods return structured outputs", {
   expect_identical(sum_opt$diagnostics, fix$opt$diagnostics)
 })
 
+test_that("summary handles optional args robustly and validates prob", {
+  fix <- make_core_fixture()
+
+  smry_default_prob <- summary(fix$opt, unused = TRUE)
+  expect_equal(smry_default_prob$prob, 0.9)
+
+  expect_error(
+    summary(fix$opt, prob = c(0.9, 0.95)),
+    "`prob` must be a single numeric value strictly between 0 and 1."
+  )
+  expect_error(
+    summary(fix$opt, prob = 0),
+    "`prob` must be a single numeric value strictly between 0 and 1."
+  )
+  expect_error(
+    summary(fix$opt, profile = NA),
+    "`profile` must be TRUE or FALSE."
+  )
+})
+
 test_that("diagnostics accessor returns structured warning metadata", {
   fix <- make_core_fixture()
 
@@ -849,6 +869,50 @@ test_that("cluster_prep exports library paths for PSOCK workers", {
   expect_true(length(captured$lib_paths) >= 1)
   expect_equal(captured$r_libs_user, Sys.getenv("R_LIBS_USER", unset = ""))
   expect_equal(captured$r_libs, Sys.getenv("R_LIBS", unset = ""))
+})
+
+test_that("screened starts run on real PSOCK workers", {
+  skip_on_cran()
+  skip_if_not_installed("pkgload")
+
+  fix <- make_core_fixture()
+
+  serial <- suppressWarnings(
+    suppressMessages(
+      multiScale_optim(
+        fitted_mod = fix$fitted_mod,
+        kernel_inputs = fix$kernel_inputs,
+        start_strategy = "screen",
+        screen_n_sigma = 3,
+        screen_n_jitter = 2,
+        screen_maxit = 2,
+        screen_jitter_sd = 0.25,
+        n_cores = NULL,
+        verbose = FALSE
+      )
+    )
+  )
+
+  parallel <- suppressWarnings(
+    suppressMessages(
+      multiScale_optim(
+        fitted_mod = fix$fitted_mod,
+        kernel_inputs = fix$kernel_inputs,
+        start_strategy = "screen",
+        screen_n_sigma = 3,
+        screen_n_jitter = 2,
+        screen_maxit = 2,
+        screen_jitter_sd = 0.25,
+        n_cores = 2,
+        PSOCK = TRUE,
+        verbose = FALSE
+      )
+    )
+  )
+
+  expect_s3_class(parallel, "multiScaleR")
+  expect_true(all(is.finite(parallel$scale_est$Mean)))
+  expect_equal(parallel$scale_est$Mean, serial$scale_est$Mean, tolerance = 1e-4)
 })
 
 test_that("PSOCK optimization works for unqualified MASS model calls", {

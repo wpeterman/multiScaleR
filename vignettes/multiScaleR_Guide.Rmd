@@ -299,8 +299,11 @@ covariates, a single default start can occasionally settle on a local optimum.
 The screened start strategy provides a lightweight diagnostic alternative. It
 scouts log-spaced σ values, optionally runs a few short screening
 optimizations, and then launches one full optimization from the best candidate.
-Use `set.seed()` before screened starts when you want reproducible jittered
-candidates.
+The marginal σ scans are serial, but the short screening attempts use
+`n_cores` when parallel optimization is requested. On Windows, those short
+attempts run through PSOCK workers just like the full optimization, so the same
+cluster and serialization considerations apply. Use `set.seed()` before
+screened starts when you want reproducible jittered candidates.
 
 ```{r opt1-screened-start, eval=FALSE}
 set.seed(1)

@@ -35,6 +35,23 @@ double min_perimeter(double n_cells) {
   return 4 * total_n + 4;
 }
 
+double max_like_adjacencies(double n_cells) {
+  if (n_cells <= 0) {
+    return na_real();
+  }
+
+  double n = std::trunc(std::sqrt(n_cells));
+  double m = n_cells - n * n;
+
+  if (m == 0) {
+    return 2 * n * (n - 1);
+  }
+  if (m <= n) {
+    return 2 * n * (n - 1) + 2 * m - 1;
+  }
+  return 2 * n * (n - 1) + 2 * m - 2;
+}
+
 struct CellValue {
   int cell;
   double value;
@@ -348,6 +365,11 @@ NumericVector landscape_adjacency_metric_cpp(NumericVector d,
     }
 
     int n_classes = static_cast<int>(class_index.size());
+    std::vector<double> class_counts(n_classes, 0.0);
+    for (const auto& x : selected) {
+      class_counts[class_index[x.value]] += 1;
+    }
+
     std::vector<double> adjacency(n_classes * n_classes, 0.0);
 
     for (std::size_t i = 0; i < selected.size(); ++i) {
@@ -383,7 +405,25 @@ NumericVector landscape_adjacency_metric_cpp(NumericVector d,
       }
     }
 
-    if (metric == "pladj") {
+    if (metric == "ai") {
+      double weighted_ai = 0;
+      double total_cells = static_cast<double>(selected.size());
+
+      for (int i = 0; i < n_classes; ++i) {
+        double max_adj = max_like_adjacencies(class_counts[i]);
+        if (!is_valid_number(max_adj) || max_adj <= 0) {
+          continue;
+        }
+
+        double like_adjacencies = adjacency[i * n_classes + i] / 2.0;
+        double class_ai = like_adjacencies / max_adj * 100.0;
+        if (is_valid_number(class_ai)) {
+          weighted_ai += class_ai * class_counts[i] / total_cells;
+        }
+      }
+
+      out[col] = weighted_ai;
+    } else if (metric == "pladj") {
       out[col] = total == 0 ? 0 : diag_total / total * 100;
     } else if (metric == "contag") {
       if (n_classes < 2 || total == 0) {

@@ -88,6 +88,7 @@
 #'
 #' Adjacency metrics:
 #' \describe{
+#'   \item{\code{"ai"}}{Aggregation index (\%).}
 #'   \item{\code{"pladj"}}{Proportion of like adjacencies (\%).}
 #'   \item{\code{"contag"}}{Contagion index (\%).}
 #' }
@@ -262,7 +263,7 @@ print.multiScaleR_vars <- function(x, ...) {
 
 .msr_landscape_metrics <- function() {
   c("shdi", "shei", "sidi", "siei", "msidi", "msiei", "pr", "prd", "rpr",
-    "ta", "ed", "te", "lsi", "pladj", "contag")
+    "ta", "ed", "te", "lsi", "ai", "pladj", "contag")
 }
 
 
@@ -278,7 +279,7 @@ print.multiScaleR_vars <- function(x, ...) {
 
 
 .msr_adjacency_metrics <- function() {
-  c("pladj", "contag")
+  c("ai", "pladj", "contag")
 }
 
 

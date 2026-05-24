@@ -119,6 +119,20 @@ print.summary_multiScaleR <- function(x, ...){
 summary.multiScaleR <- function(object, profile = FALSE, ...){
 
   param_list <- list(...)
+  prob <- 0.9
+
+  if (!inherits(object, "multiScaleR")) {
+    stop("`object` must inherit from class 'multiScaleR'.")
+  }
+  if (is.null(object$opt_mod)) {
+    stop("`object$opt_mod` is missing; cannot summarize model output.")
+  }
+  if (is.null(object$scale_est)) {
+    stop("`object$scale_est` is missing; cannot summarize optimized scale estimates.")
+  }
+  if (!is.logical(profile) || length(profile) != 1L || is.na(profile)) {
+    stop("`profile` must be TRUE or FALSE.")
+  }
 
   if(any(class(object$opt_mod) == 'gls')){
     df <- object$opt_mod$dims$N - object$opt_mod$dims$p
@@ -139,12 +153,11 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
                               names = row.names(object$scale_est),
                               profile = profile)
 
-  if(length(param_list) >= 1){
-    if('prob' %in% names(param_list)){
-      prob <- param_list$prob
-    }
-  } else {
-    prob <- 0.9
+  if ("prob" %in% names(param_list)) {
+    prob <- param_list$prob
+  }
+  if (!is.numeric(prob) || length(prob) != 1L || is.na(prob) || prob <= 0 || prob >= 1) {
+    stop("`prob` must be a single numeric value strictly between 0 and 1.")
   }
 
   ## DEBUG

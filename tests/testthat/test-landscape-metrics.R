@@ -262,7 +262,7 @@ test_that("fixed-buffer adjacency metrics match landscapemetrics point sampling"
   pts_sf <- sf::st_as_sf(pts)
   radius <- 80
   cached <- lapply(
-    c("pladj", "contag"),
+    c("ai", "pladj", "contag"),
     function(metric) {
       landscape_cached_metric(
         raster = landcover,
@@ -281,7 +281,7 @@ test_that("fixed-buffer adjacency metrics match landscapemetrics point sampling"
       )
     }
   )
-  names(cached) <- c("pladj", "contag")
+  names(cached) <- c("ai", "pladj", "contag")
 
   contag_reference <- landscape_cached_metric(
     raster = landcover,
@@ -303,11 +303,13 @@ test_that("fixed-buffer adjacency metrics match landscapemetrics point sampling"
     y = pts_sf,
     shape = "circle",
     size = radius,
-    what = "lsm_l_pladj",
+    what = c("lsm_l_ai", "lsm_l_pladj"),
     verbose = FALSE,
     progress = FALSE
   )
 
+  ai_reference <- landscape_reference_values(reference, "ai")
+  expect_lt(max(abs(cached$ai - ai_reference), na.rm = TRUE), 2)
   expect_equal(cached$pladj, landscape_reference_values(reference, "pladj"),
                tolerance = 5)
   expect_equal(cached$contag, contag_reference, tolerance = 0.01)
@@ -319,7 +321,7 @@ test_that("FFT adjacency projections agree with cached point metrics", {
   pts <- landscape_test_points(landcover)
   radius <- 80
 
-  for (metric in c("pladj", "contag")) {
+  for (metric in c("ai", "pladj", "contag")) {
     cached <- landscape_cached_metric(
       raster = landcover,
       pts = pts,
@@ -344,7 +346,12 @@ test_that("FFT adjacency projections agree with cached point metrics", {
     projected <- terra::extract(metric_raster, pts)[, 2]
 
     expect_s4_class(metric_raster, "SpatRaster")
-    expect_equal(projected, cached, tolerance = if (metric == "pladj") 1.5 else 0.25)
+    tolerance <- switch(metric, ai = 1.5, pladj = 1.5, contag = 0.25)
+    if (metric == "ai") {
+      expect_lt(max(abs(projected - cached), na.rm = TRUE), 2.5)
+    } else {
+      expect_equal(projected, cached, tolerance = tolerance)
+    }
   }
 })
 
@@ -408,6 +415,17 @@ test_that("compiled by-buffer metrics match direct matrix formulas", {
         metric = "contag"
       )[[1]],
       .landscape_adjacency_metric(local_matrix, "contag")
+    )
+    expect_equal(
+      .landscape_adjacency_by_buffer(
+        d = d,
+        r_stack.df = values,
+        cells = cells,
+        radius = radius,
+        n_cols = terra::ncol(landcover),
+        metric = "ai"
+      )[[1]],
+      .landscape_adjacency_metric(local_matrix, "ai")
     )
   }
 })
@@ -559,7 +577,24 @@ test_that("kernel_scale.raster supports standalone fixed-radius landscape scale_
   pts <- landscape_test_points(forest)
   radius <- 80
   vars <- msr_vars(
+    forest_ai = landscape_var("forest", metric = "ai", radius = radius),
     forest_ed = landscape_var("forest", metric = "ed", radius = radius)
+  )
+
+  cached_ai <- landscape_cached_metric(
+    raster = forest,
+    pts = pts,
+    radius = radius,
+    metric_fun = function(d, values, cells) {
+      .landscape_adjacency_by_buffer(
+        d = d,
+        r_stack.df = values,
+        cells = cells,
+        radius = radius,
+        n_cols = terra::ncol(forest),
+        metric = "ai"
+      )[[1]]
+    }
   )
 
   cached_ed <- landscape_cached_metric(
@@ -585,7 +620,12 @@ test_that("kernel_scale.raster supports standalone fixed-radius landscape scale_
     verbose = FALSE
   )
 
-  expect_named(projected, "forest_ed")
+  expect_named(projected, c("forest_ai", "forest_ed"))
+  expect_lt(
+    max(abs(terra::extract(projected[["forest_ai"]], pts)[, 2] - cached_ai),
+        na.rm = TRUE),
+    2.5
+  )
   expect_equal(terra::extract(projected[["forest_ed"]], pts)[, 2],
                cached_ed,
                tolerance = 25)
@@ -622,6 +662,7 @@ test_that("edge and adjacency helpers validate inputs and handle empty buffers",
   local_matrix <- matrix(c(1, 1, 0, 1), nrow = 2, byrow = TRUE)
   expect_equal(.landscape_edge_density(local_matrix, resolution = 10), 500)
   expect_equal(.landscape_edge_metric(local_matrix, 10, "te"), 20)
+  expect_equal(.landscape_adjacency_metric(local_matrix, "ai"), 75)
   expect_equal(.landscape_adjacency_metric(local_matrix, "pladj"), 50)
 
   expect_error(

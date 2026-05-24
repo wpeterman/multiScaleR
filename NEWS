@@ -1,3 +1,13 @@
+multiScaleR 0.6.29
+---------
+* Added aggregation index (`ai`) as a supported `landscape_var()` metric,
+  including fixed-buffer, optimized-radius, and FFT raster projection paths
+  with accuracy checks against `landscapemetrics`
+* Hardened `summary.multiScaleR()` argument handling so optional arguments
+  such as `prob` and `profile` are validated consistently
+* Clarified screened-start documentation for `n_cores` and Windows PSOCK
+  behavior, and added real-worker regression coverage
+
 multiScaleR 0.6.28
 ---------
 * Parallelized short screened-start optimization attempts in

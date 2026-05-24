@@ -219,6 +219,24 @@
 }
 
 
+.landscape_max_like_adjacencies <- function(n_cells) {
+  if (n_cells <= 0) {
+    return(NA_real_)
+  }
+
+  n <- trunc(sqrt(n_cells))
+  m <- n_cells - n^2
+
+  if (m == 0) {
+    2 * n * (n - 1)
+  } else if (m <= n) {
+    2 * n * (n - 1) + 2 * m - 1
+  } else {
+    2 * n * (n - 1) + 2 * m - 2
+  }
+}
+
+
 .landscape_edge_stats <- function(values, resolution) {
   validate_scalar_numeric(resolution, "resolution", positive = TRUE)
 
@@ -406,7 +424,7 @@
 
 
 .landscape_adjacency_metric <- function(values, metric) {
-  metric <- match.arg(metric, c("pladj", "contag"))
+  metric <- match.arg(metric, c("ai", "pladj", "contag"))
 
   tab <- .landscape_adjacency_table(values)
   if (length(tab) == 0) {
@@ -414,6 +432,20 @@
   }
 
   total <- sum(tab)
+  if (metric == "ai") {
+    class_counts <- .landscape_class_totals(as.vector(values))
+    class_counts <- class_counts[match(rownames(tab), names(class_counts))]
+    like_adjacencies <- diag(tab) / 2
+    max_adjacencies <- vapply(
+      class_counts,
+      .landscape_max_like_adjacencies,
+      numeric(1)
+    )
+    class_ai <- like_adjacencies / max_adjacencies * 100
+    class_ai[!is.finite(class_ai)] <- NA_real_
+    return(sum(class_ai * class_counts / sum(class_counts), na.rm = TRUE))
+  }
+
   if (metric == "pladj") {
     if (total == 0) {
       return(0)
@@ -741,6 +773,26 @@
 }
 
 
+.landscape_max_like_adjacencies_matrix <- function(n_cells) {
+  n_cells <- round(n_cells)
+  out <- matrix(NA_real_, nrow = nrow(n_cells), ncol = ncol(n_cells))
+  active <- is.finite(n_cells) & n_cells > 0
+
+  n <- trunc(sqrt(n_cells[active]))
+  m <- n_cells[active] - n^2
+
+  out[active] <- ifelse(
+    m == 0,
+    2 * n * (n - 1),
+    ifelse(m <= n,
+           2 * n * (n - 1) + 2 * m - 1,
+           2 * n * (n - 1) + 2 * m - 2)
+  )
+
+  out
+}
+
+
 .landscape_edge_raster_fft <- function(raster,
                                        radius,
                                        metric,
@@ -836,7 +888,7 @@
                                             radius,
                                             metric,
                                             na.rm = TRUE) {
-  metric <- match.arg(metric, c("pladj", "contag"))
+  metric <- match.arg(metric, c("ai", "pladj", "contag"))
   counts <- .landscape_edge_counts_raster_fft(
     raster = raster,
     radius = radius,
@@ -869,6 +921,33 @@
     result <- like_source / total_source * 100
     result[total_source <= 0 & counts$area_cells > 0] <- 0
     result[counts$area_cells <= 0] <- NA_real_
+  } else if (metric == "ai") {
+    class_counts <- .landscape_class_count_rasters(
+      raster = raster,
+      radius = radius,
+      na.rm = na.rm
+    )
+    result <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+
+    for (i in seq_along(class_counts$classes)) {
+      class <- class_counts$classes[[i]]
+      count <- class_counts$class_counts[[i]]
+      like_source <- .landscape_pair_count_raster_fft(
+        values = values,
+        from = class,
+        to = class,
+        right_kernel = counts$right_kernel,
+        down_kernel = counts$down_kernel,
+        na.rm = na.rm
+      )
+      max_adjacencies <- .landscape_max_like_adjacencies_matrix(count)
+      class_ai <- like_source / max_adjacencies * 100
+      contribution <- class_ai * count / class_counts$total
+      contribution[!is.finite(contribution)] <- 0
+      result <- result + contribution
+    }
+
+    result[class_counts$total <= 0 | counts$area_cells <= 0] <- NA_real_
   } else {
     class_counts <- .landscape_class_count_rasters(
       raster = raster,
