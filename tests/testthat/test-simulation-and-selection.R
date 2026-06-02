@@ -23,6 +23,7 @@ test_that("expected public helpers remain exported", {
     "aic_tab",
     "bic_tab",
     "diagnostics",
+    "estimate_multiscale_ram",
     "kernel_dist",
     "kernel_prep",
     "kernel_scale.raster",

@@ -1,3 +1,9 @@
+multiScaleR 0.6.30
+---------
+* Added `estimate_multiscale_ram()` to report `kernel_prep()` memory use,
+  conservative parallel RAM budgets, and recommended worker counts based on
+  available RAM and physical CPU cores while reserving two cores
+
 multiScaleR 0.6.29
 ---------
 * Added aggregation index (`ai`) as a supported `landscape_var()` metric,

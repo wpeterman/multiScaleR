@@ -10,8 +10,9 @@
 ^AGENTS\.md$
 ^src/.*\.gcno$
 ^src/.*\.gcda$
-^src/.*\.(dll|o)$
+^src/.*\.(dll|o|so)$
 ^checks$
 ^\.claude$
 ^\.positai$
 ^tools/landscape_metrics_exploration\.R$
+^future_ideas\.md$
