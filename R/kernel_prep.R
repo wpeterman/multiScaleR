@@ -386,6 +386,7 @@ kernel_prep <- function(pts,
     close(pb)
   }
 
+  validate_covariates_before_scale(cov.w, context = "`kernel_prep()` covariates")
   scl_df <- scale(cov.w)
   kernel_dat <- as.data.frame(scl_df)
 

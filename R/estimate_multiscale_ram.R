@@ -302,6 +302,52 @@ estimate_multiscale_ram <- function(kernel_inputs,
 }
 
 
+.msr_warn_unsafe_parallel_ram <- function(kernel_inputs,
+                                          fitted_mod,
+                                          join_by,
+                                          refit_fn,
+                                          n_cores,
+                                          PSOCK) {
+  if (is.null(n_cores) || as.integer(n_cores) <= 1L) {
+    return(invisible(NULL))
+  }
+  if (!inherits(kernel_inputs, "multiScaleR_data")) {
+    return(invisible(NULL))
+  }
+
+  ram <- tryCatch(
+    estimate_multiscale_ram(
+      kernel_inputs = kernel_inputs,
+      fitted_mod = fitted_mod,
+      join_by = join_by,
+      refit_fn = refit_fn,
+      n_cores = n_cores,
+      PSOCK = PSOCK
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(ram) || is.na(ram$max_cores_by_ram) ||
+      as.integer(n_cores) <= ram$max_cores_by_ram) {
+    return(invisible(NULL))
+  }
+
+  peak <- ram$component_bytes$pretty[
+    ram$component_bytes$component == "peak_parallel_estimate"
+  ]
+  warning(
+    "Requested `n_cores = ", as.integer(n_cores),
+    "` may exceed the conservative RAM budget for this `kernel_prep()` payload. ",
+    "`estimate_multiscale_ram()` recommends at most ",
+    ram$max_cores_by_ram, " worker(s) by RAM for the ",
+    ram$backend, " backend; estimated peak use is ", peak,
+    ". Consider lowering `n_cores` or running `estimate_multiscale_ram()` first.",
+    call. = FALSE
+  )
+
+  invisible(ram)
+}
+
+
 .msr_detect_cores <- function(logical = FALSE) {
   cores <- suppressWarnings(parallel::detectCores(logical = logical))
   if (length(cores) != 1 || is.na(cores) || !is.finite(cores) || cores < 1) {

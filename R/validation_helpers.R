@@ -73,3 +73,50 @@ validate_multiScaleR_input <- function(x, arg = "multiScaleR") {
     stop(sprintf("`%s` must be a `multiScaleR` or `multiScaleR_data` object.", arg), call. = FALSE)
   }
 }
+
+validate_covariates_before_scale <- function(x, context = "calculated covariates") {
+  x <- as.matrix(x)
+  if (ncol(x) == 0) {
+    return(invisible(TRUE))
+  }
+
+  for (j in seq_len(ncol(x))) {
+    covariate <- colnames(x)[[j]]
+    if (is.null(covariate) || is.na(covariate) || !nzchar(covariate)) {
+      covariate <- paste0("column ", j)
+    }
+
+    values <- x[, j]
+    non_missing <- !is.na(values)
+    finite <- is.finite(values)
+
+    if (!any(non_missing)) {
+      stop(
+        sprintf("Cannot scale %s: covariate `%s` is all NA.", context, covariate),
+        call. = FALSE
+      )
+    }
+    if (any(non_missing & !finite)) {
+      stop(
+        sprintf("Cannot scale %s: covariate `%s` contains non-finite values.", context, covariate),
+        call. = FALSE
+      )
+    }
+    if (!any(finite)) {
+      stop(
+        sprintf("Cannot scale %s: covariate `%s` has no finite values.", context, covariate),
+        call. = FALSE
+      )
+    }
+
+    finite_values <- values[finite]
+    if (length(unique(finite_values)) < 2 || isTRUE(stats::sd(finite_values) == 0)) {
+      stop(
+        sprintf("Cannot scale %s: covariate `%s` has zero variance.", context, covariate),
+        call. = FALSE
+      )
+    }
+  }
+
+  invisible(TRUE)
+}

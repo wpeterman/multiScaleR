@@ -44,7 +44,12 @@
 .next_run_recommendation <- function(scale_est,
                                      shape_est,
                                      max_D,
-                                     diagnostics) {
+                                     diagnostics,
+                                     kernel_inputs = NULL,
+                                     fitted_mod = NULL,
+                                     join_by = NULL,
+                                     refit_fn = NULL,
+                                     PSOCK = FALSE) {
   start_sigma <- scale_est[, "Mean"]
   names(start_sigma) <- row.names(scale_est)
 
@@ -82,11 +87,31 @@
     "Refit from the optimized parameters and address the flagged diagnostics."
   }
 
+  n_cores <- NULL
+  if (inherits(kernel_inputs, "multiScaleR_data")) {
+    ram <- tryCatch(
+      estimate_multiscale_ram(
+        kernel_inputs = kernel_inputs,
+        fitted_mod = fitted_mod,
+        join_by = join_by,
+        refit_fn = refit_fn,
+        PSOCK = PSOCK
+      ),
+      error = function(e) NULL
+    )
+    recommended_n_cores <- ram$recommended_n_cores
+    if (!is.null(recommended_n_cores) && length(recommended_n_cores) == 1L &&
+        is.finite(recommended_n_cores) && as.integer(recommended_n_cores) >= 1L) {
+      n_cores <- as.integer(recommended_n_cores)
+    }
+  }
+
   list(
     max_D = recommended_max_D,
     start_sigma = start_sigma,
     start_shape = start_shape,
     start_par = start_par,
+    n_cores = n_cores,
     flags = flags,
     action = action
   )
@@ -376,7 +401,10 @@
 #'   \code{start_strategy = "screen"}, the same \code{n_cores} setting is also
 #'   used for short screening attempts before the full optimization.
 #'   Parallel optimization is beneficial for models with many covariates or
-#'   slow log-likelihood evaluations.
+#'   slow log-likelihood evaluations. When \code{n_cores > 1},
+#'   \code{multiScale_optim()} checks \code{\link{estimate_multiscale_ram}} and
+#'   warns if the requested workers exceed the conservative RAM budget for the
+#'   current \code{kernel_inputs} payload.
 #' @param PSOCK Logical. On Windows, a PSOCK cluster is always used. On Unix,
 #'   a FORK cluster is used by default (faster). Set \code{TRUE} to force a
 #'   PSOCK cluster on Unix. Default: \code{FALSE}.
@@ -427,7 +455,9 @@
 #'     optimized \code{start_sigma} values in map units, optional
 #'     \code{start_shape} values for \code{kernel = "expow"}, and
 #'     \code{start_par} on the internal scaled parameter space expected by
-#'     \code{multiScale_optim}.}
+#'     \code{multiScale_optim}. When enough stored fit context is available,
+#'     \code{n_cores} contains a conservative worker-count suggestion from
+#'     \code{\link{estimate_multiscale_ram}}.}
 #'   \item{\code{warn_message}}{Integer vector of triggered warning codes:
 #'     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
 #'   \item{\code{call}}{The matched call.}
@@ -778,6 +808,15 @@ multiScale_optim <- function(fitted_mod,
                                    resolution = kernel_inputs$resolution,
                                    n_cols = kernel_inputs$n_cols)
 
+  .msr_warn_unsafe_parallel_ram(
+    kernel_inputs = kernel_inputs,
+    fitted_mod = fitted_mod,
+    join_by = join_by,
+    refit_fn = refit_fn,
+    n_cores = n_cores,
+    PSOCK = (.Platform$OS.type != "unix" || isTRUE(PSOCK))
+  )
+
   if(kernel_inputs$kernel == 'expow'){
     lwr <- c(lwr, rep(0.75, n_covs))
     uppr <- c(uppr, rep(50, n_covs))
@@ -1026,7 +1065,12 @@ multiScale_optim <- function(fitted_mod,
       scale_est = scale_est,
       shape_est = shape_est,
       max_D = kernel_inputs$max_D,
-      diagnostics = out$diagnostics
+      diagnostics = out$diagnostics,
+      kernel_inputs = kernel_inputs,
+      fitted_mod = fitted_mod,
+      join_by = join_by,
+      refit_fn = refit_fn,
+      PSOCK = PSOCK
     )
 
     return(out)

@@ -3,6 +3,9 @@ multiScaleR 0.6.30
 * Added `estimate_multiscale_ram()` to report `kernel_prep()` memory use,
   conservative parallel RAM budgets, and recommended worker counts based on
   available RAM and physical CPU cores while reserving two cores
+* Added a preflight warning in `multiScale_optim()` when requested parallel
+  workers exceed the RAM-based budget estimated for the current `kernel_prep()`
+  payload
 
 multiScaleR 0.6.29
 ---------

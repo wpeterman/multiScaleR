@@ -279,6 +279,20 @@ kernel_scale_fn <- function(par,
     }
   } ## End for loop
 
+  scale_validation_error <- tryCatch(
+    {
+      validate_covariates_before_scale(cov.w, context = "optimized covariates")
+      NULL
+    },
+    error = function(e) conditionMessage(e)
+  )
+  if (!is.null(scale_validation_error)) {
+    if (is.null(mod_return)) {
+      return(1e6^10)
+    }
+    stop(scale_validation_error, call. = FALSE)
+  }
+
   scl_df <- scale(cov.w)
   refit_error <- NULL
 
