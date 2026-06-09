@@ -201,28 +201,47 @@ kernel_scale_fn <- function(par,
                                      join_by = join_by)
   }
 
+  binned <- opt_context$binned
+
+  # Number of points before any complete-case subsetting. With cell-level data
+  # this is length(d_list); in "lean" (binned-only) mode the cells were dropped
+  # and the count comes from the binned summaries.
+  n_total <- if (!is.null(d_list)) {
+    length(d_list)
+  } else if (!is.null(binned)) {
+    binned$n_points
+  } else {
+    0L
+  }
+
   eval_idx <- NULL
   if (!is.null(opt_context$complete_idx)) {
     eval_idx <- opt_context$complete_idx
     if (length(eval_idx) == 0 ||
         anyNA(eval_idx) ||
         any(eval_idx < 1) ||
-        any(eval_idx > length(d_list))) {
+        any(eval_idx > n_total)) {
       eval_idx <- opt_context$data_idx
     }
 
     if (!is.null(eval_idx) && length(eval_idx) > 0 &&
         !anyNA(eval_idx) &&
         all(eval_idx >= 1) &&
-        all(eval_idx <= length(d_list))) {
-      d_list <- d_list[eval_idx]
-      cov_df <- cov_df[eval_idx]
+        all(eval_idx <= n_total)) {
+      if (!is.null(d_list)) d_list <- d_list[eval_idx]
+      if (!is.null(cov_df)) cov_df <- cov_df[eval_idx]
     } else {
       eval_idx <- NULL
     }
   }
 
-  n_ind <- length(d_list)
+  n_ind <- if (!is.null(d_list)) {
+    length(d_list)
+  } else if (!is.null(eval_idx)) {
+    length(eval_idx)
+  } else {
+    n_total
+  }
 
   mod <- opt_context$fitted_mod
   mod_class <- opt_context$mod_class
@@ -244,7 +263,16 @@ kernel_scale_fn <- function(par,
 
   cov.w <- matrix(NA_real_, nrow = n_ind, ncol = n_covs)
   colnames(cov.w) <- covs
-  row_ids <- names(d_list)
+
+  # Resolve point/row identifiers, preferring the cell-level names and falling
+  # back to the binned point ids (or the complete-case indices) in lean mode.
+  row_ids <- if (!is.null(d_list)) {
+    names(d_list)
+  } else if (!is.null(binned) && !is.null(binned$point_ids)) {
+    if (!is.null(eval_idx)) binned$point_ids[eval_idx] else binned$point_ids
+  } else {
+    NULL
+  }
   if (is.null(row_ids) || length(row_ids) != n_ind ||
       anyNA(row_ids) || any(!nzchar(row_ids)) || anyDuplicated(row_ids)) {
     if (!is.null(eval_idx) && length(eval_idx) == n_ind) {
@@ -255,29 +283,74 @@ kernel_scale_fn <- function(par,
   }
   rownames(cov.w) <- row_ids
 
-  for(i in seq_len(n_ind)){
-    if (is.null(scale_vars)) {
-      cov.w[i, ] <-
-        scale_type(d_list[[i]],
-                   kernel = kernel,
-                   sigma = sigma,
-                   shape = shape,
-                   r_stack.df = cov_df[[i]][,covs,drop = FALSE])
-    } else {
-      cov.w[i, ] <- .msr_eval_scale_vars(
-        d = d_list[[i]],
-        cov_df = cov_df[[i]],
-        scale_vars = scale_vars,
+  # Kernel covariates that have precomputed binned summaries use the O(nbins)
+  # fast path; everything else (landscape metrics, or legacy objects without
+  # binned data) uses the exact per-cell evaluation.
+  binned_covs <- if (!is.null(binned)) intersect(covs, binned$covariates) else character(0)
+
+  if (length(binned_covs) == n_covs && n_covs > 0) {
+    # Pure kernel model: evaluate every covariate from binned summaries.
+    opt_vars <- .msr_optimized_scale_vars(scale_vars)
+    param_covariates <- if (is.null(opt_vars)) covs else covs[covs %in% opt_vars$covariate]
+    cov.w[, binned_covs] <- .msr_binned_kernel_means(
+      binned = binned,
+      covs = binned_covs,
+      param_covariates = param_covariates,
+      sigma = sigma,
+      shape = shape,
+      kernel = kernel,
+      eval_idx = eval_idx
+    )
+  } else {
+    if (is.null(d_list) || is.null(cov_df)) {
+      stop(
+        "Cell-level data are required to evaluate one or more covariates but were not stored. Re-run `kernel_prep()` with `store_cell_data = TRUE`.",
+        call. = FALSE
+      )
+    }
+
+    # Exact per-cell evaluation over ALL covariates (preserves the optimized-
+    # covariate sigma indexing used by `.msr_eval_scale_vars()`).
+    for (i in seq_len(n_ind)) {
+      if (is.null(scale_vars)) {
+        cov.w[i, ] <-
+          scale_type(d_list[[i]],
+                     kernel = kernel,
+                     sigma = sigma,
+                     shape = shape,
+                     r_stack.df = cov_df[[i]][, covs, drop = FALSE])
+      } else {
+        cov.w[i, ] <- .msr_eval_scale_vars(
+          d = d_list[[i]],
+          cov_df = cov_df[[i]],
+          scale_vars = scale_vars,
+          sigma = sigma,
+          shape = shape,
+          kernel = kernel,
+          unit_conv = opt_context$unit_conv,
+          resolution = opt_context$resolution,
+          n_cols = opt_context$n_cols,
+          covariates = covs
+        )
+      }
+    } ## End for loop
+
+    # Overwrite the kernel covariate columns with their (faster, equivalent)
+    # binned values so mixed kernel + landscape models still benefit.
+    if (length(binned_covs) > 0 && !is.null(scale_vars)) {
+      opt_vars <- .msr_optimized_scale_vars(scale_vars)
+      param_covariates <- if (is.null(opt_vars)) covs else covs[covs %in% opt_vars$covariate]
+      cov.w[, binned_covs] <- .msr_binned_kernel_means(
+        binned = binned,
+        covs = binned_covs,
+        param_covariates = param_covariates,
         sigma = sigma,
         shape = shape,
         kernel = kernel,
-        unit_conv = opt_context$unit_conv,
-        resolution = opt_context$resolution,
-        n_cols = opt_context$n_cols,
-        covariates = covs
+        eval_idx = eval_idx
       )
     }
-  } ## End for loop
+  }
 
   scale_validation_error <- tryCatch(
     {
@@ -402,7 +475,8 @@ build_opt_context <- function(fitted_mod,
                               scale_vars = NULL,
                               unit_conv = 1,
                               resolution = NULL,
-                              n_cols = NULL) {
+                              n_cols = NULL,
+                              binned = NULL) {
   mod <- fitted_mod
   analysis_mod <- .analysis_model(mod)
   cov_names <- .msr_optimized_covariates(scale_vars, cov_df = cov_df)
@@ -455,10 +529,18 @@ build_opt_context <- function(fitted_mod,
               scale_vars = scale_vars,
               unit_conv = unit_conv,
               resolution = resolution,
-              n_cols = n_cols)
+              n_cols = n_cols,
+              binned = .msr_subset_binned(binned, covs))
 
+  n_sites <- if (!is.null(cov_df)) {
+    length(cov_df)
+  } else if (!is.null(binned)) {
+    binned$n_points
+  } else {
+    nrow(dat)
+  }
   complete_cases <- .model_complete_indices(dat = dat,
-                                            n_sites = length(cov_df))
+                                            n_sites = n_sites)
   data_idx <- complete_cases$data_idx
   complete_idx <- complete_cases$complete_idx
 

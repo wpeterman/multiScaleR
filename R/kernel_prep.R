@@ -53,6 +53,25 @@
 #'   and distance calculations. Default: \code{FALSE}.
 #' @param verbose Logical. Print status messages during preparation. Default:
 #'   \code{TRUE}.
+#' @param bin Logical. If \code{TRUE} (default), precompute distance-binned
+#'   summaries of the kernel-type covariates so that \code{\link{multiScale_optim}}
+#'   can evaluate kernel-weighted means in \code{O(nbins)} per point instead of
+#'   iterating every buffer cell on each optimizer evaluation. This makes
+#'   optimization substantially faster (and independent of \code{max_D}) at the
+#'   cost of a negligible binning approximation. Landscape-metric covariates are
+#'   never binned and always use the exact per-cell path.
+#' @param nbins Positive integer. Number of equal-width distance bins used when
+#'   \code{bin = TRUE}. More bins increase accuracy and memory; the default
+#'   (\code{256}) reproduces exact optimization results to several significant
+#'   figures. Ignored when \code{bin = FALSE}.
+#' @param store_cell_data Logical. If \code{TRUE} (default), the full per-cell
+#'   \code{d_list}/\code{raw_cov} data are retained. If \code{FALSE} and every
+#'   covariate is kernel-type (no landscape metrics) and \code{bin = TRUE}, the
+#'   cell-level data are dropped after binning, dramatically reducing the
+#'   object's memory footprint (often by 1–2 orders of magnitude). The binned
+#'   summaries are sufficient to drive optimization, \code{\link{profile_sigma}},
+#'   and the final refit. Ignored (with a message) when landscape metrics are
+#'   present or \code{bin = FALSE}.
 #'
 #' @return A list of class \code{"multiScaleR_data"} containing:
 #' \describe{
@@ -86,6 +105,13 @@
 #'     — the centering and scaling parameters applied to \code{kernel_dat}.
 #'     Stored for use by \code{\link{kernel_scale.raster}} when
 #'     \code{scale_center = TRUE}.}
+#'   \item{\code{binned}}{When \code{bin = TRUE}, a list of precomputed
+#'     distance-binned summaries (representative bin distances and per-covariate
+#'     value/count matrices) used to accelerate optimization. \code{NULL} when
+#'     \code{bin = FALSE}.}
+#'   \item{\code{cell_data_stored}}{Logical flag indicating whether the
+#'     per-cell \code{d_list}/\code{raw_cov} data were retained. \code{FALSE}
+#'     only in lean mode (\code{store_cell_data = FALSE}).}
 #' }
 #'
 #' @details
@@ -142,7 +168,10 @@ kernel_prep <- function(pts,
                         shape = NULL,
                         projected = TRUE,
                         progress = FALSE,
-                        verbose = TRUE){
+                        verbose = TRUE,
+                        bin = TRUE,
+                        nbins = 256L,
+                        store_cell_data = TRUE){
   unit_conv <- max_D
 
   kernel <- match.arg(kernel)
@@ -150,6 +179,11 @@ kernel_prep <- function(pts,
   validate_scalar_logical(projected, "projected")
   validate_scalar_logical(progress, "progress")
   validate_scalar_logical(verbose, "verbose")
+  validate_scalar_logical(bin, "bin")
+  validate_scalar_logical(store_cell_data, "store_cell_data")
+  if (isTRUE(bin)) {
+    validate_scalar_numeric(nbins, "nbins", integerish = TRUE, lower = 2)
+  }
 
   if(!inherits(raster_stack, "SpatRaster")){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
@@ -390,9 +424,36 @@ kernel_prep <- function(pts,
   scl_df <- scale(cov.w)
   kernel_dat <- as.data.frame(scl_df)
 
+  # Precompute distance-binned summaries for kernel-type covariates so the
+  # optimizer can evaluate kernel-weighted means in O(nbins) per point instead
+  # of O(n_cells). See R/kernel_bins.R.
+  binned <- NULL
+  kernel_specs <- scale_vars[scale_vars$type == "kernel", , drop = FALSE]
+  if (isTRUE(bin) && nrow(kernel_specs) > 0) {
+    binned <- .msr_build_kernel_bins(
+      d_list = D,
+      value_list = sparse_list,
+      covariates = kernel_specs$covariate,
+      sources = kernel_specs$source,
+      nbins = nbins,
+      point_ids = point_ids
+    )
+  }
+
+  # Cell-level data (`d_list`/`raw_cov`) can be dropped only when every
+  # covariate is kernel-type (landscape metrics need the full per-cell spatial
+  # detail) and binned summaries are available to drive the optimizer.
+  has_landscape <- any(scale_vars$type == "landscape")
+  drop_cells <- isFALSE(store_cell_data) && !is.null(binned) &&
+    !has_landscape && all(scale_vars$type == "kernel")
+  if (isFALSE(store_cell_data) && !drop_cells && verbose) {
+    cat(paste0("\n`store_cell_data = FALSE` was ignored: cell-level data are ",
+               "still required for this configuration.\n"))
+  }
+
   out <- list(kernel_dat = kernel_dat,
-              d_list = D,
-              raw_cov = sparse_list,
+              d_list = if (drop_cells) NULL else D,
+              raw_cov = if (drop_cells) NULL else sparse_list,
               kernel = kernel,
               shape = shape,
               min_D = min_D,
@@ -403,6 +464,8 @@ kernel_prep <- function(pts,
               scale_vars = scale_vars,
               resolution = terra::res(raster_stack)[[1]],
               n_cols = terra::ncol(raster_stack),
+              binned = binned,
+              cell_data_stored = !drop_cells,
               scl_params = list(mean = attr(scl_df, "scaled:center"),
                                 sd = attr(scl_df, "scaled:scale")))
 

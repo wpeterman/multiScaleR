@@ -156,6 +156,19 @@ optimization. Summary methods report profile-likelihood confidence intervals
 for sigma when \code{\link{profile_sigma}} has been run on the object;
 otherwise they fall back to Hessian-based intervals.
 
+\strong{Binned acceleration}
+
+When \code{kernel_inputs} was created by \code{\link{kernel_prep}} with
+\code{bin = TRUE} (the default), kernel-weighted covariates are evaluated
+from precomputed distance-binned summaries rather than by iterating every
+buffer cell on each optimizer evaluation. This makes the per-evaluation cost
+independent of \code{max_D} and typically speeds up optimization by an order
+of magnitude or more for large buffers, with a negligible binning
+approximation. Inputs created with \code{store_cell_data = FALSE} ("lean"
+mode) carry only the binned summaries; these still optimize, profile, and
+refit normally. Landscape-metric covariates always use the exact per-cell
+path and therefore require cell-level data.
+
 \strong{Parallel optimization}
 
 To ensure that fitted model function calls are properly serialized for

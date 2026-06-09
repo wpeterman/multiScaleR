@@ -311,7 +311,14 @@ print.multiScaleR_data <- function(x, ...){
   # cat("\n\nSparse Matrix contains: ")
   # cat(paste0(length(x$D@x), ' elements\n'))
   cat("\n\nNumber of elements: \n")
-  cat(paste0(length(x$d_list[[1]])))
+  if (!is.null(x$d_list)) {
+    cat(paste0(length(x$d_list[[1]])))
+  } else if (!is.null(x$binned)) {
+    cat(paste0("cell-level data dropped; ", x$binned$nbins,
+               " distance bins stored per covariate"))
+  } else {
+    cat("NA")
+  }
   cat("\nMinimum Distance:\n")
   cat(x$min_D)
   cat("\nMaximum Distance:\n")

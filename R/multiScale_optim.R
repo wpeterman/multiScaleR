@@ -473,6 +473,19 @@
 #' for sigma when \code{\link{profile_sigma}} has been run on the object;
 #' otherwise they fall back to Hessian-based intervals.
 #'
+#' \strong{Binned acceleration}
+#'
+#' When \code{kernel_inputs} was created by \code{\link{kernel_prep}} with
+#' \code{bin = TRUE} (the default), kernel-weighted covariates are evaluated
+#' from precomputed distance-binned summaries rather than by iterating every
+#' buffer cell on each optimizer evaluation. This makes the per-evaluation cost
+#' independent of \code{max_D} and typically speeds up optimization by an order
+#' of magnitude or more for large buffers, with a negligible binning
+#' approximation. Inputs created with \code{store_cell_data = FALSE} ("lean"
+#' mode) carry only the binned summaries; these still optimize, profile, and
+#' refit normally. Landscape-metric covariates always use the exact per-cell
+#' path and therefore require cell-level data.
+#'
 #' \strong{Parallel optimization}
 #'
 #' To ensure that fitted model function calls are properly serialized for
@@ -699,10 +712,14 @@ multiScale_optim <- function(fitted_mod,
   if(!is.null(n_cores) && (length(n_cores) != 1 || is.na(n_cores) || n_cores != as.integer(n_cores))){
     stop("n_cores must be a positive integer if provided.")
   }
-  if(!is.list(kernel_inputs$raw_cov) || !is.list(kernel_inputs$d_list) ||
-     length(kernel_inputs$raw_cov) == 0 || length(kernel_inputs$d_list) == 0 ||
-     length(kernel_inputs$raw_cov) != length(kernel_inputs$d_list)){
-    stop("`kernel_inputs$raw_cov` and `kernel_inputs$d_list` must be non-empty lists of equal length.")
+  if (!is.null(kernel_inputs$raw_cov) || !is.null(kernel_inputs$d_list)) {
+    if(!is.list(kernel_inputs$raw_cov) || !is.list(kernel_inputs$d_list) ||
+       length(kernel_inputs$raw_cov) == 0 || length(kernel_inputs$d_list) == 0 ||
+       length(kernel_inputs$raw_cov) != length(kernel_inputs$d_list)){
+      stop("`kernel_inputs$raw_cov` and `kernel_inputs$d_list` must be non-empty lists of equal length.")
+    }
+  } else if (is.null(kernel_inputs$binned)) {
+    stop("`kernel_inputs` must contain either cell-level data (`raw_cov`/`d_list`) or precomputed `binned` summaries.")
   }
   validate_scalar_numeric(kernel_inputs$min_D, "kernel_inputs$min_D", positive = TRUE)
   validate_scalar_numeric(kernel_inputs$max_D, "kernel_inputs$max_D", positive = TRUE)
@@ -722,8 +739,15 @@ multiScale_optim <- function(fitted_mod,
   }
 
   if (!is.null(kernel_inputs$scale_vars)) {
+    available_sources <- if (!is.null(kernel_inputs$raw_cov)) {
+      colnames(kernel_inputs$raw_cov[[1]])
+    } else if (!is.null(kernel_inputs$binned)) {
+      unname(kernel_inputs$binned$sources)
+    } else {
+      character(0)
+    }
     missing_sources <- setdiff(kernel_inputs$scale_vars$source,
-                               colnames(kernel_inputs$raw_cov[[1]]))
+                               available_sources)
     if (length(missing_sources) > 0) {
       stop("The raster surfaces provided do not match the variables used in your fitted model. Ensure names of surfaces match model variable names.",
            call. = FALSE)
@@ -806,7 +830,8 @@ multiScale_optim <- function(fitted_mod,
                                    scale_vars = kernel_inputs$scale_vars,
                                    unit_conv = kernel_inputs$unit_conv,
                                    resolution = kernel_inputs$resolution,
-                                   n_cols = kernel_inputs$n_cols)
+                                   n_cols = kernel_inputs$n_cols,
+                                   binned = kernel_inputs$binned)
 
   .msr_warn_unsafe_parallel_ram(
     kernel_inputs = kernel_inputs,

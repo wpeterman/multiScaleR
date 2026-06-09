@@ -118,14 +118,39 @@ estimate_multiscale_ram <- function(kernel_inputs,
 
   d_list <- kernel_inputs$d_list
   raw_cov <- kernel_inputs$raw_cov
+  binned <- kernel_inputs$binned
   kernel_dat <- kernel_inputs$kernel_dat
 
+  # Cell-level data may have been dropped (`store_cell_data = FALSE`); fall back
+  # to the binned summaries / kernel data to describe the point set.
+  cells_per_point <- if (!is.null(d_list)) lengths(d_list) else integer(0)
+  n_points <- if (!is.null(d_list)) {
+    length(d_list)
+  } else if (!is.null(binned)) {
+    binned$n_points
+  } else if (!is.null(kernel_dat)) {
+    nrow(kernel_dat)
+  } else {
+    0L
+  }
+  n_source_layers <- if (!is.null(raw_cov) && length(raw_cov) > 0) {
+    ncol(raw_cov[[1]])
+  } else if (!is.null(binned)) {
+    length(binned$sources)
+  } else if (!is.null(kernel_dat)) {
+    ncol(kernel_dat)
+  } else {
+    0L
+  }
+
   point_summary <- data.frame(
-    n_points = length(d_list),
-    mean_cells_per_point = if (length(d_list) > 0) mean(lengths(d_list)) else NA_real_,
-    median_cells_per_point = if (length(d_list) > 0) stats::median(lengths(d_list)) else NA_real_,
-    max_cells_per_point = if (length(d_list) > 0) max(lengths(d_list)) else NA_real_,
-    n_source_layers = if (length(raw_cov) > 0) ncol(raw_cov[[1]]) else 0L,
+    n_points = n_points,
+    mean_cells_per_point = if (length(cells_per_point) > 0) mean(cells_per_point) else NA_real_,
+    median_cells_per_point = if (length(cells_per_point) > 0) stats::median(cells_per_point) else NA_real_,
+    max_cells_per_point = if (length(cells_per_point) > 0) max(cells_per_point) else NA_real_,
+    n_source_layers = n_source_layers,
+    cell_data_stored = !is.null(d_list),
+    nbins = if (!is.null(binned)) binned$nbins else NA_integer_,
     stringsAsFactors = FALSE
   )
 
@@ -155,6 +180,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
     kernel_dat = utils::object.size(kernel_dat),
     d_list = utils::object.size(d_list),
     raw_cov = utils::object.size(raw_cov),
+    binned = utils::object.size(binned),
     join_by = utils::object.size(join_by),
     fitted_mod = utils::object.size(fitted_mod),
     opt_context = utils::object.size(opt_context)
@@ -212,6 +238,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
       "kernel_dat",
       "d_list",
       "raw_cov",
+      "binned",
       "join_by",
       "fitted_mod",
       "opt_context",
@@ -224,6 +251,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
       .msr_as_numeric_size(component_sizes$kernel_dat),
       .msr_as_numeric_size(component_sizes$d_list),
       .msr_as_numeric_size(component_sizes$raw_cov),
+      .msr_as_numeric_size(component_sizes$binned),
       .msr_as_numeric_size(component_sizes$join_by),
       .msr_as_numeric_size(component_sizes$fitted_mod),
       .msr_as_numeric_size(component_sizes$opt_context),
@@ -236,6 +264,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
       .msr_format_bytes(component_sizes$kernel_dat),
       .msr_format_bytes(component_sizes$d_list),
       .msr_format_bytes(component_sizes$raw_cov),
+      .msr_format_bytes(component_sizes$binned),
       .msr_format_bytes(component_sizes$join_by),
       .msr_format_bytes(component_sizes$fitted_mod),
       .msr_format_bytes(component_sizes$opt_context),

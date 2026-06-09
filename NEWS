@@ -1,3 +1,23 @@
+multiScaleR 0.6.31
+---------
+* `kernel_prep()` now precomputes distance-binned summaries of kernel-weighted
+  covariates (`bin = TRUE`, `nbins = 256` by default). `multiScale_optim()`,
+  `profile_sigma()`, and the screened-start path evaluate kernel covariates from
+  these summaries in O(nbins) per point instead of iterating every buffer cell
+  on each optimizer evaluation. The per-evaluation cost becomes independent of
+  `max_D`, making optimization ~10-40x faster in benchmarks (the speedup grows
+  with the number of points and the buffer size), while recovering sigma to
+  within ~1e-5 (relative) of the exact per-cell result. Set `bin = FALSE` to
+  force the exact path.
+* Added a "lean" storage mode (`kernel_prep(store_cell_data = FALSE)`) that
+  drops the per-cell `d_list`/`raw_cov` data when every covariate is
+  kernel-type, retaining only the binned summaries. This reduces the
+  `multiScaleR_data` memory footprint by roughly 30-40x in benchmarks and is
+  sufficient to optimize, profile, and refit. Cell-level data are retained
+  automatically when landscape-metric covariates are present.
+* `estimate_multiscale_ram()` and `print.multiScaleR_data()` now report binned
+  summary sizes and handle lean inputs.
+
 multiScaleR 0.6.30
 ---------
 * Added `estimate_multiscale_ram()` to report `kernel_prep()` memory use,
