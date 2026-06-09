@@ -196,10 +196,10 @@ kernel_prep <- function(pts,
   opt_scale_vars <- .msr_optimized_scale_vars(scale_vars)
   n_optimized <- nrow(opt_scale_vars)
 
-  if (any(scale_vars$type == "landscape")) {
+  if (any(scale_vars$type %in% c("landscape", "surface"))) {
     raster_res <- terra::res(raster_stack)
     if (!isTRUE(all.equal(raster_res[[1]], raster_res[[2]]))) {
-      stop("Landscape metric variables require square raster cells.",
+      stop("Landscape and surface metric variables require square raster cells.",
            call. = FALSE)
     }
   }

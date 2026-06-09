@@ -9,6 +9,7 @@ extern SEXP _multiScaleR_landscape_edge_metric_cpp(SEXP, SEXP, SEXP, SEXP, SEXP,
 extern SEXP _multiScaleR_landscape_adjacency_metric_cpp(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _multiScaleR_scale_type_cpp(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _multiScaleR_scale_type_sparse(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);  // Add this line
+extern SEXP _multiScaleR_surface_sa_focal_cpp(SEXP, SEXP);
 
 // Register native routines
 static const R_CallMethodDef CallEntries[] = {
@@ -18,6 +19,7 @@ static const R_CallMethodDef CallEntries[] = {
   {"_multiScaleR_landscape_adjacency_metric_cpp", (DL_FUNC) &_multiScaleR_landscape_adjacency_metric_cpp, 6},
   {"_multiScaleR_scale_type_cpp", (DL_FUNC) &_multiScaleR_scale_type_cpp, 6},
   {"_multiScaleR_scale_type_sparse", (DL_FUNC) &_multiScaleR_scale_type_sparse, 6},  // Add this entry
+  {"_multiScaleR_surface_sa_focal_cpp", (DL_FUNC) &_multiScaleR_surface_sa_focal_cpp, 2},
   {NULL, NULL, 0}  // Sentinel to mark the end
 };
 

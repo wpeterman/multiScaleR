@@ -25,3 +25,7 @@ scale_type_sparse <- function(d, kernel = "gaussian", sigma_ = NULL, shape_ = NU
     .Call(`_multiScaleR_scale_type_sparse`, d, kernel, sigma_, shape_, r_stack_df, output)
 }
 
+surface_sa_focal_cpp <- function(values, kernel) {
+    .Call(`_multiScaleR_surface_sa_focal_cpp`, values, kernel)
+}
+

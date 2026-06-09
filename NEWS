@@ -1,3 +1,29 @@
+multiScaleR 0.6.32
+---------
+* Added `surface_var()`, a new covariate specification for continuous surface
+  texture metrics, alongside the existing `kernel_var()` and `landscape_var()`.
+  Two metrics are supported in this release: `"sa"` (average roughness, the mean
+  absolute deviation from the neighborhood mean) and `"sq"` (root mean square
+  roughness, the sample standard deviation of the neighborhood values). Both
+  definitions match the `geodiv` package. These metrics summarize
+  within-neighborhood heterogeneity of a continuous raster (elevation, NDVI,
+  canopy height, temperature, and similar surfaces) rather than its mean, so
+  they complement `kernel_var()`. The buffer radius can be fixed or optimized,
+  and the covariates flow through `kernel_prep()`, `multiScale_optim()`, and
+  `kernel_scale.raster()` exactly like landscape metrics.
+* `surface_var()` projections in `kernel_scale.raster()` compute `"sq"` with
+  fast Fourier transform (FFT) convolution and `"sa"` with an exact masked focal
+  pass. Average roughness has no closed-form FFT decomposition, so `"sa"` is
+  projected with a compiled focal routine (`surface_sa_focal_cpp`) rather than
+  an R closure; this is exact and roughly twice as fast as the equivalent
+  `terra::focal()` call in benchmarks. Surface metrics require a continuous
+  raster with square cells.
+* Added `geodiv` to `Suggests`; the surface-metric tests use it as a validation
+  oracle and are skipped when it is not installed.
+* Added the `surface_metric_covariates` vignette, which walks through defining,
+  fitting, optimizing, and projecting surface texture covariates and how to
+  interpret roughness at different scales.
+
 multiScaleR 0.6.31
 ---------
 * `multiScale_optim()` no longer queries system RAM on every call. The

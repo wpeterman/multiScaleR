@@ -1,0 +1,414 @@
+# Tests for continuous surface texture metrics (`surface_var()`): `sa` (average
+# roughness) and `sq` (RMS roughness = sample standard deviation).
+
+# A continuous, textured test surface on a square 10 m grid. Point coordinates
+# are placed on cell centers (values ending in 5) so that the FFT/focal
+# projection neighborhood and the exact point-buffer neighborhood select the
+# same cells, making the two paths directly comparable.
+surface_test_raster <- function(seed, name = "elevation") {
+  set.seed(seed)
+  r <- terra::rast(
+    nrows = 80,
+    ncols = 80,
+    xmin = 0,
+    xmax = 800,
+    ymin = 0,
+    ymax = 800,
+    crs = "EPSG:3857"
+  )
+  n <- terra::ncell(r)
+  trend <- seq(0, 20, length.out = n)
+  terra::values(r) <- 50 + trend + stats::rnorm(n, 0, 5)
+  names(r) <- name
+  r
+}
+
+
+surface_test_points <- function(raster) {
+  terra::vect(
+    cbind(c(205, 305, 405, 505, 605), c(205, 585, 425, 245, 615)),
+    crs = terra::crs(raster)
+  )
+}
+
+
+# Reference metric computed directly from the raster: select all cells whose
+# centers fall within `radius` of each point, then apply the metric definition.
+surface_cached_metric <- function(raster, pts, radius, metric) {
+  cc <- terra::crds(raster)
+  vals <- terra::values(raster)[, 1]
+  xy <- terra::crds(pts)
+
+  vapply(
+    seq_len(nrow(xy)),
+    function(i) {
+      d <- sqrt((cc[, 1] - xy[i, 1])^2 + (cc[, 2] - xy[i, 2])^2)
+      .surface_metric(vals[d <= radius], metric)
+    },
+    numeric(1)
+  )
+}
+
+
+test_that("surface metric definitions match hand-computed values", {
+  x <- c(1, 2, 3, 4, 5)
+  expect_equal(.surface_metric(x, "sa"), 1.2)
+  expect_equal(.surface_metric(x, "sq"), stats::sd(x))
+  expect_equal(.surface_metric(x, "sq"), sqrt(2.5))
+
+  # NA values are dropped before computation.
+  xn <- c(1, 2, NA, 4, 5)
+  expect_equal(.surface_metric(xn, "sa"), 1.5)
+  expect_equal(.surface_metric(xn, "sq"), stats::sd(c(1, 2, 4, 5)))
+
+  # A single value has zero average roughness and an undefined sample SD.
+  expect_equal(.surface_metric(7, "sa"), 0)
+  expect_true(is.na(.surface_metric(7, "sq")))
+
+  # An empty (all-NA) neighborhood returns NA for both metrics.
+  expect_true(is.na(.surface_metric(c(NA, NA), "sa")))
+  expect_true(is.na(.surface_metric(numeric(0), "sq")))
+})
+
+
+test_that("surface metrics match geodiv point sampling", {
+  skip_if_not_installed("geodiv")
+
+  elevation <- surface_test_raster(101)
+  pts <- surface_test_points(elevation)
+  radius <- 120
+  cc <- terra::crds(elevation)
+  vals <- terra::values(elevation)[, 1]
+  xy <- terra::crds(pts)
+
+  for (metric in c("sa", "sq")) {
+    geodiv_fun <- if (metric == "sa") geodiv::sa else geodiv::sq
+
+    reference <- vapply(
+      seq_len(nrow(xy)),
+      function(i) {
+        d <- sqrt((cc[, 1] - xy[i, 1])^2 + (cc[, 2] - xy[i, 2])^2)
+        masked <- elevation
+        mv <- vals
+        mv[d > radius] <- NA
+        terra::values(masked) <- mv
+        geodiv_fun(masked)
+      },
+      numeric(1)
+    )
+
+    cached <- surface_cached_metric(elevation, pts, radius, metric)
+    expect_equal(cached, reference, tolerance = 1e-6)
+  }
+})
+
+
+test_that("FFT/focal surface projections agree with cached point metrics", {
+  elevation <- surface_test_raster(202)
+  pts <- surface_test_points(elevation)
+  radius <- 95
+
+  for (metric in c("sa", "sq")) {
+    cached <- surface_cached_metric(elevation, pts, radius, metric)
+
+    metric_raster <- .surface_metric_raster_fft(
+      elevation,
+      radius = radius,
+      metric = metric
+    )
+    projected <- terra::extract(metric_raster, pts)[, 2]
+
+    expect_s4_class(metric_raster, "SpatRaster")
+    expect_equal(names(metric_raster), paste0("elevation_", metric))
+    expect_equal(projected, cached, tolerance = 1e-6)
+  }
+})
+
+
+test_that("compiled sa projection matches an independent focal reference", {
+  # Use a non-square grid (nrow != ncol) so a row/column transpose bug in the
+  # compiled focal pass would surface as a large disagreement rather than pass
+  # silently.
+  elevation <- terra::rast(
+    nrows = 50,
+    ncols = 70,
+    xmin = 0,
+    xmax = 700,
+    ymin = 0,
+    ymax = 500,
+    crs = "EPSG:3857"
+  )
+  set.seed(717)
+  terra::values(elevation) <- 40 + stats::rnorm(terra::ncell(elevation), 0, 6)
+  names(elevation) <- "elevation"
+  radius <- 65
+
+  compiled <- .surface_metric_raster_fft(elevation, radius = radius, metric = "sa")
+
+  # Independent reference: terra::focal with a masked window and an R closure.
+  mask <- .landscape_circle_kernel(radius = radius,
+                                   resolution = terra::res(elevation)[[1]])
+  mask[mask == 0] <- NA_real_
+  reference <- terra::focal(
+    elevation,
+    w = mask,
+    na.policy = "all",
+    fillvalue = NA,
+    fun = function(x, ...) {
+      z <- x[!is.na(x)]
+      if (length(z) == 0) NA_real_ else sum(abs(z - mean(z))) / length(z)
+    }
+  )
+
+  expect_equal(names(compiled), "elevation_sa")
+  expect_equal(terra::values(compiled)[, 1],
+               terra::values(reference)[, 1],
+               tolerance = 1e-8)
+})
+
+
+test_that("compiled by-buffer surface metrics match the metric definition", {
+  elevation <- surface_test_raster(303)
+  pts <- surface_test_points(elevation)
+  pts_sf <- sf::st_as_sf(pts)
+  point_xy <- sf::st_coordinates(pts_sf)
+  radius <- 110
+
+  extracted <- exactextractr::exact_extract(
+    elevation,
+    sf::st_buffer(pts_sf, dist = radius),
+    include_xy = TRUE,
+    progress = FALSE
+  )
+
+  for (i in seq_along(extracted)) {
+    d <- fields::rdist(
+      matrix(point_xy[i, ], nrow = 1),
+      as.matrix(extracted[[i]][, c("x", "y")])
+    )[1, ]
+    value_col <- setdiff(names(extracted[[i]]),
+                         c("x", "y", "cell", "coverage_fraction"))[[1]]
+    values <- extracted[[i]][, value_col, drop = FALSE]
+    keep <- d <= radius
+
+    for (metric in c("sa", "sq")) {
+      expect_equal(
+        .surface_metric_by_buffer(d, values, radius, metric)[[1]],
+        .surface_metric(values[[1]][keep], metric)
+      )
+    }
+  }
+})
+
+
+test_that("surface by-buffer helper validates inputs and handles empty buffers", {
+  expect_error(
+    .surface_metric_by_buffer(
+      d = c(1, 2),
+      r_stack.df = matrix(1:3, ncol = 1),
+      radius = 1,
+      metric = "sq"
+    ),
+    "one row for each distance"
+  )
+
+  # No cells within the radius -> NA, with the source column name preserved.
+  out <- .surface_metric_by_buffer(
+    d = c(10, 20),
+    r_stack.df = data.frame(elev = c(1.5, 2.5)),
+    radius = 1,
+    metric = "sa"
+  )
+  expect_named(out, "elev")
+  expect_true(is.na(out[["elev"]]))
+
+  # Non-finite raster values are rejected.
+  expect_error(
+    .surface_metric_by_buffer(
+      d = c(1, 2),
+      r_stack.df = data.frame(elev = c(1, Inf)),
+      radius = 2,
+      metric = "sq"
+    ),
+    "finite continuous"
+  )
+})
+
+
+test_that("scale variable specs support surface metrics from a continuous raster", {
+  elevation <- surface_test_raster(404)
+  pts <- surface_test_points(elevation)
+  radius <- 95
+
+  vars <- msr_vars(
+    elev_sa = surface_var("elevation", metric = "sa", radius = radius),
+    elev_sq = surface_var("elevation", metric = "sq", radius = radius)
+  )
+
+  expect_s3_class(vars, "multiScaleR_vars")
+  expect_equal(vars$type, c("surface", "surface"))
+  expect_error(surface_var("elevation", metric = "bogus"))
+
+  kernel_inputs <- kernel_prep(
+    pts = pts,
+    raster_stack = elevation,
+    max_D = radius,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+
+  expect_named(kernel_inputs$kernel_dat, c("elev_sa", "elev_sq"))
+  # Fixed-radius covariates are not optimized.
+  expect_equal(kernel_inputs$n_covs, 0)
+
+  for (metric in c("sa", "sq")) {
+    cov <- paste0("elev_", metric)
+    cached <- surface_cached_metric(elevation, pts, radius, metric)
+    unscaled <- kernel_inputs$kernel_dat[[cov]] *
+      kernel_inputs$scl_params$sd[[cov]] +
+      kernel_inputs$scl_params$mean[[cov]]
+    expect_equal(as.numeric(unscaled), cached, tolerance = 1e-6)
+  }
+
+  projected <- kernel_scale.raster(
+    raster_stack = elevation,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_named(projected, c("elev_sa", "elev_sq"))
+  for (metric in c("sa", "sq")) {
+    cov <- paste0("elev_", metric)
+    cached <- surface_cached_metric(elevation, pts, radius, metric)
+    expect_equal(terra::extract(projected[[cov]], pts)[, 2], cached,
+                 tolerance = 1e-6)
+  }
+})
+
+
+test_that("optimized surface specs evaluate during model refits", {
+  elevation <- surface_test_raster(505)
+  pts <- surface_test_points(elevation)
+  vars <- msr_vars(
+    elev_sq = surface_var("elevation", metric = "sq")
+  )
+
+  kernel_inputs <- kernel_prep(
+    pts = pts,
+    raster_stack = elevation,
+    max_D = 120,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_equal(kernel_inputs$n_covs, 1)
+  expect_true(kernel_inputs$cell_data_stored)
+
+  dat <- data.frame(
+    y = c(1, 0, 1, 0, 1),
+    kernel_inputs$kernel_dat
+  )
+  mod <- glm(y ~ elev_sq, family = binomial(), data = dat)
+  opt_context <- build_opt_context(
+    fitted_mod = mod,
+    cov_df = kernel_inputs$raw_cov,
+    scale_vars = kernel_inputs$scale_vars,
+    unit_conv = kernel_inputs$unit_conv,
+    resolution = kernel_inputs$resolution,
+    n_cols = kernel_inputs$n_cols
+  )
+
+  neg_ll <- kernel_scale_fn(
+    par = 0.5,
+    d_list = kernel_inputs$d_list,
+    cov_df = kernel_inputs$raw_cov,
+    kernel = kernel_inputs$kernel,
+    fitted_mod = mod,
+    opt_context = opt_context
+  )
+  final <- kernel_scale_fn(
+    par = 0.5,
+    d_list = kernel_inputs$d_list,
+    cov_df = kernel_inputs$raw_cov,
+    kernel = kernel_inputs$kernel,
+    fitted_mod = mod,
+    opt_context = opt_context,
+    mod_return = TRUE
+  )
+
+  expect_true(is.finite(neg_ll))
+  expect_s3_class(final$mod, "glm")
+  expect_named(final$scl_params$mean, "elev_sq")
+})
+
+
+test_that("optimized surface specs are rejected with the expow kernel", {
+  elevation <- surface_test_raster(606)
+  vars <- msr_vars(
+    elev_sq = surface_var("elevation", metric = "sq")
+  )
+  expect_error(
+    .msr_validate_scale_vars(vars, elevation, kernel = "expow"),
+    "expow"
+  )
+})
+
+
+test_that("kernel preparation rejects flat (zero-variance) surfaces", {
+  elevation <- terra::rast(
+    nrows = 20,
+    ncols = 20,
+    xmin = 0,
+    xmax = 200,
+    ymin = 0,
+    ymax = 200,
+    crs = "EPSG:3857"
+  )
+  terra::values(elevation) <- 5
+  names(elevation) <- "elevation"
+  pts <- terra::vect(cbind(c(55, 85, 115), c(55, 85, 115)),
+                     crs = terra::crs(elevation))
+  vars <- msr_vars(
+    elev_sq = surface_var("elevation", metric = "sq", radius = 40)
+  )
+
+  expect_error(
+    kernel_prep(
+      pts = pts,
+      raster_stack = elevation,
+      max_D = 40,
+      scale_vars = vars,
+      verbose = FALSE
+    ),
+    "zero variance"
+  )
+})
+
+
+test_that("surface projections require square raster cells", {
+  elevation <- terra::rast(
+    nrows = 20,
+    ncols = 40,
+    xmin = 0,
+    xmax = 800,
+    ymin = 0,
+    ymax = 200,
+    crs = "EPSG:3857"
+  )
+  terra::values(elevation) <- stats::rnorm(terra::ncell(elevation))
+  names(elevation) <- "elevation"
+  pts <- terra::vect(cbind(c(105, 205), c(95, 105)),
+                     crs = terra::crs(elevation))
+  vars <- msr_vars(
+    elev_sq = surface_var("elevation", metric = "sq", radius = 60)
+  )
+
+  expect_error(
+    kernel_prep(
+      pts = pts,
+      raster_stack = elevation,
+      max_D = 60,
+      scale_vars = vars,
+      verbose = FALSE
+    ),
+    "square raster cells"
+  )
+})

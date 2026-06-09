@@ -1,0 +1,438 @@
+---
+title: "Surface Texture Covariates"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Surface Texture Covariates}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+library(multiScaleR)
+library(terra)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6.5,
+  fig.height = 4.25,
+  warning = FALSE,
+  message = FALSE
+)
+
+pkg_extdata <- function(...) {
+  src_path <- normalizePath(file.path("..", "inst", "extdata", ...),
+                            winslash = "/",
+                            mustWork = FALSE)
+  if (file.exists(src_path)) {
+    return(src_path)
+  }
+
+  inst_path <- system.file("extdata", ..., package = "multiScaleR")
+  if (nzchar(inst_path) && file.exists(inst_path)) {
+    return(inst_path)
+  }
+
+  stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
+}
+```
+
+# What surface texture covariates measure
+
+A kernel covariate in `multiScaleR` summarizes the *average* value of a
+continuous raster in the neighborhood of a point. A surface texture covariate
+summarizes something different: how *variable* that surface is within the
+neighborhood. Two points can have the same average elevation, NDVI, or canopy
+height, yet one can sit in smooth terrain and the other in rugged terrain.
+Surface texture metrics capture that difference.
+
+`surface_var()` derives these metrics from a continuous raster within a circular
+buffer, in the same way that `landscape_var()` derives landscape metrics from a
+categorical raster. The two functions are deliberately separate because they
+expect opposite kinds of raster: `landscape_var()` requires integer class
+codes, while `surface_var()` requires continuous values. If you have not used
+the explicit covariate interface before, read
+`vignette("landscape_metric_covariates", package = "multiScaleR")` first; this
+vignette assumes you are comfortable with `msr_vars()`.
+
+This release supports two surface texture metrics, both borrowed from the
+surface-metrology literature and matched to the `geodiv` package so that
+`geodiv` can be used to validate results.
+
+## Surface metric reference
+
+Each metric is computed on the continuous values within a circular buffer
+centered on a sample point (or on each raster cell when projecting with
+`kernel_scale.raster()`). In the formulas below, $z_i$ is a cell value in the
+neighborhood, $\bar z$ is the mean of those values, and $n$ is the number of
+finite cells.
+
+| Code | Name | Definition | Reading |
+|------|------|------------|---------|
+| `sa` | Average roughness | $S_a = \frac{1}{n}\sum_i \lvert z_i - \bar z \rvert$ | Mean absolute deviation from the neighborhood mean. Robust to a few extreme cells. |
+| `sq` | RMS roughness | $S_q = \sqrt{\frac{1}{n-1}\sum_i (z_i - \bar z)^2}$ | The sample standard deviation of the neighborhood. More sensitive to large deviations than `sa`. |
+
+Both metrics are zero on a perfectly flat surface and grow as the surface
+becomes more variable. They are reported in the units of the raster itself: if
+`land3` ranges from 0 to 1, a roughness of 0.10 means the values within the
+buffer deviate from their local mean by about a tenth of that range. `sa` and
+`sq` measure the same underlying idea (local spread) and are usually
+correlated; `sq` weights large deviations more heavily because it squares them,
+so it responds more strongly to a few unusual cells.
+
+## A note on scale
+
+A surface texture covariate behaves differently from a kernel-weighted mean as
+you change the radius. A larger radius does not simply smooth the same quantity
+over a wider area; it changes what is being measured. A small radius asks how
+rough the surface is in the immediate vicinity of a point (fine-grain texture).
+A large radius asks how variable the surface is across a broader extent, which
+folds in any large-scale gradient or patchiness. Keep this in mind when
+interpreting an optimized radius: the estimated scale is the neighborhood size
+at which within-neighborhood variability best explains the response, not the
+scale of an averaging window.
+
+---
+
+# Load example data
+
+This example reuses the simulated count data, survey locations, and landscape
+raster included with `multiScaleR`. The data contain 100 spatial sample points,
+which is enough to demonstrate the workflow without making the vignette
+expensive to build.
+
+```{r load-data}
+data("landscape_counts")
+dat <- landscape_counts
+
+data("surv_pts")
+pts <- vect(surv_pts)
+
+land_rast <- rast(pkg_extdata("landscape.tif"))
+```
+
+The raster stack contains two continuous layers suited to surface texture
+metrics. `land3` is a smooth, highly autocorrelated surface (think elevation or
+canopy height), so its roughness varies meaningfully from place to place.
+`land2` is a noisier, weakly autocorrelated surface. We also keep `land2`
+because the example counts were simulated to respond to its kernel-weighted
+mean, which gives us a covariate with a genuine, interpretable scale of effect.
+
+```{r plot-inputs, fig.cap = "***Continuous source surfaces. land3 (right) is smooth; land2 (left) is noisy.***"}
+surfaces <- c(land_rast$land2, land_rast$land3)
+plot(surfaces)
+plot(land_rast$land3, main = "land3 with survey points")
+points(pts, pch = 19, cex = 0.6, col = "red")
+```
+
+**How to read these plots:** Where `land3` transitions sharply between low and
+high values, a buffer placed on the transition contains a wide spread of values
+and will have high roughness. Where `land3` is locally flat (a broad light or
+dark patch), a buffer contains similar values and roughness is low. The
+roughness surfaces produced later in this vignette make that pattern explicit.
+
+---
+
+# Define derived covariates
+
+Use `msr_vars()` to name the model covariates. Here `land2_mean` is an
+optimized, kernel-weighted mean, while `land3_sq_500` and `land3_sa_500` are
+fixed-radius surface texture metrics computed within 500 m of each point.
+Computing the surface metrics at a fixed radius keeps this example fast: they
+are calculated once and are not re-evaluated during optimization.
+
+```{r define-vars}
+scale_vars <- msr_vars(
+  land2_mean   = kernel_var("land2"),
+  land3_sq_500 = surface_var("land3", metric = "sq", radius = 500),
+  land3_sa_500 = surface_var("land3", metric = "sa", radius = 500)
+)
+
+scale_vars
+```
+
+The distinction is the same as for landscape metrics:
+
+- `land2` and `land3` are source raster layers.
+- `land2_mean`, `land3_sq_500`, and `land3_sa_500` are model covariates.
+- Only `land2_mean` receives an optimized sigma in this example.
+
+---
+
+# Prepare model data and fit
+
+Pass the specification to `kernel_prep()`. The returned `kernel_dat` data frame
+holds the derived covariates, already centered and scaled to unit variance.
+
+```{r kernel-prep}
+kernel_inputs <- kernel_prep(
+  pts = pts,
+  raster_stack = land_rast,
+  max_D = 1500,
+  kernel = "gaussian",
+  scale_vars = scale_vars,
+  verbose = FALSE
+)
+
+head(kernel_inputs$kernel_dat)
+```
+
+Combine the covariates with the response and fit the starting model.
+
+```{r fit-model}
+df <- data.frame(dat, kernel_inputs$kernel_dat)
+
+mod <- glm(
+  counts ~ site + land2_mean + land3_sq_500 + land3_sa_500,
+  family = poisson(),
+  data = df
+)
+```
+
+---
+
+# Optimize and interpret
+
+Only `land2_mean` was left free, so optimization estimates a single scale
+parameter while the two surface metrics stay fixed at 500 m. This keeps the
+example fast and mirrors a common analysis pattern: optimize the covariate
+whose scale is the scientific question, and hold the others at a biologically
+motivated buffer.
+
+```{r optimize}
+opt <- multiScale_optim(
+  fitted_mod = mod,
+  kernel_inputs = kernel_inputs,
+  verbose = FALSE
+)
+```
+
+```{r summary}
+summary(opt)
+```
+
+**How to read the `summary()` output:** The scale section reports the estimated
+sigma for `land2_mean`, with its standard error and 95% confidence interval, in
+map units (meters here). Below it is the *effective distance*, the radius that
+captures a stated proportion (default 90%) of the Gaussian kernel weight. That
+converts sigma into a distance you can interpret on the ground. The two
+fixed-radius surface metrics do not appear in the scale section because their
+radius was specified rather than estimated; they enter the model only as
+ordinary covariates.
+
+The model coefficients are on the Poisson log (link) scale, so they must be
+back-transformed to be interpretable. Because every covariate was centered and
+scaled, each coefficient describes the effect of a one standard deviation
+change in that covariate. Exponentiating gives the multiplicative change in
+expected count.
+
+```{r coef-interpret}
+cf <- coef(summary(opt$opt_mod))
+## Multiplicative change in expected count per 1 SD increase in each covariate
+round(exp(cf[, "Estimate"]), 3)
+```
+
+For example, an `exp()` value of 1.20 for a surface metric would mean that a one
+standard deviation increase in roughness is associated with a 20 percent higher
+expected count, holding the other covariates constant. Note an important caveat:
+these example counts were simulated to respond to kernel-weighted means of
+`land1` and `land2`, not to surface roughness. The recovered scale for
+`land2_mean` is therefore the meaningful quantity to interpret here, and the
+roughness coefficients are best read as a demonstration of the mechanics. In
+your own analysis, a surface texture coefficient is interpreted exactly like any
+other scaled predictor.
+
+---
+
+# Project covariates to rasters
+
+`kernel_scale.raster()` understands `surface_var()` specifications just as it
+does kernel and landscape covariates. When a fitted `multiScaleR` object is
+supplied, the optimized covariate uses its fitted scale and the fixed-radius
+surface metrics use their specified radius. Setting `scale_center = TRUE`
+returns the projected covariates on the same centered and scaled footing as the
+model, ready for `terra::predict()`.
+
+```{r project, fig.cap = "***Projected model covariates at their fitted or fixed scales.***", fig.height = 6}
+projected <- kernel_scale.raster(
+  raster_stack = land_rast,
+  multiScaleR = opt,
+  scale_center = TRUE,
+  clamp = TRUE,
+  verbose = FALSE
+)
+
+plot(projected)
+names(projected)
+```
+
+**How to read these plots:** `land2_mean` is a smoothed average surface, so it
+looks like a blurred version of the source layer. The roughness layers
+(`land3_sq_500`, `land3_sa_500`) look different: they are bright where `land3`
+changes rapidly within 500 m and dark where it is locally uniform. Roughness
+maps highlight transitions and texture, not high or low values. The stack also
+includes a constant `site` layer filled with zeros: because `site` is a
+field-measured covariate with no raster source, `kernel_scale.raster()` appends
+a placeholder so the output can be passed directly to `terra::predict()`.
+Replace it with a real surface if you want to predict at a non-reference value
+of `site`.
+
+---
+
+# Roughness surfaces without a fitted model
+
+You do not need a fitted model to produce a roughness surface. Pass a
+`scale_vars` object in which every covariate has a fixed `radius`, and
+`kernel_scale.raster()` returns the metric surfaces directly. This is useful for
+exploring how texture varies across a landscape, or for comparing scales before
+committing to a model.
+
+```{r standalone-multiscale, fig.cap = "***RMS roughness (sq) of land3 at three radii. Larger radii fold in broader-scale variation.***", fig.height = 3.5}
+sq_multi <- kernel_scale.raster(
+  raster_stack = land_rast["land3"],
+  scale_vars = msr_vars(
+    sq_200 = surface_var("land3", metric = "sq", radius = 200),
+    sq_500 = surface_var("land3", metric = "sq", radius = 500),
+    sq_900 = surface_var("land3", metric = "sq", radius = 900)
+  ),
+  verbose = FALSE
+)
+
+plot(sq_multi, main = c("sq - 200 m", "sq - 500 m", "sq - 900 m"))
+```
+
+**How to read these plots:** At 200 m the surface picks out fine, local
+texture, so roughness is patchy and concentrated near sharp transitions. At
+900 m each buffer spans more of the underlying gradient, so roughness is
+smoother and generally higher. This is the practical face of the scale caution
+from the introduction: the radius changes the quantity, not just its
+resolution.
+
+The `sa` and `sq` metrics emphasize roughness slightly differently. Comparing
+them at a single radius shows where a few extreme cells (which `sq` weights more
+heavily) drive the signal.
+
+```{r sa-vs-sq, fig.cap = "***Average roughness (sa) versus RMS roughness (sq) of land3 at 500 m.***", fig.height = 3.5}
+sa_sq <- kernel_scale.raster(
+  raster_stack = land_rast["land3"],
+  scale_vars = msr_vars(
+    sa_500 = surface_var("land3", metric = "sa", radius = 500),
+    sq_500 = surface_var("land3", metric = "sq", radius = 500)
+  ),
+  verbose = FALSE
+)
+
+plot(sa_sq, main = c("sa - 500 m", "sq - 500 m"))
+```
+
+Projection of `sq` uses fast Fourier transform convolution, and projection of
+`sa` uses a compiled focal pass. Both reproduce the per-point calculation
+exactly; `sq` is the faster of the two on very large rasters.
+
+---
+
+# Optimizing the scale of roughness
+
+To estimate the scale of a surface texture covariate rather than fix it, omit
+`radius` from `surface_var()`. The covariate then receives its own sigma, which
+`multiScale_optim()` estimates alongside the model.
+
+```{r optimized-surface-vars, eval = FALSE}
+scale_vars_opt <- msr_vars(
+  land2_mean = kernel_var("land2"),
+  land3_sq   = surface_var("land3", metric = "sq")
+)
+
+kernel_inputs_opt <- kernel_prep(
+  pts = pts,
+  raster_stack = land_rast,
+  max_D = 1500,
+  scale_vars = scale_vars_opt,
+  verbose = FALSE
+)
+```
+
+Optimizing a surface texture radius is well defined, but it costs more than
+optimizing a kernel-weighted mean: at each candidate radius the metric is
+recomputed for every sample point, since (unlike a kernel mean) it cannot be
+read off a precomputed distance binning. Surface metrics are continuous in the
+radius, so they tend to optimize smoothly. Start with fixed radii to confirm
+the workflow, then optimize once the model structure is settled. Optimized
+surface metrics are not currently supported with `kernel = "expow"`, because the
+exponential-power shape parameter does not apply to a fixed-buffer metric.
+
+---
+
+# Practical guidance
+
+- Use a surface texture covariate when you expect the *variability* of a
+  continuous surface, rather than its average, to matter ecologically: terrain
+  ruggedness, vegetation-structure heterogeneity, thermal patchiness, and
+  similar.
+- Choose `sq` when large local deviations are ecologically important, and `sa`
+  when you want a measure that is less sensitive to a few extreme cells.
+- A surface metric and a kernel-weighted mean from the same source layer answer
+  different questions and can both be included; check their correlation before
+  interpreting either in isolation.
+- Use a fixed radius when you have a biologically motivated buffer or want a
+  fast model; optimize the radius when the scale of heterogeneity is itself the
+  question.
+
+---
+
+# Quick reference
+
+```{r quick-reference, eval = FALSE}
+## 1. Define covariates: an optimized kernel mean plus fixed-radius roughness
+scale_vars <- msr_vars(
+  land2_mean   = kernel_var("land2"),
+  land3_sq_500 = surface_var("land3", metric = "sq", radius = 500),
+  land3_sa_500 = surface_var("land3", metric = "sa", radius = 500)
+)
+
+## 2. Extract and prepare the covariates around each point
+kernel_inputs <- kernel_prep(pts, land_rast, max_D = 1500,
+                             scale_vars = scale_vars, verbose = FALSE)
+
+## 3. Fit the starting model
+df  <- data.frame(dat, kernel_inputs$kernel_dat)
+mod <- glm(counts ~ site + land2_mean + land3_sq_500 + land3_sa_500,
+           family = poisson(), data = df)
+
+## 4. Optimize the free scale parameter(s)
+opt <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs)
+summary(opt)                              # sigma + effective distance, on map units
+
+## 5. Project covariates for prediction (centered and scaled like the model)
+projected <- kernel_scale.raster(land_rast, multiScaleR = opt,
+                                 scale_center = TRUE, clamp = TRUE)
+
+## Standalone roughness surface, no model required
+sq_500 <- kernel_scale.raster(
+  land_rast["land3"],
+  scale_vars = msr_vars(sq_500 = surface_var("land3", metric = "sq", radius = 500))
+)
+```
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `surface_var()` | Define a continuous surface texture covariate (`sa` or `sq`). |
+| `msr_vars()` | Collect covariate specifications into one object. |
+| `kernel_prep()` | Extract and prepare covariates around each point. |
+| `multiScale_optim()` | Estimate the scale of effect for optimized covariates. |
+| `kernel_scale.raster()` | Project covariates to rasters, with or without a fitted model. |
+
+## See also
+
+- `vignette("landscape_metric_covariates", package = "multiScaleR")` for
+  categorical landscape metrics and the `msr_vars()` interface.
+- `vignette("multiScaleR_Guide", package = "multiScaleR")` for the full
+  modeling workflow and model interpretation.
+- `vignette("spatial_projection_clamping", package = "multiScaleR")` for
+  projecting fitted models to prediction surfaces.
