@@ -616,8 +616,14 @@ mod0_umf.p <- unmarked::pcount(~1 ~bin1 + cont2,
 ```
 
 ```{r}
-opt_umf.p <- multiScale_optim(fitted_mod = mod0_umf.p,
-                              kernel_inputs = kernel_inputs)
+## The pcount optimization refits a K = 100 N-mixture model at every optimizer
+## step (~4 min), so a small precomputed result -- built from this same
+## simulated data -- is loaded here to keep the vignette build fast. Every other
+## model in this vignette is fit live. Regenerate the snapshot with
+## data-raw/generate_pcount_vignette_object.R, or run it live with:
+##   opt_umf.p <- multiScale_optim(mod0_umf.p, kernel_inputs)
+opt_umf.p <- readRDS(system.file("extdata", "opt_umf_p.rds",
+                                 package = "multiScaleR"))
 ```
 
 Compare optimized results with simulated values. Note that the detection reported by `unmarked` is on the logit scale, so must be back-transformed. Overall, both the scale parameters and the Poisson count model parameters were accurately recovered.

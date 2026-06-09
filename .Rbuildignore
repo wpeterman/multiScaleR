@@ -16,3 +16,5 @@
 ^\.positai$
 ^tools/landscape_metrics_exploration\.R$
 ^future_ideas\.md$
+^data-raw$
+^bench_tmp$
