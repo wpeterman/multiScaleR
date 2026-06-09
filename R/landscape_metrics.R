@@ -190,7 +190,8 @@
                                              weights = NULL,
                                              base = exp(1),
                                              resolution = NULL,
-                                             classes_max = NULL) {
+                                             classes_max = NULL,
+                                             validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(base, "base", positive = TRUE)
 
@@ -203,11 +204,16 @@
   if (nrow(values) != length(d)) {
     stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
   }
-  .landscape_validate_categorical_values(
-    values,
-    metric = metric,
-    context = "Landscape composition metric"
-  )
+  # The source raster's categorical encoding is fixed, so validation only needs
+  # to happen once (at `kernel_prep()` time). The optimizer passes
+  # `validate = FALSE` to skip the per-evaluation re-scan and class detection.
+  if (isTRUE(validate)) {
+    .landscape_validate_categorical_values(
+      values,
+      metric = metric,
+      context = "Landscape composition metric"
+    )
+  }
 
   if (!is.null(weights) && length(weights) != length(d)) {
     stop("`weights` must have the same length as `d`.", call. = FALSE)
@@ -401,7 +407,8 @@
                                       radius,
                                       resolution,
                                       n_cols,
-                                      metric) {
+                                      metric,
+                                      validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(resolution, "resolution", positive = TRUE)
   validate_scalar_numeric(n_cols, "n_cols", integerish = TRUE, positive = TRUE)
@@ -418,11 +425,13 @@
   if (nrow(values) != length(d)) {
     stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
   }
-  .landscape_validate_categorical_values(
-    values,
-    metric = metric,
-    context = "Landscape edge metric"
-  )
+  if (isTRUE(validate)) {
+    .landscape_validate_categorical_values(
+      values,
+      metric = metric,
+      context = "Landscape edge metric"
+    )
+  }
 
   out <- landscape_edge_metric_cpp(
     d = d,
@@ -552,7 +561,8 @@
                                            cells,
                                            radius,
                                            n_cols,
-                                           metric) {
+                                           metric,
+                                           validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(n_cols, "n_cols", integerish = TRUE, positive = TRUE)
 
@@ -568,12 +578,14 @@
   if (nrow(values) != length(d)) {
     stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
   }
-  .landscape_validate_categorical_values(
-    values,
-    metric = metric,
-    max_classes = .landscape_adjacency_class_ceiling(metric),
-    context = "Landscape adjacency metric"
-  )
+  if (isTRUE(validate)) {
+    .landscape_validate_categorical_values(
+      values,
+      metric = metric,
+      max_classes = .landscape_adjacency_class_ceiling(metric),
+      context = "Landscape adjacency metric"
+    )
+  }
 
   out <- landscape_adjacency_metric_cpp(
     d = d,

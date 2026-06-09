@@ -28,6 +28,14 @@ multiScaleR 0.6.31
   `kernel_prep()` and landscape optimization wall-clock change little, as those
   are dominated by raster extraction and the C++ metric computation
   respectively.)
+* Landscape-metric optimization is ~3.4-4.2x faster: the source raster's
+  categorical encoding is validated once in `kernel_prep()` instead of being
+  re-scanned (with a per-call `unique()` class detection) on every optimizer
+  evaluation. Optimized radii are unchanged. Direct calls to the landscape
+  metric helpers still validate by default.
+* Hardware detection (physical/logical cores and total system RAM) is now
+  memoized, so `multiScale_optim()` no longer spawns a PowerShell process to
+  query RAM on every call when populating its parallel-worker recommendation.
 
 multiScaleR 0.6.30
 ---------

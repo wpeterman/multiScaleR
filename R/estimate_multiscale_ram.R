@@ -377,17 +377,43 @@ estimate_multiscale_ram <- function(kernel_inputs,
 }
 
 
+# Hardware (physical/logical cores, total RAM) does not change during an R
+# session, but detecting it can be costly -- on Windows `.msr_total_ram_bytes()`
+# spawns a PowerShell process. `multiScale_optim()` queries these on every call
+# to populate its `next_run` recommendation, so the results are memoized to
+# avoid repeated process spawns / system calls.
+.msr_hw_cache <- new.env(parent = emptyenv())
+
 .msr_detect_cores <- function(logical = FALSE) {
-  cores <- suppressWarnings(parallel::detectCores(logical = logical))
-  if (length(cores) != 1 || is.na(cores) || !is.finite(cores) || cores < 1) {
-    return(NA_real_)
+  key <- if (isTRUE(logical)) "logical_cores" else "physical_cores"
+  cached <- .msr_hw_cache[[key]]
+  if (!is.null(cached)) {
+    return(cached)
   }
 
-  as.integer(cores)
+  cores <- suppressWarnings(parallel::detectCores(logical = logical))
+  out <- if (length(cores) != 1 || is.na(cores) || !is.finite(cores) || cores < 1) {
+    NA_real_
+  } else {
+    as.integer(cores)
+  }
+  .msr_hw_cache[[key]] <- out
+  out
 }
 
 
 .msr_total_ram_bytes <- function() {
+  cached <- .msr_hw_cache[["total_ram_bytes"]]
+  if (!is.null(cached)) {
+    return(cached)
+  }
+  out <- .msr_total_ram_bytes_uncached()
+  .msr_hw_cache[["total_ram_bytes"]] <- out
+  out
+}
+
+
+.msr_total_ram_bytes_uncached <- function() {
   sysname <- Sys.info()[["sysname"]]
 
   if (identical(.Platform$OS.type, "windows")) {

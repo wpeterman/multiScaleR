@@ -330,7 +330,10 @@ kernel_scale_fn <- function(par,
           unit_conv = opt_context$unit_conv,
           resolution = opt_context$resolution,
           n_cols = opt_context$n_cols,
-          covariates = covs
+          covariates = covs,
+          # The source raster was already validated as categorical during
+          # `kernel_prep()`; skip the per-evaluation re-scan/class detection.
+          validate = FALSE
         )
       }
     } ## End for loop
