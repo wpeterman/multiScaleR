@@ -452,8 +452,11 @@ estimate_multiscale_ram <- function(kernel_inputs,
 
 
 .msr_system_stdout <- function(command, args = character()) {
+  # Bound the external call (PowerShell on Windows can be slow to spawn under
+  # load); on timeout/failure fall back to no output so RAM detection degrades
+  # to NA rather than blocking. `timeout` is available since R 3.5.0.
   tryCatch(
-    system2(command, args = args, stdout = TRUE, stderr = FALSE),
+    system2(command, args = args, stdout = TRUE, stderr = FALSE, timeout = 5),
     warning = function(e) character(),
     error = function(e) character()
   )

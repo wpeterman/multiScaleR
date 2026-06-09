@@ -130,9 +130,11 @@ A list of class \code{"multiScaleR"} containing:
     optimized \code{start_sigma} values in map units, optional
     \code{start_shape} values for \code{kernel = "expow"}, and
     \code{start_par} on the internal scaled parameter space expected by
-    \code{multiScale_optim}. When enough stored fit context is available,
-    \code{n_cores} contains a conservative worker-count suggestion from
-    \code{\link{estimate_multiscale_ram}}.}
+    \code{multiScale_optim}. \code{n_cores} is \code{NULL}; a conservative
+    parallel worker-count suggestion is available on demand from
+    \code{\link{estimate_multiscale_ram}} (it is no longer computed
+    automatically, as that query can be slow and shells out to an external
+    process).}
   \item{\code{warn_message}}{Integer vector of triggered warning codes:
     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
   \item{\code{call}}{The matched call.}

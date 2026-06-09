@@ -44,12 +44,7 @@
 .next_run_recommendation <- function(scale_est,
                                      shape_est,
                                      max_D,
-                                     diagnostics,
-                                     kernel_inputs = NULL,
-                                     fitted_mod = NULL,
-                                     join_by = NULL,
-                                     refit_fn = NULL,
-                                     PSOCK = FALSE) {
+                                     diagnostics) {
   start_sigma <- scale_est[, "Mean"]
   names(start_sigma) <- row.names(scale_est)
 
@@ -87,31 +82,18 @@
     "Refit from the optimized parameters and address the flagged diagnostics."
   }
 
-  n_cores <- NULL
-  if (inherits(kernel_inputs, "multiScaleR_data")) {
-    ram <- tryCatch(
-      estimate_multiscale_ram(
-        kernel_inputs = kernel_inputs,
-        fitted_mod = fitted_mod,
-        join_by = join_by,
-        refit_fn = refit_fn,
-        PSOCK = PSOCK
-      ),
-      error = function(e) NULL
-    )
-    recommended_n_cores <- ram$recommended_n_cores
-    if (!is.null(recommended_n_cores) && length(recommended_n_cores) == 1L &&
-        is.finite(recommended_n_cores) && as.integer(recommended_n_cores) >= 1L) {
-      n_cores <- as.integer(recommended_n_cores)
-    }
-  }
-
+  # The RAM-based parallel-worker recommendation is intentionally NOT computed
+  # here. Querying system RAM shells out to an external process (PowerShell on
+  # Windows) and rebuilds the optimization context, which adds latency to every
+  # `multiScale_optim()` call and can block under load. Call
+  # `estimate_multiscale_ram()` directly when a worker-count recommendation is
+  # wanted. `n_cores` is kept (as NULL) for backward compatibility.
   list(
     max_D = recommended_max_D,
     start_sigma = start_sigma,
     start_shape = start_shape,
     start_par = start_par,
-    n_cores = n_cores,
+    n_cores = NULL,
     flags = flags,
     action = action
   )
@@ -455,9 +437,11 @@
 #'     optimized \code{start_sigma} values in map units, optional
 #'     \code{start_shape} values for \code{kernel = "expow"}, and
 #'     \code{start_par} on the internal scaled parameter space expected by
-#'     \code{multiScale_optim}. When enough stored fit context is available,
-#'     \code{n_cores} contains a conservative worker-count suggestion from
-#'     \code{\link{estimate_multiscale_ram}}.}
+#'     \code{multiScale_optim}. \code{n_cores} is \code{NULL}; a conservative
+#'     parallel worker-count suggestion is available on demand from
+#'     \code{\link{estimate_multiscale_ram}} (it is no longer computed
+#'     automatically, as that query can be slow and shells out to an external
+#'     process).}
 #'   \item{\code{warn_message}}{Integer vector of triggered warning codes:
 #'     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
 #'   \item{\code{call}}{The matched call.}
@@ -1090,12 +1074,7 @@ multiScale_optim <- function(fitted_mod,
       scale_est = scale_est,
       shape_est = shape_est,
       max_D = kernel_inputs$max_D,
-      diagnostics = out$diagnostics,
-      kernel_inputs = kernel_inputs,
-      fitted_mod = fitted_mod,
-      join_by = join_by,
-      refit_fn = refit_fn,
-      PSOCK = PSOCK
+      diagnostics = out$diagnostics
     )
 
     return(out)

@@ -1,5 +1,14 @@
 multiScaleR 0.6.31
 ---------
+* `multiScale_optim()` no longer queries system RAM on every call. The
+  `next_run` recommendation previously invoked `estimate_multiscale_ram()` at
+  the end of each fit, which shelled out to an external process (PowerShell on
+  Windows) and rebuilt the optimization context; under load this could make
+  `multiScale_optim()` appear to hang after the optimization had finished. The
+  parallel worker-count suggestion is now obtained only on demand by calling
+  `estimate_multiscale_ram()` directly. `next_run$n_cores` is now `NULL`.
+  `estimate_multiscale_ram()`'s own RAM query is also bounded by a 5-second
+  timeout so it degrades to `NA` instead of blocking.
 * `kernel_prep()` now precomputes distance-binned summaries of kernel-weighted
   covariates (`bin = TRUE`, `nbins = 256` by default). `multiScale_optim()`,
   `profile_sigma()`, and the screened-start path evaluate kernel covariates from

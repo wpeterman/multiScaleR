@@ -534,8 +534,9 @@ test_that("diagnostics accessor returns structured warning metadata", {
   )
 })
 
-test_that("follow-up recommendations surface conservative n_cores when available", {
+test_that("multiScale_optim does not invoke the RAM/n_cores probe (it is a separate call)", {
   fix <- make_core_fixture()
+  ram_called <- FALSE
 
   opt <- with_mocked_bindings(
     multiScale_optim(
@@ -554,18 +555,17 @@ test_that("follow-up recommendations surface conservative n_cores when available
     },
     kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
     estimate_multiscale_ram = function(...) {
+      ram_called <<- TRUE
       list(recommended_n_cores = 4L)
     },
     .package = "multiScaleR"
   )
 
-  expect_equal(opt$next_run$n_cores, 4L)
-
-  smry <- summary(opt)
-  expect_equal(smry$next_run$n_cores, 4L)
-
-  expect_output(print(opt), "Conservative recommended `n_cores`: 4")
-  expect_output(print(smry), "Conservative recommended `n_cores`: 4")
+  # A serial optimization must not shell out for a RAM/worker recommendation;
+  # `estimate_multiscale_ram()` is now an explicit, separate call.
+  expect_false(ram_called)
+  expect_null(opt$next_run$n_cores)
+  expect_null(summary(opt)$next_run$n_cores)
 })
 
 test_that("print methods emit readable summaries", {
