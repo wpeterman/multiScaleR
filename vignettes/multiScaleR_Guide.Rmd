@@ -626,7 +626,7 @@ opt_umf.p <- readRDS(system.file("extdata", "opt_umf_p.rds",
                                  package = "multiScaleR"))
 ```
 
-Compare optimized results with simulated values. Note that the detection reported by `unmarked` is on the logit scale, so must be back-transformed. Overall, both the scale parameters and the Poisson count model parameters were accurately recovered.
+Compare optimized results with simulated values. Note that the detection reported by `unmarked` is on the logit scale, so must be back-transformed. Overall, both the scale parameters and the Poisson count model parameters were reasonably recovered.
 
 ```{r}
 summary(opt_umf.p)
