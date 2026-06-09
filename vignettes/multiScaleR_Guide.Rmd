@@ -248,10 +248,10 @@ plot(pts, add = T, pch = 19)
 
 `kernel_prep()` is the first step of every `multiScaleR` analysis. It does two things:
 
-1.  For each sample point, it extracts raster values at every cell within `max_D` (the maximum search radius) and computes their distances. These are stored as sparse matrices for efficiency.
+1.  For each sample point, it extracts raster values at every cell within `max_D` (the maximum search radius) and computes their distances. These are stored compactly (as a dense or sparse matrix per point, whichever is smaller).
 2.  It computes an initial set of distance-weighted covariate values at each sample point using a starting σ (by default, `max_D / 3`). These initial values are used to fit the starting regression model.
 
-**Choosing `max_D`**: Set `max_D` to a value you are confident exceeds the true scale of effect. If you are uncertain, err on the side of being too large; the optimization will find the right σ within that range. The tradeoff is computational: larger `max_D` means more cells to process, so keep it reasonable. If `multiScale_optim()` warns that a σ estimate is near `max_D`, increase `max_D` and re-run `kernel_prep()`.
+**Choosing `max_D`**: Set `max_D` to a value you are confident exceeds the true scale of effect. If you are uncertain, err on the side of being too large; the optimization will find the right σ within that range. With the default distance binning (see below), the *optimization* cost no longer grows with `max_D`; the main tradeoffs of a large `max_D` are the one-time extraction in `kernel_prep()` and the memory used to store the extracted cells. If `multiScale_optim()` warns that a σ estimate is near `max_D`, increase `max_D` and re-run `kernel_prep()`.
 
 ```{r}
 kernel_inputs <- kernel_prep(pts = pts,
@@ -263,6 +263,23 @@ kernel_inputs
 ```
 
 The `kernel_inputs` object holds the distance data and the initial kernel-weighted covariate values (in `kernel_inputs$kernel_dat`). These kernel-weighted values are scaled and centered (mean 0, SD 1 across sample points) so that regression coefficients are comparable across covariates.
+
+### Performance and memory for large datasets
+
+By default (`bin = TRUE`), `kernel_prep()` precomputes distance-binned summaries of each kernel-weighted covariate. During `multiScale_optim()` these let the optimizer evaluate kernel-weighted means in `O(nbins)` per point instead of iterating every raster cell in the buffer, so optimization speed becomes essentially independent of `max_D`. The binning is controlled by `nbins` (default 256) and reproduces the exact scale estimates to several significant figures; set `bin = FALSE` to force the exact per-cell path.
+
+For large point sets or a large `max_D` — where the stored cell data dominate memory — add `store_cell_data = FALSE` to drop the per-cell data after binning, keeping only the compact summaries needed to optimize, profile, and project:
+
+```{r eval = FALSE}
+kernel_inputs <- kernel_prep(pts = pts,
+                             raster_stack = land_rast,
+                             max_D = 1700,
+                             kernel = 'gaussian',
+                             store_cell_data = FALSE,
+                             verbose = FALSE)
+```
+
+This "lean" mode can shrink the stored object by one to two orders of magnitude. It is available when every covariate is kernel-weighted; cell-level data are retained automatically when landscape metrics (see the *Landscape Metric Covariates* vignette) are present, because those require the full spatial detail. Use `estimate_multiscale_ram()` to gauge the footprint and a safe parallel worker count before running.
 
 Next, combine the kernel-weighted covariate values with the response data to build the data frame for model fitting:
 

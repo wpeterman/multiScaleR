@@ -5,9 +5,9 @@ multiScaleR 0.6.31
   `profile_sigma()`, and the screened-start path evaluate kernel covariates from
   these summaries in O(nbins) per point instead of iterating every buffer cell
   on each optimizer evaluation. The per-evaluation cost becomes independent of
-  `max_D`, making optimization ~10-40x faster in benchmarks (the speedup grows
-  with the number of points and the buffer size), while recovering sigma to
-  within ~1e-5 (relative) of the exact per-cell result. Set `bin = FALSE` to
+  `max_D`, making optimization roughly 10-80x faster in benchmarks (the speedup
+  grows with the number of points and the buffer size), while recovering sigma
+  to within ~1e-5 (relative) of the exact per-cell result. Set `bin = FALSE` to
   force the exact path.
 * Added a "lean" storage mode (`kernel_prep(store_cell_data = FALSE)`) that
   drops the per-cell `d_list`/`raw_cov` data when every covariate is
