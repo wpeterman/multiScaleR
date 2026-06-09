@@ -356,6 +356,89 @@ test_that("FFT adjacency projections agree with cached point metrics", {
 })
 
 
+test_that("FFT edge and adjacency projections match rare-class point buffers", {
+  values <- matrix(1, nrow = 7, ncol = 7)
+  values[4, 4] <- 2
+  landcover <- terra::rast(
+    nrows = 7,
+    ncols = 7,
+    xmin = 0,
+    xmax = 70,
+    ymin = 0,
+    ymax = 70,
+    crs = "EPSG:3857"
+  )
+  terra::values(landcover) <- as.vector(values)
+  names(landcover) <- "landcover"
+  pts <- terra::vect(cbind(35, 35), crs = terra::crs(landcover))
+  radius <- 10
+
+  cached_ed <- landscape_cached_metric(
+    raster = landcover,
+    pts = pts,
+    radius = radius,
+    metric_fun = function(d, values, cells) {
+      .landscape_edge_by_buffer(
+        d = d,
+        r_stack.df = values,
+        cells = cells,
+        radius = radius,
+        resolution = terra::res(landcover)[[1]],
+        n_cols = terra::ncol(landcover),
+        metric = "ed"
+      )[[1]]
+    }
+  )
+  cached_pladj <- landscape_cached_metric(
+    raster = landcover,
+    pts = pts,
+    radius = radius,
+    metric_fun = function(d, values, cells) {
+      .landscape_adjacency_by_buffer(
+        d = d,
+        r_stack.df = values,
+        cells = cells,
+        radius = radius,
+        n_cols = terra::ncol(landcover),
+        metric = "pladj"
+      )[[1]]
+    }
+  )
+  cached_contag <- landscape_cached_metric(
+    raster = landcover,
+    pts = pts,
+    radius = radius,
+    metric_fun = function(d, values, cells) {
+      .landscape_adjacency_by_buffer(
+        d = d,
+        r_stack.df = values,
+        cells = cells,
+        radius = radius,
+        n_cols = terra::ncol(landcover),
+        metric = "contag"
+      )[[1]]
+    }
+  )
+
+  projected_ed <- terra::extract(
+    .landscape_edge_raster_fft(landcover, radius = radius, metric = "ed"),
+    pts
+  )[, 2]
+  projected_pladj <- terra::extract(
+    .landscape_adjacency_raster_fft(landcover, radius = radius, metric = "pladj"),
+    pts
+  )[, 2]
+  projected_contag <- terra::extract(
+    .landscape_adjacency_raster_fft(landcover, radius = radius, metric = "contag"),
+    pts
+  )[, 2]
+
+  expect_equal(projected_ed, cached_ed, tolerance = 1e-8)
+  expect_equal(projected_pladj, cached_pladj, tolerance = 1e-8)
+  expect_equal(projected_contag, cached_contag, tolerance = 1e-8)
+})
+
+
 test_that("compiled by-buffer metrics match direct matrix formulas", {
   landcover <- landscape_test_raster(707, 1:4)
   pts <- landscape_test_points(landcover)
@@ -655,6 +738,16 @@ test_that("composition helpers validate inputs and handle empty buffers", {
   )
   expect_named(out, "x")
   expect_true(is.na(out[["x"]]))
+
+  expect_error(
+    .landscape_composition_by_buffer(
+      d = c(1, 2),
+      r_stack.df = data.frame(x = c(1, 1.5)),
+      radius = 2,
+      metric = "shdi"
+    ),
+    "integer-like class values"
+  )
 })
 
 
@@ -687,4 +780,55 @@ test_that("edge and adjacency helpers validate inputs and handle empty buffers",
   )
   expect_named(out, "x")
   expect_true(is.na(out[["x"]]))
+})
+
+
+test_that("adjacency projections enforce class-count ceilings", {
+  landcover <- terra::rast(
+    nrows = 8,
+    ncols = 8,
+    xmin = 0,
+    xmax = 80,
+    ymin = 0,
+    ymax = 80,
+    crs = "EPSG:3857"
+  )
+  terra::values(landcover) <- seq_len(terra::ncell(landcover))
+  names(landcover) <- "landcover"
+
+  expect_error(
+    .landscape_adjacency_raster_fft(landcover, radius = 20, metric = "contag"),
+    "exceeds the current supported ceiling"
+  )
+})
+
+
+test_that("kernel preparation rejects unscalable landscape covariates", {
+  landcover <- terra::rast(
+    nrows = 20,
+    ncols = 20,
+    xmin = 0,
+    xmax = 200,
+    ymin = 0,
+    ymax = 200,
+    crs = "EPSG:3857"
+  )
+  terra::values(landcover) <- 1
+  names(landcover) <- "landcover"
+  pts <- terra::vect(cbind(c(55, 85, 115), c(55, 85, 115)),
+                     crs = terra::crs(landcover))
+  vars <- msr_vars(
+    landcover_shdi = landscape_var("landcover", metric = "shdi", radius = 30)
+  )
+
+  expect_error(
+    kernel_prep(
+      pts = pts,
+      raster_stack = landcover,
+      max_D = 30,
+      scale_vars = vars,
+      verbose = FALSE
+    ),
+    "zero variance"
+  )
 })

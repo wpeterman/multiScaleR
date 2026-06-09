@@ -60,8 +60,9 @@
 #' is optimized by \code{\link{multiScale_optim}}.
 #'
 #' \code{landscape_var(source, metric)} derives a landscape ecology metric from
-#' a categorical (or thresholded) raster layer within a circular buffer. The
-#' buffer radius can be fixed or optimized.
+#' a categorical (or thresholded) raster layer within a circular buffer. Raster
+#' classes must be encoded as finite integer-like values. The buffer radius can
+#' be fixed or optimized.
 #'
 #' \strong{Supported landscape metrics}
 #'
@@ -92,6 +93,10 @@
 #'   \item{\code{"pladj"}}{Proportion of like adjacencies (\%).}
 #'   \item{\code{"contag"}}{Contagion index (\%).}
 #' }
+#' Adjacency projections are class-count limited to avoid accidental use of
+#' continuous rasters and to keep FFT projection times bounded. The current
+#' ceilings are 200 classes for \code{"ai"} and \code{"pladj"}, and 50 classes
+#' for \code{"contag"}, which scales with the square of the class count.
 #'
 #' \strong{Mixing covariate types}
 #'
@@ -407,7 +412,8 @@ print.multiScaleR_vars <- function(x, ...) {
                                  unit_conv,
                                  resolution,
                                  n_cols,
-                                 covariates = scale_vars$covariate) {
+                                 covariates = scale_vars$covariate,
+                                 validate = TRUE) {
   out <- numeric(length(covariates))
   names(out) <- covariates
 
@@ -451,7 +457,8 @@ print.multiScaleR_vars <- function(x, ...) {
         metric = metric,
         base = spec$base,
         resolution = resolution,
-        classes_max = if (is.na(spec$classes_max)) NULL else spec$classes_max
+        classes_max = if (is.na(spec$classes_max)) NULL else spec$classes_max,
+        validate = validate
       )[[1]]
     } else if (metric %in% .msr_edge_metrics()) {
       out[[j]] <- .landscape_edge_by_buffer(
@@ -461,7 +468,8 @@ print.multiScaleR_vars <- function(x, ...) {
         radius = radius,
         resolution = resolution,
         n_cols = n_cols,
-        metric = metric
+        metric = metric,
+        validate = validate
       )[[1]]
     } else if (metric %in% .msr_adjacency_metrics()) {
       out[[j]] <- .landscape_adjacency_by_buffer(
@@ -470,7 +478,8 @@ print.multiScaleR_vars <- function(x, ...) {
         cells = .msr_extract_cells(cov_df),
         radius = radius,
         n_cols = n_cols,
-        metric = metric
+        metric = metric,
+        validate = validate
       )[[1]]
     } else {
       stop("Unsupported landscape metric '", metric, "'.", call. = FALSE)

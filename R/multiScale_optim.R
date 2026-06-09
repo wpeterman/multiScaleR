@@ -82,11 +82,18 @@
     "Refit from the optimized parameters and address the flagged diagnostics."
   }
 
+  # The RAM-based parallel-worker recommendation is intentionally NOT computed
+  # here. Querying system RAM shells out to an external process (PowerShell on
+  # Windows) and rebuilds the optimization context, which adds latency to every
+  # `multiScale_optim()` call and can block under load. Call
+  # `estimate_multiscale_ram()` directly when a worker-count recommendation is
+  # wanted. `n_cores` is kept (as NULL) for backward compatibility.
   list(
     max_D = recommended_max_D,
     start_sigma = start_sigma,
     start_shape = start_shape,
     start_par = start_par,
+    n_cores = NULL,
     flags = flags,
     action = action
   )
@@ -376,7 +383,10 @@
 #'   \code{start_strategy = "screen"}, the same \code{n_cores} setting is also
 #'   used for short screening attempts before the full optimization.
 #'   Parallel optimization is beneficial for models with many covariates or
-#'   slow log-likelihood evaluations.
+#'   slow log-likelihood evaluations. When \code{n_cores > 1},
+#'   \code{multiScale_optim()} checks \code{\link{estimate_multiscale_ram}} and
+#'   warns if the requested workers exceed the conservative RAM budget for the
+#'   current \code{kernel_inputs} payload.
 #' @param PSOCK Logical. On Windows, a PSOCK cluster is always used. On Unix,
 #'   a FORK cluster is used by default (faster). Set \code{TRUE} to force a
 #'   PSOCK cluster on Unix. Default: \code{FALSE}.
@@ -427,7 +437,11 @@
 #'     optimized \code{start_sigma} values in map units, optional
 #'     \code{start_shape} values for \code{kernel = "expow"}, and
 #'     \code{start_par} on the internal scaled parameter space expected by
-#'     \code{multiScale_optim}.}
+#'     \code{multiScale_optim}. \code{n_cores} is \code{NULL}; a conservative
+#'     parallel worker-count suggestion is available on demand from
+#'     \code{\link{estimate_multiscale_ram}} (it is no longer computed
+#'     automatically, as that query can be slow and shells out to an external
+#'     process).}
 #'   \item{\code{warn_message}}{Integer vector of triggered warning codes:
 #'     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
 #'   \item{\code{call}}{The matched call.}
@@ -442,6 +456,19 @@
 #' optimization. Summary methods report profile-likelihood confidence intervals
 #' for sigma when \code{\link{profile_sigma}} has been run on the object;
 #' otherwise they fall back to Hessian-based intervals.
+#'
+#' \strong{Binned acceleration}
+#'
+#' When \code{kernel_inputs} was created by \code{\link{kernel_prep}} with
+#' \code{bin = TRUE} (the default), kernel-weighted covariates are evaluated
+#' from precomputed distance-binned summaries rather than by iterating every
+#' buffer cell on each optimizer evaluation. This makes the per-evaluation cost
+#' independent of \code{max_D} and typically speeds up optimization by an order
+#' of magnitude or more for large buffers, with a negligible binning
+#' approximation. Inputs created with \code{store_cell_data = FALSE} ("lean"
+#' mode) carry only the binned summaries; these still optimize, profile, and
+#' refit normally. Landscape-metric covariates always use the exact per-cell
+#' path and therefore require cell-level data.
 #'
 #' \strong{Parallel optimization}
 #'
@@ -669,10 +696,14 @@ multiScale_optim <- function(fitted_mod,
   if(!is.null(n_cores) && (length(n_cores) != 1 || is.na(n_cores) || n_cores != as.integer(n_cores))){
     stop("n_cores must be a positive integer if provided.")
   }
-  if(!is.list(kernel_inputs$raw_cov) || !is.list(kernel_inputs$d_list) ||
-     length(kernel_inputs$raw_cov) == 0 || length(kernel_inputs$d_list) == 0 ||
-     length(kernel_inputs$raw_cov) != length(kernel_inputs$d_list)){
-    stop("`kernel_inputs$raw_cov` and `kernel_inputs$d_list` must be non-empty lists of equal length.")
+  if (!is.null(kernel_inputs$raw_cov) || !is.null(kernel_inputs$d_list)) {
+    if(!is.list(kernel_inputs$raw_cov) || !is.list(kernel_inputs$d_list) ||
+       length(kernel_inputs$raw_cov) == 0 || length(kernel_inputs$d_list) == 0 ||
+       length(kernel_inputs$raw_cov) != length(kernel_inputs$d_list)){
+      stop("`kernel_inputs$raw_cov` and `kernel_inputs$d_list` must be non-empty lists of equal length.")
+    }
+  } else if (is.null(kernel_inputs$binned)) {
+    stop("`kernel_inputs` must contain either cell-level data (`raw_cov`/`d_list`) or precomputed `binned` summaries.")
   }
   validate_scalar_numeric(kernel_inputs$min_D, "kernel_inputs$min_D", positive = TRUE)
   validate_scalar_numeric(kernel_inputs$max_D, "kernel_inputs$max_D", positive = TRUE)
@@ -692,8 +723,15 @@ multiScale_optim <- function(fitted_mod,
   }
 
   if (!is.null(kernel_inputs$scale_vars)) {
+    available_sources <- if (!is.null(kernel_inputs$raw_cov)) {
+      colnames(kernel_inputs$raw_cov[[1]])
+    } else if (!is.null(kernel_inputs$binned)) {
+      unname(kernel_inputs$binned$sources)
+    } else {
+      character(0)
+    }
     missing_sources <- setdiff(kernel_inputs$scale_vars$source,
-                               colnames(kernel_inputs$raw_cov[[1]]))
+                               available_sources)
     if (length(missing_sources) > 0) {
       stop("The raster surfaces provided do not match the variables used in your fitted model. Ensure names of surfaces match model variable names.",
            call. = FALSE)
@@ -776,7 +814,17 @@ multiScale_optim <- function(fitted_mod,
                                    scale_vars = kernel_inputs$scale_vars,
                                    unit_conv = kernel_inputs$unit_conv,
                                    resolution = kernel_inputs$resolution,
-                                   n_cols = kernel_inputs$n_cols)
+                                   n_cols = kernel_inputs$n_cols,
+                                   binned = kernel_inputs$binned)
+
+  .msr_warn_unsafe_parallel_ram(
+    kernel_inputs = kernel_inputs,
+    fitted_mod = fitted_mod,
+    join_by = join_by,
+    refit_fn = refit_fn,
+    n_cores = n_cores,
+    PSOCK = (.Platform$OS.type != "unix" || isTRUE(PSOCK))
+  )
 
   if(kernel_inputs$kernel == 'expow'){
     lwr <- c(lwr, rep(0.75, n_covs))

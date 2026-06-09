@@ -72,7 +72,10 @@ via \code{optimParallel}. Default: \code{NULL} (single-threaded). When
 \code{start_strategy = "screen"}, the same \code{n_cores} setting is also
 used for short screening attempts before the full optimization.
 Parallel optimization is beneficial for models with many covariates or
-slow log-likelihood evaluations.}
+slow log-likelihood evaluations. When \code{n_cores > 1},
+\code{multiScale_optim()} checks \code{\link{estimate_multiscale_ram}} and
+warns if the requested workers exceed the conservative RAM budget for the
+current \code{kernel_inputs} payload.}
 
 \item{PSOCK}{Logical. On Windows, a PSOCK cluster is always used. On Unix,
 a FORK cluster is used by default (faster). Set \code{TRUE} to force a
@@ -127,7 +130,11 @@ A list of class \code{"multiScaleR"} containing:
     optimized \code{start_sigma} values in map units, optional
     \code{start_shape} values for \code{kernel = "expow"}, and
     \code{start_par} on the internal scaled parameter space expected by
-    \code{multiScale_optim}.}
+    \code{multiScale_optim}. \code{n_cores} is \code{NULL}; a conservative
+    parallel worker-count suggestion is available on demand from
+    \code{\link{estimate_multiscale_ram}} (it is no longer computed
+    automatically, as that query can be slow and shells out to an external
+    process).}
   \item{\code{warn_message}}{Integer vector of triggered warning codes:
     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
   \item{\code{call}}{The matched call.}
@@ -150,6 +157,19 @@ scale. Standard errors are Hessian-based approximations from the outer
 optimization. Summary methods report profile-likelihood confidence intervals
 for sigma when \code{\link{profile_sigma}} has been run on the object;
 otherwise they fall back to Hessian-based intervals.
+
+\strong{Binned acceleration}
+
+When \code{kernel_inputs} was created by \code{\link{kernel_prep}} with
+\code{bin = TRUE} (the default), kernel-weighted covariates are evaluated
+from precomputed distance-binned summaries rather than by iterating every
+buffer cell on each optimizer evaluation. This makes the per-evaluation cost
+independent of \code{max_D} and typically speeds up optimization by an order
+of magnitude or more for large buffers, with a negligible binning
+approximation. Inputs created with \code{store_cell_data = FALSE} ("lean"
+mode) carry only the binned summaries; these still optimize, profile, and
+refit normally. Landscape-metric covariates always use the exact per-cell
+path and therefore require cell-level data.
 
 \strong{Parallel optimization}
 

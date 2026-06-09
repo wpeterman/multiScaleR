@@ -1,6 +1,80 @@
 # Internal helpers for exploratory landscape metric support.
 
+.landscape_adjacency_class_ceiling <- function(metric) {
+  switch(
+    metric,
+    contag = 50L,
+    ai = 200L,
+    pladj = 200L,
+    200L
+  )
+}
+
+
+.landscape_validate_categorical_values <- function(values,
+                                                   metric,
+                                                   max_classes = NULL,
+                                                   context = "Landscape metric") {
+  finite_values <- as.vector(values)
+  finite_values <- finite_values[!is.na(finite_values)]
+
+  if (length(finite_values) == 0) {
+    return(invisible(integer(0)))
+  }
+
+  if (any(!is.finite(finite_values))) {
+    stop(
+      sprintf("%s `%s` requires finite categorical class values.", context, metric),
+      call. = FALSE
+    )
+  }
+
+  tolerance <- sqrt(.Machine$double.eps)
+  if (any(abs(finite_values - round(finite_values)) > tolerance)) {
+    examples <- unique(finite_values[abs(finite_values - round(finite_values)) > tolerance])
+    examples <- utils::head(examples, 5)
+    stop(
+      sprintf(
+        "%s `%s` requires a categorical raster encoded with integer-like class values; found non-integer values such as %s.",
+        context,
+        metric,
+        paste(signif(examples, 6), collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  classes <- sort(unique(round(finite_values)))
+  n_classes <- length(classes)
+  if (!is.null(max_classes) && n_classes > max_classes) {
+    stop(
+      sprintf(
+        "%s `%s` has %s classes, which exceeds the current supported ceiling of %s classes. Reclassify or aggregate categories before using this adjacency metric.",
+        context,
+        metric,
+        n_classes,
+        max_classes
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(classes)
+}
+
+
+.landscape_clean_count_matrix <- function(x, tolerance = 1e-8) {
+  x[abs(x) < tolerance] <- 0
+  rounded <- round(x)
+  near_integer <- is.finite(x) & abs(x - rounded) < tolerance
+  x[near_integer] <- rounded[near_integer]
+  x
+}
+
+
 .landscape_class_totals <- function(values, weights = NULL) {
+  .landscape_validate_categorical_values(values, metric = "composition")
+
   keep <- !is.na(values)
   values <- values[keep]
 
@@ -116,7 +190,8 @@
                                              weights = NULL,
                                              base = exp(1),
                                              resolution = NULL,
-                                             classes_max = NULL) {
+                                             classes_max = NULL,
+                                             validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(base, "base", positive = TRUE)
 
@@ -128,6 +203,16 @@
   storage.mode(values) <- "double"
   if (nrow(values) != length(d)) {
     stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
+  }
+  # The source raster's categorical encoding is fixed, so validation only needs
+  # to happen once (at `kernel_prep()` time). The optimizer passes
+  # `validate = FALSE` to skip the per-evaluation re-scan and class detection.
+  if (isTRUE(validate)) {
+    .landscape_validate_categorical_values(
+      values,
+      metric = metric,
+      context = "Landscape composition metric"
+    )
   }
 
   if (!is.null(weights) && length(weights) != length(d)) {
@@ -322,7 +407,8 @@
                                       radius,
                                       resolution,
                                       n_cols,
-                                      metric) {
+                                      metric,
+                                      validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(resolution, "resolution", positive = TRUE)
   validate_scalar_numeric(n_cols, "n_cols", integerish = TRUE, positive = TRUE)
@@ -338,6 +424,13 @@
   storage.mode(values) <- "double"
   if (nrow(values) != length(d)) {
     stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
+  }
+  if (isTRUE(validate)) {
+    .landscape_validate_categorical_values(
+      values,
+      metric = metric,
+      context = "Landscape edge metric"
+    )
   }
 
   out <- landscape_edge_metric_cpp(
@@ -468,7 +561,8 @@
                                            cells,
                                            radius,
                                            n_cols,
-                                           metric) {
+                                           metric,
+                                           validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(n_cols, "n_cols", integerish = TRUE, positive = TRUE)
 
@@ -483,6 +577,14 @@
   storage.mode(values) <- "double"
   if (nrow(values) != length(d)) {
     stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
+  }
+  if (isTRUE(validate)) {
+    .landscape_validate_categorical_values(
+      values,
+      metric = metric,
+      max_classes = .landscape_adjacency_class_ceiling(metric),
+      context = "Landscape adjacency metric"
+    )
   }
 
   out <- landscape_adjacency_metric_cpp(
@@ -523,6 +625,11 @@
 
   resolution <- .landscape_validate_single_layer_raster(raster, "Composition")
   values <- terra::as.matrix(raster, wide = TRUE)
+  .landscape_validate_categorical_values(
+    values,
+    metric = "composition",
+    context = "Landscape composition projection"
+  )
   classes <- sort(unique(stats::na.omit(as.vector(values))))
   kernel <- .landscape_circle_kernel(radius = radius, resolution = resolution)
 
@@ -534,18 +641,18 @@
       ncol = ncol(values)
     )
     class_indicator[is.na(class_indicator)] <- 0
-    class_counts[[i]] <- fft_convolution(
+    class_counts[[i]] <- .landscape_clean_count_matrix(fft_convolution(
       x = class_indicator,
       kernel = kernel,
       fun = "sum",
       na.rm = na.rm
-    )
+    ))
   }
 
   total <- if (length(class_counts) == 0) {
     matrix(0, nrow = nrow(values), ncol = ncol(values))
   } else {
-    Reduce("+", class_counts)
+    .landscape_clean_count_matrix(Reduce("+", class_counts))
   }
 
   list(
@@ -658,16 +765,16 @@
 
   half_width <- ceiling(radius / resolution)
   offsets <- seq(-half_width, half_width)
-  row_offset <- matrix(rep(offsets, each = length(offsets)),
+  row_offset <- matrix(rep(offsets, times = length(offsets)),
                        nrow = length(offsets))
-  col_offset <- matrix(rep(offsets, times = length(offsets)),
+  col_offset <- matrix(rep(offsets, each = length(offsets)),
                        nrow = length(offsets))
 
   if (identical(orientation, "right")) {
     neighbour_row <- row_offset
     neighbour_col <- col_offset - 1
   } else {
-    neighbour_row <- row_offset + 1
+    neighbour_row <- row_offset - 1
     neighbour_col <- col_offset
   }
 
@@ -686,6 +793,11 @@
   resolution <- .landscape_validate_single_layer_raster(raster, "Edge")
 
   values <- terra::as.matrix(raster, wide = TRUE)
+  .landscape_validate_categorical_values(
+    values,
+    metric = "edge",
+    context = "Landscape edge projection"
+  )
   valid <- !is.na(values)
   right_edges <- matrix(0, nrow = nrow(values), ncol = ncol(values))
   down_edges <- matrix(0, nrow = nrow(values), ncol = ncol(values))
@@ -720,32 +832,32 @@
                                         resolution = resolution,
                                         orientation = "down")
 
-  area_cells <- fft_convolution(valid * 1,
-                                area_kernel,
-                                fun = "sum",
-                                na.rm = na.rm)
-  right_count <- fft_convolution(right_edges,
-                                 right_kernel,
-                                 fun = "sum",
-                                 na.rm = na.rm)
-  down_count <- fft_convolution(down_edges,
-                                down_kernel,
-                                fun = "sum",
-                                na.rm = na.rm)
-  right_valid_count <- fft_convolution(right_valid_pairs,
-                                       right_kernel,
-                                       fun = "sum",
-                                       na.rm = na.rm)
-  down_valid_count <- fft_convolution(down_valid_pairs,
-                                      down_kernel,
-                                      fun = "sum",
-                                      na.rm = na.rm)
+  area_cells <- .landscape_clean_count_matrix(fft_convolution(valid * 1,
+                                                              area_kernel,
+                                                              fun = "sum",
+                                                              na.rm = na.rm))
+  right_count <- .landscape_clean_count_matrix(fft_convolution(right_edges,
+                                                               right_kernel,
+                                                               fun = "sum",
+                                                               na.rm = na.rm))
+  down_count <- .landscape_clean_count_matrix(fft_convolution(down_edges,
+                                                              down_kernel,
+                                                              fun = "sum",
+                                                              na.rm = na.rm))
+  right_valid_count <- .landscape_clean_count_matrix(fft_convolution(right_valid_pairs,
+                                                                     right_kernel,
+                                                                     fun = "sum",
+                                                                     na.rm = na.rm))
+  down_valid_count <- .landscape_clean_count_matrix(fft_convolution(down_valid_pairs,
+                                                                    down_kernel,
+                                                                    fun = "sum",
+                                                                    na.rm = na.rm))
 
   list(
     values = values,
     area_cells = area_cells,
-    internal_edge_count = right_count + down_count,
-    valid_pair_count = right_valid_count + down_valid_count,
+    internal_edge_count = .landscape_clean_count_matrix(right_count + down_count),
+    valid_pair_count = .landscape_clean_count_matrix(right_valid_count + down_valid_count),
     resolution = resolution,
     right_kernel = right_kernel,
     down_kernel = down_kernel
@@ -873,14 +985,16 @@
     down_pairs[is.na(down_pairs)] <- 0
   }
 
-  fft_convolution(right_pairs,
-                  right_kernel,
-                  fun = "sum",
-                  na.rm = na.rm) +
-    fft_convolution(down_pairs,
-                    down_kernel,
+  .landscape_clean_count_matrix(
+    fft_convolution(right_pairs,
+                    right_kernel,
                     fun = "sum",
-                    na.rm = na.rm)
+                    na.rm = na.rm) +
+      fft_convolution(down_pairs,
+                      down_kernel,
+                      fun = "sum",
+                      na.rm = na.rm)
+  )
 }
 
 
@@ -889,12 +1003,26 @@
                                             metric,
                                             na.rm = TRUE) {
   metric <- match.arg(metric, c("ai", "pladj", "contag"))
+  projection_values <- terra::as.matrix(raster, wide = TRUE)
+  .landscape_validate_categorical_values(
+    projection_values,
+    metric = metric,
+    max_classes = .landscape_adjacency_class_ceiling(metric),
+    context = "Landscape adjacency projection"
+  )
+
   counts <- .landscape_edge_counts_raster_fft(
     raster = raster,
     radius = radius,
     na.rm = na.rm
   )
   values <- counts$values
+  .landscape_validate_categorical_values(
+    values,
+    metric = metric,
+    max_classes = .landscape_adjacency_class_ceiling(metric),
+    context = "Landscape adjacency projection"
+  )
   classes <- sort(unique(stats::na.omit(as.vector(values))))
 
   out <- terra::rast(raster)
@@ -961,8 +1089,10 @@
 
     entropy <- matrix(0, nrow = nrow(values), ncol = ncol(values))
     total_ordered <- total_source * 2
-    for (from in classes) {
-      for (to in classes) {
+    for (from_idx in seq_along(classes)) {
+      for (to_idx in seq(from_idx, length(classes))) {
+        from <- classes[[from_idx]]
+        to <- classes[[to_idx]]
         source_ab <- .landscape_pair_count_raster_fft(
           values = values,
           from = from,
@@ -971,18 +1101,25 @@
           down_kernel = counts$down_kernel,
           na.rm = na.rm
         )
-        source_ba <- .landscape_pair_count_raster_fft(
-          values = values,
-          from = to,
-          to = from,
-          right_kernel = counts$right_kernel,
-          down_kernel = counts$down_kernel,
-          na.rm = na.rm
-        )
-        p <- (source_ab + source_ba) / total_ordered
+        if (from_idx == to_idx) {
+          pair_count <- source_ab * 2
+          multiplier <- 1
+        } else {
+          source_ba <- .landscape_pair_count_raster_fft(
+            values = values,
+            from = to,
+            to = from,
+            right_kernel = counts$right_kernel,
+            down_kernel = counts$down_kernel,
+            na.rm = na.rm
+          )
+          pair_count <- source_ab + source_ba
+          multiplier <- 2
+        }
+        p <- pair_count / total_ordered
         active <- is.finite(p) & p > 0
         entropy_term <- matrix(0, nrow = nrow(values), ncol = ncol(values))
-        entropy_term[active] <- p[active] * log(p[active])
+        entropy_term[active] <- multiplier * p[active] * log(p[active])
         entropy <- entropy + entropy_term
       }
     }

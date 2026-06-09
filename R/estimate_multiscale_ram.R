@@ -50,7 +50,9 @@
 #'   \item{\code{system}}{Named list describing detected physical cores,
 #'     logical cores, total RAM, usable RAM, and the reservation settings.}
 #'   \item{\code{point_summary}}{One-row data frame summarizing the number of
-#'     points, extracted cells per point, and source raster layer count.}
+#'     points, extracted cells per point, source raster layer count, whether
+#'     cell-level data were retained (\code{cell_data_stored}), and the number
+#'     of distance bins (\code{nbins}).}
 #'   \item{\code{component_bytes}}{Data frame reporting estimated byte sizes for
 #'     the major stored objects and worker bundles.}
 #'   \item{\code{notes}}{Character vector with interpretation notes and any
@@ -118,14 +120,39 @@ estimate_multiscale_ram <- function(kernel_inputs,
 
   d_list <- kernel_inputs$d_list
   raw_cov <- kernel_inputs$raw_cov
+  binned <- kernel_inputs$binned
   kernel_dat <- kernel_inputs$kernel_dat
 
+  # Cell-level data may have been dropped (`store_cell_data = FALSE`); fall back
+  # to the binned summaries / kernel data to describe the point set.
+  cells_per_point <- if (!is.null(d_list)) lengths(d_list) else integer(0)
+  n_points <- if (!is.null(d_list)) {
+    length(d_list)
+  } else if (!is.null(binned)) {
+    binned$n_points
+  } else if (!is.null(kernel_dat)) {
+    nrow(kernel_dat)
+  } else {
+    0L
+  }
+  n_source_layers <- if (!is.null(raw_cov) && length(raw_cov) > 0) {
+    ncol(raw_cov[[1]])
+  } else if (!is.null(binned)) {
+    length(binned$sources)
+  } else if (!is.null(kernel_dat)) {
+    ncol(kernel_dat)
+  } else {
+    0L
+  }
+
   point_summary <- data.frame(
-    n_points = length(d_list),
-    mean_cells_per_point = if (length(d_list) > 0) mean(lengths(d_list)) else NA_real_,
-    median_cells_per_point = if (length(d_list) > 0) stats::median(lengths(d_list)) else NA_real_,
-    max_cells_per_point = if (length(d_list) > 0) max(lengths(d_list)) else NA_real_,
-    n_source_layers = if (length(raw_cov) > 0) ncol(raw_cov[[1]]) else 0L,
+    n_points = n_points,
+    mean_cells_per_point = if (length(cells_per_point) > 0) mean(cells_per_point) else NA_real_,
+    median_cells_per_point = if (length(cells_per_point) > 0) stats::median(cells_per_point) else NA_real_,
+    max_cells_per_point = if (length(cells_per_point) > 0) max(cells_per_point) else NA_real_,
+    n_source_layers = n_source_layers,
+    cell_data_stored = !is.null(d_list),
+    nbins = if (!is.null(binned)) binned$nbins else NA_integer_,
     stringsAsFactors = FALSE
   )
 
@@ -155,6 +182,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
     kernel_dat = utils::object.size(kernel_dat),
     d_list = utils::object.size(d_list),
     raw_cov = utils::object.size(raw_cov),
+    binned = utils::object.size(binned),
     join_by = utils::object.size(join_by),
     fitted_mod = utils::object.size(fitted_mod),
     opt_context = utils::object.size(opt_context)
@@ -212,6 +240,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
       "kernel_dat",
       "d_list",
       "raw_cov",
+      "binned",
       "join_by",
       "fitted_mod",
       "opt_context",
@@ -224,6 +253,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
       .msr_as_numeric_size(component_sizes$kernel_dat),
       .msr_as_numeric_size(component_sizes$d_list),
       .msr_as_numeric_size(component_sizes$raw_cov),
+      .msr_as_numeric_size(component_sizes$binned),
       .msr_as_numeric_size(component_sizes$join_by),
       .msr_as_numeric_size(component_sizes$fitted_mod),
       .msr_as_numeric_size(component_sizes$opt_context),
@@ -236,6 +266,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
       .msr_format_bytes(component_sizes$kernel_dat),
       .msr_format_bytes(component_sizes$d_list),
       .msr_format_bytes(component_sizes$raw_cov),
+      .msr_format_bytes(component_sizes$binned),
       .msr_format_bytes(component_sizes$join_by),
       .msr_format_bytes(component_sizes$fitted_mod),
       .msr_format_bytes(component_sizes$opt_context),
@@ -302,17 +333,89 @@ estimate_multiscale_ram <- function(kernel_inputs,
 }
 
 
-.msr_detect_cores <- function(logical = FALSE) {
-  cores <- suppressWarnings(parallel::detectCores(logical = logical))
-  if (length(cores) != 1 || is.na(cores) || !is.finite(cores) || cores < 1) {
-    return(NA_real_)
+.msr_warn_unsafe_parallel_ram <- function(kernel_inputs,
+                                          fitted_mod,
+                                          join_by,
+                                          refit_fn,
+                                          n_cores,
+                                          PSOCK) {
+  if (is.null(n_cores) || as.integer(n_cores) <= 1L) {
+    return(invisible(NULL))
+  }
+  if (!inherits(kernel_inputs, "multiScaleR_data")) {
+    return(invisible(NULL))
   }
 
-  as.integer(cores)
+  ram <- tryCatch(
+    estimate_multiscale_ram(
+      kernel_inputs = kernel_inputs,
+      fitted_mod = fitted_mod,
+      join_by = join_by,
+      refit_fn = refit_fn,
+      n_cores = n_cores,
+      PSOCK = PSOCK
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(ram) || is.na(ram$max_cores_by_ram) ||
+      as.integer(n_cores) <= ram$max_cores_by_ram) {
+    return(invisible(NULL))
+  }
+
+  peak <- ram$component_bytes$pretty[
+    ram$component_bytes$component == "peak_parallel_estimate"
+  ]
+  warning(
+    "Requested `n_cores = ", as.integer(n_cores),
+    "` may exceed the conservative RAM budget for this `kernel_prep()` payload. ",
+    "`estimate_multiscale_ram()` recommends at most ",
+    ram$max_cores_by_ram, " worker(s) by RAM for the ",
+    ram$backend, " backend; estimated peak use is ", peak,
+    ". Consider lowering `n_cores` or running `estimate_multiscale_ram()` first.",
+    call. = FALSE
+  )
+
+  invisible(ram)
+}
+
+
+# Hardware (physical/logical cores, total RAM) does not change during an R
+# session, but detecting it can be costly -- on Windows `.msr_total_ram_bytes()`
+# spawns a PowerShell process. `multiScale_optim()` queries these on every call
+# to populate its `next_run` recommendation, so the results are memoized to
+# avoid repeated process spawns / system calls.
+.msr_hw_cache <- new.env(parent = emptyenv())
+
+.msr_detect_cores <- function(logical = FALSE) {
+  key <- if (isTRUE(logical)) "logical_cores" else "physical_cores"
+  cached <- .msr_hw_cache[[key]]
+  if (!is.null(cached)) {
+    return(cached)
+  }
+
+  cores <- suppressWarnings(parallel::detectCores(logical = logical))
+  out <- if (length(cores) != 1 || is.na(cores) || !is.finite(cores) || cores < 1) {
+    NA_real_
+  } else {
+    as.integer(cores)
+  }
+  .msr_hw_cache[[key]] <- out
+  out
 }
 
 
 .msr_total_ram_bytes <- function() {
+  cached <- .msr_hw_cache[["total_ram_bytes"]]
+  if (!is.null(cached)) {
+    return(cached)
+  }
+  out <- .msr_total_ram_bytes_uncached()
+  .msr_hw_cache[["total_ram_bytes"]] <- out
+  out
+}
+
+
+.msr_total_ram_bytes_uncached <- function() {
   sysname <- Sys.info()[["sysname"]]
 
   if (identical(.Platform$OS.type, "windows")) {
@@ -349,8 +452,11 @@ estimate_multiscale_ram <- function(kernel_inputs,
 
 
 .msr_system_stdout <- function(command, args = character()) {
+  # Bound the external call (PowerShell on Windows can be slow to spawn under
+  # load); on timeout/failure fall back to no output so RAM detection degrades
+  # to NA rather than blocking. `timeout` is available since R 3.5.0.
   tryCatch(
-    system2(command, args = args, stdout = TRUE, stderr = FALSE),
+    system2(command, args = args, stdout = TRUE, stderr = FALSE, timeout = 5),
     warning = function(e) character(),
     error = function(e) character()
   )

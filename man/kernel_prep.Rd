@@ -14,7 +14,10 @@ kernel_prep(
   shape = NULL,
   projected = TRUE,
   progress = FALSE,
-  verbose = TRUE
+  verbose = TRUE,
+  bin = TRUE,
+  nbins = 256L,
+  store_cell_data = TRUE
 )
 }
 \arguments{
@@ -75,6 +78,28 @@ and distance calculations. Default: \code{FALSE}.}
 
 \item{verbose}{Logical. Print status messages during preparation. Default:
 \code{TRUE}.}
+
+\item{bin}{Logical. If \code{TRUE} (default), precompute distance-binned
+summaries of the kernel-type covariates so that \code{\link{multiScale_optim}}
+can evaluate kernel-weighted means in \code{O(nbins)} per point instead of
+iterating every buffer cell on each optimizer evaluation. This makes
+optimization substantially faster (and independent of \code{max_D}) at the
+cost of a negligible binning approximation. Landscape-metric covariates are
+never binned and always use the exact per-cell path.}
+
+\item{nbins}{Positive integer. Number of equal-width distance bins used when
+\code{bin = TRUE}. More bins increase accuracy and memory; the default
+(\code{256}) reproduces exact optimization results to several significant
+figures. Ignored when \code{bin = FALSE}.}
+
+\item{store_cell_data}{Logical. If \code{TRUE} (default), the full per-cell
+\code{d_list}/\code{raw_cov} data are retained. If \code{FALSE} and every
+covariate is kernel-type (no landscape metrics) and \code{bin = TRUE}, the
+cell-level data are dropped after binning, dramatically reducing the
+object's memory footprint (often by 1–2 orders of magnitude). The binned
+summaries are sufficient to drive optimization, \code{\link{profile_sigma}},
+and the final refit. Ignored (with a message) when landscape metrics are
+present or \code{bin = FALSE}.}
 }
 \value{
 A list of class \code{"multiScaleR_data"} containing:
@@ -86,9 +111,10 @@ A list of class \code{"multiScaleR_data"} containing:
     \code{\link{multiScale_optim}}.}
   \item{\code{d_list}}{Named list (one element per point) of numeric distance
     vectors from the point to every raster cell within the buffer.}
-  \item{\code{raw_cov}}{Named list (one element per point) of sparse matrices
+  \item{\code{raw_cov}}{Named list (one element per point) of matrices
     containing raw raster cell values within the buffer, aligned with
-    \code{d_list}.}
+    \code{d_list}. Each point is stored as a dense or sparse matrix,
+    whichever is smaller. \code{NULL} in lean mode.}
   \item{\code{kernel}}{Character string identifying the kernel used.}
   \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
     (scaled) parameter space.}
@@ -109,6 +135,13 @@ A list of class \code{"multiScaleR_data"} containing:
     — the centering and scaling parameters applied to \code{kernel_dat}.
     Stored for use by \code{\link{kernel_scale.raster}} when
     \code{scale_center = TRUE}.}
+  \item{\code{binned}}{When \code{bin = TRUE}, a list of precomputed
+    distance-binned summaries (representative bin distances and per-covariate
+    value/count matrices) used to accelerate optimization. \code{NULL} when
+    \code{bin = FALSE}.}
+  \item{\code{cell_data_stored}}{Logical flag indicating whether the
+    per-cell \code{d_list}/\code{raw_cov} data were retained. \code{FALSE}
+    only in lean mode (\code{store_cell_data = FALSE}).}
 }
 }
 \description{

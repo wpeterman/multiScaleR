@@ -534,6 +534,40 @@ test_that("diagnostics accessor returns structured warning metadata", {
   )
 })
 
+test_that("multiScale_optim does not invoke the RAM/n_cores probe (it is a separate call)", {
+  fix <- make_core_fixture()
+  ram_called <- FALSE
+
+  opt <- with_mocked_bindings(
+    multiScale_optim(
+      fitted_mod = fix$fitted_mod,
+      kernel_inputs = fix$kernel_inputs,
+      par = 0.2,
+      verbose = FALSE
+    ),
+    optim = function(...) list(par = 0.2, hessian = matrix(1, 1, 1)),
+    kernel_scale_fn = function(..., mod_return = NULL) {
+      if (isTRUE(mod_return)) {
+        list(mod = fix$fitted_mod, scl_params = fix$kernel_inputs$scl_params)
+      } else {
+        0
+      }
+    },
+    kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
+    estimate_multiscale_ram = function(...) {
+      ram_called <<- TRUE
+      list(recommended_n_cores = 4L)
+    },
+    .package = "multiScaleR"
+  )
+
+  # A serial optimization must not shell out for a RAM/worker recommendation;
+  # `estimate_multiscale_ram()` is now an explicit, separate call.
+  expect_false(ram_called)
+  expect_null(opt$next_run$n_cores)
+  expect_null(summary(opt)$next_run$n_cores)
+})
+
 test_that("print methods emit readable summaries", {
   fix <- make_core_fixture()
   warn_obj <- fix$opt
@@ -759,6 +793,46 @@ test_that("multiScale_optim covers parallel and unmarked branches via mocks", {
   )
 
   expect_s3_class(par_out, "multiScaleR")
+
+  expect_warning(
+    unsafe_ram_out <- with_mocked_bindings(
+      multiScale_optim(
+        fitted_mod = fix$fitted_mod,
+        kernel_inputs = fix$kernel_inputs,
+        par = 0.2,
+        n_cores = 2,
+        PSOCK = TRUE,
+        verbose = FALSE
+      ),
+      estimate_multiscale_ram = function(...) {
+        list(
+          max_cores_by_ram = 1L,
+          backend = "PSOCK",
+          component_bytes = data.frame(
+            component = "peak_parallel_estimate",
+            pretty = "2 GB",
+            stringsAsFactors = FALSE
+          )
+        )
+      },
+      makeCluster = function(...) "cl",
+      setDefaultCluster = function(cl = NULL) invisible(NULL),
+      cluster_prep = function(model, cl) "stats",
+      optimParallel = function(...) list(par = 0.2, hessian = matrix(1, 1, 1)),
+      stopCluster = function(cl) invisible(NULL),
+      kernel_scale_fn = function(..., mod_return = NULL) {
+        if (isTRUE(mod_return)) {
+          list(mod = fix$fitted_mod, scl_params = fix$kernel_inputs$scl_params)
+        } else {
+          0
+        }
+      },
+      kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
+      .package = "multiScaleR"
+    ),
+    "conservative RAM budget"
+  )
+  expect_s3_class(unsafe_ram_out, "multiScaleR")
 
   expect_error(
     with_mocked_bindings(

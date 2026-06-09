@@ -68,7 +68,9 @@ A list of class \code{"multiScaleR_ram"} with:
   \item{\code{system}}{Named list describing detected physical cores,
     logical cores, total RAM, usable RAM, and the reservation settings.}
   \item{\code{point_summary}}{One-row data frame summarizing the number of
-    points, extracted cells per point, and source raster layer count.}
+    points, extracted cells per point, source raster layer count, whether
+    cell-level data were retained (\code{cell_data_stored}), and the number
+    of distance bins (\code{nbins}).}
   \item{\code{component_bytes}}{Data frame reporting estimated byte sizes for
     the major stored objects and worker bundles.}
   \item{\code{notes}}{Character vector with interpretation notes and any

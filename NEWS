@@ -1,8 +1,59 @@
+multiScaleR 0.6.31
+---------
+* `multiScale_optim()` no longer queries system RAM on every call. The
+  `next_run` recommendation previously invoked `estimate_multiscale_ram()` at
+  the end of each fit, which shelled out to an external process (PowerShell on
+  Windows) and rebuilt the optimization context; under load this could make
+  `multiScale_optim()` appear to hang after the optimization had finished. The
+  parallel worker-count suggestion is now obtained only on demand by calling
+  `estimate_multiscale_ram()` directly. `next_run$n_cores` is now `NULL`.
+  `estimate_multiscale_ram()`'s own RAM query is also bounded by a 5-second
+  timeout so it degrades to `NA` instead of blocking.
+* `kernel_prep()` now precomputes distance-binned summaries of kernel-weighted
+  covariates (`bin = TRUE`, `nbins = 256` by default). `multiScale_optim()`,
+  `profile_sigma()`, and the screened-start path evaluate kernel covariates from
+  these summaries in O(nbins) per point instead of iterating every buffer cell
+  on each optimizer evaluation. The per-evaluation cost becomes independent of
+  `max_D`, making optimization roughly 10-80x faster in benchmarks (the speedup
+  grows with the number of points and the buffer size), while recovering sigma
+  to within ~1e-5 (relative) of the exact per-cell result. Set `bin = FALSE` to
+  force the exact path.
+* Added a "lean" storage mode (`kernel_prep(store_cell_data = FALSE)`) that
+  drops the per-cell `d_list`/`raw_cov` data when every covariate is
+  kernel-type, retaining only the binned summaries. This reduces the
+  `multiScaleR_data` memory footprint by roughly 30-40x in benchmarks and is
+  sufficient to optimize, profile, and refit. Cell-level data are retained
+  automatically when landscape-metric covariates are present.
+* `estimate_multiscale_ram()` and `print.multiScaleR_data()` now report binned
+  summary sizes and handle lean inputs.
+* `kernel_prep()` now stores each point's extracted cell values as a dense or
+  sparse matrix, whichever is smaller (continuous and categorical layers store
+  dense; low-prevalence binary layers stay sparse), so `raw_cov` memory is never
+  worse than before and is ~1.5x smaller for continuous rasters. `scale_type()`
+  evaluates dense values in vectorized R, matching the compiled sparse path to
+  machine precision while avoiding per-cell sparse random access; this speeds up
+  the exact (`bin = FALSE`) per-cell weighting and removes the repeated
+  sparse-to-dense conversion in the landscape-metric path. (One-time
+  `kernel_prep()` and landscape optimization wall-clock change little, as those
+  are dominated by raster extraction and the C++ metric computation
+  respectively.)
+* Landscape-metric optimization is ~3.4-4.2x faster: the source raster's
+  categorical encoding is validated once in `kernel_prep()` instead of being
+  re-scanned (with a per-call `unique()` class detection) on every optimizer
+  evaluation. Optimized radii are unchanged. Direct calls to the landscape
+  metric helpers still validate by default.
+* Hardware detection (physical/logical cores and total system RAM) is now
+  memoized, so `multiScale_optim()` no longer spawns a PowerShell process to
+  query RAM on every call when populating its parallel-worker recommendation.
+
 multiScaleR 0.6.30
 ---------
 * Added `estimate_multiscale_ram()` to report `kernel_prep()` memory use,
   conservative parallel RAM budgets, and recommended worker counts based on
   available RAM and physical CPU cores while reserving two cores
+* Added a preflight warning in `multiScale_optim()` when requested parallel
+  workers exceed the RAM-based budget estimated for the current `kernel_prep()`
+  payload
 
 multiScaleR 0.6.29
 ---------

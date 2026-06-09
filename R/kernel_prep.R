@@ -53,6 +53,25 @@
 #'   and distance calculations. Default: \code{FALSE}.
 #' @param verbose Logical. Print status messages during preparation. Default:
 #'   \code{TRUE}.
+#' @param bin Logical. If \code{TRUE} (default), precompute distance-binned
+#'   summaries of the kernel-type covariates so that \code{\link{multiScale_optim}}
+#'   can evaluate kernel-weighted means in \code{O(nbins)} per point instead of
+#'   iterating every buffer cell on each optimizer evaluation. This makes
+#'   optimization substantially faster (and independent of \code{max_D}) at the
+#'   cost of a negligible binning approximation. Landscape-metric covariates are
+#'   never binned and always use the exact per-cell path.
+#' @param nbins Positive integer. Number of equal-width distance bins used when
+#'   \code{bin = TRUE}. More bins increase accuracy and memory; the default
+#'   (\code{256}) reproduces exact optimization results to several significant
+#'   figures. Ignored when \code{bin = FALSE}.
+#' @param store_cell_data Logical. If \code{TRUE} (default), the full per-cell
+#'   \code{d_list}/\code{raw_cov} data are retained. If \code{FALSE} and every
+#'   covariate is kernel-type (no landscape metrics) and \code{bin = TRUE}, the
+#'   cell-level data are dropped after binning, dramatically reducing the
+#'   object's memory footprint (often by 1–2 orders of magnitude). The binned
+#'   summaries are sufficient to drive optimization, \code{\link{profile_sigma}},
+#'   and the final refit. Ignored (with a message) when landscape metrics are
+#'   present or \code{bin = FALSE}.
 #'
 #' @return A list of class \code{"multiScaleR_data"} containing:
 #' \describe{
@@ -63,9 +82,10 @@
 #'     \code{\link{multiScale_optim}}.}
 #'   \item{\code{d_list}}{Named list (one element per point) of numeric distance
 #'     vectors from the point to every raster cell within the buffer.}
-#'   \item{\code{raw_cov}}{Named list (one element per point) of sparse matrices
+#'   \item{\code{raw_cov}}{Named list (one element per point) of matrices
 #'     containing raw raster cell values within the buffer, aligned with
-#'     \code{d_list}.}
+#'     \code{d_list}. Each point is stored as a dense or sparse matrix,
+#'     whichever is smaller. \code{NULL} in lean mode.}
 #'   \item{\code{kernel}}{Character string identifying the kernel used.}
 #'   \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
 #'     (scaled) parameter space.}
@@ -86,6 +106,13 @@
 #'     — the centering and scaling parameters applied to \code{kernel_dat}.
 #'     Stored for use by \code{\link{kernel_scale.raster}} when
 #'     \code{scale_center = TRUE}.}
+#'   \item{\code{binned}}{When \code{bin = TRUE}, a list of precomputed
+#'     distance-binned summaries (representative bin distances and per-covariate
+#'     value/count matrices) used to accelerate optimization. \code{NULL} when
+#'     \code{bin = FALSE}.}
+#'   \item{\code{cell_data_stored}}{Logical flag indicating whether the
+#'     per-cell \code{d_list}/\code{raw_cov} data were retained. \code{FALSE}
+#'     only in lean mode (\code{store_cell_data = FALSE}).}
 #' }
 #'
 #' @details
@@ -142,7 +169,10 @@ kernel_prep <- function(pts,
                         shape = NULL,
                         projected = TRUE,
                         progress = FALSE,
-                        verbose = TRUE){
+                        verbose = TRUE,
+                        bin = TRUE,
+                        nbins = 256L,
+                        store_cell_data = TRUE){
   unit_conv <- max_D
 
   kernel <- match.arg(kernel)
@@ -150,6 +180,11 @@ kernel_prep <- function(pts,
   validate_scalar_logical(projected, "projected")
   validate_scalar_logical(progress, "progress")
   validate_scalar_logical(verbose, "verbose")
+  validate_scalar_logical(bin, "bin")
+  validate_scalar_logical(store_cell_data, "store_cell_data")
+  if (isTRUE(bin)) {
+    validate_scalar_numeric(nbins, "nbins", integerish = TRUE, lower = 2)
+  }
 
   if(!inherits(raster_stack, "SpatRaster")){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
@@ -221,8 +256,8 @@ kernel_prep <- function(pts,
                            include_xy = T)
 
 
-    # Convert to list of sparse matrices
-    sparse_list <- lapply(r_ext, df_to_sparse)
+    # Convert to per-point value matrices (dense or sparse, whichever is smaller)
+    cell_list <- lapply(r_ext, df_to_values)
 
     names(r_ext) <- 1:length(r_ext)
 
@@ -289,8 +324,8 @@ kernel_prep <- function(pts,
                            include_cell = .msr_needs_cells(scale_vars),
                            progress = progress)
 
-    # Convert to list of sparse matrices
-    sparse_list <- lapply(r_ext, df_to_sparse)
+    # Convert to per-point value matrices (dense or sparse, whichever is smaller)
+    cell_list <- lapply(r_ext, df_to_values)
 
 
 
@@ -303,7 +338,7 @@ kernel_prep <- function(pts,
       }
 
       r_ext <- lapply(r_ext, re_name)
-      sparse_list <- lapply(sparse_list, re_name)
+      cell_list <- lapply(cell_list, re_name)
     }
 
     ## Progress bar
@@ -350,7 +385,7 @@ kernel_prep <- function(pts,
   colnames(cov.w) <- scale_vars$covariate
   rownames(cov.w) <- point_ids
   names(D) <- point_ids
-  names(sparse_list) <- point_ids
+  names(cell_list) <- point_ids
   sigma <- sigma / unit_conv
 
   if(isTRUE(progress)){
@@ -371,7 +406,7 @@ kernel_prep <- function(pts,
 
     cov.w[i,] <- .msr_eval_scale_vars(
       d = D[[i]],
-      cov_df = sparse_list[[i]],
+      cov_df = cell_list[[i]],
       scale_vars = scale_vars,
       sigma = sigma,
       shape = shape,
@@ -386,12 +421,40 @@ kernel_prep <- function(pts,
     close(pb)
   }
 
+  validate_covariates_before_scale(cov.w, context = "`kernel_prep()` covariates")
   scl_df <- scale(cov.w)
   kernel_dat <- as.data.frame(scl_df)
 
+  # Precompute distance-binned summaries for kernel-type covariates so the
+  # optimizer can evaluate kernel-weighted means in O(nbins) per point instead
+  # of O(n_cells). See R/kernel_bins.R.
+  binned <- NULL
+  kernel_specs <- scale_vars[scale_vars$type == "kernel", , drop = FALSE]
+  if (isTRUE(bin) && nrow(kernel_specs) > 0) {
+    binned <- .msr_build_kernel_bins(
+      d_list = D,
+      value_list = cell_list,
+      covariates = kernel_specs$covariate,
+      sources = kernel_specs$source,
+      nbins = nbins,
+      point_ids = point_ids
+    )
+  }
+
+  # Cell-level data (`d_list`/`raw_cov`) can be dropped only when every
+  # covariate is kernel-type (landscape metrics need the full per-cell spatial
+  # detail) and binned summaries are available to drive the optimizer.
+  has_landscape <- any(scale_vars$type == "landscape")
+  drop_cells <- isFALSE(store_cell_data) && !is.null(binned) &&
+    !has_landscape && all(scale_vars$type == "kernel")
+  if (isFALSE(store_cell_data) && !drop_cells && verbose) {
+    cat(paste0("\n`store_cell_data = FALSE` was ignored: cell-level data are ",
+               "still required for this configuration.\n"))
+  }
+
   out <- list(kernel_dat = kernel_dat,
-              d_list = D,
-              raw_cov = sparse_list,
+              d_list = if (drop_cells) NULL else D,
+              raw_cov = if (drop_cells) NULL else cell_list,
               kernel = kernel,
               shape = shape,
               min_D = min_D,
@@ -402,6 +465,8 @@ kernel_prep <- function(pts,
               scale_vars = scale_vars,
               resolution = terra::res(raster_stack)[[1]],
               n_cols = terra::ncol(raster_stack),
+              binned = binned,
+              cell_data_stored = !drop_cells,
               scl_params = list(mean = attr(scl_df, "scaled:center"),
                                 sd = attr(scl_df, "scaled:scale")))
 
@@ -409,11 +474,29 @@ kernel_prep <- function(pts,
   return(out)
 }
 
-# Function to convert a data frame to a sparse matrix
-df_to_sparse <- function(df) {
+# Convert an extracted data frame to a compact per-point matrix of raster
+# values. Dense storage is faster to weight (`scale_type()` evaluates it in
+# vectorized R instead of via per-cell sparse random access) and avoids the
+# repeated sparse-to-dense conversion in the landscape-metric C++ path. Sparse
+# storage is smaller only when most cells are zero (e.g. low-prevalence binary
+# rasters). We keep whichever representation is smaller per point, so memory is
+# never worse than the previous sparse-only storage while continuous and
+# categorical layers (the common cases) get the faster dense path. Raster cell
+# ids are preserved as an attribute for the landscape edge/adjacency metrics;
+# `scale_type()` and the landscape path dispatch on the stored type.
+df_to_values <- function(df) {
   cells <- if ("cell" %in% names(df)) df$cell else NULL
   value_cols <- setdiff(names(df), c("x", "y", "cell", "coverage_fraction"))
-  out <- as(as.matrix(df[, value_cols, drop = FALSE]), "sparseMatrix")
+  dense <- as.matrix(df[, value_cols, drop = FALSE])
+  storage.mode(dense) <- "double"
+
+  out <- dense
+  sparse <- tryCatch(as(dense, "sparseMatrix"), error = function(e) NULL)
+  if (!is.null(sparse) &&
+      as.numeric(utils::object.size(sparse)) <
+        as.numeric(utils::object.size(dense))) {
+    out <- sparse
+  }
   if (!is.null(cells)) {
     attr(out, "cell") <- cells
   }
