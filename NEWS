@@ -17,6 +17,17 @@ multiScaleR 0.6.31
   automatically when landscape-metric covariates are present.
 * `estimate_multiscale_ram()` and `print.multiScaleR_data()` now report binned
   summary sizes and handle lean inputs.
+* `kernel_prep()` now stores each point's extracted cell values as a dense or
+  sparse matrix, whichever is smaller (continuous and categorical layers store
+  dense; low-prevalence binary layers stay sparse), so `raw_cov` memory is never
+  worse than before and is ~1.5x smaller for continuous rasters. `scale_type()`
+  evaluates dense values in vectorized R, matching the compiled sparse path to
+  machine precision while avoiding per-cell sparse random access; this speeds up
+  the exact (`bin = FALSE`) per-cell weighting and removes the repeated
+  sparse-to-dense conversion in the landscape-metric path. (One-time
+  `kernel_prep()` and landscape optimization wall-clock change little, as those
+  are dominated by raster extraction and the C++ metric computation
+  respectively.)
 
 multiScaleR 0.6.30
 ---------

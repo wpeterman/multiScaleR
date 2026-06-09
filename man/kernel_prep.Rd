@@ -111,9 +111,10 @@ A list of class \code{"multiScaleR_data"} containing:
     \code{\link{multiScale_optim}}.}
   \item{\code{d_list}}{Named list (one element per point) of numeric distance
     vectors from the point to every raster cell within the buffer.}
-  \item{\code{raw_cov}}{Named list (one element per point) of sparse matrices
+  \item{\code{raw_cov}}{Named list (one element per point) of matrices
     containing raw raster cell values within the buffer, aligned with
-    \code{d_list}.}
+    \code{d_list}. Each point is stored as a dense or sparse matrix,
+    whichever is smaller. \code{NULL} in lean mode.}
   \item{\code{kernel}}{Character string identifying the kernel used.}
   \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
     (scaled) parameter space.}

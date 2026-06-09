@@ -82,9 +82,10 @@
 #'     \code{\link{multiScale_optim}}.}
 #'   \item{\code{d_list}}{Named list (one element per point) of numeric distance
 #'     vectors from the point to every raster cell within the buffer.}
-#'   \item{\code{raw_cov}}{Named list (one element per point) of sparse matrices
+#'   \item{\code{raw_cov}}{Named list (one element per point) of matrices
 #'     containing raw raster cell values within the buffer, aligned with
-#'     \code{d_list}.}
+#'     \code{d_list}. Each point is stored as a dense or sparse matrix,
+#'     whichever is smaller. \code{NULL} in lean mode.}
 #'   \item{\code{kernel}}{Character string identifying the kernel used.}
 #'   \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
 #'     (scaled) parameter space.}
@@ -255,8 +256,8 @@ kernel_prep <- function(pts,
                            include_xy = T)
 
 
-    # Convert to list of sparse matrices
-    sparse_list <- lapply(r_ext, df_to_sparse)
+    # Convert to per-point value matrices (dense or sparse, whichever is smaller)
+    cell_list <- lapply(r_ext, df_to_values)
 
     names(r_ext) <- 1:length(r_ext)
 
@@ -323,8 +324,8 @@ kernel_prep <- function(pts,
                            include_cell = .msr_needs_cells(scale_vars),
                            progress = progress)
 
-    # Convert to list of sparse matrices
-    sparse_list <- lapply(r_ext, df_to_sparse)
+    # Convert to per-point value matrices (dense or sparse, whichever is smaller)
+    cell_list <- lapply(r_ext, df_to_values)
 
 
 
@@ -337,7 +338,7 @@ kernel_prep <- function(pts,
       }
 
       r_ext <- lapply(r_ext, re_name)
-      sparse_list <- lapply(sparse_list, re_name)
+      cell_list <- lapply(cell_list, re_name)
     }
 
     ## Progress bar
@@ -384,7 +385,7 @@ kernel_prep <- function(pts,
   colnames(cov.w) <- scale_vars$covariate
   rownames(cov.w) <- point_ids
   names(D) <- point_ids
-  names(sparse_list) <- point_ids
+  names(cell_list) <- point_ids
   sigma <- sigma / unit_conv
 
   if(isTRUE(progress)){
@@ -405,7 +406,7 @@ kernel_prep <- function(pts,
 
     cov.w[i,] <- .msr_eval_scale_vars(
       d = D[[i]],
-      cov_df = sparse_list[[i]],
+      cov_df = cell_list[[i]],
       scale_vars = scale_vars,
       sigma = sigma,
       shape = shape,
@@ -432,7 +433,7 @@ kernel_prep <- function(pts,
   if (isTRUE(bin) && nrow(kernel_specs) > 0) {
     binned <- .msr_build_kernel_bins(
       d_list = D,
-      value_list = sparse_list,
+      value_list = cell_list,
       covariates = kernel_specs$covariate,
       sources = kernel_specs$source,
       nbins = nbins,
@@ -453,7 +454,7 @@ kernel_prep <- function(pts,
 
   out <- list(kernel_dat = kernel_dat,
               d_list = if (drop_cells) NULL else D,
-              raw_cov = if (drop_cells) NULL else sparse_list,
+              raw_cov = if (drop_cells) NULL else cell_list,
               kernel = kernel,
               shape = shape,
               min_D = min_D,
@@ -473,11 +474,29 @@ kernel_prep <- function(pts,
   return(out)
 }
 
-# Function to convert a data frame to a sparse matrix
-df_to_sparse <- function(df) {
+# Convert an extracted data frame to a compact per-point matrix of raster
+# values. Dense storage is faster to weight (`scale_type()` evaluates it in
+# vectorized R instead of via per-cell sparse random access) and avoids the
+# repeated sparse-to-dense conversion in the landscape-metric C++ path. Sparse
+# storage is smaller only when most cells are zero (e.g. low-prevalence binary
+# rasters). We keep whichever representation is smaller per point, so memory is
+# never worse than the previous sparse-only storage while continuous and
+# categorical layers (the common cases) get the faster dense path. Raster cell
+# ids are preserved as an attribute for the landscape edge/adjacency metrics;
+# `scale_type()` and the landscape path dispatch on the stored type.
+df_to_values <- function(df) {
   cells <- if ("cell" %in% names(df)) df$cell else NULL
   value_cols <- setdiff(names(df), c("x", "y", "cell", "coverage_fraction"))
-  out <- as(as.matrix(df[, value_cols, drop = FALSE]), "sparseMatrix")
+  dense <- as.matrix(df[, value_cols, drop = FALSE])
+  storage.mode(dense) <- "double"
+
+  out <- dense
+  sparse <- tryCatch(as(dense, "sparseMatrix"), error = function(e) NULL)
+  if (!is.null(sparse) &&
+      as.numeric(utils::object.size(sparse)) <
+        as.numeric(utils::object.size(dense))) {
+    out <- sparse
+  }
   if (!is.null(cells)) {
     attr(out, "cell") <- cells
   }
