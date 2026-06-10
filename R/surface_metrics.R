@@ -447,6 +447,199 @@
 }
 
 
+# --- Kernel-weighted surface moments -----------------------------------------
+#
+# The metrics above summarize a hard-edged circular neighborhood: every cell
+# within `radius` counts equally, and the optimized parameter is that radius.
+# The weighted variants below instead weight each cell by the model's distance
+# kernel (gaussian, exp, expow) and optimize the kernel scale (sigma), exactly
+# like a `kernel_var()` mean. This estimates the scale of effect of
+# heterogeneity itself with a likelihood that is smooth in sigma, because the
+# weights vary smoothly with sigma. Weighted skewness and kurtosis use the plain
+# standardized central moments (the small-sample bias adjustment that
+# `geodiv::ssk()` applies is a discrete-count correction that does not transfer
+# to continuous weights). Weighted Sq uses the weighted root-mean-square
+# deviation (population-style, normalized by the sum of weights).
+
+# Compute a single weighted surface moment from aligned value and weight
+# vectors. Cells that are NA, or carry a non-positive/non-finite weight, are
+# dropped. Returns NA when no positive weight remains or the weighted spread is
+# zero (for the standardized higher moments).
+.surface_weighted_metric <- function(values, weights, metric) {
+  fin <- is.finite(values) & is.finite(weights) & weights > 0
+  v <- values[fin]
+  w <- weights[fin]
+  s0 <- sum(w)
+  if (length(v) == 0 || !is.finite(s0) || s0 <= 0) {
+    return(NA_real_)
+  }
+
+  mu <- sum(w * v) / s0
+  dev <- v - mu
+  m2 <- sum(w * dev^2) / s0
+
+  switch(
+    metric,
+    sa = sum(w * abs(dev)) / s0,
+    sq = if (m2 <= 0) 0 else sqrt(m2),
+    ssk = if (m2 <= 0) NA_real_ else (sum(w * dev^3) / s0) / m2^1.5,
+    sku = if (m2 <= 0) NA_real_ else (sum(w * dev^4) / s0) / m2^2 - 3
+  )
+}
+
+
+# Point-extraction path for weighted moments: weight every buffered cell by the
+# model kernel at the current sigma (and shape, for expow) and reduce to the
+# weighted moment. `sigma`/`shape` are in the same internal (scaled) units as
+# `d`, exactly as the kernel-mean path receives them.
+.surface_weighted_by_buffer <- function(d,
+                                        r_stack.df,
+                                        kernel,
+                                        sigma,
+                                        shape,
+                                        metric,
+                                        validate = TRUE) {
+  validate_scalar_numeric(sigma, "sigma", positive = TRUE)
+
+  if (length(d) == 0) {
+    stop("`d` must contain at least one distance.", call. = FALSE)
+  }
+
+  values <- as.matrix(r_stack.df)
+  storage.mode(values) <- "double"
+  if (nrow(values) != length(d)) {
+    stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
+  }
+  if (isTRUE(validate)) {
+    .surface_validate_continuous_values(
+      values,
+      metric = metric,
+      context = "Surface texture metric"
+    )
+  }
+
+  weights <- .msr_kernel_shape_weight(
+    d = d,
+    sigma = sigma,
+    shape = if (identical(kernel, "expow")) shape else NULL,
+    kernel = kernel
+  )
+
+  out <- vapply(
+    seq_len(ncol(values)),
+    function(j) .surface_weighted_metric(values[, j], weights, metric),
+    numeric(1)
+  )
+
+  stats::setNames(out, colnames(values))
+}
+
+
+# Build the kernel weight matrix used to project a weighted surface metric. This
+# mirrors the focal-window construction in `.msr_kernel_raster_one()`: a window
+# wide enough to hold `pct_wt` of the kernel mass, filled with the distance-
+# decay weights for the given kernel, sigma, and shape.
+.surface_kernel_weight_matrix <- function(raster, sigma, shape, kernel, pct_wt) {
+  mx <- kernel_dist(kernel = kernel, sigma = sigma, beta = shape, prob = pct_wt)
+  r_res <- terra::res(raster)[1]
+  focal_d <- ceiling(mx / r_res) * 2
+  if ((focal_d %% 2) == 0) {
+    focal_d <- focal_d + 1
+  }
+
+  r_wt <- terra::rast(matrix(0, focal_d, focal_d))
+  terra::crs(r_wt) <- terra::crs(raster)
+  cntr_crd <- terra::xyFromCell(r_wt, ceiling(focal_d^2 / 2))
+  cell_crds <- terra::crds(r_wt)
+  d_vec <- fields::rdist(cntr_crd, cell_crds)[1, ] * r_res
+  terra::values(r_wt) <- scale_type_r(d = d_vec,
+                                      kernel = kernel,
+                                      sigma = sigma,
+                                      shape = shape,
+                                      output = "wts")
+  terra::as.matrix(r_wt, wide = TRUE)
+}
+
+
+# Raster-projection path for the weighted moments. `sq`, `ssk`, and `sku`
+# decompose into weight-convolved power sums (S0 = sum of weights, S1..S4 =
+# weighted power sums), centered on the global raster mean for numerical
+# stability. `sa` again has no convolution form, so it reuses the compiled
+# weighted focal pass with the kernel weight matrix.
+.surface_weighted_raster_fft <- function(raster,
+                                         kernel,
+                                         sigma,
+                                         shape,
+                                         metric,
+                                         pct_wt = 0.975,
+                                         na.rm = TRUE) {
+  metric <- match.arg(metric, c("sa", "sq", "ssk", "sku"))
+  .landscape_validate_single_layer_raster(raster, "Surface")
+  values <- terra::as.matrix(raster, wide = TRUE)
+  .surface_validate_continuous_values(
+    values,
+    metric = metric,
+    context = "Surface texture projection"
+  )
+
+  wt_mat <- .surface_kernel_weight_matrix(
+    raster = raster,
+    sigma = sigma,
+    shape = shape,
+    kernel = kernel,
+    pct_wt = pct_wt
+  )
+
+  out <- terra::rast(raster)
+
+  if (metric == "sa") {
+    result <- surface_sa_focal_cpp(values, wt_mat)
+    terra::values(out) <- as.vector(t(result))
+    names(out) <- paste0(names(raster), "_sa")
+    return(out)
+  }
+
+  global_mean <- mean(values, na.rm = TRUE)
+  if (!is.finite(global_mean)) {
+    global_mean <- 0
+  }
+  centered <- values - global_mean
+  valid <- matrix(as.numeric(!is.na(values)),
+                  nrow = nrow(values),
+                  ncol = ncol(values))
+  z0 <- centered
+  z0[is.na(z0)] <- 0
+
+  s0 <- fft_convolution(valid, wt_mat, fun = "sum", na.rm = na.rm)
+  s1 <- fft_convolution(z0, wt_mat, fun = "sum", na.rm = na.rm)
+  s2 <- fft_convolution(z0^2, wt_mat, fun = "sum", na.rm = na.rm)
+
+  mu <- s1 / s0
+  m2 <- s2 / s0 - mu^2
+  m2[!is.finite(m2) | m2 < 0] <- 0
+
+  if (metric == "sq") {
+    result <- sqrt(m2)
+  } else if (metric == "ssk") {
+    s3 <- fft_convolution(z0^3, wt_mat, fun = "sum", na.rm = na.rm)
+    m3 <- s3 / s0 - 3 * mu * (s2 / s0) + 2 * mu^3
+    result <- m3 / m2^1.5
+  } else {
+    s3 <- fft_convolution(z0^3, wt_mat, fun = "sum", na.rm = na.rm)
+    s4 <- fft_convolution(z0^4, wt_mat, fun = "sum", na.rm = na.rm)
+    m4 <- s4 / s0 - 4 * mu * (s3 / s0) + 6 * mu^2 * (s2 / s0) - 3 * mu^4
+    result <- m4 / m2^2 - 3
+  }
+
+  result[!is.finite(s0) | s0 <= 0 | m2 <= 0] <- NA_real_
+  result[!is.finite(result)] <- NA_real_
+
+  terra::values(out) <- as.vector(result)
+  names(out) <- paste0(names(raster), "_", metric)
+  out
+}
+
+
 # Projection dispatcher used by `.msr_scale_vars_raster()`. `sq` and the
 # higher moments (`ssk`, `sku`) use FFT moment convolutions; `sdq` uses an FFT
 # slope convolution; `sa` uses the compiled masked focal path.

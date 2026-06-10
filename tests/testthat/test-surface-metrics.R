@@ -611,3 +611,172 @@ test_that("higher-moment and slope helpers handle small or flat windows", {
   # The slope helper needs at least a 2x2 grid.
   expect_true(is.na(.surface_slope_metric(matrix(1:3, nrow = 1), 10)))
 })
+
+
+# --- Tier 3a: kernel-weighted moments (weighted = TRUE) ----------------------
+
+test_that("surface_var validates the weighted flag", {
+  spec <- surface_var("elevation", metric = "sq", weighted = TRUE)
+  expect_true(spec$weighted)
+  expect_true(spec$optimize)
+
+  vars <- msr_vars(w = surface_var("elevation", metric = "sq", weighted = TRUE))
+  expect_true(vars$weighted)
+
+  # Weighting applies to the distribution metrics, not the slope metric.
+  expect_error(surface_var("elevation", metric = "sdq", weighted = TRUE),
+               "not supported for the slope metric")
+  # Weighted metrics optimize the kernel scale, so a fixed radius is rejected.
+  expect_error(surface_var("elevation", metric = "sq", weighted = TRUE,
+                           radius = 300),
+               "must be NULL")
+})
+
+
+test_that("weighted moment computation matches a direct weighted moment", {
+  set.seed(414)
+  z <- stats::rnorm(400, 20, 4)
+  d <- runif(400, 0, 300)
+  sigma <- 90
+  w <- exp(-(d^2) / (2 * sigma^2))
+
+  s0 <- sum(w)
+  mu <- sum(w * z) / s0
+  m2 <- sum(w * (z - mu)^2) / s0
+  manual <- c(
+    sa = sum(w * abs(z - mu)) / s0,
+    sq = sqrt(m2),
+    ssk = (sum(w * (z - mu)^3) / s0) / m2^1.5,
+    sku = (sum(w * (z - mu)^4) / s0) / m2^2 - 3
+  )
+
+  for (metric in c("sa", "sq", "ssk", "sku")) {
+    expect_equal(.surface_weighted_metric(z, w, metric), manual[[metric]],
+                 tolerance = 1e-10)
+    # The by-buffer wrapper builds the same Gaussian weights from distances.
+    expect_equal(
+      .surface_weighted_by_buffer(d, matrix(z, ncol = 1), "gaussian",
+                                  sigma, NULL, metric)[[1]],
+      manual[[metric]],
+      tolerance = 1e-10
+    )
+  }
+})
+
+
+test_that("weighted moment projections agree with point extraction", {
+  elevation <- surface_test_raster(415)
+  pts <- surface_test_points(elevation)
+  sigma <- 90
+  cc <- terra::crds(elevation)
+  vals <- terra::values(elevation)[, 1]
+  xy <- terra::crds(pts)
+
+  for (metric in c("sa", "sq", "ssk", "sku")) {
+    point_vals <- vapply(
+      seq_len(nrow(xy)),
+      function(i) {
+        d <- sqrt((cc[, 1] - xy[i, 1])^2 + (cc[, 2] - xy[i, 2])^2)
+        keep <- d <= 300
+        .surface_weighted_by_buffer(d[keep], matrix(vals[keep], ncol = 1),
+                                    "gaussian", sigma, NULL, metric)[[1]]
+      },
+      numeric(1)
+    )
+
+    metric_raster <- .surface_weighted_raster_fft(
+      elevation, kernel = "gaussian", sigma = sigma, shape = NULL,
+      metric = metric, pct_wt = 0.99
+    )
+    projected <- terra::extract(metric_raster, pts)[, 2]
+
+    expect_equal(names(metric_raster), paste0("elevation_", metric))
+    # The projection truncates the kernel tail at pct_wt while the point path
+    # uses the full buffer, so they agree to a small tail tolerance (the same
+    # behavior as kernel-weighted means). The dispersion metrics are compared
+    # relatively; the standardized higher moments sit near zero, so they are
+    # compared on an absolute scale.
+    if (metric %in% c("sa", "sq")) {
+      expect_equal(projected, point_vals, tolerance = 0.03)
+    } else {
+      expect_lt(max(abs(projected - point_vals)), 0.1)
+    }
+  }
+})
+
+
+test_that("weighted surface metrics are allowed with the expow kernel", {
+  elevation <- surface_test_raster(416)
+  weighted_vars <- msr_vars(
+    elev_sqw = surface_var("elevation", metric = "sq", weighted = TRUE)
+  )
+  # Weighted metrics use the kernel (including its shape), so expow is allowed.
+  expect_silent(.msr_validate_scale_vars(weighted_vars, elevation,
+                                         kernel = "expow"))
+  # Unweighted optimized surface metrics remain unsupported with expow.
+  unweighted_vars <- msr_vars(
+    elev_sq = surface_var("elevation", metric = "sq")
+  )
+  expect_error(.msr_validate_scale_vars(unweighted_vars, elevation,
+                                        kernel = "expow"),
+               "expow")
+})
+
+
+test_that("weighted surface metrics optimize and project end to end", {
+  elevation <- surface_test_raster(417)
+  pts <- surface_test_points(elevation)
+
+  vars <- msr_vars(
+    elev_sqw = surface_var("elevation", metric = "sq", weighted = TRUE)
+  )
+  kernel_inputs <- kernel_prep(
+    pts = pts,
+    raster_stack = elevation,
+    max_D = 300,
+    kernel = "gaussian",
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_equal(kernel_inputs$n_covs, 1)
+  expect_false(.msr_needs_cells(kernel_inputs$scale_vars))
+  expect_true(all(is.finite(kernel_inputs$kernel_dat$elev_sqw)))
+
+  dat <- data.frame(y = c(1, 0, 1, 0, 1), kernel_inputs$kernel_dat)
+  mod <- glm(y ~ elev_sqw, family = binomial(), data = dat)
+  opt_context <- build_opt_context(
+    fitted_mod = mod,
+    cov_df = kernel_inputs$raw_cov,
+    scale_vars = kernel_inputs$scale_vars,
+    unit_conv = kernel_inputs$unit_conv,
+    resolution = kernel_inputs$resolution,
+    n_cols = kernel_inputs$n_cols
+  )
+
+  # The objective is finite and varies smoothly with the scale parameter.
+  obj <- vapply(
+    c(0.2, 0.3, 0.4, 0.5),
+    function(p) {
+      kernel_scale_fn(
+        par = p,
+        d_list = kernel_inputs$d_list,
+        cov_df = kernel_inputs$raw_cov,
+        kernel = kernel_inputs$kernel,
+        fitted_mod = mod,
+        opt_context = opt_context
+      )
+    },
+    numeric(1)
+  )
+  expect_true(all(is.finite(obj)))
+
+  projected <- kernel_scale.raster(
+    raster_stack = elevation,
+    sigma = 90,
+    kernel = "gaussian",
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_named(projected, "elev_sqw")
+  expect_true(any(is.finite(terra::values(projected)[, 1])))
+})

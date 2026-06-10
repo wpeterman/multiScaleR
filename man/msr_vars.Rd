@@ -13,7 +13,7 @@ kernel_var(source)
 
 landscape_var(source, metric, radius = NULL, base = exp(1), classes_max = NULL)
 
-surface_var(source, metric, radius = NULL)
+surface_var(source, metric, radius = NULL, weighted = FALSE)
 }
 \arguments{
 \item{...}{Named \code{kernel_var()}, \code{landscape_var()}, or
@@ -47,6 +47,18 @@ bits or \code{10} for Hartley units.}
 patch types in the landscape, used only for relative patch richness
 (\code{"rpr"}). If \code{NULL} (default), the observed number of classes
 within each buffer is used as the denominator.}
+
+\item{weighted}{Logical, for \code{surface_var()} only. When \code{FALSE}
+(default), the surface metric is computed over a hard-edged circular
+neighborhood and the optimized scale parameter is that neighborhood radius.
+When \code{TRUE}, each cell is weighted by the model's distance kernel
+(the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
+parameter is the kernel scale (sigma), exactly as for a kernel-weighted
+mean. The weighted form estimates the scale of effect of heterogeneity with
+a likelihood that is smooth in sigma. It is available only for the
+distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
+not the slope metric (\code{"sdq"}), and the scale is always optimized, so
+\code{radius} must be \code{NULL}.}
 }
 \value{
 \describe{
@@ -100,6 +112,13 @@ value, so they complement \code{kernel_var()} (which summarizes the mean).
 The buffer radius can be fixed or optimized. Note that these covariates
 measure variability, not central tendency: changing the radius changes both
 the ecological scale and the statistical quantity being summarized.
+
+By default a surface metric uses a hard-edged neighborhood. Setting
+\code{weighted = TRUE} instead weights each cell by the model's distance
+kernel and optimizes the kernel scale (sigma), which estimates the scale of
+effect of heterogeneity with a smooth likelihood (see the \code{weighted}
+argument). This applies to the distribution metrics (\code{"sa"},
+\code{"sq"}, \code{"ssk"}, \code{"sku"}).
 
 \strong{Supported landscape metrics}
 
@@ -212,6 +231,9 @@ landscape_var("landcover", metric = "shdi", radius = 250, base = 2)
 ## surface_var: optimized RMS roughness, and fixed-radius average roughness
 surface_var("elevation", metric = "sq")
 surface_var("ndvi", metric = "sa", radius = 300)
+
+## Kernel-weighted roughness: optimize the scale of effect of heterogeneity
+surface_var("elevation", metric = "sq", weighted = TRUE)
 
 ## Define a single optimized kernel-weighted mean covariate
 kv <- kernel_var("forest")

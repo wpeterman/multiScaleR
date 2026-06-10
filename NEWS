@@ -1,3 +1,24 @@
+multiScaleR 0.6.34
+---------
+* `surface_var()` gains a `weighted` argument. With `weighted = TRUE`, the
+  distribution metrics (`"sa"`, `"sq"`, `"ssk"`, `"sku"`) are computed as
+  kernel-weighted moments: each cell is weighted by the model's distance kernel
+  (gaussian, exp, or expow) and the optimized parameter is the kernel scale
+  (sigma) rather than a hard neighborhood radius. Because the weights vary
+  smoothly with sigma, the likelihood is smooth in the scale parameter, so
+  `multiScale_optim()` estimates the scale of effect of heterogeneity with a
+  standard error, exactly as it does for a kernel-weighted mean. The default
+  (`weighted = FALSE`) is unchanged.
+* Weighted surface metrics are supported with every kernel, including
+  `"expow"`, since they use the kernel (and its shape). Weighting is not
+  available for the slope metric `"sdq"`, and the scale is always optimized
+  (no fixed `radius`).
+* Projection of weighted `"sq"`, `"ssk"`, and `"sku"` uses kernel-weighted FFT
+  power sums; weighted `"sa"` uses the compiled focal pass, now generalized to
+  accept per-cell weights (a 0/1 mask reproduces the unweighted result exactly).
+* Added a vignette section contrasting hard-radius and kernel-weighted
+  roughness.
+
 multiScaleR 0.6.33
 ---------
 * `surface_var()` gains three metrics: `"ssk"` (skewness) and `"sku"`

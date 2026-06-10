@@ -408,8 +408,69 @@ recomputed for every sample point, since (unlike a kernel mean) it cannot be
 read off a precomputed distance binning. Surface metrics are continuous in the
 radius, so they tend to optimize smoothly. Start with fixed radii to confirm
 the workflow, then optimize once the model structure is settled. Optimized
-surface metrics are not currently supported with `kernel = "expow"`, because the
-exponential-power shape parameter does not apply to a fixed-buffer metric.
+*unweighted* surface metrics are not currently supported with
+`kernel = "expow"`, because the exponential-power shape parameter does not apply
+to a hard-edged buffer. The weighted form below does use the kernel, so it is
+supported with every kernel.
+
+---
+
+# Weighted roughness: the scale of effect of heterogeneity
+
+The surface metrics above summarize a hard-edged circular neighborhood: every
+cell within the radius counts equally. Setting `weighted = TRUE` instead weights
+each cell by the model's distance kernel, the same Gaussian (or exponential)
+kernel used for a `kernel_var()` mean, and optimizes the kernel scale (sigma)
+rather than a hard radius.
+
+This changes both the question and the statistics. A weighted `sq` answers "at
+what spatial scale does the *variability* of this surface, measured with a
+smoothly decaying neighborhood, best predict the response?" Because the kernel
+weights change smoothly as sigma changes (cells do not jump in and out of a hard
+edge), the likelihood is smooth in sigma, so `multiScale_optim()` recovers the
+scale with a standard error just as it does for a kernel-weighted mean. This is
+the natural way to ask about the scale of effect of heterogeneity, as opposed to
+the scale of effect of the mean.
+
+```{r weighted-define}
+weighted_vars <- msr_vars(
+  land3_sq_weighted = surface_var("land3", metric = "sq", weighted = TRUE)
+)
+```
+
+Weighting is available for the distribution metrics (`sa`, `sq`, `ssk`, `sku`)
+but not the slope metric (`sdq`), and the scale is always optimized, so no
+`radius` is supplied. To see the difference a weighting makes, the projection
+below compares a hard-radius `sq` at 500 m with a Gaussian-weighted `sq` at the
+same nominal scale.
+
+```{r weighted-vs-hard, fig.cap = "***Hard-radius versus kernel-weighted RMS roughness of land3 at a 500 m scale.***", fig.height = 3.5}
+sq_hard <- kernel_scale.raster(
+  raster_stack = land_rast["land3"],
+  scale_vars = msr_vars(sq_hard = surface_var("land3", metric = "sq",
+                                              radius = 500)),
+  verbose = FALSE
+)
+
+sq_weighted <- kernel_scale.raster(
+  raster_stack = land_rast["land3"],
+  scale_vars = weighted_vars,
+  sigma = 500,            # the kernel scale for the weighted metric
+  kernel = "gaussian",
+  verbose = FALSE
+)
+
+plot(c(sq_hard, sq_weighted), main = c("sq hard radius 500 m", "sq weighted sigma 500"))
+```
+
+**How to read these plots:** Both maps show local roughness at a 500 m scale,
+but the weighted version transitions more smoothly because nearby cells
+contribute more than distant ones. In a model, the practical payoff is the
+optimization: the weighted form gives `multiScale_optim()` a smooth objective in
+sigma and returns the scale of heterogeneity with a confidence interval. Use the
+weighted form when the scale of heterogeneity is the scientific question; the
+hard-radius form remains convenient when you have a biologically motivated
+buffer or want a metric that matches the `geodiv` definitions exactly.
 
 ---
 
@@ -427,6 +488,10 @@ exponential-power shape parameter does not apply to a fixed-buffer metric.
 - Use a fixed radius when you have a biologically motivated buffer or want a
   fast model; optimize the radius when the scale of heterogeneity is itself the
   question.
+- Use `weighted = TRUE` (for `sa`, `sq`, `ssk`, `sku`) when you want the scale
+  of heterogeneity estimated with a smooth likelihood under the model's kernel;
+  keep the default hard-radius form when you want a fixed buffer or exact
+  agreement with `geodiv`.
 
 ---
 

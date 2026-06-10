@@ -29,6 +29,17 @@
 #'   as a free parameter and optimized alongside the model. When supplied, the
 #'   metric is computed at this fixed radius and no scale optimization is
 #'   performed for this covariate.
+#' @param weighted Logical, for \code{surface_var()} only. When \code{FALSE}
+#'   (default), the surface metric is computed over a hard-edged circular
+#'   neighborhood and the optimized scale parameter is that neighborhood radius.
+#'   When \code{TRUE}, each cell is weighted by the model's distance kernel
+#'   (the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
+#'   parameter is the kernel scale (sigma), exactly as for a kernel-weighted
+#'   mean. The weighted form estimates the scale of effect of heterogeneity with
+#'   a likelihood that is smooth in sigma. It is available only for the
+#'   distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
+#'   not the slope metric (\code{"sdq"}), and the scale is always optimized, so
+#'   \code{radius} must be \code{NULL}.
 #' @param base Positive numeric (not equal to 1). Logarithm base used when
 #'   computing diversity metrics (\code{"shdi"}, \code{"shei"}, \code{"msidi"},
 #'   \code{"msiei"}). Default: \code{exp(1)} (natural log). Use \code{2} for
@@ -79,6 +90,13 @@
 #' The buffer radius can be fixed or optimized. Note that these covariates
 #' measure variability, not central tendency: changing the radius changes both
 #' the ecological scale and the statistical quantity being summarized.
+#'
+#' By default a surface metric uses a hard-edged neighborhood. Setting
+#' \code{weighted = TRUE} instead weights each cell by the model's distance
+#' kernel and optimizes the kernel scale (sigma), which estimates the scale of
+#' effect of heterogeneity with a smooth likelihood (see the \code{weighted}
+#' argument). This applies to the distribution metrics (\code{"sa"},
+#' \code{"sq"}, \code{"ssk"}, \code{"sku"}).
 #'
 #' \strong{Supported landscape metrics}
 #'
@@ -195,6 +213,9 @@
 #' surface_var("elevation", metric = "sq")
 #' surface_var("ndvi", metric = "sa", radius = 300)
 #'
+#' ## Kernel-weighted roughness: optimize the scale of effect of heterogeneity
+#' surface_var("elevation", metric = "sq", weighted = TRUE)
+#'
 #' @rdname msr_vars
 #' @export
 msr_vars <- function(...) {
@@ -227,6 +248,7 @@ msr_vars <- function(...) {
     metric = vapply(specs, function(x) .msr_chr_or_na(x$metric), character(1)),
     radius = vapply(specs, function(x) .msr_num_or_na(x$radius), numeric(1)),
     optimize = vapply(specs, `[[`, logical(1), "optimize"),
+    weighted = vapply(specs, function(x) isTRUE(x$weighted), logical(1)),
     base = vapply(specs, `[[`, numeric(1), "base"),
     classes_max = vapply(specs, function(x) .msr_num_or_na(x$classes_max), numeric(1)),
     stringsAsFactors = FALSE
@@ -252,6 +274,7 @@ kernel_var <- function(source) {
       metric = NA_character_,
       radius = NA_real_,
       optimize = TRUE,
+      weighted = FALSE,
       base = exp(1),
       classes_max = NA_real_
     ),
@@ -288,6 +311,7 @@ landscape_var <- function(source,
       metric = metric,
       radius = if (is.null(radius)) NA_real_ else radius,
       optimize = is.null(radius),
+      weighted = FALSE,
       base = base,
       classes_max = if (is.null(classes_max)) NA_real_ else classes_max
     ),
@@ -300,9 +324,31 @@ landscape_var <- function(source,
 #' @export
 surface_var <- function(source,
                         metric,
-                        radius = NULL) {
+                        radius = NULL,
+                        weighted = FALSE) {
   validate_character_scalar(source, "source")
   metric <- match.arg(tolower(metric), .msr_surface_metrics())
+  validate_scalar_logical(weighted, "weighted")
+
+  if (isTRUE(weighted)) {
+    if (metric %in% .msr_surface_neighbor_metrics()) {
+      stop(
+        sprintf(
+          "`weighted = TRUE` is not supported for the slope metric `%s`; kernel weighting applies to the distribution metrics (%s).",
+          metric,
+          paste(setdiff(.msr_surface_metrics(), .msr_surface_neighbor_metrics()),
+                collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+    if (!is.null(radius)) {
+      stop(
+        "`weighted = TRUE` surface metrics optimize the kernel scale, so `radius` must be NULL.",
+        call. = FALSE
+      )
+    }
+  }
 
   if (!is.null(radius)) {
     validate_scalar_numeric(radius, "radius", positive = TRUE)
@@ -315,6 +361,7 @@ surface_var <- function(source,
       metric = metric,
       radius = if (is.null(radius)) NA_real_ else radius,
       optimize = is.null(radius),
+      weighted = weighted,
       base = exp(1),
       classes_max = NA_real_
     ),
@@ -392,6 +439,7 @@ print.multiScaleR_vars <- function(x, ...) {
     metric = NA_character_,
     radius = NA_real_,
     optimize = TRUE,
+    weighted = FALSE,
     base = exp(1),
     classes_max = NA_real_,
     stringsAsFactors = FALSE
@@ -426,10 +474,16 @@ print.multiScaleR_vars <- function(x, ...) {
     stop("`scale_vars` covariate names must be unique.", call. = FALSE)
   }
 
+  # Optimized hard-neighborhood metrics (landscape metrics and unweighted
+  # surface metrics) have no kernel, so the exponential-power shape parameter is
+  # undefined for them. Weighted surface metrics do use the kernel (including
+  # its shape), so they are permitted with `kernel = "expow"`.
   if (identical(kernel, "expow") &&
-      any(scale_vars$type %in% c("landscape", "surface") & scale_vars$optimize)) {
+      any((scale_vars$type == "landscape" |
+             (scale_vars$type == "surface" & !scale_vars$weighted)) &
+            scale_vars$optimize)) {
     stop(
-      "Optimized `landscape_var()` and `surface_var()` specifications are not currently supported with `kernel = 'expow'`.",
+      "Optimized `landscape_var()` and unweighted `surface_var()` specifications are not currently supported with `kernel = 'expow'`.",
       call. = FALSE
     )
   }
@@ -548,7 +602,18 @@ print.multiScaleR_vars <- function(x, ...) {
 
     metric <- spec$metric
     if (identical(spec$type, "surface")) {
-      if (metric %in% .msr_surface_neighbor_metrics()) {
+      if (isTRUE(spec$weighted)) {
+        param_idx <- match(covariate, param_covariates)
+        out[[j]] <- .surface_weighted_by_buffer(
+          d = d,
+          r_stack.df = values,
+          kernel = kernel,
+          sigma = sigma[[param_idx]],
+          shape = if (is.null(shape)) NULL else shape[[param_idx]],
+          metric = metric,
+          validate = validate
+        )[[1]]
+      } else if (metric %in% .msr_surface_neighbor_metrics()) {
         out[[j]] <- .surface_slope_by_buffer(
           d = d,
           r_stack.df = values,
@@ -674,25 +739,46 @@ print.multiScaleR_vars <- function(x, ...) {
            call. = FALSE)
     }
     if (isTRUE(verbose)) {
-      metric_label <- if (identical(spec$type, "surface")) {
-        "surface texture metric"
+      if (identical(spec$type, "surface") && isTRUE(spec$weighted)) {
+        cat(paste0(
+          "\nCalculating weighted surface texture metric '", spec$metric,
+          "' for variable '", spec$covariate,
+          "' at sigma = ", floor(radius), "\n"
+        ))
       } else {
-        "landscape metric"
+        metric_label <- if (identical(spec$type, "surface")) {
+          "surface texture metric"
+        } else {
+          "landscape metric"
+        }
+        cat(paste0(
+          "\nCalculating ", metric_label, " '", spec$metric,
+          "' for variable '", spec$covariate,
+          "' at radius = ", floor(radius), "\n"
+        ))
       }
-      cat(paste0(
-        "\nCalculating ", metric_label, " '", spec$metric,
-        "' for variable '", spec$covariate,
-        "' at radius = ", floor(radius), "\n"
-      ))
     }
 
     if (identical(spec$type, "surface")) {
-      out[[i]] <- .surface_metric_raster_fft(
-        raster = source_raster,
-        radius = radius,
-        metric = spec$metric,
-        na.rm = na.rm
-      )
+      if (isTRUE(spec$weighted)) {
+        param_idx <- match(spec$covariate, opt_vars$covariate)
+        out[[i]] <- .surface_weighted_raster_fft(
+          raster = source_raster,
+          kernel = kernel,
+          sigma = sigma[[param_idx]],
+          shape = if (is.null(shape)) NULL else shape[[param_idx]],
+          metric = spec$metric,
+          pct_wt = pct_wt,
+          na.rm = na.rm
+        )
+      } else {
+        out[[i]] <- .surface_metric_raster_fft(
+          raster = source_raster,
+          radius = radius,
+          metric = spec$metric,
+          na.rm = na.rm
+        )
+      }
     } else if (spec$metric %in% .msr_composition_metrics()) {
       out[[i]] <- .landscape_composition_raster_fft(
         raster = source_raster,
