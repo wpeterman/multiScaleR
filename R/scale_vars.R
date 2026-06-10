@@ -123,12 +123,31 @@
 #'   \item{\code{"sq"}}{Root mean square (RMS) roughness: the sample standard
 #'     deviation of the neighborhood values. More sensitive to large deviations
 #'     than \code{"sa"}.}
+#'   \item{\code{"ssk"}}{Skewness: the asymmetry of the neighborhood value
+#'     distribution. Positive when occasional high values dominate, negative
+#'     when occasional low values do.}
+#'   \item{\code{"sku"}}{Kurtosis (excess): the peakedness and tail weight of
+#'     the neighborhood value distribution relative to a normal distribution
+#'     (which has excess kurtosis 0).}
+#'   \item{\code{"sdq"}}{Root mean square slope: the RMS of the local gradient
+#'     magnitude, a measure of how steeply the surface changes (terrain or
+#'     structural ruggedness).}
 #' }
-#' Both definitions match the \code{geodiv} package (\code{sq} uses an N - 1
-#' denominator, as \code{stats::sd()} does). Raster projection of \code{"sq"}
+#' The dispersion and shape metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"},
+#' \code{"sku"}) match the \code{geodiv} package (\code{sq} uses an N - 1
+#' denominator as \code{stats::sd()} does; \code{ssk} uses the bias-adjusted
+#' skewness and \code{sku} the excess kurtosis, matching \code{geodiv}'s
+#' defaults). \code{"sdq"} is reported as a true slope (the gradient is divided
+#' by the cell resolution); \code{geodiv::sdq()} instead uses a cell spacing of
+#' one, so the two agree after multiplying by the resolution.
+#'
+#' Raster projection of \code{"sq"}, \code{"ssk"}, \code{"sku"}, and \code{"sdq"}
 #' uses fast Fourier transform (FFT) convolution; projection of \code{"sa"} uses
-#' an exact masked focal pass, which is slower on large rasters because average
-#' roughness has no closed-form FFT decomposition.
+#' an exact compiled masked focal pass, because average roughness has no
+#' closed-form FFT decomposition. \code{"sdq"} uses each cell's gradient, so
+#' (like the landscape edge metrics) it caches raster cell IDs internally, and
+#' its projection agrees with point extraction to within a small boundary
+#' tolerance rather than bit-for-bit.
 #'
 #' \strong{Mixing covariate types}
 #'
@@ -343,7 +362,15 @@ print.multiScaleR_vars <- function(x, ...) {
 
 
 .msr_surface_metrics <- function() {
-  c("sa", "sq")
+  c("sa", "sq", "ssk", "sku", "sdq")
+}
+
+
+# Surface metrics that require per-cell neighbor information (cell IDs), as
+# opposed to the pointwise distribution metrics. Currently only `sdq` (RMS
+# slope), which uses forward differences to each cell's neighbors.
+.msr_surface_neighbor_metrics <- function() {
+  c("sdq")
 }
 
 
@@ -456,7 +483,9 @@ print.multiScaleR_vars <- function(x, ...) {
 
 .msr_needs_cells <- function(scale_vars) {
   any(scale_vars$type == "landscape" &
-        scale_vars$metric %in% c(.msr_edge_metrics(), .msr_adjacency_metrics()))
+        scale_vars$metric %in% c(.msr_edge_metrics(), .msr_adjacency_metrics())) ||
+    any(scale_vars$type == "surface" &
+          scale_vars$metric %in% .msr_surface_neighbor_metrics())
 }
 
 
@@ -519,13 +548,26 @@ print.multiScaleR_vars <- function(x, ...) {
 
     metric <- spec$metric
     if (identical(spec$type, "surface")) {
-      out[[j]] <- .surface_metric_by_buffer(
-        d = d,
-        r_stack.df = values,
-        radius = radius,
-        metric = metric,
-        validate = validate
-      )[[1]]
+      if (metric %in% .msr_surface_neighbor_metrics()) {
+        out[[j]] <- .surface_slope_by_buffer(
+          d = d,
+          r_stack.df = values,
+          cells = .msr_extract_cells(cov_df),
+          radius = radius,
+          resolution = resolution,
+          n_cols = n_cols,
+          metric = metric,
+          validate = validate
+        )[[1]]
+      } else {
+        out[[j]] <- .surface_metric_by_buffer(
+          d = d,
+          r_stack.df = values,
+          radius = radius,
+          metric = metric,
+          validate = validate
+        )[[1]]
+      }
     } else if (metric %in% .msr_composition_metrics()) {
       out[[j]] <- .landscape_composition_by_buffer(
         d = d,

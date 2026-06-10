@@ -1,3 +1,22 @@
+multiScaleR 0.6.33
+---------
+* `surface_var()` gains three metrics: `"ssk"` (skewness) and `"sku"`
+  (excess kurtosis), which describe the shape of the neighborhood value
+  distribution, and `"sdq"` (root mean square slope), which describes local
+  gradient steepness or ruggedness. With `"sa"` and `"sq"` this completes the
+  dispersion, distribution-shape, and slope families of gradient surface
+  metrics. `"ssk"` and `"sku"` match `geodiv`'s adjusted-skewness and
+  excess-kurtosis defaults; `"sdq"` matches `geodiv::sdq()` after accounting
+  for cell resolution (multiScaleR reports a true slope, dividing the gradient
+  by the cell size).
+* Raster projection of `"ssk"`, `"sku"`, and `"sdq"` uses FFT convolution. The
+  moment projections center on the global raster mean first to avoid
+  floating-point cancellation in the third and fourth power sums. Like the
+  landscape edge metrics, `"sdq"` caches raster cell IDs and its projection
+  agrees with point extraction to within a small boundary tolerance.
+* Added the `surface_metric_covariates` vignette section demonstrating the
+  shape and slope surfaces.
+
 multiScaleR 0.6.32
 ---------
 * Added `surface_var()`, a new covariate specification for continuous surface

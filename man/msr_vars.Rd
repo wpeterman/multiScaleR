@@ -144,12 +144,31 @@ Surface metrics (require a continuous raster):
   \item{\code{"sq"}}{Root mean square (RMS) roughness: the sample standard
     deviation of the neighborhood values. More sensitive to large deviations
     than \code{"sa"}.}
+  \item{\code{"ssk"}}{Skewness: the asymmetry of the neighborhood value
+    distribution. Positive when occasional high values dominate, negative
+    when occasional low values do.}
+  \item{\code{"sku"}}{Kurtosis (excess): the peakedness and tail weight of
+    the neighborhood value distribution relative to a normal distribution
+    (which has excess kurtosis 0).}
+  \item{\code{"sdq"}}{Root mean square slope: the RMS of the local gradient
+    magnitude, a measure of how steeply the surface changes (terrain or
+    structural ruggedness).}
 }
-Both definitions match the \code{geodiv} package (\code{sq} uses an N - 1
-denominator, as \code{stats::sd()} does). Raster projection of \code{"sq"}
+The dispersion and shape metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"},
+\code{"sku"}) match the \code{geodiv} package (\code{sq} uses an N - 1
+denominator as \code{stats::sd()} does; \code{ssk} uses the bias-adjusted
+skewness and \code{sku} the excess kurtosis, matching \code{geodiv}'s
+defaults). \code{"sdq"} is reported as a true slope (the gradient is divided
+by the cell resolution); \code{geodiv::sdq()} instead uses a cell spacing of
+one, so the two agree after multiplying by the resolution.
+
+Raster projection of \code{"sq"}, \code{"ssk"}, \code{"sku"}, and \code{"sdq"}
 uses fast Fourier transform (FFT) convolution; projection of \code{"sa"} uses
-an exact masked focal pass, which is slower on large rasters because average
-roughness has no closed-form FFT decomposition.
+an exact compiled masked focal pass, because average roughness has no
+closed-form FFT decomposition. \code{"sdq"} uses each cell's gradient, so
+(like the landscape edge metrics) it caches raster cell IDs internally, and
+its projection agrees with point extraction to within a small boundary
+tolerance rather than bit-for-bit.
 
 \strong{Mixing covariate types}
 

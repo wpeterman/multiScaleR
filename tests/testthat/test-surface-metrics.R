@@ -412,3 +412,202 @@ test_that("surface projections require square raster cells", {
     "square raster cells"
   )
 })
+
+
+# --- Tier 2 metrics: ssk (skewness), sku (kurtosis), sdq (RMS slope) ---------
+
+# Reconstruct the local grid for each point's circular buffer and apply the
+# slope metric directly, as a reference for sdq.
+surface_cached_sdq <- function(raster, pts, radius) {
+  cc <- terra::crds(raster)
+  vals <- terra::values(raster)[, 1]
+  xy <- terra::crds(pts)
+  resolution <- terra::res(raster)[[1]]
+  n_cols <- terra::ncol(raster)
+
+  vapply(
+    seq_len(nrow(xy)),
+    function(i) {
+      d <- sqrt((cc[, 1] - xy[i, 1])^2 + (cc[, 2] - xy[i, 2])^2)
+      keep <- d <= radius
+      local_matrix <- .landscape_cells_to_matrix(
+        values = vals[keep],
+        cells = terra::cellFromXY(raster, cc[keep, , drop = FALSE]),
+        n_cols = n_cols
+      )
+      .surface_slope_metric(local_matrix, resolution)
+    },
+    numeric(1)
+  )
+}
+
+
+test_that("ssk and sku match geodiv point sampling", {
+  skip_if_not_installed("geodiv")
+
+  elevation <- surface_test_raster(111)
+  pts <- surface_test_points(elevation)
+  radius <- 120
+  cc <- terra::crds(elevation)
+  vals <- terra::values(elevation)[, 1]
+  xy <- terra::crds(pts)
+
+  for (metric in c("ssk", "sku")) {
+    geodiv_fun <- if (metric == "ssk") geodiv::ssk else geodiv::sku
+
+    reference <- vapply(
+      seq_len(nrow(xy)),
+      function(i) {
+        d <- sqrt((cc[, 1] - xy[i, 1])^2 + (cc[, 2] - xy[i, 2])^2)
+        masked <- elevation
+        mv <- vals
+        mv[d > radius] <- NA
+        terra::values(masked) <- mv
+        geodiv_fun(masked)
+      },
+      numeric(1)
+    )
+
+    cached <- surface_cached_metric(elevation, pts, radius, metric)
+    expect_equal(cached, reference, tolerance = 1e-6)
+  }
+})
+
+
+test_that("sdq matches geodiv on a full window, scaled by resolution", {
+  skip_if_not_installed("geodiv")
+
+  set.seed(321)
+  block <- terra::rast(
+    nrows = 25,
+    ncols = 30,
+    xmin = 0,
+    xmax = 300,
+    ymin = 0,
+    ymax = 250,
+    crs = "EPSG:3857"
+  )
+  terra::values(block) <- 40 + stats::rnorm(terra::ncell(block), 0, 6)
+  resolution <- terra::res(block)[[1]]
+
+  # geodiv::sdq uses a cell spacing of 1; .surface_slope_metric returns true
+  # slope (divided by resolution), so multiplying by resolution recovers geodiv.
+  mine <- .surface_slope_metric(terra::as.matrix(block, wide = TRUE), resolution)
+  expect_equal(mine * resolution, geodiv::sdq(block), tolerance = 1e-6)
+})
+
+
+test_that("sdq equals the known slope of a tilted plane", {
+  resolution <- 10
+  slope <- 0.7
+  # z increases by slope * resolution per column step, so the true gradient is
+  # `slope` everywhere and sdq must equal it.
+  z <- outer(seq_len(30), seq_len(30), function(i, j) slope * j * resolution)
+  expect_equal(.surface_slope_metric(z, resolution), slope, tolerance = 1e-8)
+
+  # A flat surface has zero slope.
+  expect_equal(.surface_slope_metric(matrix(5, 8, 8), resolution), 0)
+})
+
+
+test_that("ssk and sku FFT projections agree with cached point metrics", {
+  # Large-mean surface to confirm the moment projection is numerically stable.
+  elevation <- surface_test_raster(212)
+  terra::values(elevation) <- terra::values(elevation) + 500
+  pts <- surface_test_points(elevation)
+  radius <- 95
+
+  for (metric in c("ssk", "sku")) {
+    cached <- surface_cached_metric(elevation, pts, radius, metric)
+    metric_raster <- .surface_metric_raster_fft(elevation, radius = radius,
+                                                metric = metric)
+    projected <- terra::extract(metric_raster, pts)[, 2]
+
+    expect_equal(names(metric_raster), paste0("elevation_", metric))
+    expect_equal(projected, cached, tolerance = 1e-5)
+  }
+})
+
+
+test_that("sdq FFT projection agrees with the point metric within boundary tolerance", {
+  elevation <- surface_test_raster(213)
+  pts <- surface_test_points(elevation)
+  radius <- 105
+
+  cached <- surface_cached_sdq(elevation, pts, radius)
+  metric_raster <- .surface_metric_raster_fft(elevation, radius = radius,
+                                              metric = "sdq")
+  projected <- terra::extract(metric_raster, pts)[, 2]
+
+  expect_equal(names(metric_raster), "elevation_sdq")
+  # The point path restricts to in-buffer neighbors while the projection uses
+  # each cell's actual raster neighbors, so the two agree to a few percent
+  # (boundary behavior shared with the landscape edge metrics), not bit-for-bit.
+  expect_equal(projected, cached, tolerance = 0.05)
+})
+
+
+test_that("Tier 2 surface specs integrate through kernel_prep and projection", {
+  elevation <- surface_test_raster(214)
+  pts <- surface_test_points(elevation)
+  radius <- 95
+
+  vars <- msr_vars(
+    elev_ssk = surface_var("elevation", metric = "ssk", radius = radius),
+    elev_sku = surface_var("elevation", metric = "sku", radius = radius),
+    elev_sdq = surface_var("elevation", metric = "sdq", radius = radius)
+  )
+
+  # sdq needs cell IDs; ssk/sku do not. kernel_prep must extract them.
+  expect_true(.msr_needs_cells(vars))
+
+  kernel_inputs <- kernel_prep(
+    pts = pts,
+    raster_stack = elevation,
+    max_D = radius,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_named(kernel_inputs$kernel_dat, c("elev_ssk", "elev_sku", "elev_sdq"))
+  expect_equal(kernel_inputs$n_covs, 0)
+
+  # Point-extracted ssk/sku reproduce the direct cached values exactly.
+  for (metric in c("ssk", "sku")) {
+    cov <- paste0("elev_", metric)
+    cached <- surface_cached_metric(elevation, pts, radius, metric)
+    unscaled <- kernel_inputs$kernel_dat[[cov]] *
+      kernel_inputs$scl_params$sd[[cov]] +
+      kernel_inputs$scl_params$mean[[cov]]
+    expect_equal(as.numeric(unscaled), cached, tolerance = 1e-6)
+  }
+
+  # sdq extracted via cell reconstruction reproduces the cached slope.
+  cached_sdq <- surface_cached_sdq(elevation, pts, radius)
+  unscaled_sdq <- kernel_inputs$kernel_dat$elev_sdq *
+    kernel_inputs$scl_params$sd[["elev_sdq"]] +
+    kernel_inputs$scl_params$mean[["elev_sdq"]]
+  expect_equal(as.numeric(unscaled_sdq), cached_sdq, tolerance = 1e-6)
+
+  projected <- kernel_scale.raster(
+    raster_stack = elevation,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_named(projected, c("elev_ssk", "elev_sku", "elev_sdq"))
+})
+
+
+test_that("higher-moment and slope helpers handle small or flat windows", {
+  # Skewness needs at least three values; kurtosis at least two.
+  expect_true(is.na(.surface_metric(c(1, 2), "ssk")))
+  expect_true(is.na(.surface_metric(1, "sku")))
+  # Flat windows have zero spread, so standardized moments are undefined.
+  expect_true(is.na(.surface_metric(rep(3, 10), "ssk")))
+  expect_true(is.na(.surface_metric(rep(3, 10), "sku")))
+
+  # A perfectly symmetric distribution has exactly zero skewness.
+  expect_equal(.surface_metric(c(-3, -1, 0, 1, 3), "ssk"), 0)
+
+  # The slope helper needs at least a 2x2 grid.
+  expect_true(is.na(.surface_slope_metric(matrix(1:3, nrow = 1), 10)))
+})
