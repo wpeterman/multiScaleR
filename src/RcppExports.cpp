@@ -108,3 +108,15 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// surface_sa_focal_cpp
+NumericMatrix surface_sa_focal_cpp(NumericMatrix values, NumericMatrix kernel);
+RcppExport SEXP _multiScaleR_surface_sa_focal_cpp(SEXP valuesSEXP, SEXP kernelSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type kernel(kernelSEXP);
+    rcpp_result_gen = Rcpp::wrap(surface_sa_focal_cpp(values, kernel));
+    return rcpp_result_gen;
+END_RCPP
+}

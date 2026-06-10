@@ -4,6 +4,7 @@
 \alias{msr_vars}
 \alias{kernel_var}
 \alias{landscape_var}
+\alias{surface_var}
 \title{Define multiScaleR covariate transformations}
 \usage{
 msr_vars(...)
@@ -11,26 +12,31 @@ msr_vars(...)
 kernel_var(source)
 
 landscape_var(source, metric, radius = NULL, base = exp(1), classes_max = NULL)
+
+surface_var(source, metric, radius = NULL, weighted = FALSE)
 }
 \arguments{
-\item{...}{Named \code{kernel_var()} or \code{landscape_var()} specifications.
-Each argument must be named; the name becomes the covariate column name in
-the model data frame. All names must be unique. At least one specification
-is required.}
+\item{...}{Named \code{kernel_var()}, \code{landscape_var()}, or
+\code{surface_var()} specifications. Each argument must be named; the name
+becomes the covariate column name in the model data frame. All names must
+be unique. At least one specification is required.}
 
 \item{source}{Character scalar. Name of the source raster layer in
 \code{raster_stack} from which the covariate is derived. Must exactly match
 a layer name in the raster stack provided to \code{\link{kernel_prep}}.}
 
-\item{metric}{Character scalar. Landscape metric to compute within the
-circular buffer for \code{landscape_var()}. Must be one of the supported
-metrics (see Details). Matched case-insensitively.}
+\item{metric}{Character scalar. The metric to compute within the circular
+buffer. For \code{landscape_var()} this is a landscape ecology metric
+computed on a categorical raster; for \code{surface_var()} this is a
+continuous surface texture metric (\code{"sa"} or \code{"sq"}) computed on
+a continuous raster. Must be one of the supported metrics (see Details).
+Matched case-insensitively.}
 
 \item{radius}{Optional positive numeric. Fixed buffer radius in the same
 units as the projection. When \code{NULL} (default), the radius is treated
 as a free parameter and optimized alongside the model. When supplied, the
-landscape metric is computed at this fixed radius and no scale optimization
-is performed for this covariate.}
+metric is computed at this fixed radius and no scale optimization is
+performed for this covariate.}
 
 \item{base}{Positive numeric (not equal to 1). Logarithm base used when
 computing diversity metrics (\code{"shdi"}, \code{"shei"}, \code{"msidi"},
@@ -41,22 +47,38 @@ bits or \code{10} for Hartley units.}
 patch types in the landscape, used only for relative patch richness
 (\code{"rpr"}). If \code{NULL} (default), the observed number of classes
 within each buffer is used as the denominator.}
+
+\item{weighted}{Logical, for \code{surface_var()} only. When \code{FALSE}
+(default), the surface metric is computed over a hard-edged circular
+neighborhood and the optimized scale parameter is that neighborhood radius.
+When \code{TRUE}, each cell is weighted by the model's distance kernel
+(the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
+parameter is the kernel scale (sigma), exactly as for a kernel-weighted
+mean. The weighted form estimates the scale of effect of heterogeneity with
+a likelihood that is smooth in sigma. It is available only for the
+distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
+not the slope metric (\code{"sdq"}), and the scale is always optimized, so
+\code{radius} must be \code{NULL}.}
 }
 \value{
 \describe{
   \item{\code{msr_vars()}}{A data frame of class \code{"multiScaleR_vars"}
     with one row per covariate. Columns are \code{covariate} (the name
     assigned in \code{...}), \code{source} (source raster layer name),
-    \code{type} (\code{"kernel"} or \code{"landscape"}), \code{metric}
-    (landscape metric or \code{NA}), \code{radius} (fixed radius or
-    \code{NA} when optimized), \code{optimize} (logical indicating whether
-    the scale is estimated), \code{base}, and \code{classes_max}.}
+    \code{type} (\code{"kernel"}, \code{"landscape"}, or \code{"surface"}),
+    \code{metric} (landscape or surface metric, or \code{NA}), \code{radius}
+    (fixed radius or \code{NA} when optimized), \code{optimize} (logical
+    indicating whether the scale is estimated), \code{base}, and
+    \code{classes_max}.}
   \item{\code{kernel_var()}}{An internal list of class
     \code{"multiScaleR_var"} representing a kernel-weighted mean covariate.
     Pass one or more of these inside \code{msr_vars()}.}
   \item{\code{landscape_var()}}{An internal list of class
     \code{"multiScaleR_var"} representing a landscape metric covariate.
     Pass one or more of these inside \code{msr_vars()}.}
+  \item{\code{surface_var()}}{An internal list of class
+    \code{"multiScaleR_var"} representing a continuous surface texture metric
+    covariate. Pass one or more of these inside \code{msr_vars()}.}
 }
 }
 \description{
@@ -65,10 +87,10 @@ more source raster layers. They are optional; if omitted,
 \code{\link{kernel_prep}} preserves the default behavior where each raster
 layer becomes one optimized kernel-weighted covariate with the same name.
 
-Use \code{msr_vars()} to collect one or more \code{kernel_var()} or
-\code{landscape_var()} specifications into a single object that is passed to
-the \code{scale_vars} argument of \code{\link{kernel_prep}} and
-\code{\link{kernel_scale.raster}}.
+Use \code{msr_vars()} to collect one or more \code{kernel_var()},
+\code{landscape_var()}, or \code{surface_var()} specifications into a single
+object that is passed to the \code{scale_vars} argument of
+\code{\link{kernel_prep}} and \code{\link{kernel_scale.raster}}.
 }
 \details{
 \strong{Kernel vs. landscape covariates}
@@ -81,6 +103,22 @@ is optimized by \code{\link{multiScale_optim}}.
 a categorical (or thresholded) raster layer within a circular buffer. Raster
 classes must be encoded as finite integer-like values. The buffer radius can
 be fixed or optimized.
+
+\code{surface_var(source, metric)} derives a continuous surface texture
+metric from a continuous raster layer (elevation, NDVI, canopy height,
+temperature, moisture, and similar surfaces) within a circular buffer. These
+metrics summarize within-neighborhood heterogeneity rather than an average
+value, so they complement \code{kernel_var()} (which summarizes the mean).
+The buffer radius can be fixed or optimized. Note that these covariates
+measure variability, not central tendency: changing the radius changes both
+the ecological scale and the statistical quantity being summarized.
+
+By default a surface metric uses a hard-edged neighborhood. Setting
+\code{weighted = TRUE} instead weights each cell by the model's distance
+kernel and optimizes the kernel scale (sigma), which estimates the scale of
+effect of heterogeneity with a smooth likelihood (see the \code{weighted}
+argument). This applies to the distribution metrics (\code{"sa"},
+\code{"sq"}, \code{"ssk"}, \code{"sku"}).
 
 \strong{Supported landscape metrics}
 
@@ -116,6 +154,49 @@ continuous rasters and to keep FFT projection times bounded. The current
 ceilings are 200 classes for \code{"ai"} and \code{"pladj"}, and 50 classes
 for \code{"contag"}, which scales with the square of the class count.
 
+\strong{Supported surface texture metrics}
+
+Surface metrics (require a continuous raster):
+\describe{
+  \item{\code{"sa"}}{Average roughness: the mean absolute deviation of the
+    neighborhood values from their mean.}
+  \item{\code{"sq"}}{Root mean square (RMS) roughness: the sample standard
+    deviation of the neighborhood values. More sensitive to large deviations
+    than \code{"sa"}.}
+  \item{\code{"ssk"}}{Skewness: the asymmetry of the neighborhood value
+    distribution. Positive when occasional high values dominate, negative
+    when occasional low values do.}
+  \item{\code{"sku"}}{Kurtosis (excess): the peakedness and tail weight of
+    the neighborhood value distribution relative to a normal distribution
+    (which has excess kurtosis 0).}
+  \item{\code{"sdq"}}{Root mean square slope: the RMS of the local gradient
+    magnitude, a measure of how steeply the surface changes (terrain or
+    structural ruggedness).}
+  \item{\code{"sdr"}}{Surface area ratio: the percentage by which the true
+    3D surface area exceeds the flat projected area. Behaves as a continuous
+    edge-density analog (more relief gives a larger ratio).}
+}
+The dispersion and shape metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"},
+\code{"sku"}) match the \code{geodiv} package (\code{sq} uses an N - 1
+denominator as \code{stats::sd()} does; \code{ssk} uses the bias-adjusted
+skewness and \code{sku} the excess kurtosis, matching \code{geodiv}'s
+defaults). \code{"sdq"} is reported as a true slope (the gradient is divided
+by the cell resolution); \code{geodiv::sdq()} instead uses a cell spacing of
+one, so the two agree after multiplying by the resolution. \code{"sdr"} is
+computed in physical units (real elevation values and the real cell size),
+so a tilted plane of slope \code{s} returns \code{(sqrt(1 + s^2) - 1) * 100};
+\code{geodiv::sdr()} instead rescales the surface to a unit range and so is
+dimensionless. The physical definition is the interpretable one for terrain
+and, unlike the rescaled version, can be projected by FFT.
+
+Raster projection of \code{"sq"}, \code{"ssk"}, \code{"sku"}, \code{"sdq"},
+and \code{"sdr"} uses fast Fourier transform (FFT) convolution; projection of
+\code{"sa"} uses an exact compiled masked focal pass, because average
+roughness has no closed-form FFT decomposition. \code{"sdq"} and \code{"sdr"}
+use each cell's neighbors, so (like the landscape edge metrics) they cache
+raster cell IDs internally, and their projection agrees with point extraction
+to within a small boundary tolerance rather than bit-for-bit.
+
 \strong{Mixing covariate types}
 
 Multiple covariate types can be combined in one \code{msr_vars()} call. For
@@ -141,11 +222,12 @@ vars <- msr_vars(
   forest_prop = kernel_var("forest")
 )
 
-## Combining kernel and landscape covariates
+## Combining kernel, landscape, and surface covariates
 vars <- msr_vars(
   forest_prop = kernel_var("forest"),
   forest_ed   = landscape_var("forest", metric = "ed"),
-  cover_shdi_500 = landscape_var("landcover", metric = "shdi", radius = 500)
+  cover_shdi_500 = landscape_var("landcover", metric = "shdi", radius = 500),
+  elev_sd     = surface_var("elevation", metric = "sq")
 )
 
 ## landscape_var with natural-log Shannon diversity (the default)
@@ -153,6 +235,13 @@ landscape_var("landcover", metric = "shdi")
 
 ## landscape_var with log2 Shannon diversity and a fixed 250 m radius
 landscape_var("landcover", metric = "shdi", radius = 250, base = 2)
+
+## surface_var: optimized RMS roughness, and fixed-radius average roughness
+surface_var("elevation", metric = "sq")
+surface_var("ndvi", metric = "sa", radius = 300)
+
+## Kernel-weighted roughness: optimize the scale of effect of heterogeneity
+surface_var("elevation", metric = "sq", weighted = TRUE)
 
 ## Define a single optimized kernel-weighted mean covariate
 kv <- kernel_var("forest")

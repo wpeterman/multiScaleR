@@ -36,7 +36,8 @@ test_that("expected public helpers remain exported", {
     "profile_sigma",
     "sim_dat",
     "sim_dat_unmarked",
-    "sim_rast"
+    "sim_rast",
+    "surface_var"
   )
 
   expect_setequal(getNamespaceExports("multiScaleR"), expected_exports)

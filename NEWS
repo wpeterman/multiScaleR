@@ -1,3 +1,84 @@
+multiScaleR 0.6.35
+---------
+* `surface_var()` gains the `"sdr"` metric (surface area ratio): the percentage
+  by which the true 3D surface area of the neighborhood exceeds its flat
+  projected area. It behaves as a continuous edge-density analog and uses the
+  same quad triangulation as `geodiv::surface_area()`. Unlike `geodiv::sdr()`,
+  which rescales the surface to a unit range and is dimensionless, multiScaleR
+  computes `"sdr"` in physical units (real elevation values and the real cell
+  size), so a tilted plane of slope `s` returns `(sqrt(1 + s^2) - 1) * 100`.
+  The physical definition is the interpretable one for terrain and, unlike the
+  rescaled version, is FFT-projectable.
+* `"sdr"` joins `"sdq"` as a neighbor-based surface metric (it caches raster
+  cell IDs and its projection matches point extraction to a small boundary
+  tolerance). Kernel weighting is not offered for the slope/area family.
+
+multiScaleR 0.6.34
+---------
+* `surface_var()` gains a `weighted` argument. With `weighted = TRUE`, the
+  distribution metrics (`"sa"`, `"sq"`, `"ssk"`, `"sku"`) are computed as
+  kernel-weighted moments: each cell is weighted by the model's distance kernel
+  (gaussian, exp, or expow) and the optimized parameter is the kernel scale
+  (sigma) rather than a hard neighborhood radius. Because the weights vary
+  smoothly with sigma, the likelihood is smooth in the scale parameter, so
+  `multiScale_optim()` estimates the scale of effect of heterogeneity with a
+  standard error, exactly as it does for a kernel-weighted mean. The default
+  (`weighted = FALSE`) is unchanged.
+* Weighted surface metrics are supported with every kernel, including
+  `"expow"`, since they use the kernel (and its shape). Weighting is not
+  available for the slope metric `"sdq"`, and the scale is always optimized
+  (no fixed `radius`).
+* Projection of weighted `"sq"`, `"ssk"`, and `"sku"` uses kernel-weighted FFT
+  power sums; weighted `"sa"` uses the compiled focal pass, now generalized to
+  accept per-cell weights (a 0/1 mask reproduces the unweighted result exactly).
+* Added a vignette section contrasting hard-radius and kernel-weighted
+  roughness.
+
+multiScaleR 0.6.33
+---------
+* `surface_var()` gains three metrics: `"ssk"` (skewness) and `"sku"`
+  (excess kurtosis), which describe the shape of the neighborhood value
+  distribution, and `"sdq"` (root mean square slope), which describes local
+  gradient steepness or ruggedness. With `"sa"` and `"sq"` this completes the
+  dispersion, distribution-shape, and slope families of gradient surface
+  metrics. `"ssk"` and `"sku"` match `geodiv`'s adjusted-skewness and
+  excess-kurtosis defaults; `"sdq"` matches `geodiv::sdq()` after accounting
+  for cell resolution (multiScaleR reports a true slope, dividing the gradient
+  by the cell size).
+* Raster projection of `"ssk"`, `"sku"`, and `"sdq"` uses FFT convolution. The
+  moment projections center on the global raster mean first to avoid
+  floating-point cancellation in the third and fourth power sums. Like the
+  landscape edge metrics, `"sdq"` caches raster cell IDs and its projection
+  agrees with point extraction to within a small boundary tolerance.
+* Added the `surface_metric_covariates` vignette section demonstrating the
+  shape and slope surfaces.
+
+multiScaleR 0.6.32
+---------
+* Added `surface_var()`, a new covariate specification for continuous surface
+  texture metrics, alongside the existing `kernel_var()` and `landscape_var()`.
+  Two metrics are supported in this release: `"sa"` (average roughness, the mean
+  absolute deviation from the neighborhood mean) and `"sq"` (root mean square
+  roughness, the sample standard deviation of the neighborhood values). Both
+  definitions match the `geodiv` package. These metrics summarize
+  within-neighborhood heterogeneity of a continuous raster (elevation, NDVI,
+  canopy height, temperature, and similar surfaces) rather than its mean, so
+  they complement `kernel_var()`. The buffer radius can be fixed or optimized,
+  and the covariates flow through `kernel_prep()`, `multiScale_optim()`, and
+  `kernel_scale.raster()` exactly like landscape metrics.
+* `surface_var()` projections in `kernel_scale.raster()` compute `"sq"` with
+  fast Fourier transform (FFT) convolution and `"sa"` with an exact masked focal
+  pass. Average roughness has no closed-form FFT decomposition, so `"sa"` is
+  projected with a compiled focal routine (`surface_sa_focal_cpp`) rather than
+  an R closure; this is exact and roughly twice as fast as the equivalent
+  `terra::focal()` call in benchmarks. Surface metrics require a continuous
+  raster with square cells.
+* Added `geodiv` to `Suggests`; the surface-metric tests use it as a validation
+  oracle and are skipped when it is not installed.
+* Added the `surface_metric_covariates` vignette, which walks through defining,
+  fitting, optimizing, and projecting surface texture covariates and how to
+  interpret roughness at different scales.
+
 multiScaleR 0.6.31
 ---------
 * `multiScale_optim()` no longer queries system RAM on every call. The
