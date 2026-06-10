@@ -780,3 +780,114 @@ test_that("weighted surface metrics optimize and project end to end", {
   expect_named(projected, "elev_sqw")
   expect_true(any(is.finite(terra::values(projected)[, 1])))
 })
+
+
+# --- Tier 3b: sdr (surface area ratio, physical units) -----------------------
+
+# Reference sdr for each point's circular buffer via grid reconstruction.
+surface_cached_sdr <- function(raster, pts, radius) {
+  cc <- terra::crds(raster)
+  vals <- terra::values(raster)[, 1]
+  xy <- terra::crds(pts)
+  resolution <- terra::res(raster)[[1]]
+  n_cols <- terra::ncol(raster)
+
+  vapply(
+    seq_len(nrow(xy)),
+    function(i) {
+      d <- sqrt((cc[, 1] - xy[i, 1])^2 + (cc[, 2] - xy[i, 2])^2)
+      keep <- d <= radius
+      local_matrix <- .landscape_cells_to_matrix(
+        values = vals[keep],
+        cells = terra::cellFromXY(raster, cc[keep, , drop = FALSE]),
+        n_cols = n_cols
+      )
+      .surface_area_metric(local_matrix, resolution)
+    },
+    numeric(1)
+  )
+}
+
+
+test_that("sdr equals the analytic surface area ratio of a tilted plane", {
+  resolution <- 10
+  for (slope in c(0.3, 0.7, 1.5)) {
+    z <- outer(seq_len(30), seq_len(30),
+               function(i, j) slope * j * resolution)
+    expected <- (sqrt(1 + slope^2) - 1) * 100
+    expect_equal(.surface_area_metric(z, resolution), expected, tolerance = 1e-8)
+  }
+  # A flat surface has zero excess surface area.
+  expect_equal(.surface_area_metric(matrix(5, 8, 8), resolution), 0)
+  # The helper needs at least a 2x2 grid.
+  expect_true(is.na(.surface_area_metric(matrix(1:3, nrow = 1), resolution)))
+})
+
+
+test_that("sdr quad-area triangulation matches geodiv::surface_area", {
+  skip_if_not_installed("geodiv")
+
+  set.seed(733)
+  block <- matrix(stats::rnorm(20 * 24, 50, 8), 20, 24)
+  # geodiv::surface_area() rescales z to [0, 1] and uses unit cell spacing;
+  # replicate those inputs so the triangulation formula can be compared directly.
+  zs <- (block - min(block)) / (max(block) - min(block))
+  nr <- nrow(zs)
+  nc <- ncol(zs)
+  mine <- sum(.surface_akl(
+    zs[-nr, -nc], zs[-nr, -1], zs[-1, -nc], zs[-1, -1], 1, 1
+  ))
+  expect_equal(mine, geodiv::surface_area(terra::rast(block)), tolerance = 1e-6)
+})
+
+
+test_that("sdr FFT projection agrees with the point metric within boundary tolerance", {
+  elevation <- surface_test_raster(734)
+  pts <- surface_test_points(elevation)
+  radius <- 105
+
+  cached <- surface_cached_sdr(elevation, pts, radius)
+  metric_raster <- .surface_metric_raster_fft(elevation, radius = radius,
+                                              metric = "sdr")
+  projected <- terra::extract(metric_raster, pts)[, 2]
+
+  expect_equal(names(metric_raster), "elevation_sdr")
+  expect_equal(projected, cached, tolerance = 0.05)
+})
+
+
+test_that("sdr integrates through kernel_prep and projection", {
+  elevation <- surface_test_raster(735)
+  pts <- surface_test_points(elevation)
+  radius <- 95
+
+  vars <- msr_vars(elev_sdr = surface_var("elevation", metric = "sdr",
+                                          radius = radius))
+  expect_true(.msr_needs_cells(vars))
+
+  kernel_inputs <- kernel_prep(
+    pts = pts,
+    raster_stack = elevation,
+    max_D = radius,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_named(kernel_inputs$kernel_dat, "elev_sdr")
+
+  cached_sdr <- surface_cached_sdr(elevation, pts, radius)
+  unscaled <- kernel_inputs$kernel_dat$elev_sdr *
+    kernel_inputs$scl_params$sd[["elev_sdr"]] +
+    kernel_inputs$scl_params$mean[["elev_sdr"]]
+  expect_equal(as.numeric(unscaled), cached_sdr, tolerance = 1e-6)
+
+  projected <- kernel_scale.raster(
+    raster_stack = elevation,
+    scale_vars = vars,
+    verbose = FALSE
+  )
+  expect_named(projected, "elev_sdr")
+
+  # sdr is a slope-family metric, so kernel weighting is not offered.
+  expect_error(surface_var("elevation", metric = "sdr", weighted = TRUE),
+               "not supported for the slope metric")
+})

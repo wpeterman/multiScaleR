@@ -59,11 +59,12 @@ the explicit covariate interface before, read
 `vignette("landscape_metric_covariates", package = "multiScaleR")` first; this
 vignette assumes you are comfortable with `msr_vars()`.
 
-This release supports five surface texture metrics, all borrowed from the
-surface-metrology literature and matched to the `geodiv` package so that
-`geodiv` can be used to validate results. Two describe dispersion (how spread
-out the values are), two describe the shape of the value distribution, and one
-describes the steepness of local change.
+This release supports six surface texture metrics, all borrowed from the
+surface-metrology literature. Two describe dispersion (how spread out the values
+are), two describe the shape of the value distribution, and two describe the
+geometry of local change (slope and surface area). Most are matched to the
+`geodiv` package so that `geodiv` can be used to validate results; the
+exceptions are noted below.
 
 ## Surface metric reference
 
@@ -80,6 +81,7 @@ deviation, and $n$ is the number of finite cells.
 | `ssk` | Skewness | $S_{sk} \propto \frac{1}{n\,s^3}\sum_i (z_i - \bar z)^3$ | Asymmetry of the value distribution. Positive when occasional high values dominate, negative when occasional low values do. |
 | `sku` | Kurtosis | $S_{ku} = \frac{1}{n\,s^4}\sum_i (z_i - \bar z)^4 - 3$ | Peakedness and tail weight relative to a normal distribution (excess kurtosis, so a normal surface gives 0). |
 | `sdq` | RMS slope | $S_{dq} = \sqrt{\frac{1}{n}\sum_i \lvert \nabla z_i \rvert^2}$ | Root mean square of the local gradient magnitude: how steeply the surface changes (terrain or structural ruggedness). |
+| `sdr` | Surface area ratio | $S_{dr} = \left(\frac{A_{3D}}{A_{flat}} - 1\right) \times 100$ | Percentage by which the true 3D surface area exceeds the flat area. A continuous edge-density analog: more relief gives a larger ratio. |
 
 The dispersion metrics (`sa`, `sq`) are zero on a perfectly flat surface and
 grow as the surface becomes more variable. They are reported in the units of
@@ -91,13 +93,21 @@ squares them, so it responds more strongly to a few unusual cells.
 
 The shape metrics (`ssk`, `sku`) are dimensionless and describe the *form* of
 the value distribution rather than its spread, so they complement the
-dispersion metrics. `sdq` measures gradient steepness; it is reported as a true
-slope (rise over run), dividing the local elevation change by the cell
-resolution. The matched `geodiv` function `geodiv::sdq()` instead uses a cell
-spacing of one, so the two agree after multiplying by the resolution. A few
+dispersion metrics. The geometry metrics (`sdq`, `sdr`) describe local change.
+`sdq` measures gradient steepness; it is reported as a true slope (rise over
+run), dividing the local elevation change by the cell resolution. The matched
+`geodiv` function `geodiv::sdq()` instead uses a cell spacing of one, so the two
+agree after multiplying by the resolution. `sdr` is the percentage by which the
+true 3D surface area exceeds the flat projected area, computed in physical units
+(real elevation values and the real cell size), so a tilted plane of slope $s$
+gives exactly $(\sqrt{1 + s^2} - 1)\times 100$. It behaves as a continuous
+edge-density analog: terrain that folds and rises has more surface area per unit
+ground. Note that `geodiv::sdr()` rescales the surface to a unit range and is
+therefore dimensionless; the physical definition used here is the interpretable
+one for terrain and, unlike the rescaled version, can be projected by FFT. A few
 cautions are worth keeping in mind: the shape metrics are noisier than
-dispersion and need a reasonable number of cells in the buffer to be stable,
-and `ssk` and `sdq` can be correlated with `sq` on many surfaces, so check
+dispersion and need a reasonable number of cells in the buffer to be stable, and
+`ssk`, `sdq`, and `sdr` can be correlated with `sq` on many surfaces, so check
 their correlations before interpreting them together.
 
 ## A note on scale
@@ -349,35 +359,40 @@ Projection of `sq` uses fast Fourier transform convolution, and projection of
 `sa` uses a compiled focal pass. Both reproduce the per-point calculation
 exactly; `sq` is the faster of the two on very large rasters.
 
-## Distribution-shape and slope surfaces
+## Distribution-shape and geometry surfaces
 
 The same standalone projection works for the shape metrics (`ssk`, `sku`) and
-the slope metric (`sdq`). They answer different questions than dispersion:
-skewness and kurtosis describe the *form* of the value distribution in the
-neighborhood, while `sdq` describes how steeply the surface changes.
+the geometry metrics (`sdq`, `sdr`). They answer different questions than
+dispersion: skewness and kurtosis describe the *form* of the value distribution
+in the neighborhood, `sdq` describes how steeply the surface changes, and `sdr`
+describes how much extra surface area that change creates.
 
-```{r shape-slope, fig.cap = "***Skewness, kurtosis, and RMS slope of land3 at 500 m.***", fig.height = 3.5}
-shape_slope <- kernel_scale.raster(
+```{r shape-slope, fig.cap = "***Skewness, kurtosis, RMS slope, and surface area ratio of land3 at 500 m.***", fig.height = 6}
+shape_geom <- kernel_scale.raster(
   raster_stack = land_rast["land3"],
   scale_vars = msr_vars(
     ssk_500 = surface_var("land3", metric = "ssk", radius = 500),
     sku_500 = surface_var("land3", metric = "sku", radius = 500),
-    sdq_500 = surface_var("land3", metric = "sdq", radius = 500)
+    sdq_500 = surface_var("land3", metric = "sdq", radius = 500),
+    sdr_500 = surface_var("land3", metric = "sdr", radius = 500)
   ),
   verbose = FALSE
 )
 
-plot(shape_slope, main = c("ssk - 500 m", "sku - 500 m", "sdq - 500 m"))
+plot(shape_geom,
+     main = c("ssk - 500 m", "sku - 500 m", "sdq - 500 m", "sdr - 500 m"))
 ```
 
 **How to read these plots:** The skewness surface is positive where the
 neighborhood is dominated by occasional high values and negative where low
 values dominate. The kurtosis surface is high where a few extreme cells stretch
-the tails of the local distribution. The `sdq` surface is bright where `land3`
-changes steeply from cell to cell, so it resembles a ruggedness map. Because
-shape and slope are noisier than dispersion, they are most useful when a
-hypothesis specifically concerns asymmetry, tail behavior, or gradient
-steepness rather than overall variability.
+the tails of the local distribution. The `sdq` and `sdr` surfaces are both
+bright where `land3` changes steeply from cell to cell: `sdq` as a slope and
+`sdr` as the extra 3D surface area that slope produces, so they resemble
+ruggedness maps and are often correlated. Because shape and geometry are noisier
+than dispersion, they are most useful when a hypothesis specifically concerns
+asymmetry, tail behavior, gradient steepness, or surface complexity rather than
+overall variability.
 
 ---
 

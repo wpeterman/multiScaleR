@@ -152,6 +152,61 @@
 }
 
 
+# Approximate 3D surface area of each cell quad, matching the triangulation in
+# `geodiv::surface_area()`: the quad spanned by a cell (`z`), its right
+# neighbor (`zx`), its down neighbor (`zy`), and its diagonal neighbor (`zxy`)
+# is split two ways and the two areas are averaged. `dx`/`dy` are the cell
+# dimensions. All arguments are matrices aligned to the base-cell grid.
+.surface_akl <- function(z, zx, zy, zxy, dx, dy) {
+  e_zy <- sqrt(dy^2 + (zy - z)^2)
+  e_zx <- sqrt(dx^2 + (zx - z)^2)
+  e_xy_x <- sqrt(dy^2 + (zxy - zx)^2)
+  e_xy_y <- sqrt(dx^2 + (zxy - zy)^2)
+
+  akl1 <- 0.5 * (e_zy * e_zx) + 0.5 * (e_xy_x * e_xy_y)
+  akl2 <- 0.5 * (e_zy * e_xy_y) + 0.5 * (e_xy_x * e_zx)
+  0.5 * (akl1 + akl2)
+}
+
+
+# Surface area ratio (`sdr`) from a reconstructed local grid: the percentage by
+# which the true 3D surface area exceeds the flat projected area. Each interior
+# cell quad (a cell with right, down, and diagonal neighbors present) is
+# triangulated by `.surface_akl()` using physical units (real elevation values
+# and the real cell `resolution`), so the result reflects actual terrain relief.
+# This differs from `geodiv::sdr()`, which first z-scores the surface and
+# normalizes the cell spacing, producing a dimensionless texture value; the
+# physical definition used here is interpretable as a continuous edge-density
+# analog and, unlike the z-scored version, can be projected by FFT. A flat
+# surface returns 0; a tilted plane of slope s returns (sqrt(1 + s^2) - 1) * 100.
+.surface_area_metric <- function(values, resolution) {
+  validate_scalar_numeric(resolution, "resolution", positive = TRUE)
+  if (!is.matrix(values)) {
+    values <- as.matrix(values)
+  }
+  nr <- nrow(values)
+  nc <- ncol(values)
+  if (nr < 2 || nc < 2) {
+    return(NA_real_)
+  }
+
+  z <- values[-nr, -nc, drop = FALSE]
+  zx <- values[-nr, -1, drop = FALSE]
+  zy <- values[-1, -nc, drop = FALSE]
+  zxy <- values[-1, -1, drop = FALSE]
+
+  akl <- .surface_akl(z, zx, zy, zxy, resolution, resolution)
+  valid <- is.finite(akl)
+  if (!any(valid)) {
+    return(NA_real_)
+  }
+
+  surface_area <- sum(akl[valid])
+  flat_area <- sum(valid) * resolution^2
+  (surface_area / flat_area - 1) * 100
+}
+
+
 # Point-extraction path for the pointwise metrics (sa, sq, ssk, sku): compute
 # the metric for every column of buffered raster values within `radius`.
 # Mirrors `.landscape_composition_by_buffer()` so the dispatch in
@@ -193,18 +248,19 @@
 }
 
 
-# Point-extraction path for the neighbor-based metric (sdq): reconstruct the
-# local grid from the buffered cell IDs and compute the slope metric. Like the
+# Point-extraction path for the neighbor-based metrics (sdq, sdr): reconstruct
+# the local grid from the buffered cell IDs and compute the metric. Like the
 # landscape edge/adjacency metrics, this needs `cells` and `n_cols`. `validate`
 # behaves as in `.surface_metric_by_buffer()`.
-.surface_slope_by_buffer <- function(d,
-                                     r_stack.df,
-                                     cells,
-                                     radius,
-                                     resolution,
-                                     n_cols,
-                                     metric = "sdq",
-                                     validate = TRUE) {
+.surface_neighbor_by_buffer <- function(d,
+                                        r_stack.df,
+                                        cells,
+                                        radius,
+                                        resolution,
+                                        n_cols,
+                                        metric = "sdq",
+                                        validate = TRUE) {
+  metric <- match.arg(metric, c("sdq", "sdr"))
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(resolution, "resolution", positive = TRUE)
   validate_scalar_numeric(n_cols, "n_cols", integerish = TRUE, positive = TRUE)
@@ -238,7 +294,11 @@
         cells = cells[keep],
         n_cols = n_cols
       )
-      .surface_slope_metric(local_matrix, resolution)
+      if (metric == "sdq") {
+        .surface_slope_metric(local_matrix, resolution)
+      } else {
+        .surface_area_metric(local_matrix, resolution)
+      }
     },
     numeric(1)
   )
@@ -412,6 +472,58 @@
   out <- terra::rast(raster)
   terra::values(out) <- as.vector(result)
   names(out) <- paste0(names(raster), "_sdq")
+  out
+}
+
+
+# Raster-projection path for `sdr` (surface area ratio).
+#
+# Each cell's approximate quad surface area (`.surface_akl()`, physical units)
+# is precomputed on the full raster, then the circular neighborhood sums of the
+# quad area and of the base-cell count are taken via FFT. The ratio of the
+# summed surface area to the summed flat area, minus one, in percent, is `sdr`.
+# As with `sdq`, the per-cell quad uses each cell's actual raster neighbors, so
+# the projection and the point path agree closely but not bit-for-bit at window
+# boundaries. Cells with no valid quad in the window return NA.
+.surface_sdr_raster_fft <- function(raster, radius, na.rm = TRUE) {
+  resolution <- .landscape_validate_single_layer_raster(raster, "Surface")
+  values <- terra::as.matrix(raster, wide = TRUE)
+  .surface_validate_continuous_values(
+    values,
+    metric = "sdr",
+    context = "Surface texture projection"
+  )
+
+  nr <- nrow(values)
+  nc <- ncol(values)
+
+  akl_full <- matrix(NA_real_, nrow = nr, ncol = nc)
+  if (nr > 1 && nc > 1) {
+    z <- values[-nr, -nc, drop = FALSE]
+    zx <- values[-nr, -1, drop = FALSE]
+    zy <- values[-1, -nc, drop = FALSE]
+    zxy <- values[-1, -1, drop = FALSE]
+    akl_full[-nr, -nc] <- .surface_akl(z, zx, zy, zxy, resolution, resolution)
+  }
+
+  valid <- matrix(as.numeric(is.finite(akl_full)), nrow = nr, ncol = nc)
+  akl0 <- akl_full
+  akl0[!is.finite(akl0)] <- 0
+
+  kernel <- .landscape_circle_kernel(radius = radius, resolution = resolution)
+  surface_area <- fft_convolution(akl0, kernel, fun = "sum", na.rm = na.rm)
+  base_cells <- .landscape_clean_count_matrix(
+    fft_convolution(valid, kernel, fun = "sum", na.rm = na.rm)
+  )
+
+  flat_area <- base_cells * resolution^2
+  result <- (surface_area / flat_area - 1) * 100
+  result[!is.finite(base_cells) | base_cells < 1] <- NA_real_
+  result[!is.finite(result)] <- NA_real_
+
+  out <- terra::rast(raster)
+  terra::values(out) <- as.vector(result)
+  names(out) <- paste0(names(raster), "_sdr")
   out
 }
 
@@ -644,7 +756,7 @@
 # higher moments (`ssk`, `sku`) use FFT moment convolutions; `sdq` uses an FFT
 # slope convolution; `sa` uses the compiled masked focal path.
 .surface_metric_raster_fft <- function(raster, radius, metric, na.rm = TRUE) {
-  metric <- match.arg(metric, c("sa", "sq", "ssk", "sku", "sdq"))
+  metric <- match.arg(metric, c("sa", "sq", "ssk", "sku", "sdq", "sdr"))
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_logical(na.rm, "na.rm")
 
@@ -656,6 +768,7 @@
                                      metric = "ssk", na.rm = na.rm),
     sku = .surface_moment_raster_fft(raster = raster, radius = radius,
                                      metric = "sku", na.rm = na.rm),
-    sdq = .surface_sdq_raster_fft(raster = raster, radius = radius, na.rm = na.rm)
+    sdq = .surface_sdq_raster_fft(raster = raster, radius = radius, na.rm = na.rm),
+    sdr = .surface_sdr_raster_fft(raster = raster, radius = radius, na.rm = na.rm)
   )
 }

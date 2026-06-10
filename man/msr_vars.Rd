@@ -172,6 +172,9 @@ Surface metrics (require a continuous raster):
   \item{\code{"sdq"}}{Root mean square slope: the RMS of the local gradient
     magnitude, a measure of how steeply the surface changes (terrain or
     structural ruggedness).}
+  \item{\code{"sdr"}}{Surface area ratio: the percentage by which the true
+    3D surface area exceeds the flat projected area. Behaves as a continuous
+    edge-density analog (more relief gives a larger ratio).}
 }
 The dispersion and shape metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"},
 \code{"sku"}) match the \code{geodiv} package (\code{sq} uses an N - 1
@@ -179,15 +182,20 @@ denominator as \code{stats::sd()} does; \code{ssk} uses the bias-adjusted
 skewness and \code{sku} the excess kurtosis, matching \code{geodiv}'s
 defaults). \code{"sdq"} is reported as a true slope (the gradient is divided
 by the cell resolution); \code{geodiv::sdq()} instead uses a cell spacing of
-one, so the two agree after multiplying by the resolution.
+one, so the two agree after multiplying by the resolution. \code{"sdr"} is
+computed in physical units (real elevation values and the real cell size),
+so a tilted plane of slope \code{s} returns \code{(sqrt(1 + s^2) - 1) * 100};
+\code{geodiv::sdr()} instead rescales the surface to a unit range and so is
+dimensionless. The physical definition is the interpretable one for terrain
+and, unlike the rescaled version, can be projected by FFT.
 
-Raster projection of \code{"sq"}, \code{"ssk"}, \code{"sku"}, and \code{"sdq"}
-uses fast Fourier transform (FFT) convolution; projection of \code{"sa"} uses
-an exact compiled masked focal pass, because average roughness has no
-closed-form FFT decomposition. \code{"sdq"} uses each cell's gradient, so
-(like the landscape edge metrics) it caches raster cell IDs internally, and
-its projection agrees with point extraction to within a small boundary
-tolerance rather than bit-for-bit.
+Raster projection of \code{"sq"}, \code{"ssk"}, \code{"sku"}, \code{"sdq"},
+and \code{"sdr"} uses fast Fourier transform (FFT) convolution; projection of
+\code{"sa"} uses an exact compiled masked focal pass, because average
+roughness has no closed-form FFT decomposition. \code{"sdq"} and \code{"sdr"}
+use each cell's neighbors, so (like the landscape edge metrics) they cache
+raster cell IDs internally, and their projection agrees with point extraction
+to within a small boundary tolerance rather than bit-for-bit.
 
 \strong{Mixing covariate types}
 

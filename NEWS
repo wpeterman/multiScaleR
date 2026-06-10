@@ -1,3 +1,18 @@
+multiScaleR 0.6.35
+---------
+* `surface_var()` gains the `"sdr"` metric (surface area ratio): the percentage
+  by which the true 3D surface area of the neighborhood exceeds its flat
+  projected area. It behaves as a continuous edge-density analog and uses the
+  same quad triangulation as `geodiv::surface_area()`. Unlike `geodiv::sdr()`,
+  which rescales the surface to a unit range and is dimensionless, multiScaleR
+  computes `"sdr"` in physical units (real elevation values and the real cell
+  size), so a tilted plane of slope `s` returns `(sqrt(1 + s^2) - 1) * 100`.
+  The physical definition is the interpretable one for terrain and, unlike the
+  rescaled version, is FFT-projectable.
+* `"sdr"` joins `"sdq"` as a neighbor-based surface metric (it caches raster
+  cell IDs and its projection matches point extraction to a small boundary
+  tolerance). Kernel weighting is not offered for the slope/area family.
+
 multiScaleR 0.6.34
 ---------
 * `surface_var()` gains a `weighted` argument. With `weighted = TRUE`, the
