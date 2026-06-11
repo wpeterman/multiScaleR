@@ -117,7 +117,8 @@ NumericVector landscape_composition_metric_cpp(NumericVector d,
                                                Nullable<NumericVector> weights_,
                                                double base,
                                                Nullable<double> resolution_,
-                                               Nullable<double> classes_max_) {
+                                               Nullable<double> classes_max_,
+                                               Nullable<double> focal_class_) {
   if (values.nrow() != d.size()) {
     stop("`values` must have one row for each distance in `d`.");
   }
@@ -137,11 +138,11 @@ NumericVector landscape_composition_metric_cpp(NumericVector d,
     }
   }
 
-  bool needs_resolution = metric == "prd" || metric == "ta";
+  bool needs_resolution = metric == "prd" || metric == "ta" || metric == "ca";
   double resolution = NA_REAL;
   if (needs_resolution) {
     if (resolution_.isNull()) {
-      stop("`resolution` is required for PRD and TA.");
+      stop("`resolution` is required for PRD, TA, and CA.");
     }
     resolution = as<double>(resolution_);
     if (!is_valid_number(resolution) || resolution <= 0) {
@@ -155,6 +156,19 @@ NumericVector landscape_composition_metric_cpp(NumericVector d,
     classes_max = as<double>(classes_max_);
     if (!is_valid_number(classes_max) || classes_max <= 0) {
       stop("`classes_max` must be > 0.");
+    }
+  }
+
+  // Class-level composition metrics (PLAND, CA) target one focal class.
+  bool needs_focal = metric == "pland" || metric == "ca";
+  double focal_class = NA_REAL;
+  if (needs_focal) {
+    if (focal_class_.isNull()) {
+      stop("`class` is required for the class-level metrics PLAND and CA.");
+    }
+    focal_class = as<double>(focal_class_);
+    if (!is_valid_number(focal_class)) {
+      stop("`class` must be a finite categorical value.");
     }
   }
 
@@ -225,6 +239,14 @@ NumericVector landscape_composition_metric_cpp(NumericVector d,
       out[col] = has_classes_max ? richness / classes_max * 100 : NA_REAL;
     } else if (metric == "ta") {
       out[col] = area_ha;
+    } else if (metric == "pland" || metric == "ca") {
+      auto it = totals.find(focal_class);
+      double focal_weight = it == totals.end() ? 0.0 : it->second;
+      if (metric == "pland") {
+        out[col] = focal_weight / total_weight * 100;
+      } else {
+        out[col] = focal_weight * resolution * resolution / 10000.0;
+      }
     } else {
       stop("Unsupported composition metric.");
     }
@@ -330,7 +352,9 @@ NumericVector landscape_adjacency_metric_cpp(NumericVector d,
                                              NumericVector cells,
                                              double radius,
                                              int n_cols,
-                                             std::string metric) {
+                                             std::string metric,
+                                             double base,
+                                             Nullable<double> focal_class_) {
   if (values.nrow() != d.size()) {
     stop("`values` must have one row for each distance in `d`.");
   }
@@ -343,6 +367,23 @@ NumericVector landscape_adjacency_metric_cpp(NumericVector d,
   if (n_cols <= 0) {
     stop("`n_cols` must be > 0.");
   }
+  if (!is_valid_number(base) || base <= 0 || base == 1) {
+    stop("`base` must be > 0 and must not equal 1.");
+  }
+
+  // CLUMPY is class-level and targets one focal class.
+  bool needs_focal = metric == "clumpy";
+  double focal_class = NA_REAL;
+  if (needs_focal) {
+    if (focal_class_.isNull()) {
+      stop("`class` is required for the class-level metric CLUMPY.");
+    }
+    focal_class = as<double>(focal_class_);
+    if (!is_valid_number(focal_class)) {
+      stop("`class` must be a finite categorical value.");
+    }
+  }
+  double log_base = std::log(base);
 
   NumericVector out(values.ncol(), NA_REAL);
 
@@ -438,6 +479,105 @@ NumericVector landscape_adjacency_metric_cpp(NumericVector d,
           entropy_sum += p * std::log(p);
         }
         out[col] = (1 + entropy_sum / (2 * std::log(n_classes))) * 100;
+      }
+    } else if (metric == "iji") {
+      // Interspersion & juxtaposition: entropy of the between-class adjacency
+      // distribution, normalised by its maximum. Undefined for < 3 classes.
+      if (n_classes < 3) {
+        out[col] = NA_REAL;
+      } else {
+        double between_total = 0;
+        for (int a = 0; a < n_classes; ++a) {
+          for (int b = a + 1; b < n_classes; ++b) {
+            between_total += adjacency[a * n_classes + b];
+          }
+        }
+        if (between_total <= 0) {
+          out[col] = NA_REAL;
+        } else {
+          double e_sum = 0;
+          for (int a = 0; a < n_classes; ++a) {
+            for (int b = a + 1; b < n_classes; ++b) {
+              double e = adjacency[a * n_classes + b];
+              if (e > 0) {
+                double p = e / between_total;
+                e_sum -= p * std::log(p);
+              }
+            }
+          }
+          double denom = std::log(0.5 * n_classes * (n_classes - 1));
+          out[col] = e_sum / denom * 100;
+        }
+      }
+    } else if (metric == "ent" || metric == "condent" || metric == "joinent" ||
+               metric == "mutinf" || metric == "relmutinf") {
+      // Information theory on the normalised co-occurrence matrix
+      // (Nowosad & Stepinski 2019): marginal entropy `ent`, joint entropy
+      // `joinent`, conditional entropy `condent`, mutual information `mutinf`,
+      // and relative mutual information `relmutinf`.
+      if (total <= 0) {
+        out[col] = NA_REAL;
+      } else {
+        double joinent = 0;
+        std::vector<double> row_total(n_classes, 0.0);
+        for (int a = 0; a < n_classes; ++a) {
+          for (int b = 0; b < n_classes; ++b) {
+            double g = adjacency[a * n_classes + b];
+            row_total[a] += g;
+            if (g > 0) {
+              double p = g / total;
+              joinent -= p * std::log(p) / log_base;
+            }
+          }
+        }
+        double ent = 0;
+        for (int a = 0; a < n_classes; ++a) {
+          double px = row_total[a] / total;
+          if (px > 0) {
+            ent -= px * std::log(px) / log_base;
+          }
+        }
+        double condent = joinent - ent;
+        double mutinf = ent - condent;
+        double relmutinf = mutinf == 0 ? 1.0 : mutinf / ent;
+        if (metric == "ent") {
+          out[col] = ent;
+        } else if (metric == "condent") {
+          out[col] = condent;
+        } else if (metric == "joinent") {
+          out[col] = joinent;
+        } else if (metric == "mutinf") {
+          out[col] = mutinf;
+        } else {
+          out[col] = relmutinf;
+        }
+      }
+    } else if (metric == "clumpy") {
+      // Clumpiness index for the focal class: like-adjacency proportion given
+      // the minimum perimeter, rescaled against the proportion expected under a
+      // spatially random distribution. Bounded on [-1, 1].
+      auto focal_it = class_index.find(focal_class);
+      if (focal_it == class_index.end()) {
+        out[col] = NA_REAL;
+      } else {
+        int fi = focal_it->second;
+        double n_i = class_counts[fi];
+        double total_cells = static_cast<double>(selected.size());
+        double p_i = n_i / total_cells;
+        double min_e = min_perimeter(n_i);
+        if (p_i >= 1 || !is_valid_number(min_e)) {
+          out[col] = NA_REAL;
+        } else {
+          double like_i = adjacency[fi * n_classes + fi];
+          double g_i = like_i / (4.0 * n_i - min_e);
+          double clumpy;
+          if (g_i >= p_i || p_i >= 0.5) {
+            clumpy = (g_i - p_i) / (1 - p_i);
+          } else {
+            clumpy = (g_i - p_i) / (-p_i);
+          }
+          out[col] = clumpy;
+        }
       }
     } else {
       stop("Unsupported adjacency metric.");

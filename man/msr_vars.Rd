@@ -11,7 +11,14 @@ msr_vars(...)
 
 kernel_var(source)
 
-landscape_var(source, metric, radius = NULL, base = exp(1), classes_max = NULL)
+landscape_var(
+  source,
+  metric,
+  radius = NULL,
+  base = exp(1),
+  classes_max = NULL,
+  class = NULL
+)
 
 surface_var(source, metric, radius = NULL, weighted = FALSE)
 }
@@ -38,15 +45,28 @@ as a free parameter and optimized alongside the model. When supplied, the
 metric is computed at this fixed radius and no scale optimization is
 performed for this covariate.}
 
-\item{base}{Positive numeric (not equal to 1). Logarithm base used when
-computing diversity metrics (\code{"shdi"}, \code{"shei"}, \code{"msidi"},
-\code{"msiei"}). Default: \code{exp(1)} (natural log). Use \code{2} for
-bits or \code{10} for Hartley units.}
+\item{base}{Positive numeric (not equal to 1). Logarithm base used by every
+entropy-based metric: the diversity metrics (\code{"shdi"}, \code{"shei"},
+\code{"msidi"}, \code{"msiei"}) and the information-theory metrics
+(\code{"ent"}, \code{"condent"}, \code{"joinent"}, \code{"mutinf"}).
+Default: \code{exp(1)} (natural log, so entropies are in nats). Use
+\code{2} for bits or \code{10} for Hartley units. To reproduce the
+information-theory values reported by FRAGSTATS and the \code{landscapemetrics}
+package, set \code{base = 2}. The base cancels in the ratio metrics
+(\code{"relmutinf"}, \code{"iji"}), so they are unaffected by it.}
 
 \item{classes_max}{Optional positive numeric. Maximum number of possible
 patch types in the landscape, used only for relative patch richness
 (\code{"rpr"}). If \code{NULL} (default), the observed number of classes
 within each buffer is used as the denominator.}
+
+\item{class}{Optional integer-like scalar. The focal class for the class-level
+metrics (\code{"clumpy"}, \code{"pland"}, \code{"ca"}), which describe one
+category rather than the whole landscape. It must match one of the integer
+class codes in the source raster. It is required for those three metrics and
+is not accepted for any other metric (which describe the whole buffer). Where
+the focal class is absent from a buffer, \code{"pland"} and \code{"ca"}
+return 0 (zero cover) and \code{"clumpy"} returns \code{NA}.}
 
 \item{weighted}{Logical, for \code{surface_var()} only. When \code{FALSE}
 (default), the surface metric is computed over a hard-edged circular
@@ -68,8 +88,11 @@ not the slope metric (\code{"sdq"}), and the scale is always optimized, so
     \code{type} (\code{"kernel"}, \code{"landscape"}, or \code{"surface"}),
     \code{metric} (landscape or surface metric, or \code{NA}), \code{radius}
     (fixed radius or \code{NA} when optimized), \code{optimize} (logical
-    indicating whether the scale is estimated), \code{base}, and
-    \code{classes_max}.}
+    indicating whether the scale is estimated), \code{weighted} (logical, the
+    kernel-weighted form of a surface metric), \code{base} (logarithm base for
+    entropy metrics), \code{classes_max} (richness denominator for
+    \code{"rpr"}, or \code{NA}), and \code{class} (focal class for the
+    class-level metrics, or \code{NA}).}
   \item{\code{kernel_var()}}{An internal list of class
     \code{"multiScaleR_var"} representing a kernel-weighted mean covariate.
     Pass one or more of these inside \code{msr_vars()}.}
@@ -143,16 +166,66 @@ Edge metrics (require adjacency information; cell IDs are cached internally):
   \item{\code{"lsi"}}{Landscape shape index.}
 }
 
-Adjacency metrics:
+Adjacency metrics (configuration; built from cell-pair counts):
 \describe{
-  \item{\code{"ai"}}{Aggregation index (\%).}
-  \item{\code{"pladj"}}{Proportion of like adjacencies (\%).}
-  \item{\code{"contag"}}{Contagion index (\%).}
+  \item{\code{"ai"}}{Aggregation index (\%). Area-weighted percentage of like
+    adjacencies relative to the maximum possible for each class. Higher values
+    mean classes are more spatially aggregated.}
+  \item{\code{"pladj"}}{Proportion of like adjacencies (\%). Percentage of all
+    cell-pair boundaries that fall between cells of the same class.}
+  \item{\code{"contag"}}{Contagion index (\%). Ranges from near 0 (maximum
+    interspersion of classes) to 100 (a single class). Requires at least 2
+    classes within the buffer.}
+  \item{\code{"iji"}}{Interspersion and juxtaposition index (\%). The evenness
+    of the adjacencies among the different classes, ignoring like adjacencies.
+    Ranges from near 0 (one class pair dominates the between-class
+    boundaries) to 100 (every class is equally adjacent to every other).
+    Undefined, and returned as \code{NA}, for fewer than 3 classes.}
 }
-Adjacency projections are class-count limited to avoid accidental use of
-continuous rasters and to keep FFT projection times bounded. The current
-ceilings are 200 classes for \code{"ai"} and \code{"pladj"}, and 50 classes
-for \code{"contag"}, which scales with the square of the class count.
+
+Information theory metrics (configuration and composition; built from the
+class-pair co-occurrence matrix following Nowosad and Stepinski, 2019). The
+\code{base} argument sets the logarithm base; set \code{base = 2} for bits, as
+in \code{landscapemetrics}:
+\describe{
+  \item{\code{"ent"}}{Marginal entropy, H(x). The diversity of the cell values
+    entering adjacencies; it increases with the number and evenness of classes.}
+  \item{\code{"joinent"}}{Joint entropy, H(x, y). The diversity of the
+    class-pair adjacencies themselves; the total complexity of the pattern.}
+  \item{\code{"condent"}}{Conditional entropy, H(y | x). The configurational
+    complexity that remains once composition is accounted for: the uncertainty
+    about a neighbor's class given the focal cell's class.}
+  \item{\code{"mutinf"}}{Mutual information, I(y, x). How much knowing a cell's
+    class tells you about its neighbor; it rises as like classes cluster
+    together. This is the configuration signal separated from composition.}
+  \item{\code{"relmutinf"}}{Relative mutual information, I(y, x) / H(x). Mutual
+    information rescaled by marginal entropy to the range 0 to 1, so that
+    configuration can be compared across landscapes of differing composition.
+    It is 1 when mutual information is 0 (the \code{landscapemetrics}
+    convention) and is unaffected by \code{base}.}
+}
+
+Class-level metrics (describe a single focal class; require the \code{class}
+argument):
+\describe{
+  \item{\code{"clumpy"}}{Clumpiness index for the focal class. Ranges from -1
+    (maximally disaggregated) through 0 (randomly distributed) to 1 (maximally
+    clumped), correcting the proportion of like adjacencies for the class's own
+    abundance. Returned as \code{NA} where the class fills or is absent from
+    the buffer.}
+  \item{\code{"pland"}}{Percentage of landscape (\%). The focal class's share
+    of the valid buffer cells.}
+  \item{\code{"ca"}}{Class area (hectares) of the focal class within the
+    buffer.}
+}
+
+Adjacency and information-theory projections are class-count limited to avoid
+accidental use of continuous rasters and to keep FFT projection times bounded.
+The current ceilings are 200 classes for the like-adjacency metrics
+(\code{"ai"}, \code{"pladj"}, \code{"clumpy"}) and 50 classes for the metrics
+built from the full class-pair matrix (\code{"contag"}, \code{"iji"}, and the
+information-theory family), whose cost scales with the square of the class
+count.
 
 \strong{Supported surface texture metrics}
 
@@ -236,6 +309,16 @@ landscape_var("landcover", metric = "shdi")
 ## landscape_var with log2 Shannon diversity and a fixed 250 m radius
 landscape_var("landcover", metric = "shdi", radius = 250, base = 2)
 
+## Configuration: interspersion (landscape-level), no class argument
+landscape_var("landcover", metric = "iji", radius = 500)
+
+## Information theory in bits (set base = 2 to match landscapemetrics)
+landscape_var("landcover", metric = "mutinf", radius = 500, base = 2)
+
+## Class-level metrics require `class`: clumpiness and cover of class 3
+landscape_var("landcover", metric = "clumpy", radius = 500, class = 3)
+landscape_var("landcover", metric = "pland", radius = 500, class = 3)
+
 ## surface_var: optimized RMS roughness, and fixed-radius average roughness
 surface_var("elevation", metric = "sq")
 surface_var("ndvi", metric = "sa", radius = 300)
@@ -246,7 +329,16 @@ surface_var("elevation", metric = "sq", weighted = TRUE)
 ## Define a single optimized kernel-weighted mean covariate
 kv <- kernel_var("forest")
 }
+\references{
+Nowosad, J., & Stepinski, T. F. (2019). Information theory as a consistent
+framework for quantification and classification of landscape patterns.
+\emph{Landscape Ecology}, 34(9), 2091-2101.
+\doi{10.1007/s10980-019-00830-x}
+}
 \seealso{
 \code{\link{kernel_prep}}, \code{\link{multiScale_optim}},
-  \code{\link{kernel_scale.raster}}
+  \code{\link{kernel_scale.raster}}. For a worked walkthrough of the landscape
+  metrics see \code{vignette("landscape_metric_covariates", package = "multiScaleR")},
+  and for the continuous-surface metrics see
+  \code{vignette("surface_metric_covariates", package = "multiScaleR")}.
 }

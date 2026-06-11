@@ -26,8 +26,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // landscape_composition_metric_cpp
-NumericVector landscape_composition_metric_cpp(NumericVector d, NumericMatrix values, double radius, std::string metric, Nullable<NumericVector> weights_, double base, Nullable<double> resolution_, Nullable<double> classes_max_);
-RcppExport SEXP _multiScaleR_landscape_composition_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP radiusSEXP, SEXP metricSEXP, SEXP weights_SEXP, SEXP baseSEXP, SEXP resolution_SEXP, SEXP classes_max_SEXP) {
+NumericVector landscape_composition_metric_cpp(NumericVector d, NumericMatrix values, double radius, std::string metric, Nullable<NumericVector> weights_, double base, Nullable<double> resolution_, Nullable<double> classes_max_, Nullable<double> focal_class_);
+RcppExport SEXP _multiScaleR_landscape_composition_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP radiusSEXP, SEXP metricSEXP, SEXP weights_SEXP, SEXP baseSEXP, SEXP resolution_SEXP, SEXP classes_max_SEXP, SEXP focal_class_SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -39,7 +39,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type base(baseSEXP);
     Rcpp::traits::input_parameter< Nullable<double> >::type resolution_(resolution_SEXP);
     Rcpp::traits::input_parameter< Nullable<double> >::type classes_max_(classes_max_SEXP);
-    rcpp_result_gen = Rcpp::wrap(landscape_composition_metric_cpp(d, values, radius, metric, weights_, base, resolution_, classes_max_));
+    Rcpp::traits::input_parameter< Nullable<double> >::type focal_class_(focal_class_SEXP);
+    rcpp_result_gen = Rcpp::wrap(landscape_composition_metric_cpp(d, values, radius, metric, weights_, base, resolution_, classes_max_, focal_class_));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -61,8 +62,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // landscape_adjacency_metric_cpp
-NumericVector landscape_adjacency_metric_cpp(NumericVector d, NumericMatrix values, NumericVector cells, double radius, int n_cols, std::string metric);
-RcppExport SEXP _multiScaleR_landscape_adjacency_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP cellsSEXP, SEXP radiusSEXP, SEXP n_colsSEXP, SEXP metricSEXP) {
+NumericVector landscape_adjacency_metric_cpp(NumericVector d, NumericMatrix values, NumericVector cells, double radius, int n_cols, std::string metric, double base, Nullable<double> focal_class_);
+RcppExport SEXP _multiScaleR_landscape_adjacency_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP cellsSEXP, SEXP radiusSEXP, SEXP n_colsSEXP, SEXP metricSEXP, SEXP baseSEXP, SEXP focal_class_SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -72,7 +73,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type radius(radiusSEXP);
     Rcpp::traits::input_parameter< int >::type n_cols(n_colsSEXP);
     Rcpp::traits::input_parameter< std::string >::type metric(metricSEXP);
-    rcpp_result_gen = Rcpp::wrap(landscape_adjacency_metric_cpp(d, values, cells, radius, n_cols, metric));
+    Rcpp::traits::input_parameter< double >::type base(baseSEXP);
+    Rcpp::traits::input_parameter< Nullable<double> >::type focal_class_(focal_class_SEXP);
+    rcpp_result_gen = Rcpp::wrap(landscape_adjacency_metric_cpp(d, values, cells, radius, n_cols, metric, base, focal_class_));
     return rcpp_result_gen;
 END_RCPP
 }

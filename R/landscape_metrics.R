@@ -3,9 +3,19 @@
 .landscape_adjacency_class_ceiling <- function(metric) {
   switch(
     metric,
+    # Metrics that consume the full class-by-class co-occurrence matrix cost
+    # O(classes^2) pair convolutions, so they keep the tighter contagion ceiling.
     contag = 50L,
+    iji = 50L,
+    ent = 50L,
+    condent = 50L,
+    joinent = 50L,
+    mutinf = 50L,
+    relmutinf = 50L,
+    # Like-adjacency-only metrics cost O(classes) convolutions.
     ai = 200L,
     pladj = 200L,
+    clumpy = 200L,
     200L
   )
 }
@@ -191,6 +201,7 @@
                                              base = exp(1),
                                              resolution = NULL,
                                              classes_max = NULL,
+                                             focal_class = NULL,
                                              validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(base, "base", positive = TRUE)
@@ -227,7 +238,8 @@
     weights_ = weights,
     base = base,
     resolution_ = resolution,
-    classes_max_ = classes_max
+    classes_max_ = classes_max,
+    focal_class_ = focal_class
   )
 
   stats::setNames(out, colnames(values))
@@ -562,9 +574,12 @@
                                            radius,
                                            n_cols,
                                            metric,
+                                           base = exp(1),
+                                           focal_class = NULL,
                                            validate = TRUE) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_numeric(n_cols, "n_cols", integerish = TRUE, positive = TRUE)
+  validate_scalar_numeric(base, "base", positive = TRUE)
 
   if (length(d) == 0) {
     stop("`d` must contain at least one distance.", call. = FALSE)
@@ -593,7 +608,9 @@
     cells = as.numeric(cells),
     radius = radius,
     n_cols = n_cols,
-    metric = metric
+    metric = metric,
+    base = base,
+    focal_class_ = focal_class
   )
 
   stats::setNames(out, colnames(values))
@@ -670,11 +687,12 @@
                                               metric,
                                               base = exp(1),
                                               classes_max = NULL,
+                                              focal_class = NULL,
                                               na.rm = TRUE) {
   metric <- match.arg(
     metric,
     c("shdi", "shei", "sidi", "siei", "msidi", "msiei", "pr",
-      "prd", "rpr", "ta")
+      "prd", "rpr", "ta", "pland", "ca")
   )
   validate_scalar_numeric(base, "base", positive = TRUE)
   if (base == 1) {
@@ -682,6 +700,10 @@
   }
   if (!is.null(classes_max)) {
     validate_scalar_numeric(classes_max, "classes_max", positive = TRUE)
+  }
+  if (metric %in% c("pland", "ca") && is.null(focal_class)) {
+    stop("`class` is required for the class-level metrics PLAND and CA.",
+         call. = FALSE)
   }
 
   counts <- .landscape_class_count_rasters(
@@ -716,6 +738,19 @@
   msidi <- -log(sum_sq)
   area_total <- total * counts$resolution^2 / 10000
 
+  # Per-window count of the focal class for the class-level metrics. An absent
+  # class contributes zero cover (PLAND = 0, CA = 0) wherever the window is valid.
+  focal_count <- if (metric %in% c("pland", "ca")) {
+    idx <- match(focal_class, counts$classes)
+    if (is.na(idx)) {
+      matrix(0, nrow = nrow(total), ncol = ncol(total))
+    } else {
+      counts$class_counts[[idx]]
+    }
+  } else {
+    NULL
+  }
+
   values <- switch(
     metric,
     shdi = shdi,
@@ -733,7 +768,9 @@
         present / classes_max * 100
       }
     },
-    ta = area_total
+    ta = area_total,
+    pland = focal_count / total * 100,
+    ca = focal_count * counts$resolution^2 / 10000
   )
 
   values[!is.finite(total) | total <= 0] <- NA_real_
@@ -1001,8 +1038,21 @@
 .landscape_adjacency_raster_fft <- function(raster,
                                             radius,
                                             metric,
+                                            base = exp(1),
+                                            focal_class = NULL,
                                             na.rm = TRUE) {
-  metric <- match.arg(metric, c("ai", "pladj", "contag"))
+  metric <- match.arg(
+    metric,
+    c("ai", "pladj", "contag", "iji", "ent", "condent", "joinent", "mutinf",
+      "relmutinf", "clumpy")
+  )
+  validate_scalar_numeric(base, "base", positive = TRUE)
+  if (base == 1) {
+    stop("`base` must not equal 1.", call. = FALSE)
+  }
+  if (metric == "clumpy" && is.null(focal_class)) {
+    stop("`class` is required for the class-level metric CLUMPY.", call. = FALSE)
+  }
   projection_values <- terra::as.matrix(raster, wide = TRUE)
   .landscape_validate_categorical_values(
     projection_values,
@@ -1033,6 +1083,16 @@
   }
 
   total_source <- counts$valid_pair_count
+  pair_count_fn <- function(from, to) {
+    .landscape_pair_count_raster_fft(
+      values = values,
+      from = from,
+      to = to,
+      right_kernel = counts$right_kernel,
+      down_kernel = counts$down_kernel,
+      na.rm = na.rm
+    )
+  }
 
   if (metric == "pladj") {
     like_source <- matrix(0, nrow = nrow(values), ncol = ncol(values))
@@ -1076,7 +1136,33 @@
     }
 
     result[class_counts$total <= 0 | counts$area_cells <= 0] <- NA_real_
+  } else if (metric == "clumpy") {
+    class_counts <- .landscape_class_count_rasters(
+      raster = raster,
+      radius = radius,
+      na.rm = na.rm
+    )
+    idx <- match(focal_class, class_counts$classes)
+    zero_mat <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+    n_i <- if (is.na(idx)) zero_mat else class_counts$class_counts[[idx]]
+    like_i <- if (is.na(idx)) zero_mat else 2 * pair_count_fn(focal_class, focal_class)
+    total_cells <- class_counts$total
+    p_i <- n_i / total_cells
+    min_e <- .landscape_min_perimeter_matrix(n_i)
+    # Proportion of like adjacencies given the minimum perimeter (other_i = 4 n_i),
+    # then rescaled against the proportion expected under spatial randomness.
+    g_i <- like_i / (4 * n_i - min_e)
+    result <- matrix(NA_real_, nrow = nrow(values), ncol = ncol(values))
+    high <- (g_i >= p_i) | (p_i >= 0.5)
+    high[is.na(high)] <- FALSE
+    result[high]  <- (g_i[high]  - p_i[high])  / (1 - p_i[high])
+    result[!high] <- (g_i[!high] - p_i[!high]) / (-p_i[!high])
+    result[n_i <= 0 | p_i >= 1 | !is.finite(min_e) |
+             total_cells <= 0 | counts$area_cells <= 0] <- NA_real_
   } else {
+    # Co-occurrence family: contagion, interspersion & juxtaposition (IJI), and
+    # the information-theory metrics all read the per-window class-pair
+    # co-occurrence matrix, assembled here once from FFT pair counts.
     class_counts <- .landscape_class_count_rasters(
       raster = raster,
       radius = radius,
@@ -1087,45 +1173,83 @@
       present <- present + (count > 0)
     }
 
-    entropy <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+    zero <- function() matrix(0, nrow = nrow(values), ncol = ncol(values))
     total_ordered <- total_source * 2
+    joint_entropy <- zero()      # sum of multiplier * p * ln(p) over the matrix
+    between_total <- zero()      # IJI: total between-class adjacencies
+    between_entropy <- zero()    # IJI: sum of e * ln(e) over between-class pairs
+    needs_marginal <- metric %in% c("ent", "condent", "mutinf", "relmutinf")
+    row_totals <- if (needs_marginal) {
+      lapply(seq_along(classes), function(i) zero())
+    } else {
+      NULL
+    }
+
     for (from_idx in seq_along(classes)) {
       for (to_idx in seq(from_idx, length(classes))) {
-        from <- classes[[from_idx]]
-        to <- classes[[to_idx]]
-        source_ab <- .landscape_pair_count_raster_fft(
-          values = values,
-          from = from,
-          to = to,
-          right_kernel = counts$right_kernel,
-          down_kernel = counts$down_kernel,
-          na.rm = na.rm
-        )
+        source_ab <- pair_count_fn(classes[[from_idx]], classes[[to_idx]])
         if (from_idx == to_idx) {
           pair_count <- source_ab * 2
           multiplier <- 1
         } else {
-          source_ba <- .landscape_pair_count_raster_fft(
-            values = values,
-            from = to,
-            to = from,
-            right_kernel = counts$right_kernel,
-            down_kernel = counts$down_kernel,
-            na.rm = na.rm
-          )
+          source_ba <- pair_count_fn(classes[[to_idx]], classes[[from_idx]])
           pair_count <- source_ab + source_ba
           multiplier <- 2
+          between_total <- between_total + pair_count
+          active_e <- pair_count > 0
+          e_term <- zero()
+          e_term[active_e] <- pair_count[active_e] * log(pair_count[active_e])
+          between_entropy <- between_entropy + e_term
+        }
+        if (needs_marginal) {
+          row_totals[[from_idx]] <- row_totals[[from_idx]] + pair_count
+          if (from_idx != to_idx) {
+            row_totals[[to_idx]] <- row_totals[[to_idx]] + pair_count
+          }
         }
         p <- pair_count / total_ordered
         active <- is.finite(p) & p > 0
-        entropy_term <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+        entropy_term <- zero()
         entropy_term[active] <- multiplier * p[active] * log(p[active])
-        entropy <- entropy + entropy_term
+        joint_entropy <- joint_entropy + entropy_term
       }
     }
 
-    result <- (1 + entropy / (2 * log(present))) * 100
-    result[present < 2 | total_source <= 0 | counts$area_cells <= 0] <- NA_real_
+    if (metric == "contag") {
+      result <- (1 + joint_entropy / (2 * log(present))) * 100
+      result[present < 2 | total_source <= 0 | counts$area_cells <= 0] <- NA_real_
+    } else if (metric == "iji") {
+      result <- (log(between_total) - between_entropy / between_total) /
+        log(0.5 * present * (present - 1)) * 100
+      result[present < 3 | between_total <= 0 |
+               counts$area_cells <= 0] <- NA_real_
+    } else {
+      log_base <- log(base)
+      joinent <- -joint_entropy / log_base
+      ent <- zero()
+      if (needs_marginal) {
+        for (i in seq_along(classes)) {
+          px <- row_totals[[i]] / total_ordered
+          active_x <- is.finite(px) & px > 0
+          ent_term <- zero()
+          ent_term[active_x] <- px[active_x] * log(px[active_x])
+          ent <- ent - ent_term
+        }
+        ent <- ent / log_base
+      }
+      condent <- joinent - ent
+      mutinf <- ent - condent
+      relmutinf <- ifelse(mutinf == 0, 1, mutinf / ent)
+      result <- switch(
+        metric,
+        ent = ent,
+        condent = condent,
+        joinent = joinent,
+        mutinf = mutinf,
+        relmutinf = relmutinf
+      )
+      result[total_source <= 0 | counts$area_cells <= 0] <- NA_real_
+    }
   }
 
   result[!is.finite(result)] <- NA_real_

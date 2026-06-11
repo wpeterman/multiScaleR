@@ -10,3 +10,5 @@ future_ideas.md
 src/*.o
 src/*.so
 src/*.dll
+/doc/
+/Meta/

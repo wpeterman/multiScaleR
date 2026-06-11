@@ -62,11 +62,17 @@ explicitly.
 
 # Landscape metric reference
 
-`landscape_var()` supports 16 metrics grouped into three categories. All metrics
+`landscape_var()` supports 25 metrics grouped into five families. All metrics
 are computed within a circular buffer centered on each sample point (or on each
 raster cell when projecting with `kernel_scale.raster()`). Metrics that operate
 on categorical rasters expect integer class values; continuous rasters should
 be classified before use.
+
+Most metrics describe the whole landscape within the buffer. Three are
+*class-level*: they describe a single category and require a `class` argument
+naming the focal class (covered in [Class-level metrics](#class-level-metrics)).
+All of the categorical metrics reproduce the values returned by the
+`landscapemetrics` package, which itself follows the FRAGSTATS conventions.
 
 ## Composition metrics
 
@@ -100,13 +106,59 @@ They require a categorical raster and use cell adjacency information.
 ## Adjacency metrics
 
 These metrics describe how often similar or dissimilar classes occur next to one
-another. They require a categorical raster and use cell-pair counts.
+another. They require a categorical raster and use cell-pair counts (the
+class-by-class co-occurrence matrix).
 
 | Code | Name | Description |
 |------|------|-------------|
 | `ai` | Aggregation Index | Area-weighted aggregation of like adjacencies within classes. Higher values indicate that classes are more aggregated. |
 | `pladj` | Proportion of Like Adjacencies | Percentage of cell-pair boundaries shared between cells of the *same* class. High values indicate a clumped or aggregated landscape. |
 | `contag` | Contagion | Measures the degree of clumping across all class pairs. Ranges from 0 (maximum interspersion) to 100 (single class). Requires ≥ 2 classes. |
+| `iji` | Interspersion & Juxtaposition | Evenness of adjacencies *among different classes* (like adjacencies are ignored). Ranges from near 0 (one class pair dominates the between-class boundaries) to 100 (every class is equally adjacent to every other). Requires ≥ 3 classes; otherwise `NA`. |
+
+## Information theory metrics
+
+These metrics come from treating the class-pair co-occurrence matrix as a
+bivariate probability distribution, following Nowosad and Stepinski (2019).
+Their value is that they separate *composition* (how many classes, how evenly
+mixed) from *configuration* (how the classes are arranged), which the diversity
+and contagion metrics confound. They require a categorical raster. The `base`
+argument sets the logarithm base; use `base = 2` for bits, matching
+`landscapemetrics`.
+
+| Code | Name | Description |
+|------|------|-------------|
+| `ent` | Marginal entropy, H(x) | Diversity of the cell values entering adjacencies. Increases with the number and evenness of classes; this is the composition signal. |
+| `joinent` | Joint entropy, H(x, y) | Diversity of the class-pair adjacencies themselves: the total complexity of the pattern. |
+| `condent` | Conditional entropy, H(y \| x) | Configurational complexity remaining once composition is accounted for: the uncertainty about a neighbor's class given the focal cell's class. |
+| `mutinf` | Mutual information, I(y, x) | How much a cell's class tells you about its neighbor's. Rises as like classes cluster; this is configuration separated from composition. |
+| `relmutinf` | Relative mutual information | `mutinf / ent`, rescaled to 0–1 so configuration can be compared across landscapes of differing composition. Equal to 1 when `mutinf` is 0. Unaffected by `base`. |
+
+## Class-level metrics {#class-level-metrics}
+
+The metrics above summarize the whole landscape within the buffer. These three
+instead describe a single focal class, supplied through the `class` argument of
+`landscape_var()` (an integer matching one of the raster's class codes). Asking
+for one of these metrics without a `class`, or supplying `class` to any other
+metric, is an error. Where the focal class is absent from a buffer, `pland` and
+`ca` return 0 and `clumpy` returns `NA`.
+
+| Code | Name | Description |
+|------|------|-------------|
+| `clumpy` | Clumpiness Index | Aggregation of the focal class, corrected for its own abundance. Ranges from -1 (maximally disaggregated) through 0 (random) to 1 (maximally clumped). |
+| `pland` | Percentage of Landscape | The focal class's share of the valid buffer cells, as a percentage. |
+| `ca` | Class Area | Area of the focal class within the buffer, in hectares. |
+
+```{r class-level-example}
+## Clumpiness of land-cover class 2, and that class's percentage cover,
+## both within a fixed 500 m radius
+class_vars <- msr_vars(
+  cover2_clumpy = landscape_var("landcover", metric = "clumpy", radius = 500, class = 2),
+  cover2_pland  = landscape_var("landcover", metric = "pland",  radius = 500, class = 2)
+)
+
+class_vars
+```
 
 ---
 
@@ -332,6 +384,58 @@ plot(ed_multi,
      main = c("ED — 200 m", "ED — 500 m", "ED — 900 m"))
 ```
 
+## Separating composition from configuration
+
+The information-theory metrics are most useful when you want to ask whether an
+effect is driven by *what* is in the neighborhood (its composition) or by *how*
+it is arranged (its configuration). The surfaces below project three metrics for
+the three-class `landcover` layer at a fixed 500 m radius.
+
+```{r info-theory-surfaces, fig.cap = "***Composition and configuration surfaces for the same landscape.***", fig.height = 3.5}
+info_surfaces <- kernel_scale.raster(
+  raster_stack = metric_rasters["landcover"],
+  scale_vars   = msr_vars(
+    H_x    = landscape_var("landcover", metric = "ent",    radius = 500, base = 2),
+    MI     = landscape_var("landcover", metric = "mutinf", radius = 500, base = 2),
+    relMI  = landscape_var("landcover", metric = "relmutinf", radius = 500)
+  ),
+  verbose = FALSE
+)
+
+plot(info_surfaces, main = c("Marginal entropy (bits)",
+                             "Mutual information (bits)",
+                             "Relative mutual information"))
+```
+
+**How to read these surfaces:** marginal entropy (`ent`, here in bits because
+`base = 2`) is a composition measure: it is high where the buffer holds several
+classes in roughly equal proportion, and near 0 where one class dominates.
+Mutual information (`mutinf`) is a configuration measure: it is high where like
+classes cluster into contiguous patches and low where the classes are finely
+interspersed, *independent* of how many classes are present. Relative mutual
+information (`relmutinf`) divides the two, putting configuration on a 0 to 1
+scale so it is comparable between neighborhoods that differ in composition. Two
+buffers can share the same `ent` yet have very different `mutinf`: same
+ingredients, different spatial arrangement. That separation is the reason to
+prefer these metrics over contagion when arrangement is the hypothesis of
+interest.
+
+For a single class, `clumpy` answers the same configuration question on the -1
+to 1 scale familiar from FRAGSTATS, while `pland` reports that class's cover:
+
+```{r clumpy-surface, fig.cap = "***Clumpiness and cover of land-cover class 2.***", fig.height = 3.5}
+class2_surfaces <- kernel_scale.raster(
+  raster_stack = metric_rasters["landcover"],
+  scale_vars   = msr_vars(
+    clumpy2 = landscape_var("landcover", metric = "clumpy", radius = 500, class = 2),
+    pland2  = landscape_var("landcover", metric = "pland",  radius = 500, class = 2)
+  ),
+  verbose = FALSE
+)
+
+plot(class2_surfaces, main = c("CLUMPY (class 2)", "PLAND (class 2, %)"))
+```
+
 ---
 
 # Optimizing landscape metric radii
@@ -365,3 +469,21 @@ acceptable.
 At present, optimized landscape metrics are not supported with
 `kernel = "expow"` because the exponential-power shape parameter does not apply
 cleanly to fixed-buffer landscape metrics.
+
+---
+
+# See also
+
+- `vignette("surface_metric_covariates", package = "multiScaleR")` for the
+  continuous-surface analogue of these metrics (roughness, gradient, and texture
+  of a continuous raster).
+- `vignette("multiScaleR_Guide", package = "multiScaleR")` for the core
+  kernel-weighting workflow.
+- The help page `?msr_vars` lists every supported metric with its definition.
+
+# References
+
+Nowosad, J., & Stepinski, T. F. (2019). Information theory as a consistent
+framework for quantification and classification of landscape patterns.
+*Landscape Ecology*, 34(9), 2091–2101.
+<https://doi.org/10.1007/s10980-019-00830-x>

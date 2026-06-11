@@ -1,3 +1,28 @@
+multiScaleR 0.6.36
+---------
+* `landscape_var()` gains nine categorical metrics, all reproducing the values
+  returned by the `landscapemetrics` package (FRAGSTATS conventions) for both the
+  fixed-buffer path and the FFT raster projection.
+* Configuration: `"iji"` (interspersion and juxtaposition), the evenness of the
+  adjacencies among different classes. Like contagion, it is built from the
+  per-window class-pair co-occurrence matrix that already powers `"contag"`, so
+  it adds no extra convolutions.
+* Information theory (Nowosad & Stepinski 2019): `"ent"` (marginal entropy),
+  `"condent"` (conditional entropy), `"joinent"` (joint entropy), `"mutinf"`
+  (mutual information), and `"relmutinf"` (relative mutual information). These
+  separate composition from configuration, which the diversity and contagion
+  metrics confound. The `base` argument now sets the logarithm base for these
+  entropies as well as the diversity metrics; set `base = 2` for bits, matching
+  `landscapemetrics`. The ratio metrics (`"relmutinf"`, `"iji"`) are unaffected
+  by `base`.
+* Class-level metrics, supplied through a new `class` argument naming the focal
+  class: `"clumpy"` (clumpiness index, -1 to 1), `"pland"` (percentage of
+  landscape), and `"ca"` (class area in hectares). `class` is required for these
+  three metrics and is not accepted for any other metric.
+* The landscape-metric vignette gains tables for the new families and a worked
+  example contrasting composition (`"ent"`) with configuration (`"mutinf"`,
+  `"clumpy"`).
+
 multiScaleR 0.6.35
 ---------
 * `surface_var()` gains the `"sdr"` metric (surface area ratio): the percentage

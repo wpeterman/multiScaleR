@@ -5,16 +5,16 @@ ci_func_cpp <- function(x, df, min_D = NULL, names = NULL) {
     .Call(`_multiScaleR_ci_func_cpp`, x, df, min_D, names)
 }
 
-landscape_composition_metric_cpp <- function(d, values, radius, metric, weights_, base, resolution_, classes_max_) {
-    .Call(`_multiScaleR_landscape_composition_metric_cpp`, d, values, radius, metric, weights_, base, resolution_, classes_max_)
+landscape_composition_metric_cpp <- function(d, values, radius, metric, weights_, base, resolution_, classes_max_, focal_class_) {
+    .Call(`_multiScaleR_landscape_composition_metric_cpp`, d, values, radius, metric, weights_, base, resolution_, classes_max_, focal_class_)
 }
 
 landscape_edge_metric_cpp <- function(d, values, cells, radius, resolution, n_cols, metric) {
     .Call(`_multiScaleR_landscape_edge_metric_cpp`, d, values, cells, radius, resolution, n_cols, metric)
 }
 
-landscape_adjacency_metric_cpp <- function(d, values, cells, radius, n_cols, metric) {
-    .Call(`_multiScaleR_landscape_adjacency_metric_cpp`, d, values, cells, radius, n_cols, metric)
+landscape_adjacency_metric_cpp <- function(d, values, cells, radius, n_cols, metric, base, focal_class_) {
+    .Call(`_multiScaleR_landscape_adjacency_metric_cpp`, d, values, cells, radius, n_cols, metric, base, focal_class_)
 }
 
 scale_type_cpp <- function(d, kernel = "gaussian", sigma_ = NULL, shape_ = NULL, r_stack_df = NULL, output = NULL) {

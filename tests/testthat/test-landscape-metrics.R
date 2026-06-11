@@ -832,3 +832,194 @@ test_that("kernel preparation rejects unscalable landscape covariates", {
     "zero variance"
   )
 })
+
+
+# Whole-landscape helpers: a buffer large enough to cover the entire raster makes
+# the per-window co-occurrence equal to the whole-landscape value, so the direct
+# C++ path can be compared to landscapemetrics at machine precision.
+landscape_whole_adjacency <- function(raster, metric, base = 2, focal = NULL) {
+  v <- terra::values(raster)[, 1]
+  n <- length(v)
+  .landscape_adjacency_by_buffer(
+    d = rep(0, n),
+    r_stack.df = data.frame(x = v),
+    cells = seq_len(n),
+    radius = 1e6,
+    n_cols = terra::ncol(raster),
+    metric = metric,
+    base = base,
+    focal_class = focal,
+    validate = FALSE
+  )[[1]]
+}
+
+landscape_whole_composition <- function(raster, metric, focal = NULL) {
+  v <- terra::values(raster)[, 1]
+  n <- length(v)
+  .landscape_composition_by_buffer(
+    d = rep(0, n),
+    r_stack.df = data.frame(x = v),
+    radius = 1e6,
+    metric = metric,
+    resolution = terra::res(raster)[[1]],
+    focal_class = focal,
+    validate = FALSE
+  )[[1]]
+}
+
+
+test_that("IJI and information-theory metrics match landscapemetrics", {
+  skip_if_not_installed("landscapemetrics")
+
+  lsm_funs <- list(
+    iji = landscapemetrics::lsm_l_iji,
+    ent = landscapemetrics::lsm_l_ent,
+    condent = landscapemetrics::lsm_l_condent,
+    joinent = landscapemetrics::lsm_l_joinent,
+    mutinf = landscapemetrics::lsm_l_mutinf,
+    relmutinf = landscapemetrics::lsm_l_relmutinf
+  )
+
+  for (seed in c(11, 27)) {
+    landcover <- landscape_test_raster(seed, 1:4)
+    for (metric in names(lsm_funs)) {
+      # base = 2 to match the log2 convention landscapemetrics uses
+      got <- landscape_whole_adjacency(landcover, metric, base = 2)
+      reference <- lsm_funs[[metric]](landcover)$value
+      expect_equal(got, reference, tolerance = 1e-6,
+                   info = paste0(metric, " (seed ", seed, ")"))
+    }
+  }
+})
+
+
+test_that("class-level CLUMPY, PLAND, and CA match landscapemetrics", {
+  skip_if_not_installed("landscapemetrics")
+
+  landcover <- landscape_test_raster(33, 1:4)
+  lm_clumpy <- landscapemetrics::lsm_c_clumpy(landcover)
+  lm_pland <- landscapemetrics::lsm_c_pland(landcover)
+  lm_ca <- landscapemetrics::lsm_c_ca(landcover)
+
+  for (k in 1:4) {
+    expect_equal(landscape_whole_adjacency(landcover, "clumpy", focal = k),
+                 lm_clumpy$value[lm_clumpy$class == k], tolerance = 1e-6,
+                 info = paste("clumpy class", k))
+    expect_equal(landscape_whole_composition(landcover, "pland", focal = k),
+                 lm_pland$value[lm_pland$class == k], tolerance = 1e-6,
+                 info = paste("pland class", k))
+    expect_equal(landscape_whole_composition(landcover, "ca", focal = k),
+                 lm_ca$value[lm_ca$class == k], tolerance = 1e-6,
+                 info = paste("ca class", k))
+  }
+})
+
+
+test_that("FFT projections of the new metrics agree with windowed landscapemetrics", {
+  skip_if_not_installed("landscapemetrics")
+
+  landcover <- landscape_test_raster(606, 1:4)
+  pts <- landscape_test_points(landcover)
+  radius <- 80
+  n_cols <- terra::ncol(landcover)
+
+  windowed_reference <- function(metric_call) {
+    landscape_cached_metric(
+      raster = landcover, pts = pts, radius = radius,
+      metric_fun = function(d, values, cells) {
+        keep <- d <= radius
+        local_matrix <- .landscape_cells_to_matrix(values[[1]][keep], cells[keep], n_cols)
+        metric_call(local_matrix)
+      }
+    )
+  }
+
+  # landscape-level (base = 2 for the information-theory metrics)
+  level_funs <- list(
+    iji = landscapemetrics::lsm_l_iji,
+    ent = landscapemetrics::lsm_l_ent,
+    mutinf = landscapemetrics::lsm_l_mutinf,
+    relmutinf = landscapemetrics::lsm_l_relmutinf
+  )
+  for (metric in names(level_funs)) {
+    projected <- terra::extract(
+      .landscape_adjacency_raster_fft(landcover, radius = radius, base = 2, metric = metric),
+      pts
+    )[, 2]
+    reference <- windowed_reference(function(m) {
+      suppressWarnings(level_funs[[metric]](m)$value)
+    })
+    expect_equal(projected, reference, tolerance = 1,
+                 info = paste("FFT", metric))
+  }
+
+  # class-level: clumpy (adjacency) and pland (composition) for one class
+  projected_clumpy <- terra::extract(
+    .landscape_adjacency_raster_fft(landcover, radius = radius, metric = "clumpy", focal_class = 2),
+    pts
+  )[, 2]
+  reference_clumpy <- windowed_reference(function(m) {
+    res <- suppressWarnings(landscapemetrics::lsm_c_clumpy(terra::rast(m)))
+    out <- res$value[res$class == 2]
+    if (length(out) == 0) NA_real_ else out
+  })
+  expect_equal(projected_clumpy, reference_clumpy, tolerance = 0.05,
+               info = "FFT clumpy")
+
+  projected_pland <- terra::extract(
+    .landscape_composition_raster_fft(landcover, radius = radius, metric = "pland", focal_class = 2),
+    pts
+  )[, 2]
+  reference_pland <- windowed_reference(function(m) {
+    res <- suppressWarnings(landscapemetrics::lsm_c_pland(terra::rast(m)))
+    out <- res$value[res$class == 2]
+    if (length(out) == 0) 0 else out
+  })
+  expect_equal(projected_pland, reference_pland, tolerance = 1,
+               info = "FFT pland")
+})
+
+
+test_that("new metrics handle invariant and degenerate landscapes", {
+  single <- landscape_test_raster(5, 1L)          # one class everywhere
+  two <- terra::rast(single)
+  terra::values(two) <- rep(c(1L, 2L), terra::ncell(single) / 2)
+
+  # IJI needs at least three classes
+  expect_true(is.na(landscape_whole_adjacency(single, "iji")))
+  expect_true(is.na(landscape_whole_adjacency(two, "iji")))
+
+  # A single class carries no information: entropy 0, relative MI defined as 1
+  expect_equal(landscape_whole_adjacency(single, "ent", base = 2), 0)
+  expect_equal(landscape_whole_adjacency(single, "mutinf", base = 2), 0)
+  expect_equal(landscape_whole_adjacency(single, "relmutinf"), 1)
+
+  # CLUMPY is NA where the focal class fills the landscape or is absent
+  expect_true(is.na(landscape_whole_adjacency(single, "clumpy", focal = 1)))
+  expect_true(is.na(landscape_whole_adjacency(single, "clumpy", focal = 9)))
+
+  # PLAND and CA: full cover for the present class, zero for an absent class
+  expect_equal(landscape_whole_composition(single, "pland", focal = 1), 100)
+  expect_equal(landscape_whole_composition(single, "pland", focal = 9), 0)
+  expect_equal(landscape_whole_composition(single, "ca", focal = 9), 0)
+})
+
+
+test_that("landscape_var validates the class argument", {
+  expect_error(landscape_var("x", "clumpy"), "`class` is required")
+  expect_error(landscape_var("x", "pland"), "`class` is required")
+  expect_error(landscape_var("x", "ca"), "`class` is required")
+  expect_error(landscape_var("x", "iji", class = 2), "applies only to the class-level")
+  expect_error(landscape_var("x", "shdi", class = 2), "applies only to the class-level")
+
+  spec <- landscape_var("x", "clumpy", class = 3)
+  expect_equal(spec$metric, "clumpy")
+  expect_equal(spec$class, 3)
+
+  vars <- msr_vars(
+    cover3 = landscape_var("x", "pland", radius = 100, class = 3),
+    juxta = landscape_var("x", "iji", radius = 100)
+  )
+  expect_true("class" %in% names(vars))
+  expect_equal(vars$class, c(3, NA_real_))
+})
