@@ -1,3 +1,18 @@
+multiScaleR 0.6.37
+---------
+* `profile_sigma()` is substantially faster. Along the profile grid only the
+  profiled covariate's sigma changes, so the kernel-weighted columns of the
+  other covariates are now computed once and reused, and only the profiled
+  covariate is re-evaluated at each grid point (previously every covariate was
+  recomputed at every point). The profiled log-likelihood and AICc are
+  bit-identical to before. The speedup grows with the number of covariates and
+  is largest when covariates are expensive to evaluate per point (landscape or
+  surface metrics, or older objects without the binned accelerator).
+* Internal: the covariate-weighting step of `kernel_scale_fn()` is factored into
+  `.msr_kernel_cov_w()` (which can compute a single covariate column), and the
+  objective accepts a precomputed covariate matrix via a new `cov_w` argument.
+  Behavior of the optimizer and the profile-likelihood intervals is unchanged.
+
 multiScaleR 0.6.36
 ---------
 * `landscape_var()` gains nine categorical metrics, all reproducing the values

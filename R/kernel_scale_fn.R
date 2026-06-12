@@ -167,45 +167,20 @@
 }
 
 
-#' @title Kernel scaling function
-#' @description Function for internal use with optim
-#' @param par list of parameters
-#' @param d_list List of distance vectors
-#' @param cov_df List of data frames with values extracted from rasters
-#' @param kernel Kernel used
-#' @param fitted_mod fitted model object
-#' @param join_by Data frame to join unmarked frame during optimization
-#' @param mod_return Default: NULL
-#' @param opt_context Cached optimization context created internally by `multiScale_optim()`
-#' @return Either estimated parameters or the fitted model using provided parameters
-#' @details For internal use
-#' @rdname kernel_scale_fn
-#' @keywords internal
-#' @importFrom insight get_data get_loglikelihood find_predictors
-#' @importFrom stats formula logLik model.frame
-#' @useDynLib multiScaleR, .registration=TRUE
-#' @importFrom Rcpp evalCpp
-#' @importFrom methods is
-kernel_scale_fn <- function(par,
-                            d_list,
-                            cov_df,
-                            kernel,
-                            fitted_mod,
-                            join_by = NULL,
-                            mod_return = NULL,
-                            opt_context = NULL){
-
-  if(is.null(opt_context)){
-    opt_context <- build_opt_context(fitted_mod = fitted_mod,
-                                     cov_df = cov_df,
-                                     join_by = join_by)
-  }
-
+# Build the raw (unscaled) kernel-weighted covariate matrix that `kernel_scale_fn()`
+# refits on. Extracted from `kernel_scale_fn()` so that callers which vary one
+# covariate at a time (notably `profile_sigma()`) can recompute a single column and
+# reuse the rest. `covariates = NULL` computes every model covariate, reproducing
+# the original in-line behavior exactly; a character subset computes only those
+# columns (same rows, same values).
+.msr_kernel_cov_w <- function(par,
+                              d_list,
+                              cov_df,
+                              kernel,
+                              opt_context,
+                              covariates = NULL) {
   binned <- opt_context$binned
 
-  # Number of points before any complete-case subsetting. With cell-level data
-  # this is length(d_list); in "lean" (binned-only) mode the cells were dropped
-  # and the count comes from the binned summaries.
   n_total <- if (!is.null(d_list)) {
     length(d_list)
   } else if (!is.null(binned)) {
@@ -243,26 +218,21 @@ kernel_scale_fn <- function(par,
     n_total
   }
 
-  mod <- opt_context$fitted_mod
-  mod_class <- opt_context$mod_class
   covs <- opt_context$covs
   n_covs <- opt_context$n_covs
   scale_vars <- opt_context$scale_vars
 
   sigma <- par[1:n_covs]
-  if(kernel == 'expow'){
+  if (kernel == 'expow') {
     shape <- par[(n_covs + 1):(n_covs * 2)]
   } else {
     shape <- NULL
   }
 
-  if(any(sigma < 0)){
-    obj <- 1e6^10
-    return(obj)
-  }
+  target_covs <- if (is.null(covariates)) covs else covariates
 
-  cov.w <- matrix(NA_real_, nrow = n_ind, ncol = n_covs)
-  colnames(cov.w) <- covs
+  cov.w <- matrix(NA_real_, nrow = n_ind, ncol = length(target_covs))
+  colnames(cov.w) <- target_covs
 
   # Resolve point/row identifiers, preferring the cell-level names and falling
   # back to the binned point ids (or the complete-case indices) in lean mode.
@@ -286,12 +256,12 @@ kernel_scale_fn <- function(par,
   # Kernel covariates that have precomputed binned summaries use the O(nbins)
   # fast path; everything else (landscape metrics, or legacy objects without
   # binned data) uses the exact per-cell evaluation.
-  binned_covs <- if (!is.null(binned)) intersect(covs, binned$covariates) else character(0)
+  binned_covs <- if (!is.null(binned)) intersect(target_covs, binned$covariates) else character(0)
+  opt_vars <- .msr_optimized_scale_vars(scale_vars)
+  param_covariates <- if (is.null(opt_vars)) covs else covs[covs %in% opt_vars$covariate]
 
-  if (length(binned_covs) == n_covs && n_covs > 0) {
-    # Pure kernel model: evaluate every covariate from binned summaries.
-    opt_vars <- .msr_optimized_scale_vars(scale_vars)
-    param_covariates <- if (is.null(opt_vars)) covs else covs[covs %in% opt_vars$covariate]
+  if (length(binned_covs) == length(target_covs) && length(target_covs) > 0) {
+    # Every requested covariate has a binned summary: pure fast path.
     cov.w[, binned_covs] <- .msr_binned_kernel_means(
       binned = binned,
       covs = binned_covs,
@@ -309,30 +279,33 @@ kernel_scale_fn <- function(par,
       )
     }
 
-    # Exact per-cell evaluation over ALL covariates (preserves the optimized-
-    # covariate sigma indexing used by `.msr_eval_scale_vars()`).
+    # Exact per-cell evaluation over the requested covariates. `sig_idx` maps the
+    # requested columns back to their positions in the full sigma/shape vectors so
+    # a subset is weighted with exactly the same parameters as the full matrix.
+    sig_idx <- match(target_covs, covs)
     for (i in seq_len(n_ind)) {
       if (is.null(scale_vars)) {
         cov.w[i, ] <-
           scale_type(d_list[[i]],
                      kernel = kernel,
-                     sigma = sigma,
-                     shape = shape,
-                     r_stack.df = cov_df[[i]][, covs, drop = FALSE])
+                     sigma = sigma[sig_idx],
+                     shape = if (is.null(shape)) NULL else shape[sig_idx],
+                     r_stack.df = cov_df[[i]][, target_covs, drop = FALSE])
       } else {
+        # `.msr_eval_scale_vars()` indexes `sigma`/`shape` by each covariate's
+        # position within the `covariates` it is handed, so a subset must receive
+        # the subset-ordered parameters (`sig_idx` maps back to the full vector).
         cov.w[i, ] <- .msr_eval_scale_vars(
           d = d_list[[i]],
           cov_df = cov_df[[i]],
           scale_vars = scale_vars,
-          sigma = sigma,
-          shape = shape,
+          sigma = sigma[sig_idx],
+          shape = if (is.null(shape)) NULL else shape[sig_idx],
           kernel = kernel,
           unit_conv = opt_context$unit_conv,
           resolution = opt_context$resolution,
           n_cols = opt_context$n_cols,
-          covariates = covs,
-          # The source raster was already validated as categorical during
-          # `kernel_prep()`; skip the per-evaluation re-scan/class detection.
+          covariates = target_covs,
           validate = FALSE
         )
       }
@@ -341,8 +314,6 @@ kernel_scale_fn <- function(par,
     # Overwrite the kernel covariate columns with their (faster, equivalent)
     # binned values so mixed kernel + landscape models still benefit.
     if (length(binned_covs) > 0 && !is.null(scale_vars)) {
-      opt_vars <- .msr_optimized_scale_vars(scale_vars)
-      param_covariates <- if (is.null(opt_vars)) covs else covs[covs %in% opt_vars$covariate]
       cov.w[, binned_covs] <- .msr_binned_kernel_means(
         binned = binned,
         covs = binned_covs,
@@ -353,6 +324,68 @@ kernel_scale_fn <- function(par,
         eval_idx = eval_idx
       )
     }
+  }
+
+  cov.w
+}
+
+
+#' @title Kernel scaling function
+#' @description Function for internal use with optim
+#' @param par list of parameters
+#' @param d_list List of distance vectors
+#' @param cov_df List of data frames with values extracted from rasters
+#' @param kernel Kernel used
+#' @param fitted_mod fitted model object
+#' @param join_by Data frame to join unmarked frame during optimization
+#' @param mod_return Default: NULL
+#' @param opt_context Cached optimization context created internally by `multiScale_optim()`
+#' @param cov_w Optional precomputed (unscaled) kernel-weighted covariate matrix.
+#'   When supplied, the per-covariate weighting step is skipped and this matrix is
+#'   scaled and refit directly. Used by `profile_sigma()` to reuse the columns of
+#'   covariates that are held at their optimum. Default: NULL (compute internally).
+#' @return Either estimated parameters or the fitted model using provided parameters
+#' @details For internal use
+#' @rdname kernel_scale_fn
+#' @keywords internal
+#' @importFrom insight get_data get_loglikelihood find_predictors
+#' @importFrom stats formula logLik model.frame
+#' @useDynLib multiScaleR, .registration=TRUE
+#' @importFrom Rcpp evalCpp
+#' @importFrom methods is
+kernel_scale_fn <- function(par,
+                            d_list,
+                            cov_df,
+                            kernel,
+                            fitted_mod,
+                            join_by = NULL,
+                            mod_return = NULL,
+                            opt_context = NULL,
+                            cov_w = NULL){
+
+  if(is.null(opt_context)){
+    opt_context <- build_opt_context(fitted_mod = fitted_mod,
+                                     cov_df = cov_df,
+                                     join_by = join_by)
+  }
+
+  mod <- opt_context$fitted_mod
+  mod_class <- opt_context$mod_class
+  n_covs <- opt_context$n_covs
+
+  sigma <- par[1:n_covs]
+  if (any(sigma < 0)) {
+    return(1e6^10)
+  }
+
+  if (is.null(cov_w)) {
+    cov.w <- .msr_kernel_cov_w(par = par,
+                               d_list = d_list,
+                               cov_df = cov_df,
+                               kernel = kernel,
+                               opt_context = opt_context)
+  } else {
+    cov.w <- cov_w
   }
 
   scale_validation_error <- tryCatch(

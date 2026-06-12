@@ -12,7 +12,8 @@ kernel_scale_fn(
   fitted_mod,
   join_by = NULL,
   mod_return = NULL,
-  opt_context = NULL
+  opt_context = NULL,
+  cov_w = NULL
 )
 }
 \arguments{
@@ -31,6 +32,11 @@ kernel_scale_fn(
 \item{mod_return}{Default: NULL}
 
 \item{opt_context}{Cached optimization context created internally by `multiScale_optim()`}
+
+\item{cov_w}{Optional precomputed (unscaled) kernel-weighted covariate matrix.
+When supplied, the per-covariate weighting step is skipped and this matrix is
+scaled and refit directly. Used by `profile_sigma()` to reuse the columns of
+covariates that are held at their optimum. Default: NULL (compute internally).}
 }
 \value{
 Either estimated parameters or the fitted model using provided parameters

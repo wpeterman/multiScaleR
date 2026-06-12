@@ -206,9 +206,27 @@ profile_sigma <- function(x,
   }
   n_grid <- length(sigma_seq)
 
+  # Only the profiled covariate's sigma changes across the grid; every other
+  # covariate sits at its optimum and produces an identical kernel-weighted
+  # column on every grid point. Compute those optimum columns once and reuse
+  # them, recomputing just the profiled column per point. This avoids the
+  # dominant cost (the per-point covariate weighting) for the held covariates.
+  # If the baseline cannot be built (e.g. a lean object missing data a covariate
+  # needs), `base_cov_w` is NULL and each point falls back to a full evaluation.
+  base_par <- if (is.null(opt_shape)) opt_par else c(opt_par, opt_shape)
+  base_cov_w <- tryCatch(
+    .msr_kernel_cov_w(par = base_par,
+                      d_list = kernel_inputs$d_list,
+                      cov_df = kernel_inputs$raw_cov,
+                      kernel = kernel,
+                      opt_context = opt_context),
+    error = function(e) NULL
+  )
+
   profile_one_covariate <- function(j) {
     ll_vec   <- numeric(n_grid)
     aicc_vec <- numeric(n_grid)
+    cov_name <- covs[j]
 
     for (i in seq_len(n_grid)) {
       # Build parameter vector: replace j-th sigma, keep others at optimum
@@ -218,6 +236,26 @@ profile_sigma <- function(x,
       # Append shape parameters if expow
       if (!is.null(opt_shape)) {
         par_i <- c(par_i, opt_shape)
+      }
+
+      # Reuse the cached optimum columns and recompute only the profiled
+      # covariate. A NULL baseline (or any failure here) means `cov_w_i` stays
+      # NULL and `kernel_scale_fn()` recomputes every covariate as before.
+      cov_w_i <- NULL
+      if (!is.null(base_cov_w)) {
+        cov_w_i <- tryCatch({
+          col_j <- .msr_kernel_cov_w(
+            par = par_i,
+            d_list = kernel_inputs$d_list,
+            cov_df = kernel_inputs$raw_cov,
+            kernel = kernel,
+            opt_context = opt_context,
+            covariates = cov_name
+          )
+          cw <- base_cov_w
+          cw[, cov_name] <- col_j[, cov_name]
+          cw
+        }, error = function(e) NULL)
       }
 
       # Evaluate negative log-likelihood
@@ -230,7 +268,8 @@ profile_sigma <- function(x,
           fitted_mod  = opt_context$fitted_mod,
           join_by     = join_by,
           mod_return  = NULL,
-          opt_context = opt_context
+          opt_context = opt_context,
+          cov_w       = cov_w_i
         ),
         error = function(e) NA_real_
       )
