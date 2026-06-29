@@ -29,7 +29,7 @@
 #'
 #' @return
 #' When \code{model} is provided: a data frame with one row per optimized
-#' covariate and three columns — \code{Mean} (distance at the estimated sigma),
+#' covariate and three columns: \code{Mean} (distance at the estimated sigma),
 #' \code{Lower} (distance at the lower 95\% CI of sigma), and \code{Upper}
 #' (distance at the upper 95\% CI of sigma). Values are rounded to two decimal
 #' places.

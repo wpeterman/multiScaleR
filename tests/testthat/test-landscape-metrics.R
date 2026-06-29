@@ -834,6 +834,66 @@ test_that("kernel preparation rejects unscalable landscape covariates", {
 })
 
 
+test_that("fragile landscape metrics give metric-specific scale-variation guidance", {
+  landcover_two <- terra::rast(
+    nrows = 20,
+    ncols = 20,
+    xmin = 0,
+    xmax = 200,
+    ymin = 0,
+    ymax = 200,
+    crs = "EPSG:3857"
+  )
+  terra::values(landcover_two) <- rep(c(1L, 2L), length.out = terra::ncell(landcover_two))
+  names(landcover_two) <- "landcover"
+  pts <- terra::vect(cbind(c(55, 85, 115), c(55, 85, 115)),
+                     crs = terra::crs(landcover_two))
+
+  expect_error(
+    kernel_prep(
+      pts = pts,
+      raster_stack = landcover_two,
+      max_D = 30,
+      scale_vars = msr_vars(
+        landcover_iji = landscape_var("landcover", metric = "iji", radius = 30)
+      ),
+      verbose = FALSE
+    ),
+    "Metric `iji` is fragile"
+  )
+
+  landcover_single <- terra::rast(landcover_two)
+  terra::values(landcover_single) <- 1L
+  names(landcover_single) <- "landcover"
+
+  expect_error(
+    kernel_prep(
+      pts = pts,
+      raster_stack = landcover_single,
+      max_D = 30,
+      scale_vars = msr_vars(
+        landcover_siei = landscape_var("landcover", metric = "siei", radius = 30)
+      ),
+      verbose = FALSE
+    ),
+    "Metric `siei` can lose variation"
+  )
+
+  expect_error(
+    kernel_prep(
+      pts = pts,
+      raster_stack = landcover_single,
+      max_D = 30,
+      scale_vars = msr_vars(
+        landcover_msiei = landscape_var("landcover", metric = "msiei", radius = 30)
+      ),
+      verbose = FALSE
+    ),
+    "Metric `msiei` can lose variation"
+  )
+})
+
+
 # Whole-landscape helpers: a buffer large enough to cover the entire raster makes
 # the per-window co-occurrence equal to the whole-landscape value, so the direct
 # C++ path can be compared to landscapemetrics at machine precision.

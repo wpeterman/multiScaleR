@@ -1,43 +1,49 @@
 ## Test environments
 
--   local Windows 11, R 4.5.3
--   GitHub Actions (macOS, Windows, Ubuntu)
+- local Windows 11, R 4.6.0
 
 ## R CMD check results
 
-0 errors \| 0 warnings \| 0 notes
+Local validation for this release candidate completed with:
+
+- 0 errors
+- 0 warnings
+- 0 notes
+
+Command used:
+
+```r
+rcmdcheck::rcmdcheck(args = c("--as-cran", "--no-manual"),
+                     check_dir = "checks",
+                     error_on = "never")
+```
 
 ## Changes from Previous Submission
 
-This update includes changes made since version 0.5.0:
+This update is the 0.7.0 release of multiScaleR. Major changes include:
 
--   added a Windows R-devel compatibility shim for Rcpp header compilation
--   forced C++17 compilation for compatibility with CRAN Windows R-devel checks
--   expanded unit test coverage
--   improved error and diagnostic messaging
--   added optional profile-likelihood scale intervals
--   added sigma profiling and plot methods
--   made profile-likelihood confidence intervals opt-in
--   fixed complete-case alignment in multiscale optimization inputs
--   added structured optimization diagnostics and a `diagnostics()` accessor
--   added an optional custom refit hook for model classes that cannot use default model updates
--   fixed singular-Hessian fallback SE values to remain numeric
--   excluded missing raster cells from sparse kernel weighted averages
--   added linear and user-specified sigma grids to `profile_sigma()`
--   preserved original sparse kernel dot-product behavior for complete raster layers
--   preserved point row identities across `kernel_prep()` outputs used during optimization
--   ensured PSOCK workers use the same multiScaleR code as the main R session
--   fixed complete-case row alignment when fitted model frames retain original row names
--   fixed PSOCK optimization for unqualified model calls such as `glm.nb()` after `library(MASS)`
--   improved model-data, predictor, and log-likelihood handling for wrapped model objects
--   added regression coverage for nested `clogit` wrappers in serial and PSOCK optimization
--   avoided recoverable model-data warnings in marginal effect plots
--   updated vignettes and documentation
+- self-contained vignettes for CRAN rebuilds
+- new categorical landscape metrics, including edge, adjacency,
+  information-theory, and class-level metrics
+- new continuous surface texture metrics, including weighted surface
+  heterogeneity metrics
+- faster `profile_sigma()` evaluation for models with multiple expensive
+  covariates, with a reproducible benchmark included under `tools/benchmarks/`
+- improved diagnostics for landscape metrics that are undefined or uninformative
+  during scale optimization
+- expanded unit tests and vignette documentation for landscape and surface
+  metric workflows
 
-### Addressed CRAN feedback:
+### Addressed CRAN feedback
 
--   Version 0.6.11 failed the CRAN incoming Windows R-devel pretest during package installation because the R-devel toolchain compiled the package with C++20 and the installed Rcpp headers failed before package code was compiled. Version 0.6.12 explicitly sets `CXX_STD = CXX17` in both `src/Makevars` and `src/Makevars.win`.
--   Version 0.6.12 still failed the CRAN incoming Windows R-devel pretest during package installation because the Windows R-devel headers available to win-builder did not declare `R_NamespaceRegistry`, while the installed Rcpp headers still referenced it. Version 0.6.13 adds a small Windows/R-devel-only compatibility header that declares the symbol before Rcpp headers are included. Debian R-devel checks for 0.6.12 otherwise passed with only the recent-update incoming note.
+CRAN checks for version 0.6.13 reported an ERROR on
+`r-devel-linux-x86_64-fedora-gcc` while rebuilding `multiScaleR_Guide.Rmd`.
+The failure occurred because the vignette setup attempted to download
+precomputed `.RData` objects from GitHub during the CRAN rebuild.
+
+Version 0.7.0 removes remote vignette downloads. The guide now relies on package
+data, lightweight live examples, and precomputed objects bundled in
+`inst/extdata`, so vignette rebuilds do not depend on network access.
 
 ## Downstream Dependencies
 

@@ -74,7 +74,9 @@ validate_multiScaleR_input <- function(x, arg = "multiScaleR") {
   }
 }
 
-validate_covariates_before_scale <- function(x, context = "calculated covariates") {
+validate_covariates_before_scale <- function(x,
+                                             context = "calculated covariates",
+                                             scale_vars = NULL) {
   x <- as.matrix(x)
   if (ncol(x) == 0) {
     return(invisible(TRUE))
@@ -92,7 +94,10 @@ validate_covariates_before_scale <- function(x, context = "calculated covariates
 
     if (!any(non_missing)) {
       stop(
-        sprintf("Cannot scale %s: covariate `%s` is all NA.", context, covariate),
+        paste0(
+          sprintf("Cannot scale %s: covariate `%s` is all NA.", context, covariate),
+          .msr_covariate_scale_hint(covariate, scale_vars)
+        ),
         call. = FALSE
       )
     }
@@ -112,11 +117,46 @@ validate_covariates_before_scale <- function(x, context = "calculated covariates
     finite_values <- values[finite]
     if (length(unique(finite_values)) < 2 || isTRUE(stats::sd(finite_values) == 0)) {
       stop(
-        sprintf("Cannot scale %s: covariate `%s` has zero variance.", context, covariate),
+        paste0(
+          sprintf("Cannot scale %s: covariate `%s` has zero variance.", context, covariate),
+          .msr_covariate_scale_hint(covariate, scale_vars)
+        ),
         call. = FALSE
       )
     }
   }
 
   invisible(TRUE)
+}
+
+.msr_covariate_scale_hint <- function(covariate, scale_vars = NULL) {
+  if (is.null(scale_vars) || !inherits(scale_vars, "multiScaleR_vars")) {
+    return("")
+  }
+
+  spec <- scale_vars[scale_vars$covariate == covariate, , drop = FALSE]
+  if (nrow(spec) != 1 || !identical(spec$type, "landscape")) {
+    return("")
+  }
+
+  metric <- spec$metric
+  if (metric == "iji") {
+    return(paste0(
+      " Metric `iji` is fragile for scale optimization because it requires ",
+      "at least three classes and enough between-class adjacencies in each ",
+      "buffer; prescreen it for usable variation, increase the radius or ",
+      "`max_D`, or use a more stable diversity or entropy metric."
+    ))
+  }
+
+  if (metric %in% c("siei", "msiei")) {
+    return(paste0(
+      " Metric `", metric, "` can lose variation when local class evenness ",
+      "is uniform or saturated; prescreen it across sample points before ",
+      "optimizing its scale, increase the radius or `max_D`, or use the ",
+      "corresponding diversity metric."
+    ))
+  }
+
+  ""
 }

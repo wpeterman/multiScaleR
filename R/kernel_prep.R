@@ -33,7 +33,7 @@
 #' @param scale_vars Optional variable specifications created with
 #'   \code{\link{msr_vars}}. When omitted, each raster layer becomes one
 #'   kernel-weighted covariate with the same name, preserving historical
-#'   behavior. Provide \code{scale_vars} to define derived model covariates —
+#'   behavior. Provide \code{scale_vars} to define derived model covariates,
 #'   for example, combining a kernel-weighted mean with landscape composition
 #'   or edge metrics from the same source layer. See \code{\link{kernel_var}}
 #'   and \code{\link{landscape_var}}.
@@ -41,11 +41,11 @@
 #'   optimization. Length must equal the number of covariates with
 #'   \code{optimize = TRUE} in \code{scale_vars} (or the number of raster
 #'   layers when \code{scale_vars} is not provided). Values must be in the same
-#'   units as the projection. Default: \code{NULL} — initial values are
+#'   units as the projection. Default: \code{NULL}; initial values are
 #'   generated automatically as \code{max_D / 2}, which is recommended.
 #' @param shape Optional numeric vector of initial shape values when
 #'   \code{kernel = "expow"}. Length requirements same as \code{sigma}. Default:
-#'   \code{NULL} — starting values of 2 are generated automatically.
+#'   \code{NULL}; starting values of 2 are generated automatically.
 #' @param projected Logical. Whether \code{pts} and \code{raster_stack} are in a
 #'   projected (planar) coordinate system. Currently only projected coordinates
 #'   are supported. Default: \code{TRUE}.
@@ -103,7 +103,7 @@
 #'   \item{\code{n_cols}}{Integer. Number of raster columns (used for adjacency
 #'     landscape metrics).}
 #'   \item{\code{scl_params}}{Named list with elements \code{mean} and \code{sd}
-#'     — the centering and scaling parameters applied to \code{kernel_dat}.
+#'     the centering and scaling parameters applied to \code{kernel_dat}.
 #'     Stored for use by \code{\link{kernel_scale.raster}} when
 #'     \code{scale_center = TRUE}.}
 #'   \item{\code{binned}}{When \code{bin = TRUE}, a list of precomputed
@@ -127,7 +127,7 @@
 #' \code{\link{multiScale_optim}}, the \code{max_distance} diagnostic will warn
 #' if the estimated scale approaches \code{max_D}.
 #'
-#' Initial \code{sigma} values do not need to be precise — the optimizer will
+#' Initial \code{sigma} values do not need to be precise. The optimizer will
 #' refine them. Provide explicit starting values only if the default
 #' (\code{max_D / 2}) leads to convergence problems.
 #'
@@ -421,7 +421,9 @@ kernel_prep <- function(pts,
     close(pb)
   }
 
-  validate_covariates_before_scale(cov.w, context = "`kernel_prep()` covariates")
+  validate_covariates_before_scale(cov.w,
+                                   context = "`kernel_prep()` covariates",
+                                   scale_vars = scale_vars)
   scl_df <- scale(cov.w)
   kernel_dat <- as.data.frame(scl_df)
 

@@ -1,0 +1,13 @@
+"case","implementation","replicate","elapsed_sec","n_profile_points","n_covariates"
+"landscape_metrics_four_covariates","legacy_full_recompute",1,0.92,5,4
+"landscape_metrics_four_covariates","current_reuse_held_covariates",1,0.370000000000001,5,4
+"landscape_metrics_four_covariates","legacy_full_recompute",2,0.969999999999999,5,4
+"landscape_metrics_four_covariates","current_reuse_held_covariates",2,0.359999999999999,5,4
+"landscape_metrics_four_covariates","legacy_full_recompute",3,0.940000000000001,5,4
+"landscape_metrics_four_covariates","current_reuse_held_covariates",3,0.309999999999999,5,4
+"weighted_surface_metrics_four_covariates","legacy_full_recompute",1,1.23,5,4
+"weighted_surface_metrics_four_covariates","current_reuse_held_covariates",1,0.41,5,4
+"weighted_surface_metrics_four_covariates","legacy_full_recompute",2,1.08,5,4
+"weighted_surface_metrics_four_covariates","current_reuse_held_covariates",2,0.450000000000003,5,4
+"weighted_surface_metrics_four_covariates","legacy_full_recompute",3,1.07,5,4
+"weighted_surface_metrics_four_covariates","current_reuse_held_covariates",3,0.590000000000003,5,4

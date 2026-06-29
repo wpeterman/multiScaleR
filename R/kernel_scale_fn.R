@@ -390,7 +390,9 @@ kernel_scale_fn <- function(par,
 
   scale_validation_error <- tryCatch(
     {
-      validate_covariates_before_scale(cov.w, context = "optimized covariates")
+      validate_covariates_before_scale(cov.w,
+                                       context = "optimized covariates",
+                                       scale_vars = opt_context$scale_vars)
       NULL
     },
     error = function(e) conditionMessage(e)

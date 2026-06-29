@@ -28,7 +28,7 @@ during model fitting (or the \code{source} names in \code{scale_vars}).}
 
 \item{sigma}{Numeric vector of kernel scale parameter(s) in the same units
 as the raster projection (e.g., metres). One value per raster layer.
-Ignored when \code{multiScaleR} is provided — sigma values are extracted
+Ignored when \code{multiScaleR} is provided; sigma values are extracted
 from the fitted object automatically.}
 
 \item{multiScaleR}{A fitted object of class \code{"multiScaleR"} (from
@@ -120,7 +120,7 @@ preds <- terra::predict(opt_hab_sc, opt$opt_mod, type = "response")
 
 The FFT convolution (\code{fft = TRUE}) is substantially faster for large
 rasters or wide kernels. It produces minor edge artefacts near raster
-boundaries — typically within one kernel-width of the edge. For analyses
+boundaries, typically within one kernel-width of the edge. For analyses
 focused on interior areas this is usually negligible. Use
 \code{fft = FALSE} for exact focal smoothing when edge accuracy matters.
 

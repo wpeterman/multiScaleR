@@ -49,7 +49,7 @@ diagnostic is triggered. \code{diagnostics()} provides programmatic access
 to the same information without re-running the model.
 
 When \code{max_distance} is triggered, consider re-running
-\code{\link{kernel_prep}} with a larger \code{max_D} value — the suggested
+\code{\link{kernel_prep}} with a larger \code{max_D} value. The suggested
 minimum is stored in \code{suggested_max_D}.
 
 When \code{sigma_precision} is triggered, the variable may not have a

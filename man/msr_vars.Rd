@@ -150,9 +150,11 @@ Composition metrics (require a categorical raster):
   \item{\code{"shdi"}}{Shannon diversity index.}
   \item{\code{"shei"}}{Shannon evenness index.}
   \item{\code{"sidi"}}{Simpson diversity index.}
-  \item{\code{"siei"}}{Simpson evenness index.}
+  \item{\code{"siei"}}{Simpson evenness index. Can be uninformative for
+    optimized scales when local evenness is uniform across sample points.}
   \item{\code{"msidi"}}{Modified Simpson diversity index.}
-  \item{\code{"msiei"}}{Modified Simpson evenness index.}
+  \item{\code{"msiei"}}{Modified Simpson evenness index. Can be uninformative
+    for optimized scales when local evenness is uniform across sample points.}
   \item{\code{"pr"}}{Patch richness (number of distinct classes).}
   \item{\code{"prd"}}{Patch richness density (pr per 100 ha).}
   \item{\code{"rpr"}}{Relative patch richness (pr / classes_max * 100).}
@@ -180,7 +182,10 @@ Adjacency metrics (configuration; built from cell-pair counts):
     of the adjacencies among the different classes, ignoring like adjacencies.
     Ranges from near 0 (one class pair dominates the between-class
     boundaries) to 100 (every class is equally adjacent to every other).
-    Undefined, and returned as \code{NA}, for fewer than 3 classes.}
+    Undefined, and returned as \code{NA}, for fewer than 3 classes. For
+    optimized scales, prescreen for usable variation because local windows
+    with too few classes or between-class adjacencies can produce all
+    \code{NA} values.}
 }
 
 Information theory metrics (configuration and composition; built from the
@@ -226,6 +231,13 @@ The current ceilings are 200 classes for the like-adjacency metrics
 built from the full class-pair matrix (\code{"contag"}, \code{"iji"}, and the
 information-theory family), whose cost scales with the square of the class
 count.
+
+Before optimizing the scale of \code{"iji"}, \code{"siei"}, or \code{"msiei"},
+inspect a pilot \code{kernel_prep()} result or a few fixed radii. These
+metrics can be undefined or nearly constant when buffers contain too few
+classes, too few between-class adjacencies, or nearly identical evenness at
+all sample points. In that case, use a larger radius, increase \code{max_D},
+or choose a more stable diversity, entropy, or edge metric.
 
 \strong{Supported surface texture metrics}
 

@@ -84,9 +84,9 @@ buffer. They require a categorical (integer-valued) raster.
 | `shdi` | Shannon Diversity Index | $-\sum p_i \ln p_i$, where $p_i$ is the proportion of class $i$. Increases with richness and evenness. The `base` argument controls the logarithm base (default: natural log). |
 | `shei` | Shannon Evenness Index | SHDI / ln(richness). Ranges from 0 (one dominant class) to 1 (perfectly even). |
 | `sidi` | Simpson Diversity Index | $1 - \sum p_i^2$. Probability that two randomly selected cells belong to different classes. Ranges from 0 to 1. |
-| `siei` | Simpson Evenness Index | SIDI / (1 − 1/richness). Standardizes SIDI against maximum possible diversity; requires ≥ 2 classes. |
+| `siei` | Simpson Evenness Index | SIDI / (1 - 1/richness). Standardizes SIDI against maximum possible diversity. Requires at least 2 classes and can be uninformative for optimized scales when local evenness is uniform across sample points. |
 | `msidi` | Modified Simpson Diversity | $-\ln \sum p_i^2$. Logarithmic transformation of Simpson concentration; unbounded above. |
-| `msiei` | Modified Simpson Evenness | MSIDI / ln(richness). Evenness analogue of MSIDI. |
+| `msiei` | Modified Simpson Evenness | MSIDI / ln(richness). Evenness analogue of MSIDI. Can be uninformative for optimized scales when local evenness is uniform across sample points. |
 | `pr` | Patch Richness | Count of distinct classes present in the buffer. |
 | `prd` | Patch Richness Density | PR per 100 ha of buffer area. |
 | `rpr` | Relative Patch Richness | (PR / `classes_max`) × 100. Requires the `classes_max` argument. |
@@ -113,8 +113,8 @@ class-by-class co-occurrence matrix).
 |------|------|-------------|
 | `ai` | Aggregation Index | Area-weighted aggregation of like adjacencies within classes. Higher values indicate that classes are more aggregated. |
 | `pladj` | Proportion of Like Adjacencies | Percentage of cell-pair boundaries shared between cells of the *same* class. High values indicate a clumped or aggregated landscape. |
-| `contag` | Contagion | Measures the degree of clumping across all class pairs. Ranges from 0 (maximum interspersion) to 100 (single class). Requires ≥ 2 classes. |
-| `iji` | Interspersion & Juxtaposition | Evenness of adjacencies *among different classes* (like adjacencies are ignored). Ranges from near 0 (one class pair dominates the between-class boundaries) to 100 (every class is equally adjacent to every other). Requires ≥ 3 classes; otherwise `NA`. |
+| `contag` | Contagion | Measures the degree of clumping across all class pairs. Ranges from 0 (maximum interspersion) to 100 (single class). Requires at least 2 classes. |
+| `iji` | Interspersion & Juxtaposition | Evenness of adjacencies *among different classes* (like adjacencies are ignored). Ranges from near 0 (one class pair dominates the between-class boundaries) to 100 (every class is equally adjacent to every other). Requires at least 3 classes and enough between-class adjacencies in each buffer; otherwise it returns `NA`. |
 
 ## Information theory metrics
 
@@ -336,7 +336,7 @@ standalone_vars <- msr_vars(
   cover_sidi  = landscape_var("landcover", metric = "sidi",  radius = 500)
 )
 
-## Apply directly — no multiScaleR object or sigma values required
+## Apply directly: no multiScaleR object or sigma values required
 metric_surfaces <- kernel_scale.raster(
   raster_stack = metric_rasters,
   scale_vars   = standalone_vars,
@@ -353,7 +353,7 @@ names(metric_surfaces)
 ```
 
 You can also compute a single metric in one line without defining a `msr_vars()`
-object — simply wrap a single `landscape_var()` call:
+object. Simply wrap a single `landscape_var()` call:
 
 ```{r standalone-single, fig.cap = "***Edge density within a 300 m radius.***"}
 ed_300 <- kernel_scale.raster(
@@ -381,7 +381,7 @@ ed_multi <- kernel_scale.raster(
 )
 
 plot(ed_multi,
-     main = c("ED — 200 m", "ED — 500 m", "ED — 900 m"))
+     main = c("ED: 200 m", "ED: 500 m", "ED: 900 m"))
 ```
 
 ## Separating composition from configuration
@@ -456,6 +456,13 @@ optimizing a kernel-weighted mean. At each candidate radius, the landscape metri
 must be recalculated for every sample point. For moderate or large data sets,
 consider first testing the workflow with a subset of points or using
 precomputed results in reproducible documents.
+
+Before optimizing `iji`, `siei`, or `msiei`, inspect a pilot `kernel_prep()`
+result or compare a few fixed radii. These metrics can be all `NA` or nearly
+constant when buffers contain too few classes, too few between-class
+adjacencies, or nearly identical evenness at all sample points. In that case,
+use a larger radius, increase `max_D`, or choose a more stable diversity,
+entropy, or edge metric.
 
 ---
 

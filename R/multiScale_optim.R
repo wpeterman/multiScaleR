@@ -359,7 +359,7 @@
 #'   Values must be divided by \code{max_D} to match the internal scaled
 #'   parameter space. Length must equal the number of optimized covariates
 #'   (or twice that for \code{kernel = "expow"}, where shape parameters follow
-#'   sigma parameters). Default: \code{NULL} — starting values are chosen
+#'   sigma parameters). Default: \code{NULL}; starting values are chosen
 #'   automatically.
 #' @param start_strategy Character. How to choose starting values when
 #'   \code{par = NULL}: \code{"single"} (default) uses one shared default
@@ -421,7 +421,7 @@
 #'   \item{\code{kernel_inputs}}{The \code{kernel_inputs} list (minus
 #'     \code{min_D} and \code{max_D}, which are stored separately).}
 #'   \item{\code{scl_params}}{Named list with \code{mean} and \code{sd} vectors
-#'     for each covariate — the centering and scaling parameters from the
+#'     for each covariate: the centering and scaling parameters from the
 #'     optimized kernel data. Used by \code{\link{kernel_scale.raster}} when
 #'     \code{scale_center = TRUE}.}
 #'   \item{\code{join_by}}{The \code{join_by} data frame, or \code{NULL}.}

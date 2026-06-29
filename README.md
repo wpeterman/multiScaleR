@@ -27,7 +27,7 @@ Then execute the following commands in R:
 ``` r
 # Install 'remotes' package, if needed
 if(!("remotes" %in% list.files(.libPaths()))) {
-      install.packages("remotes", repo = "http://cran.rstudio.com", dep = TRUE) 
+      install.packages("remotes", repo = "https://cloud.r-project.org", dep = TRUE)
 } 
 
 remotes::install_github("wpeterman/multiScaleR", 

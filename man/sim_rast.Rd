@@ -77,7 +77,7 @@ function. The underlying continuous fields are normalized to [0, 1] before
 thresholding (binary surfaces) or returning directly (continuous surfaces).
 
 The two autocorrelation ranges allow simulation of covariates that operate
-at different spatial scales — a common scenario in landscape ecology where
+at different spatial scales, a common scenario in landscape ecology where
 some resources are patchily distributed at fine scales and others vary
 broadly across the study area.
 

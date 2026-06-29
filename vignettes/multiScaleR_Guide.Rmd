@@ -254,7 +254,7 @@ The `kernel_inputs` object holds the distance data and the initial kernel-weight
 
 By default (`bin = TRUE`), `kernel_prep()` precomputes distance-binned summaries of each kernel-weighted covariate. During `multiScale_optim()` these let the optimizer evaluate kernel-weighted means in `O(nbins)` per point instead of iterating every raster cell in the buffer, so optimization speed becomes essentially independent of `max_D`. The binning is controlled by `nbins` (default 256) and reproduces the exact scale estimates to several significant figures; set `bin = FALSE` to force the exact per-cell path.
 
-For large point sets or a large `max_D` — where the stored cell data dominate memory — add `store_cell_data = FALSE` to drop the per-cell data after binning, keeping only the compact summaries needed to optimize, profile, and project:
+For large point sets or a large `max_D`, where the stored cell data dominate memory, add `store_cell_data = FALSE` to drop the per-cell data after binning, keeping only the compact summaries needed to optimize, profile, and project:
 
 ```{r eval = FALSE}
 kernel_inputs <- kernel_prep(pts = pts,

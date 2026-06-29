@@ -1,17 +1,26 @@
-multiScaleR 0.6.37
+multiScaleR 0.7.0
 ---------
-* `profile_sigma()` is substantially faster. Along the profile grid only the
-  profiled covariate's sigma changes, so the kernel-weighted columns of the
-  other covariates are now computed once and reused, and only the profiled
-  covariate is re-evaluated at each grid point (previously every covariate was
-  recomputed at every point). The profiled log-likelihood and AICc are
-  bit-identical to before. The speedup grows with the number of covariates and
-  is largest when covariates are expensive to evaluate per point (landscape or
-  surface metrics, or older objects without the binned accelerator).
+* Vignettes are self-contained for CRAN rebuilds. The main guide uses package
+  data and bundled example objects rather than downloading precomputed objects
+  from GitHub during vignette setup.
+* `profile_sigma()` is faster when profiling models with multiple expensive
+  covariates. Along the profile grid only the profiled covariate's sigma
+  changes, so the kernel-weighted columns of the other covariates are now
+  computed once and reused, and only the profiled covariate is re-evaluated at
+  each grid point. The reproducible benchmark in
+  `tools/benchmarks/profile_sigma_covariate_reuse_benchmark.R` checks that the
+  profile values match the legacy full-recompute loop before timing. On the
+  local benchmark, the current path was 2.61x faster for four landscape metrics
+  and 2.40x faster for four weighted surface metrics.
 * Internal: the covariate-weighting step of `kernel_scale_fn()` is factored into
   `.msr_kernel_cov_w()` (which can compute a single covariate column), and the
   objective accepts a precomputed covariate matrix via a new `cov_w` argument.
   Behavior of the optimizer and the profile-likelihood intervals is unchanged.
+* `kernel_prep()` and scale profiling now provide metric-specific guidance when
+  fragile landscape metrics cannot be scaled because the derived covariate is
+  all `NA` or has zero variance. The messages call out the common failure modes
+  for `iji`, `siei`, and `msiei`, and the landscape-metric documentation now
+  recommends prescreening these metrics before optimizing their scales.
 
 multiScaleR 0.6.36
 ---------

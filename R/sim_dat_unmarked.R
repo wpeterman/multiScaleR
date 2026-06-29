@@ -78,41 +78,44 @@
 #'
 #' @examples
 #' \donttest{
-#' rs <- sim_rast(user_seed = 123)
-#' rs <- terra::subset(rs, c(1,3))
+#' rs <- sim_rast(dim = 50, user_seed = 123)
+#' rs <- terra::subset(rs, c(1, 3))
 #' s_dat <- sim_dat_unmarked(alpha = 1,
-#'                           beta = c(0.75,-0.75),
+#'                           beta = c(0.75, -0.75),
 #'                           kernel = 'gaussian',
-#'                           sigma = c(75, 150),
-#'                           n_points = 75,
-#'                           n_surv = 5,
+#'                           sigma = c(40, 80),
+#'                           n_points = 20,
+#'                           n_surv = 3,
 #'                           det = 0.5,
 #'                           type = 'count',
 #'                           raster_stack = rs,
-#'                           max_D = 550,
+#'                           max_D = 220,
 #'                           user_seed = 123)
 #' plot(s_dat$df$y ~ s_dat$df$bin1)
 #' plot(s_dat$df$y ~ s_dat$df$cont1)
 #' ## unmarked analysis
-#' library(unmarked)
 #' kernel_inputs <- kernel_prep(pts = s_dat$pts,
 #'                              raster_stack = rs,
-#'                              max_D = 550,
-#'                              kernel = 'gaus')
+#'                              max_D = 220,
+#'                              kernel = 'gaus',
+#'                              verbose = FALSE)
 #'
-#' umf <- unmarkedFramePCount(y = s_dat$y,
-#'                            siteCovs = kernel_inputs$kernel_dat)
+#' umf <- unmarked::unmarkedFramePCount(y = s_dat$y,
+#'                                      siteCovs = kernel_inputs$kernel_dat)
 #'
 #' ## Base unmarked model
-#' mod0 <- pcount(~1 ~bin1 + cont1,
-#'                data = umf,
-#'                K = 100)
+#' mod0 <- unmarked::pcount(~1 ~ bin1 + cont1,
+#'                          data = umf,
+#'                          K = 30)
 #'
-#' ## `multiscale_optim`
-#' opt1 <- multiScale_optim(fitted_mod = mod0,
-#'                          kernel_inputs = kernel_inputs)
+#' ## The unmarked optimization is slower than the simulation and base model
+#' ## fit, so it is skipped in automated example checks.
+#' if (interactive()) {
+#'   opt1 <- multiScale_optim(fitted_mod = mod0,
+#'                            kernel_inputs = kernel_inputs)
 #'
-#' summary(opt1)
+#'   summary(opt1)
+#' }
 #'}
 #' @export
 #' @importFrom terra as.polygons ext nlyr rast
