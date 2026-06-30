@@ -20,6 +20,7 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.width = 6.5,
   fig.height = 4.25,
+  eval = FALSE,
   warning = FALSE,
   message = FALSE
 )
@@ -39,6 +40,8 @@ pkg_extdata <- function(...) {
 
   stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
 }
+
+vignette_cache <- readRDS(pkg_extdata("vignette_cache.rds"))
 ```
 
 # Why explicit covariate specifications?
@@ -280,7 +283,8 @@ opt <- multiScale_optim(
 )
 ```
 
-```{r summary}
+```{r summary, eval = TRUE}
+opt <- vignette_cache$landscape$opt
 summary(opt)
 ```
 
@@ -292,21 +296,15 @@ summary(opt)
 `multiScaleR` object is supplied, optimized covariates use their fitted scale
 and fixed-radius landscape metrics use their specified radius.
 
-```{r project, fig.cap = "***Projected derived covariates.***"}
-projected <- kernel_scale.raster(
-  raster_stack = metric_rasters,
-  multiScaleR = opt,
-  scale_center = TRUE,
-  clamp = TRUE,
-  verbose = FALSE
-)
+```{r project, fig.cap = "***Projected derived covariates.***", eval = TRUE}
+projected <- terra::unwrap(vignette_cache$landscape$projected)
 
 plot(projected)
 ```
 
 The resulting raster names match the model covariates:
 
-```{r projected-names}
+```{r projected-names, eval = TRUE}
 names(projected)
 ```
 
@@ -324,7 +322,7 @@ Pass a `scale_vars` object in which all covariates have a fixed `radius` (i.e.,
 `radius` is not `NULL` in `landscape_var()`). No `sigma` argument is needed
 because no scale is being optimized.
 
-```{r standalone-metric-rasters, fig.cap = "***Landscape metric surfaces computed directly from the source rasters at a fixed 500 m radius.***", fig.height = 7}
+```{r standalone-metric-rasters, fig.cap = "***Landscape metric surfaces computed directly from the source rasters at a fixed 500 m radius.***", fig.height = 7, eval = FALSE}
 ## Define several metrics at a fixed 500 m radius
 standalone_vars <- msr_vars(
   land1_ai    = landscape_var("land1",    metric = "ai",    radius = 500),
@@ -348,14 +346,14 @@ plot(metric_surfaces)
 
 Each output layer is named after the covariate defined in `msr_vars()`:
 
-```{r standalone-names}
+```{r standalone-names, eval = FALSE}
 names(metric_surfaces)
 ```
 
 You can also compute a single metric in one line without defining a `msr_vars()`
 object. Simply wrap a single `landscape_var()` call:
 
-```{r standalone-single, fig.cap = "***Edge density within a 300 m radius.***"}
+```{r standalone-single, fig.cap = "***Edge density within a 300 m radius.***", eval = FALSE}
 ed_300 <- kernel_scale.raster(
   raster_stack = metric_rasters["land1"],
   scale_vars   = msr_vars(ed_300m = landscape_var("land1", metric = "ed", radius = 300)),
@@ -369,7 +367,7 @@ Different radii produce notably different surfaces for the same metric. The
 example below computes edge density at three scales and plots them together for
 comparison:
 
-```{r standalone-multiscale, fig.cap = "***Edge density at three spatial scales.***", fig.height = 3.5}
+```{r standalone-multiscale, fig.cap = "***Edge density at three spatial scales.***", fig.height = 3.5, eval = FALSE}
 ed_multi <- kernel_scale.raster(
   raster_stack = metric_rasters["land1"],
   scale_vars   = msr_vars(
@@ -391,7 +389,7 @@ effect is driven by *what* is in the neighborhood (its composition) or by *how*
 it is arranged (its configuration). The surfaces below project three metrics for
 the three-class `landcover` layer at a fixed 500 m radius.
 
-```{r info-theory-surfaces, fig.cap = "***Composition and configuration surfaces for the same landscape.***", fig.height = 3.5}
+```{r info-theory-surfaces, fig.cap = "***Composition and configuration surfaces for the same landscape.***", fig.height = 3.5, eval = FALSE}
 info_surfaces <- kernel_scale.raster(
   raster_stack = metric_rasters["landcover"],
   scale_vars   = msr_vars(
@@ -423,7 +421,7 @@ interest.
 For a single class, `clumpy` answers the same configuration question on the -1
 to 1 scale familiar from FRAGSTATS, while `pland` reports that class's cover:
 
-```{r clumpy-surface, fig.cap = "***Clumpiness and cover of land-cover class 2.***", fig.height = 3.5}
+```{r clumpy-surface, fig.cap = "***Clumpiness and cover of land-cover class 2.***", fig.height = 3.5, eval = FALSE}
 class2_surfaces <- kernel_scale.raster(
   raster_stack = metric_rasters["landcover"],
   scale_vars   = msr_vars(

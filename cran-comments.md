@@ -20,7 +20,19 @@ rcmdcheck::rcmdcheck(args = c("--as-cran", "--no-manual"),
 
 ## Changes from Previous Submission
 
-This update is the 0.7.0 release of multiScaleR. Major changes include:
+This update is the 0.7.1 release of multiScaleR. It resubmits 0.7.0 with a
+shorter vignette rebuild time on Windows.
+
+The incoming pretest for 0.7.0 was otherwise clean, but Windows reported:
+
+- Overall checktime 13 min > 10 min
+
+Version 0.7.1 reduces check time by loading cached vignette objects for slow
+fitted-model summaries and plots. The calls used to regenerate those objects
+remain visible in the vignettes, and the cache can be rebuilt with
+`data-raw/generate_vignette_cache.R`.
+
+Major changes from the previous CRAN version include:
 
 - self-contained vignettes for CRAN rebuilds
 - new categorical landscape metrics, including edge, adjacency,

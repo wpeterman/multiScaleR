@@ -20,6 +20,7 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.width = 6.5,
   fig.height = 4.25,
+  eval = FALSE,
   warning = FALSE,
   message = FALSE
 )
@@ -39,6 +40,8 @@ pkg_extdata <- function(...) {
 
   stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
 }
+
+vignette_cache <- readRDS(pkg_extdata("vignette_cache.rds"))
 ```
 
 # What surface texture covariates measure
@@ -237,7 +240,8 @@ opt <- multiScale_optim(
 )
 ```
 
-```{r summary}
+```{r summary, eval = TRUE}
+opt <- vignette_cache$surface$opt
 summary(opt)
 ```
 
@@ -256,7 +260,7 @@ scaled, each coefficient describes the effect of a one standard deviation
 change in that covariate. Exponentiating gives the multiplicative change in
 expected count.
 
-```{r coef-interpret}
+```{r coef-interpret, eval = TRUE}
 cf <- coef(summary(opt$opt_mod))
 ## Multiplicative change in expected count per 1 SD increase in each covariate
 round(exp(cf[, "Estimate"]), 3)
@@ -283,14 +287,8 @@ surface metrics use their specified radius. Setting `scale_center = TRUE`
 returns the projected covariates on the same centered and scaled footing as the
 model, ready for `terra::predict()`.
 
-```{r project, fig.cap = "***Projected model covariates at their fitted or fixed scales.***", fig.height = 6}
-projected <- kernel_scale.raster(
-  raster_stack = land_rast,
-  multiScaleR = opt,
-  scale_center = TRUE,
-  clamp = TRUE,
-  verbose = FALSE
-)
+```{r project, fig.cap = "***Projected model covariates at their fitted or fixed scales.***", fig.height = 6, eval = TRUE}
+projected <- terra::unwrap(vignette_cache$surface$projected)
 
 plot(projected)
 names(projected)

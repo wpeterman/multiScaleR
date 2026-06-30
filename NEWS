@@ -1,5 +1,9 @@
 multiScaleR 0.7.0
 ---------
+* CRAN resubmission: reduce Windows incoming check time by loading cached
+  vignette objects for slow fitted-model summaries and plots. The calls used to
+  regenerate those objects remain visible in the vignettes, and the cache can be
+  rebuilt with `data-raw/generate_vignette_cache.R`.
 * Vignettes are self-contained for CRAN rebuilds. The main guide uses package
   data and bundled example objects rather than downloading precomputed objects
   from GitHub during vignette setup.

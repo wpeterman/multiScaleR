@@ -1,3 +1,5 @@
+testthat::skip_on_cran()
+
 test_that("ci_func_r covers finite and non-finite branches", {
   x <- matrix(c(5, 1, 10, Inf), ncol = 2, byrow = TRUE)
   out <- multiScaleR:::ci_func_r(x, df = 20, min_D = 2, names = c("a", "b"))

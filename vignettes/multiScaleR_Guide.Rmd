@@ -16,10 +16,26 @@ vignette: >
 ```{r setup, include=FALSE, echo=FALSE}
 library(multiScaleR)
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-# All optimized models in this vignette are computed live below. Distance
-# binning (the default in `kernel_prep()`) makes the optimizations fast enough
-# to run at build time, so the printed results always reflect the current code
-# (no pre-computed objects are downloaded).
+
+pkg_extdata <- function(...) {
+  src_path <- normalizePath(file.path("..", "inst", "extdata", ...),
+                            winslash = "/",
+                            mustWork = FALSE)
+  if (file.exists(src_path)) {
+    return(src_path)
+  }
+
+  inst_path <- system.file("extdata", ..., package = "multiScaleR")
+  if (nzchar(inst_path) && file.exists(inst_path)) {
+    return(inst_path)
+  }
+
+  stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
+}
+
+vignette_cache <- readRDS(pkg_extdata("vignette_cache.rds"))
+# Slow fitted objects used for printed summaries and plots are loaded from
+# package extdata. Regenerate them with data-raw/generate_vignette_cache.R.
 ```
 
 # Background
@@ -288,13 +304,17 @@ summary(mod0)
 
 ## `multiScale_optim`
 
-We are now ready to optimize the scales of effect with `multiScale_optim()`. This function searches over σ values for each raster layer (and simultaneously updates regression coefficients) to find the combination that maximizes the likelihood of the fitted model.
+We are now ready to optimize the scales of effect with `multiScale_optim()`. This function searches over σ values for each raster layer (and simultaneously updates regression coefficients) to find the combination that maximizes the likelihood of the fitted model. The full guide shows the optimization calls and then loads cached fitted objects bundled with the package so the printed summaries and plots remain available without making CRAN rebuild the slow fits.
 
 > **Parallelization**: For this vignette, the function is run without parallelization. In practice, optimization will be substantially faster when you specify `n_cores` (e.g., `n_cores = 4`) when fitting models with many locations.
 
-```{r opt1}
+```{r opt1, eval=FALSE}
 opt1 <- multiScale_optim(fitted_mod = mod0,
                          kernel_inputs = kernel_inputs)
+```
+
+```{r load-cached-opt1, include=FALSE}
+opt1 <- vignette_cache$guide$opt1
 ```
 
 When the likelihood surface is broad or the model includes several landscape covariates, a single default start can occasionally settle on a local optimum. The screened start strategy provides a lightweight diagnostic alternative. It scouts log-spaced σ values, optionally runs a few short screening optimizations, and then launches one full optimization from the best candidate. The marginal σ scans are serial, but the short screening attempts use `n_cores` when parallel optimization is requested. On Windows, those short attempts run through PSOCK workers just like the full optimization, so the same cluster and serialization considerations apply. Use `set.seed()` before screened starts when you want reproducible jittered candidates.
@@ -362,10 +382,14 @@ mod0_2 <- glm(counts ~ site + land1 + land2,
               data = df)
 ```
 
-```{r}
+```{r, eval=FALSE}
 ## Optimize
 opt2 <- multiScale_optim(fitted_mod = mod0_2,
                          kernel_inputs = kernel_inputs)
+```
+
+```{r load-cached-opt2, include=FALSE}
+opt2 <- vignette_cache$guide$opt2
 ```
 
 No warnings! Let's look at our results.
@@ -422,7 +446,7 @@ Intervals are log-spaced so that evaluation is denser at smaller σ values, wher
 ```{r sigma-profile, fig.cap = "AICc profile across sigma for each spatial covariate. The red dashed line marks the optimized sigma."}
 n_profile_cores <- min(length(opt2$scale_est$Mean),
                        max(1L, parallel::detectCores(logical = FALSE)))
-prof2 <- profile_sigma(opt2, n_pts = 15, n_cores = n_profile_cores, verbose = FALSE)
+prof2 <- vignette_cache$guide$prof2
 plot(prof2)
 ```
 
@@ -433,8 +457,7 @@ We can also apply the optimized kernel to the full raster surfaces. This is a ke
 `kernel_scale.raster()` smooths each raster layer using the estimated σ from the optimization. When `scale_center = TRUE`, the smoothed values are standardized using the mean and SD from the sample points, matching the scaling used during model fitting. This ensures that `terra::predict()` receives covariate values in the same space as the training data.
 
 ```{r kernel_raster}
-rast_opt <- kernel_scale.raster(raster_stack = land_rast,
-                                multiScaleR = opt2)
+rast_opt <- terra::unwrap(vignette_cache$guide$rast_opt)
 plot(rast_opt)
 ```
 
@@ -442,9 +465,9 @@ plot(rast_opt)
 
 ## Kernels
 
-Data were simulated from a Gaussian kernel, but we can optimize using other kernels and compare model performance. Starting values had to be specified when using the exponential power kernel due to convergence issues.
+Data were simulated from a Gaussian kernel, but you can optimize using other kernels and compare model performance. The code below is shown as an interactive template rather than run during vignette builds because it fits several additional optimization models. Starting values may be needed when using the exponential power kernel due to convergence issues.
 
-```{r other_kernel}
+```{r other_kernel, eval=FALSE}
 ## Negative Exponential
 exp_inputs <- kernel_prep(pts = pts,
                           raster_stack = land_rast,
@@ -469,7 +492,7 @@ fixed_inputs <- kernel_prep(pts = pts,
 
 Optimize model with alternative kernels
 
-```{r}
+```{r, eval=FALSE}
 opt_exp <- multiScale_optim(fitted_mod = mod0_2,
                             kernel_inputs = exp_inputs)
 
@@ -484,7 +507,7 @@ opt_fixed <- multiScale_optim(fitted_mod = mod0_2,
                               kernel_inputs = fixed_inputs)
 ```
 
-If you explore each of the outputs, you'll see that we generally arrive at similar results. There are some warnings, but we won't worry about those right now. Next, we'll try to compare the relative support of these models using different weighted kernels.
+If you explore each of the outputs, you will usually see similar scale estimates for this simulated example. The main practical lesson is that the Gaussian kernel is the default because it is stable, simple, and usually adequate; alternative kernels are most useful when there is a clear biological reason to test a different distance-decay shape.
 
 # Model Selection
 
@@ -492,9 +515,9 @@ If you explore each of the outputs, you'll see that we generally arrive at simil
 
 When you optimize σ, you are estimating an additional parameter beyond the regression coefficients. Standard AIC from the base model does not account for this extra complexity. `multiScaleR` uses AICc (corrected for small samples) and BIC tables that account for the σ parameters in the penalty term. This is important: comparing models with `aic_tab()` or `bic_tab()` gives a fair comparison across models with different numbers of spatial covariates.
 
-With `multiScaleR` it is possible to create AIC(c) or BIC tables from lists of fitted models.
+With `multiScaleR` it is possible to create AIC(c) or BIC tables from lists of fitted models. The examples below are not evaluated during vignette builds because each candidate model requires another scale optimization.
 
-```{r}
+```{r, eval=FALSE}
 mod_list <- list(opt2,
                  opt_exp,
                  opt_expow,
@@ -511,7 +534,7 @@ The questionably-fitting exponential power model is best-supported by AICc ranki
 
 Of greater interest is using model selection to identify the best supported model in terms of parameterization (not kernel used).
 
-```{r}
+```{r, eval=FALSE}
 ## Landscape only effect
 mod0_3 <- glm(counts ~ land1 + land2,
               family = poisson(),
@@ -541,7 +564,7 @@ mod0_7 <- glm(counts ~ site,
 
 Optimize scale for each alternative model
 
-```{r}
+```{r, eval=FALSE}
 opt3 <- multiScale_optim(fitted_mod = mod0_3,
                          kernel_inputs = kernel_inputs)
 opt4 <- multiScale_optim(fitted_mod = mod0_4,
@@ -554,7 +577,7 @@ opt6 <- multiScale_optim(fitted_mod = mod0_6,
 
 Put models into list and assess.
 
-```{r}
+```{r, eval=FALSE}
 mod_list2 <- list(opt1, opt2, opt3, opt4, opt5, opt6, mod0_7)
 
 aic_tab(mod_list2)
@@ -665,9 +688,9 @@ plot(ab.mod_pred)
 
 ## Binomial Occurrence Model
 
-Now we'll simulate occurrence data suitable for analysis with `unmarked`. Preliminary experience has shown that simulation parameters can be harder to recover when using an occupancy model in `unmarked` with `multiScaleR`. We'll use the same raster surfaces.
+Now we'll simulate occurrence data suitable for analysis with `unmarked`. Preliminary experience has shown that simulation parameters can be harder to recover when using an occupancy model in `unmarked` with `multiScaleR`. We'll use the same raster surfaces. This section is not evaluated during vignette builds because the repeated `unmarked` refits are computationally expensive; copy the code into an interactive R session to run it.
 
-```{r}
+```{r, eval=FALSE}
 s_dat.occ <- sim_dat_unmarked(alpha = 0.25,
                               beta = c(-0.75,1),
                               kernel = 'gaussian',
@@ -686,7 +709,7 @@ plot(s_dat.occ$df$y ~ s_dat.occ$df$cont2)
 
 Prepare inputs for use with `multiScaleR`
 
-```{r}
+```{r, eval=FALSE}
 kernel_inputs <- kernel_prep(pts = s_dat.occ$pts,
                              raster_stack = rs,
                              max_D = 800,
@@ -702,12 +725,12 @@ umf <- unmarkedFrameOccu(y = s_dat.occ$y,
                                 data = umf))
 ```
 
-```{r}
+```{r, eval=FALSE}
 opt_umf.occ <- multiScale_optim(fitted_mod = mod0_umf.occ,
                                 kernel_inputs = kernel_inputs)
 ```
 
-```{r}
+```{r, eval=FALSE}
 summary(opt_umf.occ)
 plogis(opt_umf.occ$opt_mod@estimates@estimates$det@estimates[[1]])
 ```
@@ -716,7 +739,7 @@ We did a decent job of recovering simulated values. Note that the sample size wa
 
 ### Project model
 
-```{r}
+```{r, eval=FALSE}
 ## Project model
 rast_scale.center <- kernel_scale.raster(raster_stack = rs,
                                          multiScaleR = opt_umf.occ,
@@ -735,7 +758,7 @@ plot(occ.mod_pred)
 
 `multiScaleR` has been developed to work with any model class that has an update function. It has been tested with models fit using several different packages. If a particular model class does not work, please let me know so I can trouble shoot and try to incorporate functionality for it. In the example below, I demonstrate the fitting of a zero-inflated model with the `pscl` package. Notably, the zero-inflated term is a spatial variable that is also smoothed during the analysis. This requires some manual processing to simulate data.
 
-```{r}
+```{r, eval=FALSE}
 set.seed(12345)
 rs <- sim_rast(user_seed = 999,
                dim = 500, resolution = 30)
@@ -790,7 +813,7 @@ with(dat, plot(cnt ~ bin1))
 
 With data generated, we can now fit our zero-inflated model and `kernel_prep` and optimize with `multiScaleR`.
 
-```{r}
+```{r, eval=FALSE}
 library(pscl)
 zinb_mod <- pscl::zeroinfl(cnt ~ bin1 | cont1,
                            dist = 'negbin',
@@ -805,14 +828,14 @@ kernel_inputs <- kernel_prep(pts = pts,
 
 **NOTE: It is highly encouraged to fit your model as `pscl::zeroinfl`.**
 
-```{r}
+```{r, eval=FALSE}
 zinb_opt <- multiScale_optim(zinb_mod,
                              kernel_inputs)
 ```
 
 We did a pretty good job in this simple scenario. Note the larger sample size. This was necessary to get good estimates for all parameters. Also, while `cont1` was estimated relatively accurately, there is much greater uncertainty when compared to `bin1`.
 
-```{r}
+```{r, eval=FALSE}
 summary(zinb_opt)
 plot(zinb_opt)
 plot_marginal_effects(zinb_opt)
@@ -826,7 +849,7 @@ Below is a brief walk through the other functions related to scales of effect th
 
 In some cases, a direct assessment of scale of effect distance is desired.
 
-```{r}
+```{r, eval=FALSE}
 ## With fitted model
 kernel_dist(opt2)
 
@@ -896,7 +919,7 @@ plot(r_sim2)
 
 This function will simulate data from scaled raster surfaces.
 
-```{r}
+```{r, eval=FALSE}
 s_dat <- sim_dat(alpha = 0.25,
                  beta = c(0.75, -0.75),
                  kernel = 'gaussian',
@@ -910,14 +933,14 @@ s_dat <- sim_dat(alpha = 0.25,
 
 Look at the simulated covariate relationships with counts
 
-```{r}
+```{r, eval=FALSE}
 plot(s_dat$df$y ~ s_dat$df$bin1)
 plot(s_dat$df$y ~ s_dat$df$cont2)
 ```
 
 Use the simulated data with `multiScaleR`
 
-```{r}
+```{r, eval=FALSE}
 sim_mod <- glm(y ~ bin1 + cont2,
                family = 'poisson',
                data = s_dat$df)
@@ -929,14 +952,14 @@ kernel_inputs <- kernel_prep(pts = s_dat$pts,
                              verbose = FALSE)
 ```
 
-```{r}
+```{r, eval=FALSE}
 sim_opt <- multiScale_optim(fitted_mod = sim_mod,
                             kernel_inputs = kernel_inputs)
 ```
 
 Check results
 
-```{r}
+```{r, eval=FALSE}
 summary(sim_opt)
 
 plot(sim_opt)

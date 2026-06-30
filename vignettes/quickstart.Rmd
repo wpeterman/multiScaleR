@@ -39,6 +39,8 @@ pkg_extdata <- function(...) {
 
   stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
 }
+
+vignette_cache <- readRDS(pkg_extdata("vignette_cache.rds"))
 ```
 
 # What is multiScaleR?
@@ -160,9 +162,13 @@ mod <- glm(counts ~ site + land1 + land2,
 simultaneously updating regression coefficients to maximize the model
 likelihood. Use `n_cores` to parallelize and speed up the search.
 
-```{r optim, eval = TRUE}
+```{r optim, eval = FALSE}
 opt <- multiScaleR::multiScale_optim(fitted_mod    = mod,
                                      kernel_inputs = kernel_inputs)
+```
+
+```{r load-cached-opt, include = FALSE}
+opt <- vignette_cache$quickstart$opt
 ```
 
 If optimization is sensitive to the initial σ values, use the screened start
@@ -239,7 +245,7 @@ efficient setting when computer resources permit.
 ```{r profile, fig.cap = "***AICc profile across sigma. Red dashed line marks optimized sigma.***"}
 n_profile_cores <- min(length(opt$scale_est$Mean),
                        max(1L, parallel::detectCores(logical = FALSE)))
-prof <- profile_sigma(opt, n_pts = 15, n_cores = n_profile_cores, verbose = FALSE)
+prof <- vignette_cache$quickstart$prof
 plot(prof)
 ```
 
@@ -255,16 +261,12 @@ centering and scaling used during model fitting. The output can be passed
 directly to `terra::predict()`.
 
 ```{r project, fig.cap = "***Kernel-smoothed raster layers at optimized scales.***"}
-r_scaled <- kernel_scale.raster(raster_stack = land_rast,
-                                multiScaleR  = opt,
-                                scale_center = TRUE,
-                                clamp        = TRUE
-                                )
+r_scaled <- terra::unwrap(vignette_cache$quickstart$r_scaled)
 plot(r_scaled)
 ```
 
 ```{r predict, fig.cap = "***Predicted counts across the landscape.***"}
-pred <- terra::predict(r_scaled, opt$opt_mod, type = "response")
+pred <- terra::unwrap(vignette_cache$quickstart$pred)
 plot(pred, main = "Predicted counts")
 plot(surv_pts, add = T, col = 'red')
 ```

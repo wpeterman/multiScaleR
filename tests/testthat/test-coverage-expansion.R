@@ -1,3 +1,5 @@
+testthat::skip_on_cran()
+
 test_that("simulation helpers cover alternate response types, spatial inputs, and validations", {
   fix <- make_simulation_fixture()
   rs1 <- terra::subset(fix$rs, "cont1")
