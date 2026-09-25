@@ -41,7 +41,8 @@
 #' where the focal covariate sweeps from its minimum to maximum observed value
 #' and all other predictors are held at their sample mean. For kernel-scaled
 #' covariates, whose scaled mean is 0, this is equivalent to holding them at
-#' their average landscape value.
+#' their average landscape value. Variables used only in model offsets are held
+#' at their sample mean for prediction but do not receive marginal effect panels.
 #'
 #' For \code{glm} and most GLM-family models, predictions are transformed via
 #' the inverse link function automatically (e.g., \code{exp()} for Poisson
@@ -182,6 +183,17 @@ plot_marginal_effects <- function(x,
   } else {
     c_vars <- find_predictors(analysis_mod)[[1]]
     vars <- unlist(find_predictors(analysis_mod))
+    # Offset-only variables describe effort, not covariate effects. Keep them
+    # in vars so prediction holds them at their mean, but omit their panels.
+    # A variable that also enters as a model term remains a plotted covariate.
+    offset_vars <- tryCatch(insight::find_offset(analysis_mod), error = function(e) NULL)
+    if (length(offset_vars) > 0) {
+      term_vars <- tryCatch({
+        labels <- attr(stats::terms(formula(analysis_mod)), "term.labels")
+        if (length(labels)) all.vars(stats::reformulate(labels)) else character(0)
+      }, error = function(e) character(0))
+      c_vars <- setdiff(c_vars, setdiff(offset_vars, term_vars))
+    }
     dat_all <- .model_data(analysis_mod)
     if(is.null(dat_all)){
       dat_all <- extract_model_data(analysis_mod)

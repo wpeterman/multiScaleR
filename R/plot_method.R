@@ -9,9 +9,10 @@
 #' @param ... Optional named arguments to customize the plot:
 #' \describe{
 #'   \item{\code{prob}}{Numeric between 0 and 1 (exclusive). Cumulative kernel
-#'     density threshold used to mark the effective distance. Default:
-#'     \code{0.9} (90\% of the kernel weight falls within the annotated
-#'     distance).}
+#'     weight along a line through the point used to mark the distance.
+#'     Default: \code{0.9}. The line-based marker is not the radius enclosing
+#'     90\% of weight across raster cells; see \code{\link{kernel_dist}} with
+#'     \code{dimension = "2d"} for that radius.}
 #'   \item{\code{scale_dist}}{Logical. If \code{TRUE} (default), a vertical
 #'     dashed line is drawn at the effective distance, and a shaded rectangle
 #'     spans the 95\% confidence interval.}

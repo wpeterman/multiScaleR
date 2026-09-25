@@ -30,6 +30,16 @@
 .msr_parameter_count <- function(model) {
   analysis_mod <- .analysis_model(model)
 
+  # logLik degrees of freedom include ancillary likelihood parameters such as
+  # negative-binomial theta, which coefficient tables may omit.
+  loglik_df <- tryCatch(
+    attr(stats::logLik(analysis_mod), "df"),
+    error = function(e) NULL
+  )
+  if (length(loglik_df) == 1 && is.finite(loglik_df)) {
+    return(as.integer(loglik_df))
+  }
+
   params <- tryCatch(
     get_parameters(analysis_mod),
     error = function(e) NULL
@@ -44,14 +54,6 @@
   )
   if (length(coefs) > 0) {
     return(length(coefs))
-  }
-
-  loglik_df <- tryCatch(
-    attr(stats::logLik(analysis_mod), "df"),
-    error = function(e) NULL
-  )
-  if (length(loglik_df) == 1 && is.finite(loglik_df)) {
-    return(as.integer(loglik_df))
   }
 
   if (any(grepl("^unmarked", class(analysis_mod)))) {
@@ -183,8 +185,9 @@
 #' package) sorted by ascending AIC(c), containing:
 #' \describe{
 #'   \item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
-#'   \item{\code{K}}{Number of estimated parameters (regression coefficients +
-#'     sigma, + shape for \code{"expow"} kernel).}
+#'   \item{\code{K}}{Number of fitted likelihood parameters, including
+#'     ancillary parameters such as negative-binomial dispersion, plus optimized
+#'     scale and shape parameters for \code{multiScaleR} models.}
 #'   \item{\code{AICc} or \code{AIC}}{Information criterion value.}
 #'   \item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}
 #'   \item{\code{ModelLik}}{Relative likelihood (\code{exp(-0.5 * Delta)}).}
@@ -201,7 +204,8 @@
 #' (refitted) model stored in \code{opt_mod} is used for log-likelihood and
 #' parameter count. The sigma parameter (and shape for \code{"expow"}) is added
 #' to K automatically. For plain model objects in a mixed list, sigma is not
-#' added to K.
+#' added to K. The fitted model's log-likelihood degrees of freedom are used
+#' when available, so negative-binomial dispersion contributes one parameter.
 #'
 #' @usage
 #' aic_tab(mod_list,
@@ -348,8 +352,9 @@ aic_tab <- function(mod_list,
 #' package) sorted by ascending BIC, containing:
 #' \describe{
 #'   \item{\code{Modnames}}{Model name.}
-#'   \item{\code{K}}{Number of estimated parameters (regression coefficients +
-#'     sigma, + shape for \code{"expow"} kernel).}
+#'   \item{\code{K}}{Number of fitted likelihood parameters, including
+#'     ancillary parameters such as negative-binomial dispersion, plus optimized
+#'     scale and shape parameters for \code{multiScaleR} models.}
 #'   \item{\code{BIC}}{Bayesian information criterion value.}
 #'   \item{\code{Delta_BIC}}{Difference from the top model.}
 #'   \item{\code{BICWt}}{BIC weight.}

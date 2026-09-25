@@ -1,0 +1,189 @@
+---
+title: "Using Year-Specific Rasters in One Model"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Using Year-Specific Rasters in One Model}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+                      fig.width = 6, fig.height = 4.25)
+library(multiScaleR)
+library(terra)
+```
+
+When habitat changes between survey years, each observation should use the map
+from its own year. `kernel_prep_by_group()` prepares one pooled analysis object
+from a named list of maps and a year label for every observation. The model can
+then estimate one landscape coefficient and one scale across both years. Read
+`vignette("quickstart", package = "multiScaleR")` first for the basic
+preparation and optimization workflow.
+
+## Build aligned annual maps and observations
+
+The following small maps represent the proportion of habitat in a neighborhood.
+The second map has a managed patch. Both maps use the same projected grid and
+the same layer name. If your maps contain numeric land-cover class codes, turn
+the class of interest into a binary layer before calculating its mean. Averaging
+the class codes themselves has no meaningful ecological interpretation.
+
+```{r annual-data}
+set.seed(93)
+habitat_1 <- rast(nrows = 35, ncols = 40, xmin = 0, xmax = 800,
+                  ymin = 0, ymax = 700, crs = "EPSG:26915")
+xy <- xyFromCell(habitat_1, seq_len(ncell(habitat_1)))
+values(habitat_1) <- as.integer(
+  sin(xy[, 1] / 80) + cos(xy[, 2] / 105) > 0
+)
+names(habitat_1) <- "habitat"
+habitat_2 <- habitat_1
+habitat_2[xy[, 1] > 350 & xy[, 1] < 500 &
+          xy[, 2] > 250 & xy[, 2] < 440] <- 0
+
+observations <- data.frame(
+  year = factor(rep(c("year1", "year2"), each = 30)),
+  x = runif(60, 120, 680), y = runif(60, 120, 580)
+)
+rownames(observations) <- paste0("site_", seq_len(nrow(observations)))
+points <- sf::st_as_sf(observations, coords = c("x", "y"), crs = 26915)
+```
+
+Each row is one observation. A nest sampled repeatedly can have the same
+coordinates in several rows, but each row needs a unique ID and its own year
+label. The response model must account for dependence among repeated
+observations when the study design requires it.
+
+## Prepare one pooled set of covariates
+
+```{r grouped-preparation}
+prepared <- kernel_prep_by_group(
+  pts = points,
+  raster_stacks = list(year1 = habitat_1, year2 = habitat_2),
+  group = observations$year,
+  max_D = 100,
+  kernel = "gaussian",
+  bin = TRUE,
+  store_cell_data = FALSE,
+  verbose = FALSE
+)
+head(prepared$kernel_dat)
+table(prepared$raster_group)
+```
+
+**How to read the output:** `kernel_dat` has one row per observation. Its
+`habitat` column is the initial kernel-weighted habitat proportion, centered
+and divided by the standard deviation across *all 60 observations*. These
+standardized values are inputs for the starting model. `raster_group` records
+which map each row used. A year-2 observation uses the year-2 map even if its
+location lies outside the managed patch, because its surrounding buffer may
+include changed cells.
+
+`max_D` and the estimated scale use map units, meters here. Set `max_D` beyond
+the plausible scale of effect. Binning summarizes values by distance so the
+optimizer can evaluate many scales efficiently. `store_cell_data = FALSE`
+works here because the only spatial covariate is a kernel-weighted mean. For
+landscape configuration or surface metrics, use `scale_vars` with the same
+source layer names in every annual map and retain cell data.
+
+## Fit one relationship across years
+
+The response below is simulated only to show the connection between the
+prepared object and a model. Its Bernoulli likelihood represents known survival
+over the same observation interval for every row. Nest or juvenile survival
+data with unequal exposure periods, censoring, repeated measurements, or
+imperfect detection require a model that addresses those features.
+
+```{r grouped-fit}
+observations$survived <- rbinom(
+  nrow(observations), 1,
+  plogis(-0.4 + 0.9 * prepared$kernel_dat$habitat +
+           0.3 * (observations$year == "year2"))
+)
+model_data <- cbind(observations, prepared$kernel_dat)
+initial_model <- glm(survived ~ habitat + year,
+                     family = binomial(), data = model_data,
+                     na.action = na.fail)
+fit <- multiScale_optim(initial_model, prepared,
+                        n_cores = 1, verbose = FALSE)
+fit$scale_est
+coef(fit$opt_mod)
+diagnostics(fit)$sample_size
+```
+
+**How to read the output:** `scale_est["habitat", "Mean"]` is one Gaussian
+scale in meters, estimated from both years. The `habitat` coefficient is on the
+log-odds scale per one pooled standard deviation of the kernel-weighted habitat
+proportion. Exponentiating it gives an odds ratio for that contrast. The year
+coefficient changes the baseline log odds for year 2 relative to year 1. The
+`sample_size` diagnostic shows how many prepared rows entered the fitted
+model. Check the scale-boundary and precision diagnostics as well.
+
+This formula assumes the habitat slope and scale are shared across years. A
+year term alone does not test that assumption. Interpret the model in light of
+the number of years, study sites, and response design. For a scale interval,
+use `summary(fit, profile = TRUE)` when the profiling refit can be evaluated.
+
+## Project the fitted relationship onto each annual map
+
+Project each map separately with the same fitted scales and pooled centering
+parameters. The year term is categorical, so specify its level for each
+prediction scenario. `kernel_scale.raster()` warns that it cannot create a
+categorical placeholder automatically; the prediction function below supplies
+the correct level explicitly.
+
+```{r annual-projection, eval=FALSE}
+surface_year1 <- kernel_scale.raster(habitat_1, multiScaleR = fit,
+                                     scale_center = TRUE, verbose = FALSE)
+surface_year2 <- kernel_scale.raster(habitat_2, multiScaleR = fit,
+                                     scale_center = TRUE, verbose = FALSE)
+predict_year <- function(surface, year_value) {
+  terra::predict(surface, fit$opt_mod, type = "response",
+                 fun = function(model, data, ...) {
+                   data$year <- factor(year_value,
+                                       levels = levels(observations$year))
+                   predict(model, newdata = data, ...)
+                 })
+}
+pred_year1 <- predict_year(surface_year1, "year1")
+pred_year2 <- predict_year(surface_year2, "year2")
+```
+
+These surfaces show model predictions for each annual landscape and its year
+term. They do not represent a causal effect of management; other conditions
+may differ between years.
+
+## Quick reference
+
+```{r quick-reference, eval=FALSE}
+# 1. Align the annual maps on one projected grid with matching layer names.
+maps <- list(year1 = habitat_1, year2 = habitat_2)
+
+# 2. Assign each observation to its map; bins and scaling are pooled.
+prepared <- kernel_prep_by_group(points, maps, observations$year,
+                                  max_D = 100, bin = TRUE,
+                                  store_cell_data = FALSE)
+
+# 3. Fit the response model appropriate for the sampling design.
+model_data <- cbind(observations, prepared$kernel_dat)
+initial_model <- glm(survived ~ habitat + year,
+                     family = binomial(), data = model_data)
+fit <- multiScale_optim(initial_model, prepared)
+summary(fit)               # shared habitat scale and model coefficients
+diagnostics(fit)$sample_size
+```
+
+| Function | Purpose |
+|:--|:--|
+| `kernel_prep_by_group()` | Assign observations to maps and prepare pooled inputs. |
+| `multiScale_optim()` | Fit shared spatial scales and model effects. |
+| `diagnostics()` | Check sample size and scale warnings. |
+
+See `vignette("quickstart", package = "multiScaleR")` for the single-map
+workflow and `vignette("landscape_metric_covariates", package = "multiScaleR")`
+for configuration metrics.

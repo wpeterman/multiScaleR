@@ -68,6 +68,24 @@ validate_character_scalar <- function(x, arg) {
   }
 }
 
+validate_reserved_variable_names <- function(variable_names, context) {
+  if ("x" %in% variable_names) {
+    warning(
+      paste0(
+        "`x` is reserved for the x-coordinate column used internally during ",
+        "raster extraction and cannot be used as a ", context, ". Rename the variable and rerun the analysis."
+      ),
+      call. = FALSE
+    )
+    stop(
+      "Analysis stopped because `x` would confound with the internal x/y coordinate columns.",
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
 validate_multiScaleR_input <- function(x, arg = "multiScaleR") {
   if (!inherits(x, c("multiScaleR", "multiScaleR_data"))) {
     stop(sprintf("`%s` must be a `multiScaleR` or `multiScaleR_data` object.", arg), call. = FALSE)

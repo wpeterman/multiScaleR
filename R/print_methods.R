@@ -56,6 +56,38 @@ format_max_distance_warning <- function(diagnostics) {
   invisible(next_run)
 }
 
+# Print the distance section shared by `print.multiScaleR()` and
+# `print.summary_multiScaleR()`. `dist_2d` is NULL for summary objects created
+# before the planar distance was added; those print the one-dimensional table
+# alone, as before.
+.msr_print_distance <- function(dist_1d, dist_2d, prob, hard_radius) {
+  pct <- paste0(prob * 100, "%")
+  cat("\n\n***** Optimized Scale of Effect -- Distance *****\n")
+  weighted <- setdiff(rownames(dist_1d), hard_radius)
+
+  if (!length(weighted)) {
+    cat("Radius (map units) of each hard-radius covariate\n\n")
+    print(dist_1d)
+    return(invisible(NULL))
+  }
+  if (is.null(dist_2d)) {
+    cat(paste0("1D: ", pct, " kernel weight along a line for weighted covariates; radius for hard-radius covariates"))
+    cat("\n\n")
+    print(dist_1d)
+    return(invisible(NULL))
+  }
+
+  cat("Scale distances (map units) at ", pct, ", two definitions.\n", sep = "")
+  if (length(hard_radius)) {
+    cat("Hard-radius covariates show their radius in both tables.\n")
+  }
+  cat("\n1D, along a line through the point (`kernel_dist()` default):\n")
+  print(dist_1d)
+  cat("\n2D, radius of the circle for the ideal untruncated kernel (`dimension = \"2d\"`):\n")
+  print(dist_2d)
+  invisible(NULL)
+}
+
 #' @title Print method for summary_multiScaleR
 #' @description Print method for objects of class \code{summary_multiScaleR}.
 #' @param x A \code{summary_multiScaleR} object
@@ -70,8 +102,15 @@ print.summary_multiScaleR <- function(x, ...){
   cat("\n\nKernel used:\n")
   cat(x$kernel)
 
-  cat("\n\n***** Optimized Scale of Effect -- Sigma *****\n\n")
+  cat("\n\n***** Optimized Scale of Effect *****\n\n")
   print(x$opt_scale)
+  hard_radius <- x$hard_radius
+  if (length(hard_radius)) {
+    cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ".\n", sep = "")
+    cat("Hard-radius effects change in steps as cells enter the buffer. ")
+    cat("Hessian standard errors are omitted; use `summary(x, profile = TRUE)` ")
+    cat("for profile-likelihood limits.\n")
+  }
   scale_ci_method <- attr(x$opt_scale, "interval_method")
   if (!is.null(scale_ci_method) && any(scale_ci_method != "wald")) {
     cat("\nProfile-likelihood confidence limits were used for `sigma` where available;\n")
@@ -85,11 +124,10 @@ print.summary_multiScaleR <- function(x, ...){
     cat("\n\n  ==================================== ")
   }
 
-  cat("\n\n***** Optimized Scale of Effect -- Distance *****\n")
-  dist_print <- (paste0(x$prob*100,"% Kernel Weight"))
-  cat(dist_print)
-  cat("\n\n")
-  print(x$opt_dist)
+  .msr_print_distance(dist_1d = x$opt_dist,
+                      dist_2d = x$opt_dist_2d,
+                      prob = x$prob,
+                      hard_radius = hard_radius)
   cat("\n\n  ==================================== ")
 
 
@@ -127,6 +165,11 @@ print.summary_multiScaleR <- function(x, ...){
             "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
             "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
   }
+  if (isTRUE(x$diagnostics$sample_size$triggered)) {
+    cat("\nSample size: ", x$diagnostics$sample_size$fitted_n,
+        " of ", x$diagnostics$sample_size$prepared_n,
+        " prepared observations entered the fitted model.\n", sep = "")
+  }
   .msr_print_next_run(x$next_run)
   invisible(x)
 }
@@ -142,7 +185,22 @@ print.summary_multiScaleR <- function(x, ...){
 #'   fitted object during the current R session.
 #' @param ... Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).
 #'
-#' @return An object of class \code{summary_multiScaleR}. Confidence limits for `sigma` default to the package's existing Wald-style limits. If \code{profile = TRUE}, profile likelihood is used when feasible; if profiling fails, the summary falls back to Wald-style limits.
+#' @return An object of class \code{summary_multiScaleR}. Kernel-scale limits
+#'   default to Wald intervals. Scale distances, in map units, come in two
+#'   forms: \code{opt_dist} (also \code{opt_distance}) holds the
+#'   one-dimensional distance from \code{\link{kernel_dist}}, the distance at
+#'   which the kernel's cumulative density along a line through the point
+#'   reaches \code{prob} (about 1.65 sigma for a Gaussian kernel at 90\%).
+#'   \code{opt_dist_2d} holds the two-dimensional distance, the radius of the
+#'   circle around the point that holds \code{prob} of the weight of an ideal,
+#'   untruncated kernel on a plane (about 2.15 sigma for a Gaussian kernel at
+#'   90\%). Both tables have columns
+#'   \code{Mean}, \code{2.5\%}, and \code{97.5\%}, and hard-radius covariates
+#'   report their radius in both. See \code{\link{kernel_dist}} for when to
+#'   use each. For hard-radius landscape and unweighted
+#'   surface metrics, Hessian standard errors and Wald limits are shown as
+#'   \code{NA}; use \code{profile = TRUE} for profile-likelihood limits.
+#'   Profiling errors are reported instead of silently returning invalid limits.
 #' @export
 #' @method summary multiScaleR
 summary.multiScaleR <- function(object, profile = FALSE, ...){
@@ -195,6 +253,19 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
   object_profile <- object
   object_profile$profile_scale_est <- tab_scale
   opt_distance <- kernel_dist(object_profile, prob = prob)
+  opt_distance_2d <- kernel_dist(object_profile, prob = prob, dimension = "2d")
+  hard_radius <- intersect(rownames(tab_scale),
+                           .msr_hard_radius_covariates(object$kernel_inputs$scale_vars))
+  if (length(hard_radius)) {
+    tab_scale[hard_radius, "SE"] <- NA_real_
+    interval_method <- attr(tab_scale, "interval_method")
+    no_profile <- hard_radius[interval_method[hard_radius] == "wald"]
+    if (length(no_profile)) {
+      tab_scale[no_profile, c("2.5%", "97.5%")] <- NA_real_
+      opt_distance[no_profile, c("2.5%", "97.5%")] <- NA_real_
+      opt_distance_2d[no_profile, c("2.5%", "97.5%")] <- NA_real_
+    }
+  }
 
   if(!is.null(object$shape_est)){
     tab_shape <- ci_func(object$shape_est,
@@ -206,9 +277,11 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
                 opt_shape = tab_shape,
                 opt_dist = opt_distance,
                 opt_distance = opt_distance,
+                opt_dist_2d = opt_distance_2d,
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
+                hard_radius = hard_radius,
                 diagnostics = object$diagnostics,
                 warn_message = object$warn_message,
                 next_run = object$next_run,
@@ -218,9 +291,11 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
                 opt_shape = NULL,
                 opt_dist = opt_distance,
                 opt_distance = opt_distance,
+                opt_dist_2d = opt_distance_2d,
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
+                hard_radius = hard_radius,
                 diagnostics = object$diagnostics,
                 warn_message = object$warn_message,
                 next_run = object$next_run,
@@ -247,18 +322,32 @@ print.multiScaleR <- function(x, ...){
   cat('\n\nKernel used: \n')
   cat(x$kernel_inputs$kernel)
 
-  cat("\n\n***** Optimized Scale of Effect -- Sigma *****\n\n")
-  print(x$scale_est)
+  hard_radius <- intersect(rownames(x$scale_est),
+                           .msr_hard_radius_covariates(x$kernel_inputs$scale_vars))
+  display_scale <- x$scale_est
+  if (length(hard_radius)) display_scale[hard_radius, "SE"] <- NA_real_
+  cat("\n\n***** Optimized Scale of Effect *****\n\n")
+  print(display_scale)
+  if (length(hard_radius)) {
+    cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "),
+        ". Use `summary(x, profile = TRUE)` for radius intervals.\n", sep = "")
+  }
 
   if(x$kernel_inputs$kernel == 'expow'){
     cat("\n\n***** Optimized Kernel Shape Parameter *****\n\n")
     print(x$shape_est)
   }
 
-  cat("\n\n***** Optimized Scale of Effect -- Distance *****\n")
-  cat("90% Kernel Weight")
-  cat("\n\n")
-  print(kernel_dist(x))
+  display_distance <- kernel_dist(x)
+  display_distance_2d <- kernel_dist(x, dimension = "2d")
+  if (length(hard_radius)) {
+    display_distance[hard_radius, c("2.5%", "97.5%")] <- NA_real_
+    display_distance_2d[hard_radius, c("2.5%", "97.5%")] <- NA_real_
+  }
+  .msr_print_distance(dist_1d = display_distance,
+                      dist_2d = display_distance_2d,
+                      prob = 0.9,
+                      hard_radius = hard_radius)
 
   cat("\n  ==================================== ")
   cat("\n\n ***** Fitted Model *****\n")
@@ -290,6 +379,11 @@ print.multiScaleR <- function(x, ...){
     cat(red("\n WARNING!!!\n",
             "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
             "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
+  }
+  if (isTRUE(x$diagnostics$sample_size$triggered)) {
+    cat("\nSample size: ", x$diagnostics$sample_size$fitted_n,
+        " of ", x$diagnostics$sample_size$prepared_n,
+        " prepared observations entered the fitted model.\n", sep = "")
   }
   .msr_print_next_run(x$next_run)
   invisible(x)

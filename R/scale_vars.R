@@ -14,7 +14,8 @@
 #' @param ... Named \code{kernel_var()}, \code{landscape_var()}, or
 #'   \code{surface_var()} specifications. Each argument must be named; the name
 #'   becomes the covariate column name in the model data frame. All names must
-#'   be unique. At least one specification is required.
+#'   be unique and cannot be \code{"x"}, which is reserved for internal
+#'   coordinate data. At least one specification is required.
 #' @param source Character scalar. Name of the source raster layer in
 #'   \code{raster_stack} from which the covariate is derived. Must exactly match
 #'   a layer name in the raster stack provided to \code{\link{kernel_prep}}.
@@ -335,11 +336,12 @@ msr_vars <- function(...) {
   if (anyDuplicated(spec_names)) {
     stop("All `msr_vars()` names must be unique.", call. = FALSE)
   }
+  validate_reserved_variable_names(spec_names, "covariate name in `msr_vars()`")
 
   for (i in seq_along(specs)) {
     if (!inherits(specs[[i]], "multiScaleR_var")) {
       stop(
-        "All `msr_vars()` inputs must be created with `kernel_var()` or `landscape_var()`.",
+        "All `msr_vars()` inputs must be created with `kernel_var()`, `landscape_var()`, or `surface_var()`.",
         call. = FALSE
       )
     }
@@ -361,6 +363,22 @@ msr_vars <- function(...) {
 
   class(out) <- c("multiScaleR_vars", "data.frame")
   out
+}
+
+
+.msr_hard_radius_covariates <- function(scale_vars) {
+  if (is.null(scale_vars) || is.null(scale_vars$type) ||
+      is.null(scale_vars$covariate)) return(character())
+  weighted <- if ("weighted" %in% names(scale_vars)) {
+    as.logical(scale_vars$weighted)
+  } else {
+    rep(FALSE, nrow(scale_vars))
+  }
+  weighted[is.na(weighted)] <- FALSE
+  scale_vars$covariate[
+    scale_vars$type == "landscape" |
+      (scale_vars$type == "surface" & !weighted)
+  ]
 }
 
 

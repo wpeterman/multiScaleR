@@ -484,6 +484,24 @@ test_that("single-covariate models work when kernel inputs contain extra raster 
   )
 })
 
+test_that("multiScale_optim rejects x as a model predictor", {
+  fix <- make_core_fixture()
+  dat <- transform(fix$df, x = seq_len(nrow(fix$df)))
+  mod <- glm(y ~ x, family = poisson(), data = dat)
+
+  expect_warning(
+    expect_error(
+      multiScale_optim(
+        fitted_mod = mod,
+        kernel_inputs = fix$kernel_inputs,
+        verbose = FALSE
+      ),
+      "Analysis stopped"
+    ),
+    "reserved"
+  )
+})
+
 test_that("summary and distance methods return structured outputs", {
   fix <- make_core_fixture()
 
@@ -529,7 +547,8 @@ test_that("diagnostics accessor returns structured warning metadata", {
     list(
       max_distance = NULL,
       sigma_precision = NULL,
-      shape_precision = NULL
+      shape_precision = NULL,
+      sample_size = NULL
     )
   )
 })

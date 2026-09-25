@@ -11,7 +11,8 @@
 #' @param raster_stack One or more raster layers of class \code{SpatRaster}
 #'   (terra). Layer names must match the variable names in the model formula
 #'   used with \code{\link{multiScale_optim}}, unless \code{scale_vars} is
-#'   provided to define derived covariates.
+#'   provided to define derived covariates. Layer names cannot be \code{"x"},
+#'   which is reserved for internal coordinate data.
 #' @param max_D Positive numeric. The maximum radius (in the same units as the
 #'   projection of \code{pts} and \code{raster_stack}) around each point to
 #'   sample from the raster. Should be at least 2–3 times the largest expected
@@ -133,7 +134,11 @@
 #'
 #' Row names from \code{pts} are preserved throughout the returned object so
 #' that downstream model data frames can be joined back to the original point
-#' order.
+#' order. Raster extraction is processed in batches of 25 points to limit the
+#' peak memory used by temporary extraction tables. Point order, returned
+#' values, and distance calculations are unchanged.
+#' To assign each observation to a different annual raster while estimating
+#' one pooled landscape relationship, use \code{\link{kernel_prep_by_group}}.
 #' @examples
 #' library(terra)
 #' pts <- vect(cbind(c(3,5,7),
@@ -189,10 +194,12 @@ kernel_prep <- function(pts,
   if(!inherits(raster_stack, "SpatRaster")){
     stop('Raster layers must be provided as a `SpatRaster` object from `terra`')
   }
+  validate_reserved_variable_names(names(raster_stack), "raster layer name")
 
   scale_vars <- .msr_validate_scale_vars(scale_vars = scale_vars,
                                          raster_stack = raster_stack,
                                          kernel = kernel)
+  validate_reserved_variable_names(scale_vars$covariate, "derived covariate name")
   opt_scale_vars <- .msr_optimized_scale_vars(scale_vars)
   n_optimized <- nrow(opt_scale_vars)
 
@@ -316,60 +323,59 @@ kernel_prep <- function(pts,
     if(verbose){
       cat(paste0("\nExtracting values from raster layers...\n"))
     }
-    r_ext <- exact_extract(raster_stack,
-                           buff_poly,
-                           # full_colnames = T,
-                           # force_df = T,
-                           include_xy = T,
-                           include_cell = .msr_needs_cells(scale_vars),
-                           progress = progress)
 
-    # Convert to per-point value matrices (dense or sparse, whichever is smaller)
-    cell_list <- lapply(r_ext, df_to_values)
-
-
-
-    if(nlyr(raster_stack) == 1){
-      re_name <- function(x){
-        c_names <- colnames(x)
-        c_names[1] <- names(raster_stack)
-        colnames(x) <- c_names
-        return(x)
-      }
-
-      r_ext <- lapply(r_ext, re_name)
-      cell_list <- lapply(cell_list, re_name)
-    }
-
-    ## Progress bar
-    D <- vector('list', dim(pts)[1])
+    # Extract, convert, and compute distances in batches of points so the full
+    # extraction table (values, x, y, coverage fraction, and cell for every cell
+    # in every buffer) never sits in memory at once. Each point's buffer is
+    # extracted independently, so results are identical to a single call.
+    n_pts_all <- dim(pts)[1]
+    batch_size <- 25L
+    batches <- split(seq_len(n_pts_all),
+                     ceiling(seq_len(n_pts_all) / batch_size))
+    need_cells <- .msr_needs_cells(scale_vars)
+    single_layer <- nlyr(raster_stack) == 1
+    cell_list <- vector("list", n_pts_all)
+    D <- vector("list", n_pts_all)
+    min_D <- NULL
 
     if(isTRUE(progress)){
-
-      cat(paste0("\nCalculating distances...\n"))
-
       pb = txtProgressBar(min = 0,
-                          max = dim(pts)[1],
+                          max = n_pts_all,
                           initial = 0,
                           char = "*",
                           style = 3)
-
     }
 
-    for (i in 1:dim(pts)[1]) {
-      if(isTRUE(progress)){
-        setTxtProgressBar(pb,i)
+    for (b in batches) {
+      r_ext <- exact_extract(raster_stack,
+                             buff_poly[b, ],
+                             include_xy = T,
+                             include_cell = need_cells,
+                             progress = FALSE)
+      for (j in seq_along(b)) {
+        i <- b[j]
+        df <- r_ext[[j]]
+        if (single_layer) {
+          c_names <- colnames(df)
+          c_names[1] <- names(raster_stack)
+          colnames(df) <- c_names
+        }
+        xy <- df[, c("x", "y")]
+        if (is.null(min_D)) {
+          min_D <- floor(rdist(xy[1:2, ])[1, 2])
+        }
+        cell_list[[i]] <- df_to_values(df)
+        D[[i]] <- rdist(st_coordinates(pts[i,]), xy)[1,] / unit_conv
+        r_ext[j] <- list(NULL)
       }
-
-      D[[i]] <- rdist(st_coordinates(pts[i,]),
-                      # r_ext[r_ext$id == i, c("x","y")])[1,]
-                      r_ext[[i]][, c("x","y")])[1,] / unit_conv
-
+      rm(r_ext, df, xy)
+      if(isTRUE(progress)){
+        setTxtProgressBar(pb, max(b))
+      }
     }
     if(isTRUE(progress)){
       close(pb)
     }
-    min_D <- floor(rdist(r_ext[[1]][1:2,c("x","y")])[1,2])
   } ## End ifelse for projected points
 
   n_pts <- dim(pts)[1]

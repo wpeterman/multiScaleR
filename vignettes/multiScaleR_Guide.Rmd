@@ -123,7 +123,7 @@ The key function is `multiScale_optim()`. It takes your fitted model and the `ke
 
 **Key concepts to keep in mind:**
 
-- **σ (sigma)**: The scale parameter of the kernel function (in map units, e.g., meters). It controls how quickly landscape influence decays with distance. With a Gaussian kernel and σ = 300 m, 90% of the distance-weighted landscape average at a sample point is drawn from cells within roughly 493 m; cells beyond that radius collectively account for the remaining 10%.
+- **σ (sigma)**: The scale parameter of the kernel function (in map units, e.g., meters). It controls how quickly kernel weight declines with distance. For an ideal Gaussian kernel with σ = 300 m on an unbounded plane, a circle of radius 644 m holds 90% of the weight. This planar radius is about 2.15σ (see `kernel_dist()` below). The share represented by extracted raster cells can differ near boundaries, missing cells, or a finite `max_D`.
 - **`max_D`**: The maximum distance (in map units) to extract raster values for each sample point. This should exceed your expected scale of effect. If `multiScale_optim()` warns that an estimated σ is near `max_D`, re-run `kernel_prep()` with a larger value.
 - **Initial model**: The model you fit *before* optimization uses unsmoothed (initial σ) kernel-weighted covariate values. Its structure (formula, family, random effects) is inherited by the optimization. Get the model structure right before optimizing.
 
@@ -133,7 +133,7 @@ The key function is `multiScale_optim()`. It takes your fitted model and the `ke
 
 There are *many* different kernel transformations that could be used to quantify the contribution of environmental variables as a function of distance. The kernel function determines the *shape* of that decay: how quickly nearby cells lose influence relative to the focal point.
 
-Four kernel functions are implemented in `multiScaleR`. In each case, σ (sigma) is estimated during optimization and controls the spatial scale (width) of the kernel. All plots below show the weight assigned to a landscape cell as a function of its distance from a sample point, with a vertical line marking the distance that captures 90% of the total weight.
+Four kernel functions are implemented in `multiScaleR`. In each case, σ (sigma) is estimated during optimization and controls the spatial scale (width) of the kernel. All plots below show the weight assigned to a landscape cell as a function of its distance from a sample point. The vertical line marks the 1D distance capturing 90% of kernel weight along a line through the point, not the radius capturing 90% of weight on a plane.
 
 - **Gaussian** (recommended for most uses): smooth, symmetric bell-curve decay. Governed by a single parameter σ.
 - **Negative Exponential**: faster initial decay than Gaussian; also governed by σ alone.
@@ -250,8 +250,13 @@ plot(pts, add = T, pch = 19)
 
 `kernel_prep()` is the first step of every `multiScaleR` analysis. It does two things:
 
+For observations collected against different annual maps, use
+`kernel_prep_by_group()` in its place. That function extracts each observation
+from its assigned map, then creates shared distance bins and pooled scaling
+parameters. See `vignette("year-specific-rasters", package = "multiScaleR")`.
+
 1.  For each sample point, it extracts raster values at every cell within `max_D` (the maximum search radius) and computes their distances. These are stored compactly (as a dense or sparse matrix per point, whichever is smaller).
-2.  It computes an initial set of distance-weighted covariate values at each sample point using a starting σ (by default, `max_D / 3`). These initial values are used to fit the starting regression model.
+2.  It computes an initial set of distance-weighted covariate values at each sample point using a starting σ (by default, `max_D / 2`). These initial values are used to fit the starting regression model.
 
 **Choosing `max_D`**: Set `max_D` to a value you are confident exceeds the true scale of effect. If you are uncertain, err on the side of being too large; the optimization will find the right σ within that range. With the default distance binning (see below), the *optimization* cost no longer grows with `max_D`; the main tradeoffs of a large `max_D` are the one-time extraction in `kernel_prep()` and the memory used to store the extracted cells. If `multiScale_optim()` warns that a σ estimate is near `max_D`, increase `max_D` and re-run `kernel_prep()`.
 
@@ -346,7 +351,7 @@ summary(opt1)
 
 **How to read the `summary()` output:**
 
-The top of the output shows the estimated σ (scale parameter) for each raster layer, with standard errors and 95% confidence intervals. Below each σ estimate is the *effective distance*: the distance that captures a specified proportion (default: 90%) of the total kernel weight. This converts σ into an ecologically interpretable distance in map units (meters in this case). A Gaussian kernel with σ = 250 has 90% of its cumulative weight within approximately 412 m of the focal point.
+The top of the output shows the estimated σ (scale parameter) for each raster layer, with standard errors and 95% confidence intervals. Below the σ estimates is the *effective distance*, which converts σ into a distance in map units (meters in this case), reported two ways. The **1D** table gives the distance at which the kernel's cumulative weight along a line through the sample point reaches a specified proportion (default: 90%); for a Gaussian kernel this is about 1.65σ. The **2D** table gives the radius of the circle around the sample point that holds that proportion of the weight of an ideal, untruncated kernel on a plane, about 2.15σ for a Gaussian kernel. A Gaussian kernel with σ = 250 m has a 1D distance of about 411 m and a 2D radius of about 536 m. Use the 2D radius when describing the area associated with the modeled kernel weights. On an unbounded plane, the 1D distance captures only about 74% of the weight within a circle. Raster edges, missing cells, and the `max_D` cutoff can change the share realized in your data, so report the definition and extraction extent.
 
 The bottom of the output is the standard model summary from your regression (GLM in this case), showing regression coefficients, standard errors, and p-values for each covariate, exactly as you would see from `summary(glm(...))`.
 
@@ -357,6 +362,13 @@ By default, confidence intervals on σ are computed using the **delta method**: 
 However, the log-likelihood surface for σ is often asymmetric, especially when the scale parameter is near `max_D`, when sample sizes are small, or when the effect size is weak. In these situations the delta-method CI can be misleading: the lower and upper bounds may not accurately reflect the true uncertainty in each direction. **Profile-likelihood CIs** address this by tracing the likelihood surface directly: for each boundary value of σ, the optimizer finds the configuration of all other parameters that maximizes the likelihood, then identifies where that profile drops by the critical chi-squared quantile (1.92 log-likelihood units for a 95% CI). Profile CIs are therefore more reliable when the surface is irregular, at the cost of additional computation.
 
 To request profile-likelihood CIs, pass `profile = TRUE` to `summary()`:
+
+For landscape metrics and unweighted surface metrics whose radius changes in
+discrete cell steps, the Hessian standard error is not a useful measure of
+uncertainty. Their default summary displays `NA` for the standard error and
+Wald interval. Use the profile-likelihood interval and report the parameter
+as a radius in map units. Candidate scales that make a covariate undefined
+at modeled observations are rejected so likelihoods retain the same sample.
 
 ```{r eval=FALSE}
 summary(opt1, profile = TRUE)
@@ -415,7 +427,7 @@ The true data-generating values were (see section 3):
 
 Overall, we do a good job recovering both the regression coefficients (β) and the scales of effect (σ) within reasonable uncertainty bounds. This is reassuring but also a good reminder: with real data, you will not have ground truth to check against. Careful model selection and biological reasoning are your guides.
 
-**Visualizing the kernel decay.** The `plot()` method shows how the influence of each landscape variable falls off with distance. The vertical line marks the distance enclosing 90% of the cumulative kernel weight (the *effective distance*).
+**Visualizing the kernel decay.** The `plot()` method shows how the kernel weight for each landscape variable falls off with distance. Its vertical line marks the 1D distance enclosing 90% of cumulative weight along a line through the point. Use `kernel_dist(opt2, dimension = "2d")` for the corresponding planar radius.
 
 ```{r}
 ## Kernel function
@@ -432,6 +444,13 @@ plot_marginal_effects(opt2)
 ```
 
 **Profiling the likelihood surface.** `profile_sigma()` provides a diagnostic view of how the model fit changes as σ varies across its search range for each covariate, while all other σ values are held at their optimized values. Rather than reporting a single point estimate with an interval, it shows the full shape of the AICc (or log-likelihood) surface across the parameter space.
+
+Profiling must be able to refit the stored model. If a model was created inside
+a temporary function or loop, keep its formula and data available to the
+model call. Write the formula directly in the fitting call when possible, or
+provide a `refit_fn` to `multiScale_optim()`. If all refits fail,
+`profile_sigma()` stops with an error instead of displaying optimizer
+penalties as a likelihood profile.
 
 `profile_sigma()` can evaluate covariate profiles in parallel via `n_cores`. Because each scaled surface (spatial covariate) is profiled independently, setting `n_cores` to the number of scaled surfaces is often the most efficient choice when your computer has enough available resources.
 
@@ -455,6 +474,12 @@ For `opt2`, the profile confirms a clear, well-defined minimum in AICc near the 
 We can also apply the optimized kernel to the full raster surfaces. This is a key step if you want to generate spatially explicit predictions across the landscape.
 
 `kernel_scale.raster()` smooths each raster layer using the estimated σ from the optimization. When `scale_center = TRUE`, the smoothed values are standardized using the mean and SD from the sample points, matching the scaling used during model fitting. This ensures that `terra::predict()` receives covariate values in the same space as the training data.
+
+For a model containing `offset(log(n_weeks))`, the projected raster stack
+contains a layer named `n_weeks` with value 1 by default. Set
+`offset_values = c(n_weeks = 4)` to predict for four weeks of exposure.
+Direct offsets default to zero. Choose values that match the quantity you
+want to predict.
 
 ```{r kernel_raster}
 rast_opt <- terra::unwrap(vignette_cache$guide$rast_opt)
@@ -856,7 +881,12 @@ kernel_dist(opt2)
 ## Distance of 95% kernel
 kernel_dist(opt2, prob = 0.95)
 
+## Radius of the circle holding 90% of ideal planar kernel weight
+kernel_dist(opt2, dimension = "2d")
+
 ```
+
+By default, `kernel_dist()` measures along a line through the sample point (`dimension = "1d"`). Because a kernel weights raster cells across a plane, `dimension = "2d"` instead returns the radius of the circle around the point that holds the requested share of the total weight. It is always the larger of the two; `summary()` reports both.
 
 It's also possible to calculate the distance encompassed by specified kernels without a fitted model.
 
@@ -866,6 +896,9 @@ kernel_dist(kernel = "gaussian", sigma = 100, prob = 0.9)
 kernel_dist(kernel = "exp", sigma = 100, prob = 0.9)
 
 kernel_dist(kernel = "expow", sigma = 100, beta = 5, prob = 0.9)
+
+## The same Gaussian kernel, as the radius of a circle
+kernel_dist(kernel = "gaussian", sigma = 100, prob = 0.9, dimension = "2d")
 ```
 
 ## `plot_kernel`

@@ -43,8 +43,9 @@
 #'   exponential power kernel.
 #' @param max_D Positive numeric. Maximum buffer radius for
 #'   \code{\link{kernel_prep}} during simulation. If \code{NULL} (default),
-#'   set automatically to 110\% of the distance enclosing 99\% of the kernel
-#'   weight at \code{max(sigma)}.
+#'   set automatically to 110\% of the one-dimensional distance enclosing
+#'   99\% of kernel weight along a line at \code{max(sigma)}. Supply a larger
+#'   \code{max_D} if the radius enclosing 99\% of weight on a plane is needed.
 #' @param user_seed Optional integer seed for reproducibility. Default:
 #'   \code{NULL}.
 #' @param ... Additional arguments. Not currently used.

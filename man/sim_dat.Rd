@@ -72,8 +72,10 @@ between 1 and 50 are typical. Required when \code{kernel = "expow"}.}
 
 \item{max_D}{Positive numeric. Maximum buffer radius for
 \code{\link{kernel_prep}} during simulation. If \code{NULL} (default), set
-automatically to 110\% of the distance enclosing 99\% of the kernel weight
-at \code{max(sigma)}.}
+automatically to 110\% of the one-dimensional distance enclosing 99\%
+of kernel weight along a line at \code{max(sigma)}. This historical default
+is smaller than the radius enclosing 99\% of weight on a plane; supply a
+larger \code{max_D} if that planar cutoff is needed.}
 
 \item{user_seed}{Optional integer seed for reproducibility. Default:
 \code{NULL}.}

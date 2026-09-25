@@ -27,10 +27,12 @@
 #'   explicitly defined covariates without passing a fitted \code{multiScaleR}
 #'   object. When \code{multiScaleR} is provided, \code{scale_vars} is
 #'   extracted automatically.
-#' @param pct_wt Numeric between 0 and 1 (exclusive). Cumulative kernel density
-#'   cutoff used to determine the focal window size for smoothing. A larger
-#'   value (e.g., \code{0.99}) captures more of the kernel tail but increases
-#'   computation time. Default: \code{0.975}.
+#' @param pct_wt Numeric between 0 and 1 (exclusive). Cumulative kernel weight
+#'   along a line through the focal cell used to determine the smoothing window
+#'   radius. A larger value (e.g., \code{0.99}) includes more of the kernel tail
+#'   but increases computation time. This is the historical one-dimensional
+#'   cutoff, not the proportion of total weight within the planar window.
+#'   Default: \code{0.975}.
 #' @param fft Logical. If \code{TRUE} (default), smoothing is performed via
 #'   Fast Fourier Transform (FFT) convolution, which is substantially faster
 #'   for large rasters and wide kernels. Some edge effects may occur at raster
@@ -55,6 +57,12 @@
 #'   containing a \code{NA} cell will produce a \code{NA} output.
 #' @param verbose Logical. Print layer-level progress messages. Default:
 #'   \code{TRUE}.
+#' @param offset_values Named numeric vector of values for variables
+#'   inside model offsets, such as \code{c(n_weeks = 4)} for
+#'   \code{offset(log(n_weeks))}. These are raw input values, not transformed
+#'   offsets. When omitted, a log offset uses 1 (zero on the log scale) and
+#'   a direct offset uses 0. Set this argument for a meaningful projection
+#'   scenario.
 #' @param ... Reserved for deprecated arguments. Currently only \code{scale_opt}
 #'   (deprecated alias for \code{multiScaleR}) is handled.
 #'
@@ -65,6 +73,8 @@
 #' predictors (i.e., predictors not derived from raster layers), constant
 #' ("dummy") raster layers filled with zeros are appended to make the output
 #' compatible with \code{terra::predict}.
+#' Offset variables are appended under their input names so transformed offset
+#' expressions can be evaluated by \code{terra::predict}.
 #'
 #' @details
 #' \strong{Typical usage} after running \code{\link{multiScale_optim}}:
@@ -98,6 +108,10 @@
 #' work but do not represent real spatial variation. Replace them manually for
 #' non-zero projection scenarios. Categorical predictors are skipped with a
 #' warning.
+#' Offset terms use their underlying input variables as layer names. For
+#' \code{offset(log(n_weeks))}, the default layer is \code{n_weeks = 1},
+#' representing one week of effort. Set \code{offset_values = c(n_weeks = 4)}
+#' to predict for four weeks. Direct offsets default to zero.
 #'
 #' @examples
 #' ## Not Run
@@ -126,6 +140,7 @@ kernel_scale.raster <- function(raster_stack,
                                 pct_mx = 0,
                                 na.rm = TRUE,
                                 verbose = TRUE,
+                                offset_values = NULL,
                                 ...){
 
   args <- list(...)
@@ -145,6 +160,13 @@ kernel_scale.raster <- function(raster_stack,
   validate_scalar_logical(clamp, "clamp")
   validate_scalar_logical(na.rm, "na.rm")
   validate_scalar_logical(verbose, "verbose")
+  if (!is.null(offset_values)) {
+    if (!is.numeric(offset_values) || is.null(names(offset_values)) ||
+        any(!nzchar(names(offset_values))) || anyDuplicated(names(offset_values)) ||
+        any(!is.finite(offset_values))) {
+      stop("`offset_values` must be a named finite numeric vector.", call. = FALSE)
+    }
+  }
   validate_scalar_numeric(pct_wt,
                           "pct_wt",
                           lower = 0,
@@ -255,7 +277,8 @@ kernel_scale.raster <- function(raster_stack,
       smooth_stack <- .add_site_covariate_rasters(
         smooth_stack = smooth_stack,
         multiScaleR = multiScaleR,
-        raster_covs = names(smooth_stack)
+        raster_covs = names(smooth_stack),
+        offset_values = offset_values
       )
     }
 
@@ -400,7 +423,8 @@ kernel_scale.raster <- function(raster_stack,
     smooth_stack <- .add_site_covariate_rasters(
       smooth_stack = smooth_stack,
       multiScaleR = multiScaleR,
-      raster_covs = var
+      raster_covs = var,
+      offset_values = offset_values
     )
   }
 
@@ -410,7 +434,8 @@ kernel_scale.raster <- function(raster_stack,
 
 ## Helper function
 # helper: add constant rasters for non-raster covariates used by fitted model
-.add_site_covariate_rasters <- function(smooth_stack, multiScaleR, raster_covs) {
+.add_site_covariate_rasters <- function(smooth_stack, multiScaleR, raster_covs,
+                                        offset_values = NULL) {
 
   if (is.null(multiScaleR) || !inherits(multiScaleR, "multiScaleR")) {
     return(smooth_stack)
@@ -431,8 +456,31 @@ kernel_scale.raster <- function(raster_stack,
   # response name
   resp <- names(mf)[1]
 
-  # raw variables in the fitted model frame, excluding response
-  model_vars <- setdiff(names(mf), resp)
+  # model.frame names transformed offset columns by expression. Convert those
+  # names to the raw input variables that terra::predict evaluates in newdata.
+  offset_cols <- grep("^offset\\(", names(mf), value = TRUE)
+  offset_vars <- character()
+  offset_defaults <- numeric()
+  for (term in offset_cols) {
+    expr <- tryCatch(parse(text = term)[[1]][[2]], error = function(e) NULL)
+    if (is.null(expr)) next
+    vars <- all.vars(expr)
+    if (length(vars) != 1L) {
+      stop("Offsets used in raster projection must contain exactly one input variable.",
+           call. = FALSE)
+    }
+    is_log <- is.call(expr) && identical(as.character(expr[[1]]), "log") &&
+      length(expr) == 2L && identical(expr[[2]], as.name(vars))
+    is_direct <- is.symbol(expr)
+    if (!is_log && !is_direct && !vars %in% names(offset_values)) {
+      stop(sprintf("Offset expression `%s` needs an explicit raw value in `offset_values`.",
+                   term), call. = FALSE)
+    }
+    offset_vars <- c(offset_vars, vars)
+    offset_defaults <- c(offset_defaults, if (is_log) 1 else 0)
+  }
+  names(offset_defaults) <- offset_vars
+  model_vars <- c(setdiff(names(mf), c(resp, offset_cols)), offset_vars)
 
   # variables already represented by smoothed rasters
   site_vars <- setdiff(model_vars, raster_covs)
@@ -445,6 +493,14 @@ kernel_scale.raster <- function(raster_stack,
   tmpl <- smooth_stack[[1]]
 
   for (v in site_vars) {
+    if (v %in% offset_vars) {
+      value <- if (v %in% names(offset_values)) offset_values[[v]] else
+        offset_defaults[[v]]
+      rr <- tmpl * 0 + value
+      names(rr) <- v
+      smooth_stack <- c(smooth_stack, rr)
+      next
+    }
     x <- mf[[v]]
 
     # factor / character / complex terms are not safe to add as dummy rasters

@@ -15,13 +15,14 @@ diagnostics(object, ...)
 \item{...}{Additional arguments passed to methods.}
 }
 \value{
-A named list with up to three elements:
+A named list with four elements:
 \describe{
   \item{\code{max_distance}}{A list describing whether the estimated scale of
     effect approaches or exceeds \code{max_D}. Fields include:
     \code{triggered} (logical), \code{variables} (names of affected
-    covariates), \code{effective_distance} (estimated 90\% kernel distance
-    per covariate), \code{max_D} (the limit used), \code{ratio}
+    covariates), \code{effective_distance} (estimated 90\% one-dimensional
+    kernel distance per covariate; see \code{\link{kernel_dist}}),
+    \code{max_D} (the limit used), \code{ratio}
     (\code{max_D / effective_distance}), and \code{suggested_max_D} (a
     recommended minimum \code{max_D} value). Triggered when
     \code{max_D / effective_distance < 2}.}
@@ -34,6 +35,11 @@ A named list with up to three elements:
   \item{\code{shape_precision}}{Identical structure to \code{sigma_precision}
     but for the shape parameter of the exponential power kernel.  \code{NULL}
     unless \code{kernel = "expow"} was used and a precision concern arose.}
+  \item{\code{sample_size}}{A list with \code{fitted_n}, the number of
+    observations in the final model, and \code{prepared_n}, the number of
+    observations in the preparation object. \code{triggered} is \code{TRUE}
+    when the fitted model uses fewer observations. Candidate scales that
+    change the initial model's sample are rejected during optimization.}
 }
 }
 \description{
@@ -43,7 +49,7 @@ Returns structured warning/diagnostic information stored on fitted
 optimization result.
 }
 \details{
-All three diagnostics are evaluated automatically at the end of
+These diagnostics are evaluated automatically at the end of
 \code{\link{multiScale_optim}}. Console warnings are printed when any
 diagnostic is triggered. \code{diagnostics()} provides programmatic access
 to the same information without re-running the model.

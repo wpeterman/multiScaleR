@@ -1,3 +1,31 @@
+multiScaleR 0.7.1
+---------
+* `kernel_prep_by_group()` prepares pooled model inputs from aligned annual or
+  other group-specific rasters, with shared distance bins and pooled scaling.
+* Adjacency metric projection now works on non-square rasters. Optimization
+  rejects candidate scales that would change the fitted sample and reports
+  when the starting model already excluded prepared observations.
+* Hard-radius metrics display radius rather than sigma and omit invalid
+  Hessian standard errors and Wald intervals; profile intervals remain
+  available on request. Profiling reports refit failures instead of returning
+  an all-penalty likelihood profile.
+* Raster projection supplies input layers for model offsets and accepts
+  scenario values through `offset_values`. Model selection includes ancillary
+  likelihood parameters such as negative-binomial dispersion in its count.
+* `plot_marginal_effects()` holds offset-only variables at their sample mean
+  for prediction without drawing misleading effect panels for them.
+* Preparation and optimization stop early with rename guidance when a raster
+  layer, derived covariate, or model predictor is named `x`, which is reserved
+  for internal coordinates.
+* `kernel_prep()` extracts raster cells in batches of 25 points to reduce
+  temporary extraction memory while preserving point order and results.
+* `kernel_dist()` gains `dimension = "2d"`, the radius of a circle holding
+  `prob` of an ideal, untruncated planar kernel's weight. For a Gaussian kernel
+  at 90%, it is about 2.15 sigma, versus 1.65 sigma along a line. `summary()`
+  and `print()` report both distances, and `summary()` returns the planar table
+  as `opt_dist_2d`;
+  `opt_dist` and the `kernel_dist()` default are unchanged.
+
 multiScaleR 0.7.0
 ---------
 * CRAN resubmission: reduce Windows incoming check time by loading cached

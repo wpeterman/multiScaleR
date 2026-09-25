@@ -57,6 +57,10 @@
 #' At each evaluation point the model is refit and the log-likelihood extracted.
 #' AICc is computed from the log-likelihood, the number of regression parameters
 #' (including sigma), and the number of observations.
+#' If all refits return the optimizer penalty, profiling stops with an error
+#' instead of returning an artificial flat profile. Keep the model formula and
+#' data available to the stored model call, or provide a working
+#' \code{refit_fn} to \code{\link{multiScale_optim}}.
 #'
 #' Log-spacing concentrates evaluation points at smaller sigma values where the
 #' likelihood surface often changes more rapidly, and spaces them out at larger
@@ -287,6 +291,23 @@ profile_sigma <- function(x,
 
       ll_vec[i]   <- ll_val
       aicc_vec[i] <- aicc_val
+    }
+
+    if (all(!is.finite(ll_vec) | ll_vec <= -(1e6^10))) {
+      first_par <- opt_par
+      first_par[j] <- sigma_seq[1] / unit_conv
+      if (!is.null(opt_shape)) first_par <- c(first_par, opt_shape)
+      detail <- tryCatch({
+        kernel_scale_fn(
+          par = first_par, d_list = kernel_inputs$d_list,
+          cov_df = kernel_inputs$raw_cov, kernel = kernel,
+          fitted_mod = opt_context$fitted_mod, join_by = join_by,
+          mod_return = TRUE, opt_context = opt_context
+        )
+        "All likelihood evaluations returned the optimizer penalty."
+      }, error = function(e) conditionMessage(e))
+      stop(sprintf("Could not profile `%s`: %s", cov_name, detail),
+           call. = FALSE)
     }
 
     data.frame(

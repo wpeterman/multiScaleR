@@ -25,7 +25,8 @@ multiScale_optim(
 kernel-weighted variables defined in \code{kernel_inputs}. Supported
 classes include \code{lm}, \code{glm}, \code{gls} (nlme), and
 \code{unmarkedFit} (unmarked). Many other model classes are also supported
-via \code{stats::update()} or a custom \code{refit_fn}.}
+via \code{stats::update()} or a custom \code{refit_fn}. A predictor cannot
+be named \code{"x"}, which is reserved for internal coordinate data.}
 
 \item{kernel_inputs}{A list of class \code{"multiScaleR_data"} created by
 \code{\link{kernel_prep}}. Must contain elements \code{raw_cov},
@@ -94,8 +95,9 @@ A list of class \code{"multiScaleR"} containing:
 \describe{
   \item{\code{scale_est}}{Data frame with one row per optimized covariate and
     two columns: \code{Mean} (optimized sigma on the original projection
-    scale) and \code{SE} (Hessian-based standard error). Row names are
-    covariate names.}
+    scale) and \code{SE} (Hessian-based standard error). \code{SE} is
+    \code{NA} for hard-radius landscape and unweighted surface metrics,
+    whose likelihood changes in steps. Row names are covariate names.}
   \item{\code{shape_est}}{Data frame of the same structure as
     \code{scale_est} for the shape parameter, or \code{NULL} when
     \code{kernel != "expow"}.}
@@ -157,6 +159,12 @@ scale. Standard errors are Hessian-based approximations from the outer
 optimization. Summary methods report profile-likelihood confidence intervals
 for sigma when \code{\link{profile_sigma}} has been run on the object;
 otherwise they fall back to Hessian-based intervals.
+Candidate scales that make a covariate undefined at a modeled observation
+are rejected, so the optimizer compares likelihoods for the same sample.
+The final \code{sample_size} diagnostic reports whether the starting model
+already excluded any prepared observations. For hard-radius landscape and
+unweighted surface metrics, Hessian uncertainty is not meaningful; use
+\code{summary(x, profile = TRUE)} for profile-likelihood intervals.
 
 \strong{Binned acceleration}
 

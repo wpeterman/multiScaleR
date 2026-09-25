@@ -94,6 +94,29 @@ test_that("kernel_prep validates key inputs", {
   )
 })
 
+test_that("x is rejected as a raster or derived covariate name", {
+  pts <- terra::vect(cbind(c(5, 7, 9), c(9, 7, 5)))
+  r <- terra::rast(matrix(runif(20 * 20), 20, 20))
+  names(r) <- "x"
+
+  expect_warning(
+    expect_error(
+      kernel_prep(pts = pts, raster_stack = r, max_D = 5, verbose = FALSE),
+      "Analysis stopped"
+    ),
+    "reserved"
+  )
+
+  names(r) <- "hab"
+  expect_warning(
+    expect_error(
+      msr_vars(x = kernel_var("hab")),
+      "Analysis stopped"
+    ),
+    "reserved"
+  )
+})
+
 test_that("print method for multiScaleR_data reports object metadata", {
   fix <- make_core_fixture()
 

@@ -26,6 +26,7 @@ test_that("expected public helpers remain exported", {
     "estimate_multiscale_ram",
     "kernel_dist",
     "kernel_prep",
+    "kernel_prep_by_group",
     "kernel_scale.raster",
     "kernel_var",
     "landscape_var",

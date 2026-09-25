@@ -82,6 +82,10 @@ considered during optimization. Users can instead request linear spacing with
 At each evaluation point the model is refit and the log-likelihood extracted.
 AICc is computed from the log-likelihood, the number of regression parameters
 (including sigma), and the number of observations.
+If all refits return the optimizer penalty, profiling stops with an error
+instead of returning an artificial flat profile. Keep the model formula and
+data available to the stored model call, or provide a working
+\code{refit_fn} to \code{\link{multiScale_optim}}.
 
 Log-spacing concentrates evaluation points at smaller sigma values where the
 likelihood surface often changes more rapidly, and spaces them out at larger

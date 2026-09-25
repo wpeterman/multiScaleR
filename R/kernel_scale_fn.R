@@ -404,6 +404,15 @@ kernel_scale_fn <- function(par,
     stop(scale_validation_error, call. = FALSE)
   }
 
+  # A candidate scale must not change which observations contribute to the
+  # likelihood. In particular, an undefined landscape metric must not improve
+  # the objective merely by causing the model refit to drop its site.
+  if (anyNA(cov.w)) {
+    if (is.null(mod_return)) return(1e6^10)
+    stop("An optimized covariate is missing for an observation in the fitted sample. Choose a scale with defined covariates for every modeled observation.",
+         call. = FALSE)
+  }
+
   scl_df <- scale(cov.w)
   refit_error <- NULL
 
@@ -459,6 +468,18 @@ kernel_scale_fn <- function(par,
       ),
       call. = FALSE
     )
+  }
+
+  starting_n <- tryCatch(.msr_model_nobs(.analysis_model(mod)),
+                         error = function(e) NA_integer_)
+  candidate_n <- tryCatch(.msr_model_nobs(.analysis_model(mod_u)),
+                          error = function(e) NA_integer_)
+  if (length(starting_n) == 1L && length(candidate_n) == 1L &&
+      is.finite(starting_n) && is.finite(candidate_n) &&
+      candidate_n != starting_n) {
+    if (is.null(mod_return)) return(1e6^10)
+    stop("The final refit changed the number of observations relative to the starting model.",
+         call. = FALSE)
   }
 
   if(is.null(mod_return)){

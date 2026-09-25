@@ -35,8 +35,9 @@ A data frame of class \code{"aictab"} (from the \code{AICcmodavg}
 package) sorted by ascending AIC(c), containing:
 \describe{
   \item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
-  \item{\code{K}}{Number of estimated parameters (regression coefficients +
-    sigma, + shape for \code{"expow"} kernel).}
+  \item{\code{K}}{Number of fitted likelihood parameters, including
+    ancillary parameters such as negative-binomial dispersion, plus optimized
+    scale and shape parameters for \code{multiScaleR} models.}
   \item{\code{AICc} or \code{AIC}}{Information criterion value.}
   \item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}
   \item{\code{ModelLik}}{Relative likelihood (\code{exp(-0.5 * Delta)}).}
@@ -57,7 +58,8 @@ the \code{AICcmodavg} package. For \code{multiScaleR} objects, the optimized
 (refitted) model stored in \code{opt_mod} is used for log-likelihood and
 parameter count. The sigma parameter (and shape for \code{"expow"}) is added
 to K automatically. For plain model objects in a mixed list, sigma is not
-added to K.
+added to K. The fitted model's log-likelihood degrees of freedom are used
+when available, so negative-binomial dispersion contributes one parameter.
 }
 \examples{
 ## Simulate data

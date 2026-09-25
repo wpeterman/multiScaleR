@@ -6,9 +6,10 @@
 #' into spatial influence zones before running \code{\link{multiScale_optim}}.
 #' To plot the kernel from a fitted model, use \code{plot(opt)} instead.
 #'
-#' @param prob Numeric between 0 and 1 (exclusive). Cumulative density threshold
-#'   used to mark the effective distance on the plot. Default: \code{0.9} (90\%
-#'   of the kernel weight falls within the marked distance).
+#' @param prob Numeric between 0 and 1 (exclusive). Cumulative weight along a
+#'   line through the point used to mark the plotted distance. Default:
+#'   \code{0.9}. For the radius holding this proportion of weight on a plane,
+#'   use \code{\link{kernel_dist}} with \code{dimension = "2d"}.
 #' @param sigma Positive numeric. The scale parameter of the kernel, in the
 #'   same units as the projection used with \code{\link{kernel_prep}} (e.g.,
 #'   metres when using a metric CRS). Controls the width of the kernel: larger
@@ -42,9 +43,11 @@
 #'   invisibly.
 #'
 #' @details
-#' The x-axis range is set to cover 99.9\% of the cumulative density so that
-#' the tails of the distribution are visible. The \code{prob} marker is rounded
-#' to the nearest 10 distance units for display purposes.
+#' The x-axis range is set to cover 99.9\% of the one-dimensional cumulative
+#' weight so that the tails of the curve are visible. The \code{prob} marker is
+#' rounded to the nearest 10 distance units for display purposes. The marker
+#' describes the kernel along a line, not the share of weight across raster
+#' cells on a plane.
 #'
 #' For fitted-model kernel plots (with confidence intervals), use
 #' \code{plot(multiScaleR_object)} instead.

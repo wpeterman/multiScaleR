@@ -17,6 +17,7 @@
 ^tools/landscape_metrics_exploration\.R$
 ^tools/landscape_metrics_roadmap\.md$
 ^future_ideas\.md$
+^PROJECT_NOTES\.md$
 ^data-raw$
 ^bench_tmp$
 ^doc$

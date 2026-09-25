@@ -33,7 +33,13 @@ scale_ci_table <- function(object,
   } else {
     profile_tab <- try(profile_sigma_intervals(object), silent = TRUE)
     if (inherits(profile_tab, "try-error") || is.null(profile_tab)) {
-      profile_tab <- list(intervals = NULL, method = NULL)
+      detail <- if (inherits(profile_tab, "try-error")) {
+        conditionMessage(attr(profile_tab, "condition"))
+      } else {
+        "The fitted object lacks information needed for profiling."
+      }
+      stop("Profile-likelihood intervals could not be computed: ", detail,
+           call. = FALSE)
     }
     assign(cache_key, profile_tab, envir = .profile_scale_cache)
   }
@@ -96,6 +102,17 @@ profile_sigma_intervals <- function(object,
 
   bounds <- parameter_bounds(object)
   full_par <- object$optim_results$par
+  # Verify that the stored call can still refit the model before a profile
+  # interval is constructed. A lost formula or data symbol must not turn a
+  # constant optimizer penalty into an apparently precise confidence interval.
+  kernel_scale_fn(par = full_par,
+                  d_list = object$kernel_inputs$d_list,
+                  cov_df = object$kernel_inputs$raw_cov,
+                  kernel = object$kernel_inputs$kernel,
+                  fitted_mod = object$fitted_mod_original,
+                  join_by = object$join_by,
+                  mod_return = TRUE,
+                  opt_context = object$opt_context)
   mle_fit <- list(value = object$optim_results$value,
                   par_full = full_par)
   cutoff <- object$optim_results$value + stats::qchisq(level, df = 1) / 2

@@ -649,8 +649,8 @@
 
 # Build the kernel weight matrix used to project a weighted surface metric. This
 # mirrors the focal-window construction in `.msr_kernel_raster_one()`: a window
-# wide enough to hold `pct_wt` of the kernel mass, filled with the distance-
-# decay weights for the given kernel, sigma, and shape.
+# sized using the historical one-dimensional `pct_wt` cutoff, filled with the
+# distance-decay weights for the given kernel, sigma, and shape.
 .surface_kernel_weight_matrix <- function(raster, sigma, shape, kernel, pct_wt) {
   mx <- kernel_dist(kernel = kernel, sigma = sigma, beta = shape, prob = pct_wt)
   r_res <- terra::res(raster)[1]

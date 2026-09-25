@@ -247,9 +247,14 @@ summary(opt)
 
 **How to read the `summary()` output:** The scale section reports the estimated
 sigma for `land2_mean`, with its standard error and 95% confidence interval, in
-map units (meters here). Below it is the *effective distance*, the radius that
-captures a stated proportion (default 90%) of the Gaussian kernel weight. That
-converts sigma into a distance you can interpret on the ground. The two
+map units (meters here). Below it is the *effective distance*, which converts
+sigma into a distance you can interpret on the ground, reported two ways: the
+1D distance along a line through the point (about 1.65 sigma for a Gaussian
+kernel at the default 90%) and the 2D radius of the circle that holds 90% of
+the weight of an ideal, untruncated kernel on a plane (about 2.15 sigma). Use
+the 2D radius to describe the area associated with kernel weighting, while
+checking whether `max_D`, raster edges, or missing cells truncate that area.
+See `?kernel_dist` for both definitions. The two
 fixed-radius surface metrics do not appear in the scale section because their
 radius was specified rather than estimated; they enter the model only as
 ordinary covariates.

@@ -4,7 +4,7 @@
 \alias{kernel_dist}
 \title{Scale Distance}
 \usage{
-kernel_dist(model, prob = 0.9, ...)
+kernel_dist(model, prob = 0.9, dimension = c("1d", "2d"), ...)
 }
 \arguments{
 \item{model}{A fitted \code{multiScaleR} object from \code{\link{multiScale_optim}}.
@@ -12,9 +12,21 @@ When provided, scale distances and 95\% confidence intervals are returned for
 all optimized covariates. When omitted, \code{sigma}, \code{kernel}, and
 (for \code{expow}) \code{beta} must be supplied via \code{...}.}
 
-\item{prob}{Numeric between 0 and 1 (exclusive). Cumulative kernel density
-threshold used to define the effective distance. Default: \code{0.9}, meaning
-the distance enclosing 90\% of the kernel weight.}
+\item{prob}{Numeric between 0 and 1 (exclusive). Cumulative proportion
+used to define the distance. Default: \code{0.9}. The proportion refers
+to weight along a line for \code{dimension = "1d"} and weight on a plane
+for \code{dimension = "2d"}.}
+
+\item{dimension}{Character. How the distance is measured. \code{"1d"}
+(default) returns the distance at which the kernel's cumulative density,
+read along a line through the point, reaches \code{prob}; this is the value
+\code{kernel_dist()} has always returned. \code{"2d"} returns the radius of
+the circle around the point that holds \code{prob} of the total weight the
+ideal kernel gives to locations on an unbounded plane. Because raster cells
+lie across a plane, the \code{"2d"} radius answers "within what
+distance does the ideal kernel assign 90\% of its total weight?". For
+distance-weighted kernels it is larger than the \code{"1d"} distance;
+hard-radius covariates report the same radius for both. See Details.}
 
 \item{...}{Additional parameters used when \code{model} is not supplied:
 \describe{
@@ -33,37 +45,81 @@ the distance enclosing 90\% of the kernel weight.}
 }
 \value{
 When \code{model} is provided: a data frame with one row per optimized
-covariate and three columns: \code{Mean} (distance at the estimated sigma),
-\code{Lower} (distance at the lower 95\% CI of sigma), and \code{Upper}
-(distance at the upper 95\% CI of sigma). Values are rounded to two decimal
-places.
+covariate and three columns, all in map units: \code{Mean} (distance at the
+estimated sigma), \code{2.5\%} (distance at the lower 95\% limit of sigma),
+and \code{97.5\%} (distance at the upper 95\% limit of sigma). Values are
+rounded to two decimal places. For hard-radius covariates (landscape metrics
+and unweighted surface metrics) the row reports the radius itself, whichever
+\code{dimension} is requested.
 
 When kernel parameters are supplied directly via \code{...}: a single numeric
-value giving the distance at which the cumulative kernel density first reaches
-\code{prob}.
+value giving the distance, in map units, at which the cumulative kernel
+weight under the requested dimensional definition reaches \code{prob}.
 }
 \description{
-Estimates the distance at which a specified cumulative proportion
-of the kernel density function is reached. Can be used with a fitted
-\code{multiScaleR} object to report optimized scale distances, or with
-manually supplied kernel parameters to explore kernel behavior.
+Converts a kernel scale parameter (\code{sigma}) into a distance
+in map units: the distance within which a specified proportion of the kernel
+weight falls. Distances can be measured along a line through the point
+(one-dimensional) or as the radius of a circle around it (two-dimensional).
+Can be used with a fitted \code{multiScaleR} object to report optimized scale
+distances, or with manually supplied kernel parameters to explore kernel
+behavior.
 }
 \details{
-The effective distance depends on both the kernel type and the scale parameter
-\code{sigma}:
+\strong{One or two dimensions.} A kernel assigns each raster cell a weight
+that declines with the cell's distance from the point. Two distances can
+summarize how far that weight reaches:
 \itemize{
-  \item \strong{Gaussian}: uses the inverse normal CDF, so the 90\% distance
-    is approximately 1.65 sigma.
-  \item \strong{Negative exponential}: uses \code{-sigma * log(1 - prob)}.
-  \item \strong{Fixed buffer}: returns \code{sigma * prob} (the fraction of
+  \item \code{dimension = "1d"} treats the kernel as a curve along a single
+    line (a transect) through the point and returns the distance on either
+    side that encloses \code{prob} of the area under that curve. For a
+    Gaussian kernel the 90\% distance is about 1.65 sigma.
+  \item \code{dimension = "2d"} accounts for locations lying on a plane, so
+    the number of locations at distance \emph{d} grows with the circumference
+    2 pi \emph{d}. It returns the radius of the circle that holds \code{prob}
+    of the ideal kernel weight. For a Gaussian kernel the 90\% radius is about
+    2.15 sigma.
+}
+With sigma = 300 m, a Gaussian kernel gives a 90\% distance of about 493 m in
+one dimension and 644 m in two. On an unbounded plane, locations within
+493 m carry only about 74\% of the total weight. When you describe the area
+associated with kernel weighting, or compare with values defined on the plane
+(for example, a radius holding 90\% of the kernel weight), use
+\code{"2d"}. Always state which definition you report.
+
+\strong{Kernel formulas.} In one dimension:
+\itemize{
+  \item \strong{Gaussian}: the inverse normal CDF, \code{qnorm((1 + prob) / 2) * sigma}.
+  \item \strong{Negative exponential}: \code{-sigma * log(1 - prob)}.
+  \item \strong{Fixed buffer}: \code{sigma * prob} (the fraction of
     the buffer radius).
   \item \strong{Exponential power}: integrates the density numerically; both
     \code{sigma} and \code{beta} (shape) must be specified.
 }
+In two dimensions:
+\itemize{
+  \item \strong{Gaussian}: \code{sigma * sqrt(-2 * log(1 - prob))}.
+  \item \strong{Negative exponential}: \code{sigma * qgamma(prob, shape = 2)},
+    about 3.89 sigma at 90\%.
+  \item \strong{Fixed buffer}: \code{sigma * sqrt(prob)}, the radius of the
+    circle holding \code{prob} of the buffer's area.
+  \item \strong{Exponential power}:
+    \code{sigma * qgamma(prob, shape = 2 / beta)^(1 / beta)}.
+}
+Both definitions describe the ideal continuous kernel. They do not account
+for truncation at \code{max_D}, raster boundaries, missing cells, or cell
+geometry. The realized share of weight among extracted raster cells can
+therefore differ. If the two-dimensional radius approaches or exceeds
+\code{max_D}, consider increasing \code{max_D} in
+\code{\link{kernel_prep}} and refitting the model.
 
 Confidence intervals for the fitted \code{model} case are derived from the
 Hessian-based standard errors (or profile-likelihood intervals when
-\code{\link{profile_sigma}} has been run and stored on the object).
+\code{\link{profile_sigma}} has been run and stored on the object). Each
+limit of sigma is converted to a distance with the same formula.
+
+\code{summary()} of a fitted model reports both distances; see
+\code{\link{summary.multiScaleR}}.
 }
 \examples{
 \donttest{
@@ -87,7 +143,8 @@ opt <- multiScale_optim(fitted_mod = mod,
                         kernel_inputs = kernel_inputs)
 
 ## Uses of `kernel_dist`
-kernel_dist(model = opt)
+kernel_dist(model = opt)                     # along a line (1D)
+kernel_dist(model = opt, dimension = "2d")   # radius of a circle (2D)
 kernel_dist(model = opt, prob = 0.95)
 kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
 kernel_dist(sigma = 100, prob = 0.975, kernel = "exp")
@@ -95,7 +152,12 @@ kernel_dist(sigma = 100, prob = 0.95, kernel = "expow", beta = 1.5)
 kernel_dist(sigma = 100, kernel = "fixed")
 }
 
+## The two definitions for a Gaussian kernel with sigma = 300
+kernel_dist(sigma = 300, kernel = "gaussian")                     # about 493
+kernel_dist(sigma = 300, kernel = "gaussian", dimension = "2d")   # about 644
+
 }
 \seealso{
-\code{\link{plot.multiScaleR}}
+\code{\link{summary.multiScaleR}}, \code{\link{plot.multiScaleR}},
+  \code{\link{plot_kernel}}
 }

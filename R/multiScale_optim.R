@@ -345,7 +345,8 @@
 #'   kernel-weighted variables defined in \code{kernel_inputs}. Supported
 #'   classes include \code{lm}, \code{glm}, \code{gls} (nlme), and
 #'   \code{unmarkedFit} (unmarked). Many other model classes are also supported
-#'   via \code{stats::update()} or a custom \code{refit_fn}.
+#'   via \code{stats::update()} or a custom \code{refit_fn}. A predictor cannot
+#'   be named \code{"x"}, which is reserved for internal coordinate data.
 #' @param kernel_inputs A list of class \code{"multiScaleR_data"} created by
 #'   \code{\link{kernel_prep}}. Must contain elements \code{raw_cov},
 #'   \code{d_list}, \code{min_D}, \code{max_D}, \code{unit_conv}, and
@@ -401,8 +402,9 @@
 #' \describe{
 #'   \item{\code{scale_est}}{Data frame with one row per optimized covariate and
 #'     two columns: \code{Mean} (optimized sigma on the original projection
-#'     scale) and \code{SE} (Hessian-based standard error). Row names are
-#'     covariate names.}
+#'     scale) and \code{SE} (Hessian-based standard error). \code{SE} is
+#'     \code{NA} for hard-radius landscape and unweighted surface metrics,
+#'     whose likelihood changes in steps. Row names are covariate names.}
 #'   \item{\code{shape_est}}{Data frame of the same structure as
 #'     \code{scale_est} for the shape parameter, or \code{NULL} when
 #'     \code{kernel != "expow"}.}
@@ -456,6 +458,12 @@
 #' optimization. Summary methods report profile-likelihood confidence intervals
 #' for sigma when \code{\link{profile_sigma}} has been run on the object;
 #' otherwise they fall back to Hessian-based intervals.
+#' Candidate scales that make a covariate undefined at a modeled observation
+#' are rejected, so the optimizer compares likelihoods for the same sample.
+#' The final \code{sample_size} diagnostic reports whether the starting model
+#' already excluded any prepared observations. For hard-radius landscape and
+#' unweighted surface metrics, Hessian uncertainty is not meaningful; use
+#' \code{summary(x, profile = TRUE)} for profile-likelihood intervals.
 #'
 #' \strong{Binned acceleration}
 #'
@@ -721,6 +729,7 @@ multiScale_optim <- function(fitted_mod,
     # mod_vars <- find_predictors(fitted_mod)[[1]]
     mod_vars <- .model_predictors(analysis_mod)
   }
+  validate_reserved_variable_names(mod_vars, "model predictor")
 
   if (!is.null(kernel_inputs$scale_vars)) {
     available_sources <- if (!is.null(kernel_inputs$raw_cov)) {
@@ -997,6 +1006,8 @@ multiScale_optim <- function(fitted_mod,
     scale_est <- data.frame(Mean = opt_results$par_unscale[1:n_covs],
                             SE = res[1:n_covs])
     rownames(scale_est) <- r_vars
+    hard_radius <- .msr_hard_radius_covariates(kernel_inputs$scale_vars)
+    scale_est[intersect(rownames(scale_est), hard_radius), "SE"] <- NA_real_
 
     if(kernel_inputs$kernel == 'expow') {
       shape_est <- data.frame(Mean = opt_results$par_unscale[(n_covs + 1):(n_covs * 2)],
@@ -1047,6 +1058,21 @@ multiScale_optim <- function(fitted_mod,
                                               max_D = kernel_inputs$max_D)
     out$diagnostics$max_distance <- max_dist_diag
 
+    fitted_n <- .msr_model_nobs(out$opt_mod)
+    prepared_n <- nrow(kernel_inputs$kernel_dat)
+    out$diagnostics$sample_size <- list(
+      code = "sample_size",
+      triggered = fitted_n < prepared_n,
+      fitted_n = fitted_n,
+      prepared_n = prepared_n
+    )
+    if (isTRUE(out$diagnostics$sample_size$triggered)) {
+      warning(sprintf(
+        "The fitted model uses %d of %d prepared observations. Check the initial model's missing-data handling before comparing fits.",
+        fitted_n, prepared_n
+      ), call. = FALSE)
+    }
+
     if (isTRUE(max_dist_diag$triggered)) {
       out$warn_message <- c(out$warn_message, 1)
       cat(red("\n WARNING!!!\n",
@@ -1054,8 +1080,11 @@ multiScale_optim <- function(fitted_mod,
               "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(max_dist_diag$suggested_max_D) %+% " to ensure accurate estimation of scale.\n\n"))
     }
 
-    if(any((scale_est[,1] / scale_est[,2]) < 2, na.rm = T)){
-      out$diagnostics$sigma_precision <- .precision_diagnostic(scale_est, "sigma_precision")
+    smooth_scale <- scale_est[!rownames(scale_est) %in% hard_radius, , drop = FALSE]
+    if(nrow(smooth_scale) && any((smooth_scale[,1] / smooth_scale[,2]) < 2,
+                                 na.rm = TRUE)){
+      out$diagnostics$sigma_precision <- .precision_diagnostic(smooth_scale,
+                                                                "sigma_precision")
       out$warn_message <- c(out$warn_message, 2)
       cat(red("\n WARNING!!!\n",
               "The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.\n",

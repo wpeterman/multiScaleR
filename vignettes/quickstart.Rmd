@@ -121,6 +121,11 @@ points(pts, pch = 19, cex = 0.6, col = 'red')
 
 ## Prepare inputs with `kernel_prep()`
 
+If observations span years with different land-cover maps, use
+`kernel_prep_by_group()` to assign each observation its year's map and estimate
+one pooled relationship. See `vignette("year-specific-rasters", package =
+"multiScaleR")` for a complete example.
+
 `kernel_prep()` extracts raster values within `max_D` meters of each survey
 point and computes initial distance-weighted covariate values. Set `max_D`
 to a value that comfortably exceeds the scale of effect you expect. If
@@ -215,9 +220,10 @@ should fall within the reported confidence intervals.
 
 ## Visualize kernel decay and covariate effects
 
-`plot()` shows how the kernel weight assigned to each landscape cell decreases
-with distance. The vertical line marks the distance enclosing 90% of the total
-kernel weight (the effective scale of effect).
+`plot()` shows how kernel weight decreases with distance. Its vertical line
+marks the distance enclosing 90% of weight along a line through the point (1D).
+For the radius of a circle holding 90% of an ideal kernel's weight on a plane,
+use `kernel_dist(opt, dimension = "2d")`; `summary(opt)` reports both distances.
 
 ```{r plot-kernel, fig.cap = "***Distance-decay of kernel weight for each covariate.***"}
 plot(opt)

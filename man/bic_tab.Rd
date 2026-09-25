@@ -28,8 +28,9 @@ A data frame of class \code{"bictab"} (from the \code{AICcmodavg}
 package) sorted by ascending BIC, containing:
 \describe{
   \item{\code{Modnames}}{Model name.}
-  \item{\code{K}}{Number of estimated parameters (regression coefficients +
-    sigma, + shape for \code{"expow"} kernel).}
+  \item{\code{K}}{Number of fitted likelihood parameters, including
+    ancillary parameters such as negative-binomial dispersion, plus optimized
+    scale and shape parameters for \code{multiScaleR} models.}
   \item{\code{BIC}}{Bayesian information criterion value.}
   \item{\code{Delta_BIC}}{Difference from the top model.}
   \item{\code{BICWt}}{BIC weight.}

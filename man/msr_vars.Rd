@@ -26,7 +26,8 @@ surface_var(source, metric, radius = NULL, weighted = FALSE)
 \item{...}{Named \code{kernel_var()}, \code{landscape_var()}, or
 \code{surface_var()} specifications. Each argument must be named; the name
 becomes the covariate column name in the model data frame. All names must
-be unique. At least one specification is required.}
+be unique and cannot be \code{"x"}, which is reserved for internal
+coordinate data. At least one specification is required.}
 
 \item{source}{Character scalar. Name of the source raster layer in
 \code{raster_stack} from which the covariate is derived. Must exactly match

@@ -8,7 +8,8 @@ k_dist(
   sigma,
   prob = 0.95,
   kernel = c("gaussian", "exp", "expow", "fixed"),
-  beta = NULL
+  beta = NULL,
+  dimension = c("1d", "2d")
 )
 }
 \arguments{
@@ -19,11 +20,19 @@ k_dist(
 \item{kernel}{Character. One of "gaussian", "exp", "expow", or "fixed".}
 
 \item{beta}{Numeric. Shape parameter for exponential power kernel. Ignored unless kernel = "expow".}
+
+\item{dimension}{Character. \code{"1d"} (default) for the distance along a
+line through the point; \code{"2d"} for the radius of the circle holding
+\code{prob} of the total weight when the kernel weights cells on a plane.}
 }
 \value{
-Numeric. Distance at which the cumulative kernel density reaches the specified proportion.
+Numeric distance in map units at which the cumulative kernel weight
+  reaches \code{prob} under the selected dimensional definition.
 }
 \description{
-Compute the distance at which a given cumulative density is reached for several kernel types.
+Compute the distance at which a given cumulative proportion of
+  kernel weight is reached for several kernel types, measured either along a
+  line through the point (one-dimensional) or as the radius of a circle
+  around it (two-dimensional).
 }
 \keyword{internal}

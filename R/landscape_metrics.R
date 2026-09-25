@@ -1095,7 +1095,8 @@
   }
 
   if (metric == "pladj") {
-    like_source <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+    like_source <- matrix(0, nrow = nrow(counts$area_cells),
+                          ncol = ncol(counts$area_cells))
     for (class in classes) {
       like_source <- like_source + .landscape_pair_count_raster_fft(
         values = values,
@@ -1115,7 +1116,8 @@
       radius = radius,
       na.rm = na.rm
     )
-    result <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+    result <- matrix(0, nrow = nrow(counts$area_cells),
+                     ncol = ncol(counts$area_cells))
 
     for (i in seq_along(class_counts$classes)) {
       class <- class_counts$classes[[i]]
@@ -1143,7 +1145,8 @@
       na.rm = na.rm
     )
     idx <- match(focal_class, class_counts$classes)
-    zero_mat <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+    zero_mat <- matrix(0, nrow = nrow(counts$area_cells),
+                       ncol = ncol(counts$area_cells))
     n_i <- if (is.na(idx)) zero_mat else class_counts$class_counts[[idx]]
     like_i <- if (is.na(idx)) zero_mat else 2 * pair_count_fn(focal_class, focal_class)
     total_cells <- class_counts$total
@@ -1152,7 +1155,8 @@
     # Proportion of like adjacencies given the minimum perimeter (other_i = 4 n_i),
     # then rescaled against the proportion expected under spatial randomness.
     g_i <- like_i / (4 * n_i - min_e)
-    result <- matrix(NA_real_, nrow = nrow(values), ncol = ncol(values))
+    result <- matrix(NA_real_, nrow = nrow(counts$area_cells),
+                     ncol = ncol(counts$area_cells))
     high <- (g_i >= p_i) | (p_i >= 0.5)
     high[is.na(high)] <- FALSE
     result[high]  <- (g_i[high]  - p_i[high])  / (1 - p_i[high])
@@ -1168,12 +1172,14 @@
       radius = radius,
       na.rm = na.rm
     )
-    present <- matrix(0, nrow = nrow(values), ncol = ncol(values))
+    present <- matrix(0, nrow = nrow(counts$area_cells),
+                      ncol = ncol(counts$area_cells))
     for (count in class_counts$class_counts) {
       present <- present + (count > 0)
     }
 
-    zero <- function() matrix(0, nrow = nrow(values), ncol = ncol(values))
+    zero <- function() matrix(0, nrow = nrow(counts$area_cells),
+                              ncol = ncol(counts$area_cells))
     total_ordered <- total_source * 2
     joint_entropy <- zero()      # sum of multiplier * p * ln(p) over the matrix
     between_total <- zero()      # IJI: total between-class adjacencies

@@ -60,7 +60,8 @@ Marginal effects are computed by constructing a \code{newdata} data frame
 where the focal covariate sweeps from its minimum to maximum observed value
 and all other predictors are held at their sample mean. For kernel-scaled
 covariates, whose scaled mean is 0, this is equivalent to holding them at
-their average landscape value.
+their average landscape value. Variables used only in model offsets are held
+at their sample mean for prediction but do not receive marginal effect panels.
 
 For \code{glm} and most GLM-family models, predictions are transformed via
 the inverse link function automatically (e.g., \code{exp()} for Poisson

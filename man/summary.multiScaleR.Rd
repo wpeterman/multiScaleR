@@ -17,7 +17,22 @@ fitted object during the current R session.}
 \item{...}{Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).}
 }
 \value{
-An object of class \code{summary_multiScaleR}. Confidence limits for `sigma` default to the package's existing Wald-style limits. If \code{profile = TRUE}, profile likelihood is used when feasible; if profiling fails, the summary falls back to Wald-style limits.
+An object of class \code{summary_multiScaleR}. Kernel-scale limits
+  default to Wald intervals. Scale distances, in map units, come in two
+  forms: \code{opt_dist} (also \code{opt_distance}) holds the
+  one-dimensional distance from \code{\link{kernel_dist}}, the distance at
+  which the kernel's cumulative density along a line through the point
+  reaches \code{prob} (about 1.65 sigma for a Gaussian kernel at 90\%).
+  \code{opt_dist_2d} holds the two-dimensional distance, the radius of the
+  circle around the point that holds \code{prob} of the weight of an ideal,
+  untruncated kernel on a plane (about 2.15 sigma for a Gaussian kernel at
+  90\%). Both tables have columns
+  \code{Mean}, \code{2.5\%}, and \code{97.5\%}, and hard-radius covariates
+  report their radius in both. See \code{\link{kernel_dist}} for when to
+  use each. For hard-radius landscape and unweighted
+  surface metrics, Hessian standard errors and Wald limits are shown as
+  \code{NA}; use \code{profile = TRUE} for profile-likelihood limits.
+  Profiling errors are reported instead of silently returning invalid limits.
 }
 \description{
 Summarizes output from \code{multiScale_optim}.
