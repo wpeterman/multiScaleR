@@ -60,7 +60,7 @@ With advanced coding skills, Bayesian analytical frameworks can be used to estim
 - Model selection tables (AIC, BIC) account for the additional parameters estimated during scale optimization.
 - Functions to simulate rasters and response data facilitate power analysis and methods testing.
 
-`multiScaleR` is fully supported for models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and `unmarked`. It should work with any model class that has an `update` function and is a supported class in the R package [insight](https://CRAN.R-project.org/package=insight). Let me know if you encounter issues or would like to see support for other model classes.
+`multiScaleR` supports models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and many `unmarkedFit` classes. For `unmarked`, a raster covariate being optimized must be a static site covariate, and the fitted class must support refitting with updated data. Other model classes may work when they provide a suitable `update` method and are supported by [insight](https://CRAN.R-project.org/package=insight). Let me know if you encounter issues or would like to see support for other model classes.
 
 **References**
 
@@ -675,6 +675,29 @@ opt_umf.p <- readRDS(system.file("extdata", "opt_umf_p.rds",
 ```
 
 Compare optimized results with simulated values. Note that the detection reported by `unmarked` is on the logit scale, so must be back-transformed. Overall, both the scale parameters and the Poisson count model parameters were reasonably recovered.
+
+For repeated site-year rows, the preparation object still has one row per unique spatial site. Add a site ID to the fitted model's `siteCovs` and pass one matching ID per prepared site through `join_by`. The site IDs in the model may repeat and may appear in any row order. The code below shows the required data layout; replace `counts_by_year` with the survey count matrices, each having sites in the same order as `kernel_inputs$kernel_dat`.
+
+```{r eval=FALSE}
+# Spatial site IDs follow the point order used by kernel_prep().
+site_id <- seq_len(nrow(kernel_inputs$kernel_dat))
+join_by <- data.frame(site_id = site_id)
+
+# Each count matrix has one row per site and one column per visit.
+y_stacked <- do.call(rbind, counts_by_year)
+site_row <- rep(site_id, times = length(counts_by_year))
+site_covs <- kernel_inputs$kernel_dat[site_row, , drop = FALSE]
+site_covs$site_id <- site_id[site_row]
+
+umf_years <- unmarked::unmarkedFramePCount(y = y_stacked,
+                                           siteCovs = site_covs)
+mod_years <- unmarked::pcount(~1 ~ bin1 + cont2, data = umf_years,
+                              K = 100)
+opt_years <- multiScale_optim(mod_years, kernel_inputs,
+                              join_by = join_by)
+```
+
+Check that the rows of `y_stacked` and `site_covs` refer to the same site-year records before fitting. Without `join_by`, model rows must match prepared spatial sites one for one in the same order. An open-population `pcountOpen()` model instead stores one row per site and the repeated years across count columns; it can use the same static site covariates without `join_by`. For either model type, examine the scale profile and `diagnostics()` because sparse counts can yield weakly identified scales.
 
 ```{r}
 summary(opt_umf.p)

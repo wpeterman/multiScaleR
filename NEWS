@@ -1,3 +1,12 @@
+multiScaleR 0.7.2
+---------
+* `join_by` now preserves unmarked response and site-covariate row alignment,
+  validates site keys, and rejects mismatched rows instead of recycling values.
+* Optimization supports unmarked fits with component formula lists, including
+  tested `pcountOpen()` and `colext()` workflows with static site covariates.
+* Refit checks and sample-size diagnostics account for repeated and removed
+  unmarked sites. Documentation and tests cover multi-year site mapping.
+
 multiScaleR 0.7.1
 ---------
 * `kernel_prep_by_group()` prepares pooled model inputs from aligned annual or

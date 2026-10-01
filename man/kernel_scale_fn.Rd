@@ -27,7 +27,8 @@ kernel_scale_fn(
 
 \item{fitted_mod}{fitted model object}
 
-\item{join_by}{Data frame to join unmarked frame during optimization}
+\item{join_by}{Optional data frame of site keys used to map prepared spatial
+covariates to the unmarked frame without changing its row order.}
 
 \item{mod_return}{Default: NULL}
 

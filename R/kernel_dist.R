@@ -185,7 +185,7 @@ kernel_dist <- function(model,
 
       } else if(any(grepl("^unmarked", class(opt_mod)))){
         df <- dim(opt_mod@data@y)[1]
-        names <- all.vars(opt_mod@formula)
+        names <- .unmarked_model_predictors(opt_mod)
 
       } else {
         df <- get_df(opt_mod, type = "residual")

@@ -351,11 +351,11 @@
 #'   \code{\link{kernel_prep}}. Must contain elements \code{raw_cov},
 #'   \code{d_list}, \code{min_D}, \code{max_D}, \code{unit_conv}, and
 #'   \code{kernel}.
-#' @param join_by Default: \code{NULL}. A data frame used to join site-level
-#'   spatial covariates to repeated observations for \code{unmarked} models
-#'   where sites are surveyed across multiple years. The column name in
-#'   \code{join_by} must match a column in the data used to fit the
-#'   \code{unmarked} model. See Details.
+#' @param join_by Default: \code{NULL}. For \code{unmarked} models, a data
+#'   frame with one unique key row per spatial site in \code{kernel_inputs},
+#'   in the same order as those sites. Its named key columns must also occur in
+#'   the fitted model's \code{siteCovs}. Use it when model rows repeat sites,
+#'   such as one row per site and year. See Details.
 #' @param par Optional numeric vector of starting values for the optimizer.
 #'   Values must be divided by \code{max_D} to match the internal scaled
 #'   parameter space. Length must equal the number of optimized covariates
@@ -460,8 +460,9 @@
 #' otherwise they fall back to Hessian-based intervals.
 #' Candidate scales that make a covariate undefined at a modeled observation
 #' are rejected, so the optimizer compares likelihoods for the same sample.
-#' The final \code{sample_size} diagnostic reports whether the starting model
-#' already excluded any prepared observations. For hard-radius landscape and
+#' The final \code{sample_size} diagnostic reports prepared and fitted row
+#' counts; for repeated-site \code{unmarked} data it also reports the number
+#' of distinct prepared spatial sites. For hard-radius landscape and
 #' unweighted surface metrics, Hessian uncertainty is not meaningful; use
 #' \code{summary(x, profile = TRUE)} for profile-likelihood intervals.
 #'
@@ -488,11 +489,20 @@
 #'
 #' \strong{Joining unmarked multi-year data}
 #'
-#' When using \code{unmarked} models where sites are surveyed across multiple
-#' years but the spatial covariates are constant across years, provide a
-#' \code{join_by} data frame to match each site's kernel-weighted covariate
-#' value to its observations. The column name in \code{join_by} must match a
-#' column in the data used to fit the \code{unmarked} model.
+#' When \code{unmarked} model rows repeat spatial sites, provide a
+#' \code{join_by} data frame with one row per prepared site. For example, if
+#' the spatial sites have IDs \code{c("A", "B")} and model rows have site IDs
+#' \code{c("A", "B", "A", "B")} for two years, use
+#' \code{join_by = data.frame(site = c("A", "B"))} and include the four-row
+#' \code{site} column in the model's \code{siteCovs}. Multiple key columns
+#' are allowed. Prepared keys must be unique and every model row must match.
+#' The model's response and site-covariate row order is preserved. Without
+#' \code{join_by}, the number and order of model rows must equal the prepared
+#' spatial sites. When both objects retain the same row IDs, their order is
+#' checked. Otherwise, the order must be supplied correctly by the caller.
+#' Optimized covariates must be static \code{siteCovs};
+#' \code{obsCovs} and \code{yearlySiteCovs} cannot be optimized through this
+#' site-level workflow.
 #'
 #' \strong{Custom refit functions}
 #'
@@ -724,7 +734,7 @@ multiScale_optim <- function(fitted_mod,
     # mod_vars <- find_predictors(fitted_mod)[[1]]
     mod_vars <- .model_predictors(analysis_mod)
   } else if (any(grepl("^unmarked", class(fitted_mod)))) {
-    mod_vars <- all.vars(formula(fitted_mod@formula))
+    mod_vars <- .unmarked_model_predictors(fitted_mod)
   } else {
     # mod_vars <- find_predictors(fitted_mod)[[1]]
     mod_vars <- .model_predictors(analysis_mod)
@@ -779,7 +789,7 @@ multiScale_optim <- function(fitted_mod,
     n_covs <- length(r_vars)
   } else if(any(grepl("^unmarked", class(fitted_mod)))) {
     mod_class <- 'unmarked'
-    mod_vars <- all.vars(formula(fitted_mod@formula))
+    mod_vars <- .unmarked_model_predictors(fitted_mod)
     r_vars <- mod_vars[which(mod_vars %in% optimized_covariates)]
     n_covs <- length(r_vars)
     fitType <- fitted_mod@fitType
@@ -1059,13 +1069,25 @@ multiScale_optim <- function(fitted_mod,
     out$diagnostics$max_distance <- max_dist_diag
 
     fitted_n <- .msr_model_nobs(out$opt_mod)
-    prepared_n <- nrow(kernel_inputs$kernel_dat)
-    out$diagnostics$sample_size <- list(
+    prepared_sites <- nrow(kernel_inputs$kernel_dat)
+    # A repeated-site unmarked frame has more model rows than spatial sites.
+    # Its data slots also retain rows dropped from the likelihood.
+    prepared_n <- if (inherits(fitted_mod, "unmarkedFit")) {
+      fitted_n <- fitted_n - length(out$opt_mod@sitesRemoved)
+      nrow(fitted_mod@data@siteCovs)
+    } else {
+      prepared_sites
+    }
+    sample_size <- list(
       code = "sample_size",
       triggered = fitted_n < prepared_n,
       fitted_n = fitted_n,
       prepared_n = prepared_n
     )
+    if (inherits(fitted_mod, "unmarkedFit")) {
+      sample_size$prepared_sites <- prepared_sites
+    }
+    out$diagnostics$sample_size <- sample_size
     if (isTRUE(out$diagnostics$sample_size$triggered)) {
       warning(sprintf(
         "The fitted model uses %d of %d prepared observations. Check the initial model's missing-data handling before comparing fits.",

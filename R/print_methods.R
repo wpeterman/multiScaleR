@@ -227,7 +227,7 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
 
   } else if(any(grepl("^unmarked", class(object$opt_mod)))){
     df <- dim(object$opt_mod@data@y)[1]
-    names <- all.vars(object$opt_mod@formula)
+    names <- .unmarked_model_predictors(object$opt_mod)
 
   } else {
     df <- get_df(object$opt_mod, type = "residual")

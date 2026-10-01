@@ -30,7 +30,10 @@
 #'     unless \code{kernel = "expow"} was used and a precision concern arose.}
 #'   \item{\code{sample_size}}{A list with \code{fitted_n}, the number of
 #'     observations in the final model, and \code{prepared_n}, the number of
-#'     observations in the preparation object. \code{triggered} is \code{TRUE}
+#'     observations in the preparation object, or model rows for repeated-site
+#'     \code{unmarked} data. For \code{unmarked} fits, \code{prepared_sites}
+#'     is the number of distinct spatial sites in the preparation object.
+#'     \code{triggered} is \code{TRUE}
 #'     when the fitted model uses fewer observations. Candidate scales that
 #'     change the initial model's sample are rejected during optimization.}
 #' }

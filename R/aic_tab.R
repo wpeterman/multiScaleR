@@ -57,7 +57,7 @@
   }
 
   if (any(grepl("^unmarked", class(analysis_mod)))) {
-    return(length(all.vars(formula(analysis_mod@formula))))
+    return(length(.unmarked_model_predictors(analysis_mod)))
   }
 
   stop("Could not determine the number of fitted parameters for one or more models.",

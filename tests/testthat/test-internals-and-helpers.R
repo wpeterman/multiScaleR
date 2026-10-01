@@ -162,7 +162,9 @@ test_that("build_opt_context caches reusable model metadata", {
   expect_equal(um_context$n_covs, 2)
   expect_equal(um_context$join_cols, "site")
   expect_true(all(c("site", "nuisance") %in% colnames(um_context$umf_template@siteCovs)))
-  expect_false(any(um_context$covs %in% colnames(um_context$umf_template@siteCovs)))
+  expect_true(all(um_context$covs %in% colnames(um_context$umf_template@siteCovs)))
+  expect_equal(um_context$unmarked_site_idx,
+               seq_len(nrow(unmark$kernel_inputs$kernel_dat)))
 })
 
 test_that("kernel_scale_fn covers glm, other, unmarked, fallback, and negative sigma paths", {

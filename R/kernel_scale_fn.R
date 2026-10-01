@@ -38,6 +38,83 @@
 }
 
 
+# unmarked fits differ in whether they retain one formula or a list of
+# component formulas. Only variables in the fitted formulas can be optimized.
+.unmarked_model_predictors <- function(model) {
+  collect_formulas <- function(x) {
+    if (inherits(x, "formula")) return(list(x))
+    if (is.list(x)) return(do.call(c, lapply(x, collect_formulas)))
+    list()
+  }
+  formulas <- list()
+  slots <- methods::slotNames(model)
+  if ("formula" %in% slots) formulas <- c(formulas, list(model@formula))
+  if ("formlist" %in% slots) formulas <- c(formulas, model@formlist)
+  formulas <- collect_formulas(formulas)
+  if (length(formulas) == 0L) {
+    stop("Could not recover formulas from this unmarked model class: ",
+         class(model)[1], call. = FALSE)
+  }
+  unique(unlist(lapply(formulas, all.vars), use.names = FALSE))
+}
+
+
+# Resolve every model row to exactly one prepared spatial site. The model may
+# repeat site keys (for example, once per year); prepared keys must be unique.
+.unmarked_site_map <- function(site_covs, join_by, n_sites,
+                               prepared_ids = NULL) {
+  if (is.null(join_by)) {
+    if (nrow(site_covs) != n_sites) {
+      stop("The unmarked model has ", nrow(site_covs), " site-covariate rows but ",
+           n_sites, " prepared spatial sites. Supply `join_by` with one key row per prepared site and matching key columns in `siteCovs`.",
+           call. = FALSE)
+    }
+    model_ids <- row.names(site_covs)
+    if (length(prepared_ids) == n_sites && !anyNA(prepared_ids) &&
+        !anyDuplicated(prepared_ids) &&
+        setequal(as.character(prepared_ids), model_ids) &&
+        !identical(as.character(prepared_ids), model_ids)) {
+      stop("Unmarked site-covariate row IDs do not match the prepared spatial site order. Supply `join_by` with explicit site keys.",
+           call. = FALSE)
+    }
+    return(seq_len(n_sites))
+  }
+  if (!is.data.frame(join_by) || ncol(join_by) == 0L || nrow(join_by) != n_sites ||
+      anyDuplicated(names(join_by))) {
+    stop("`join_by` must be a data frame with one or more named key columns and exactly one row per prepared spatial site.",
+         call. = FALSE)
+  }
+  keys <- names(join_by)
+  if (any(!nzchar(keys)) || !all(keys %in% names(site_covs))) {
+    stop("Columns in `join_by` must also be present in the unmarked site covariates.",
+         call. = FALSE)
+  }
+  if (anyNA(join_by) || anyNA(site_covs[keys])) {
+    stop("`join_by` and matching unmarked site-covariate keys cannot contain missing values.",
+         call. = FALSE)
+  }
+  if (anyDuplicated(join_by)) {
+    stop("Each prepared spatial site must have a unique key row in `join_by`.",
+         call. = FALSE)
+  }
+  # merge is used only to calculate indices. It never replaces siteCovs or
+  # changes the row order that must stay paired with the response matrix.
+  temporary <- make.unique(c(keys, ".msr_model_row", ".msr_prepared_row"))
+  model_col <- temporary[length(keys) + 1L]
+  prepared_col <- temporary[length(keys) + 2L]
+  left <- site_covs[keys]
+  left[[model_col]] <- seq_len(nrow(left))
+  right <- join_by
+  right[[prepared_col]] <- seq_len(nrow(right))
+  matched <- merge(left, right, by = keys, sort = FALSE, all.x = TRUE)
+  if (nrow(matched) != nrow(site_covs) || anyNA(matched[[prepared_col]])) {
+    stop("Every unmarked site-covariate key must match exactly one row of `join_by`.",
+         call. = FALSE)
+  }
+  matched[[prepared_col]][order(matched[[model_col]])]
+}
+
+
 .model_data <- function(model, ...) {
   suppressWarnings(tryCatch(
     get_data(model, ...),
@@ -337,7 +414,8 @@
 #' @param cov_df List of data frames with values extracted from rasters
 #' @param kernel Kernel used
 #' @param fitted_mod fitted model object
-#' @param join_by Data frame to join unmarked frame during optimization
+#' @param join_by Optional data frame of site keys used to map prepared spatial
+#'   covariates to the unmarked frame without changing its row order.
 #' @param mod_return Default: NULL
 #' @param opt_context Cached optimization context created internally by `multiScale_optim()`
 #' @param cov_w Optional precomputed (unscaled) kernel-weighted covariate matrix.
@@ -420,14 +498,9 @@ kernel_scale_fn <- function(par,
     umf <- opt_context$umf_template
 
     mod_u <- tryCatch({
-      if(!is.null(join_by)){
-        scl_df_join <- data.frame(scl_df, join_by, check.names = FALSE)
-        umf@siteCovs <- merge(umf@siteCovs, scl_df_join, by = opt_context$join_cols)
-        .refit_model(mod, data = umf, opt_context = opt_context)
-      } else {
-        umf@siteCovs[opt_context$covs] <- as.data.frame(scl_df)
-        .refit_model(mod, data = umf, opt_context = opt_context)
-      }
+      umf@siteCovs[opt_context$covs] <-
+        as.data.frame(scl_df[opt_context$unmarked_site_idx, , drop = FALSE])
+      .refit_model(mod, data = umf, opt_context = opt_context)
     }, error = function(e) {
       refit_error <<- conditionMessage(e)
       NULL
@@ -479,6 +552,12 @@ kernel_scale_fn <- function(par,
       candidate_n != starting_n) {
     if (is.null(mod_return)) return(1e6^10)
     stop("The final refit changed the number of observations relative to the starting model.",
+         call. = FALSE)
+  }
+  if (identical(mod_class, "unmarked") &&
+      !identical(mod@sitesRemoved, mod_u@sitesRemoved)) {
+    if (is.null(mod_return)) return(1e6^10)
+    stop("The final unmarked refit changed which sites contribute to the likelihood.",
          call. = FALSE)
   }
 
@@ -546,7 +625,7 @@ build_opt_context <- function(fitted_mod,
     dat <- .model_data(analysis_mod)
   } else if(any(grepl("^unmarked", class(mod)))) {
     mod_class <- 'unmarked'
-    mod_vars <- all.vars(mod@formula)
+    mod_vars <- .unmarked_model_predictors(mod)
     dat <- mod@data@siteCovs
   } else if(any(class(mod) == 'glm')) {
     mod_class <- 'glm'
@@ -605,22 +684,24 @@ build_opt_context <- function(fitted_mod,
 
   if(mod_class == 'unmarked'){
     umf_template <- mod@data
-    if(!is.null(join_by)){
-      if(!all(colnames(join_by) %in% colnames(umf_template@siteCovs))){
-        stop(
-          "Columns in `join_by` must also be present in the unmarked site covariates.",
-          call. = FALSE
-        )
-      }
-      drop_cols <- which(colnames(umf_template@siteCovs) %in% covs)
-      if(length(drop_cols) > 0){
-        umf_template@siteCovs <- umf_template@siteCovs[,-drop_cols,drop = FALSE]
-      }
-      out$join_cols <- colnames(join_by)
-    } else {
-      out$site_cov_idx <- match(covs, colnames(umf_template@siteCovs))
+    missing_site_covs <- setdiff(covs, names(umf_template@siteCovs))
+    if (length(missing_site_covs) > 0L) {
+      stop("Optimized unmarked covariates must be static `siteCovs`: ",
+           paste(missing_site_covs, collapse = ", "), call. = FALSE)
     }
-    out$complete_idx <- complete_idx
+    if (!is.null(join_by) && any(covs %in% names(join_by))) {
+      stop("`join_by` key columns cannot be optimized covariates.",
+           call. = FALSE)
+    }
+    prepared_ids <- if (!is.null(cov_df)) names(cov_df) else binned$point_ids
+    out$unmarked_site_idx <- .unmarked_site_map(umf_template@siteCovs,
+                                                join_by, n_sites,
+                                                prepared_ids)
+    if (!is.null(join_by)) out$join_cols <- names(join_by)
+    out$site_cov_idx <- match(covs, names(umf_template@siteCovs))
+    # Compute all prepared sites so the index map remains valid even when the
+    # model has repeated rows or missing values in unrelated site covariates.
+    out$complete_idx <- NULL
     out$umf_template <- umf_template
   } else {
     out$data_template <- dat[data_idx, , drop = FALSE]
