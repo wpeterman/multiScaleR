@@ -23,23 +23,27 @@ Functions to simulate data with known scales of effect are included with this pa
 
 ## Installation
 
-If installing the development version from GitHub, Windows users will need to install RTools first. Rtools provides a compiler and some helpers to compile code for R in Windows. Download Rtools from here: <https://cran.r-project.org/bin/windows/Rtools/> and select the appropriate Rtools version (4.0 with R 4.x.x)
+Install the CRAN release with:
 
-To install, right click on the ".exe" file and select "Run as administrator".
+```{r cran-install, eval=FALSE}
+install.packages("multiScaleR")
+```
+
+If installing from GitHub on Windows, you may need Rtools to compile the package from source. Choose the Rtools release that matches your version of R and follow the installation instructions at <https://cran.r-project.org/bin/windows/Rtools/>.
 
 Then execute the following commands in R:
 ```{r, eval=FALSE}
 # Install 'remotes' package, if needed
-if(!("remotes" %in% list.files(.libPaths()))) {
-      install.packages("remotes", repo = "https://cloud.r-project.org", dep = TRUE)
-} 
+if (!requireNamespace("remotes", quietly = TRUE)) {
+  install.packages("remotes", repos = "https://cloud.r-project.org")
+}
 
 remotes::install_github("wpeterman/multiScaleR", 
                         build_vignettes = TRUE) # Install & build vignette
 
-library(multiScaleR) # Loads package and the other dependencies
+library(multiScaleR) # Load the package
 ```
 
-The package vignette walks through all available functions as well as provides worked analyses of simulated data.
+The package vignettes provide worked analyses of simulated data and explain the main workflows.
 
 <p align="center"> <img src="man/figures/logo.png" height="200"/> </p>

@@ -55,8 +55,10 @@
 #' considered during optimization. Users can instead request linear spacing with
 #' \code{spacing = "linear"} or supply exact values with \code{sigma_values}.
 #' At each evaluation point the model is refit and the log-likelihood extracted.
-#' AICc is computed from the log-likelihood, the number of regression parameters
-#' (including sigma), and the number of observations.
+#' AICc uses all free fitted likelihood parameters (including ancillary and
+#' unmarked detection or variance parameters), plus estimated sigma and shape
+#' parameters, and the existing model observation count. Parameter counting
+#' follows \code{\link{aic_tab}}. AICc is \code{NA} when \code{n <= K + 1}.
 #' If all refits return the optimizer penalty, profiling stops with an error
 #' instead of returning an artificial flat profile. Keep the model formula and
 #' data available to the stored model call, or provide a working
@@ -165,11 +167,8 @@ profile_sigma <- function(x,
 
   # Compute K (number of model parameters) for AICc
   mod <- x$opt_mod
-  k_base <- .msr_parameter_count(mod)
   n <- .msr_model_nobs(mod)
-  # Add sigma parameters (and shape if expow)
-  k_total <- k_base + n_covs
-  if (kernel == "expow") k_total <- k_total + n_covs
+  k_total <- .msr_selection_parameter_count(x)
 
   if (!is.null(sigma_values)) {
     validate_numeric_vector(sigma_values, "sigma_values", positive = TRUE)

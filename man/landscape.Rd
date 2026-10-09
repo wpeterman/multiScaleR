@@ -6,7 +6,7 @@
 \format{
 `landscape_rast`
 
-A spatRaster object with three surfaces:
+A SpatRaster object with three surfaces:
 \describe{
   \item{land1}{ --> A binary landscape surface with low autocorrelation}
   \item{land2}{ --> A continuous landscape surface with low autocorrelation}

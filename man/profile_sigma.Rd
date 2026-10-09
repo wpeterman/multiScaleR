@@ -80,8 +80,10 @@ default this is a log-spaced sequence from the minimum to maximum distance
 considered during optimization. Users can instead request linear spacing with
 \code{spacing = "linear"} or supply exact values with \code{sigma_values}.
 At each evaluation point the model is refit and the log-likelihood extracted.
-AICc is computed from the log-likelihood, the number of regression parameters
-(including sigma), and the number of observations.
+AICc uses all free fitted likelihood parameters (including ancillary and
+unmarked detection or variance parameters), plus estimated sigma and shape
+parameters, and the existing model observation count. Parameter counting
+follows \code{\link{aic_tab}}. AICc is \code{NA} when \code{n <= K + 1}.
 If all refits return the optimizer penalty, profiling stops with an error
 instead of returning an artificial flat profile. Keep the model formula and
 data available to the stored model call, or provide a working

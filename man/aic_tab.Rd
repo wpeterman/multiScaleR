@@ -60,64 +60,32 @@ parameter count. The sigma parameter (and shape for \code{"expow"}) is added
 to K automatically. For plain model objects in a mixed list, sigma is not
 added to K. The fitted model's log-likelihood degrees of freedom are used
 when available, so negative-binomial dispersion contributes one parameter.
+For \code{unmarkedFit} models, native AIC and log-likelihood metadata
+determine the count, including detection coefficients, factor contrasts,
+mixture parameters, and estimated random-effect variances. Optimizer and
+TMB free-parameter metadata are checked for agreement when present. Latent
+random effects and the integration limit \code{K} are not counted.
+Missing or inconsistent parameter metadata and non-finite log-likelihoods
+raise an error instead of guessing from predictor names.
+AICc tables raise an error if any model has \code{n <= K + 1}; use
+\code{AICc = FALSE} for an AIC table in that case.
 }
 \examples{
-## Simulate data
-set.seed(555)
+## Bundled counts simulated with a habitat scale of 75 map units
+data("pts")
+data("count_data")
+hab <- terra::rast(system.file("extdata", "hab.tif", package = "multiScaleR"))
+prepared <- kernel_prep(pts, hab, max_D = 300, sigma = 75, verbose = FALSE)
+dat <- data.frame(y = count_data$y, prepared$kernel_dat)
+fixed_model <- glm(y ~ hab, family = poisson(), data = dat)
+null_model <- glm(y ~ 1, family = poisson(), data = dat)
+spatial_model <- multiScale_optim(fixed_model, prepared, par = 75 / 300,
+                                  n_cores = 1, verbose = FALSE)
+models <- list(spatial = spatial_model, fixed = fixed_model, null = null_model)
 
-points <- vect(cbind(c(5,7,9,11,13),
-                     c(13,11,9,7,5)))
-
-mat_list <- list(r1 = rast(matrix(rnorm(20^2),
-                                  nrow = 20)),
-                 r2 = rast(matrix(rnorm(20^2),
-                                  nrow = 20)))
-rast_stack <- rast(mat_list)
-kernel_inputs <- kernel_prep(pts = points,
-                             raster_stack = rast_stack,
-                             max_D = 5,
-                             kernel = 'gaussian',
-                             sigma = NULL)
-## Example response data
-y <- rnorm(5)
-
-## Create data frame with raster variables
-dat <- data.frame(y = y,
-                  kernel_inputs$kernel_dat)
-mod1 <- glm(y ~ r1,
-            data = dat)
-mod2 <- glm(y ~ r2,
-            data = dat)
-mod3 <- glm(y ~ r1 + r2,
-            data = dat)
-
-## NOTE: This code is only for demonstration
-## Optimization results will have no meaning
-
-opt_mod1 <- multiScale_optim(fitted_mod = mod1,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-
-opt_mod2 <- multiScale_optim(fitted_mod = mod2,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-opt_mod3 <- multiScale_optim(fitted_mod = mod3,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-
- ## AIC table
- mod_list <- list(opt_mod1, opt_mod2, opt_mod3)
-
- aic_tab(mod_list = mod_list,
-         AICc = FALSE)
-
- ## AICc table with specified names
- aic_tab(mod_list = mod_list,
-         AICc = TRUE,
-         mod_names = c('mod1', 'mod2', 'mod3'))
+## The spatial model pays for one extra estimated sigma parameter.
+aic_tab(models, AICc = FALSE, mod_names = names(models))
+aic_tab(models, AICc = TRUE, mod_names = names(models))
 }
 \author{
 Bill Peterman

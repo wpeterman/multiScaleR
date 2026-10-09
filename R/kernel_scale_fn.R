@@ -198,49 +198,8 @@
 }
 
 
-.finite_first_numeric <- function(value) {
-  value <- suppressWarnings(as.numeric(value)[1])
-  length(value) == 1 && is.finite(value)
-}
-
-
 .neg_loglik_model <- function(model, mod_class) {
-  if (identical(mod_class, "unmarked")) {
-    value <- try(model@negLogLike, silent = TRUE)
-    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
-      return(as.numeric(value)[1])
-    }
-
-    value <- try(unmarked::logLik(model)[1] * -1, silent = TRUE)
-    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
-      return(as.numeric(value)[1])
-    }
-  }
-
-  if (.has_nested_analysis_model(model)) {
-    value <- try(stats::logLik(.analysis_model(model))[1] * -1, silent = TRUE)
-    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
-      return(as.numeric(value)[1])
-    }
-
-    value <- try(insight::get_loglikelihood(.analysis_model(model))[1] * -1,
-                 silent = TRUE)
-    if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
-      return(as.numeric(value)[1])
-    }
-  }
-
-  value <- try(stats::logLik(model)[1] * -1, silent = TRUE)
-  if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
-    return(as.numeric(value)[1])
-  }
-
-  value <- try(insight::get_loglikelihood(model)[1] * -1, silent = TRUE)
-  if (!inherits(value, "try-error") && .finite_first_numeric(value)) {
-    return(as.numeric(value)[1])
-  }
-
-  stop("Could not extract a finite log-likelihood from the refitted model.", call. = FALSE)
+  -.msr_model_loglik(model)
 }
 
 

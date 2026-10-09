@@ -27,8 +27,81 @@
 }
 
 
+.msr_model_loglik <- function(model) {
+  analysis_mod <- .analysis_model(.msr_selection_model(model))
+  value <- tryCatch(
+    if (methods::is(analysis_mod, "unmarkedFit")) {
+      unmarked::logLik(analysis_mod)
+    } else {
+      logLik(analysis_mod)
+    },
+    error = function(e) NULL
+  )
+  if (is.null(value) && !methods::is(analysis_mod, "unmarkedFit")) {
+    value <- tryCatch(suppressWarnings(insight::get_loglikelihood(analysis_mod)),
+                      error = function(e) NULL)
+  }
+  if (!is.numeric(value) || length(value) != 1L || !is.finite(value)) {
+    stop("Could not extract a finite scalar log-likelihood from model class `",
+         class(analysis_mod)[1], "`.", call. = FALSE)
+  }
+  as.numeric(value)
+}
+
+
+.msr_validate_parameter_count <- function(k, model, source) {
+  if (!is.numeric(k) || length(k) != 1L || !is.finite(k) ||
+      k < 0 || k > .Machine$integer.max || abs(k - round(k)) > 1e-7) {
+    stop("Could not determine fitted parameter count for model class `",
+         class(model)[1], "`: invalid ", source, ".", call. = FALSE)
+  }
+  as.integer(round(k))
+}
+
+
+.msr_unmarked_parameter_count <- function(model) {
+  ll <- .msr_model_loglik(model)
+  aic <- model@AIC
+  if (!is.numeric(aic) || length(aic) != 1L || !is.finite(aic)) {
+    stop("Could not determine fitted parameter count for model class `",
+         class(model)[1], "`: missing or malformed native AIC metadata.",
+         call. = FALSE)
+  }
+  # Native AIC counts all modeled components. TMB's optimizer vector contains
+  # fixed/hyperparameters, excluding integrated random-effect realizations.
+  k <- .msr_validate_parameter_count((aic + 2 * ll) / 2, model,
+                                      "count implied by native AIC and log-likelihood")
+  par <- model@opt$par
+  if (!is.null(par)) {
+    if (!is.numeric(par) || !is.null(dim(par)) || any(!is.finite(par))) {
+      stop("Could not determine fitted parameter count for model class `",
+           class(model)[1], "`: malformed optimizer parameter metadata.",
+           call. = FALSE)
+    }
+    if (length(par) != k) {
+      stop("Inconsistent native AIC and optimizer parameter count for model class `",
+           class(model)[1], "`; free fitted parameters cannot be inferred reliably.",
+           call. = FALSE)
+    }
+  }
+  if ("TMB" %in% methods::slotNames(model) && !is.null(model@TMB)) {
+    tmb_par <- model@TMB$par
+    if (!is.numeric(tmb_par) || !is.null(dim(tmb_par)) ||
+        any(!is.finite(tmb_par)) || length(tmb_par) != k) {
+      stop("Inconsistent native AIC and TMB free parameter metadata for model class `",
+           class(model)[1], "` (including fixed or mapped parameters).", call. = FALSE)
+    }
+  }
+  k
+}
+
+
 .msr_parameter_count <- function(model) {
   analysis_mod <- .analysis_model(model)
+
+  if (methods::is(analysis_mod, "unmarkedFit")) {
+    return(.msr_unmarked_parameter_count(analysis_mod))
+  }
 
   # logLik degrees of freedom include ancillary likelihood parameters such as
   # negative-binomial theta, which coefficient tables may omit.
@@ -36,12 +109,12 @@
     attr(stats::logLik(analysis_mod), "df"),
     error = function(e) NULL
   )
-  if (length(loglik_df) == 1 && is.finite(loglik_df)) {
-    return(as.integer(loglik_df))
+  if (!is.null(loglik_df)) {
+    return(.msr_validate_parameter_count(loglik_df, analysis_mod, "logLik degrees of freedom"))
   }
 
   params <- tryCatch(
-    get_parameters(analysis_mod),
+    suppressWarnings(get_parameters(analysis_mod)),
     error = function(e) NULL
   )
   if (is.data.frame(params) && nrow(params) > 0) {
@@ -56,12 +129,22 @@
     return(length(coefs))
   }
 
-  if (any(grepl("^unmarked", class(analysis_mod)))) {
-    return(length(.unmarked_model_predictors(analysis_mod)))
-  }
-
-  stop("Could not determine the number of fitted parameters for one or more models.",
+  stop("Could not determine the number of fitted parameters for model class `",
+       class(analysis_mod)[1], "`: no reliable parameter metadata available.",
        call. = FALSE)
+}
+
+
+.msr_selection_formula_label <- function(model) {
+  model <- .analysis_model(model)
+  if (methods::is(model, "unmarkedFit")) {
+    if ("formula" %in% methods::slotNames(model)) {
+      return(paste(deparse(model@formula), collapse = " "))
+    }
+    return(paste(vapply(model@formlist, function(f) paste(deparse(f), collapse = " "),
+                        character(1)), collapse = "; "))
+  }
+  paste((find_formula(model)$conditional)[-2], collapse = " ")
 }
 
 
@@ -206,6 +289,15 @@
 #' to K automatically. For plain model objects in a mixed list, sigma is not
 #' added to K. The fitted model's log-likelihood degrees of freedom are used
 #' when available, so negative-binomial dispersion contributes one parameter.
+#' For \code{unmarkedFit} models, native AIC and log-likelihood metadata
+#' determine the count, including detection coefficients, factor contrasts,
+#' mixture parameters, and estimated random-effect variances. Optimizer and
+#' TMB free-parameter metadata are checked for agreement when present. Latent
+#' random effects and the integration limit \code{K} are not counted.
+#' Missing or inconsistent parameter metadata and non-finite log-likelihoods
+#' raise an error instead of guessing from predictor names.
+#' AICc tables raise an error if any model has \code{n <= K + 1}; use
+#' \code{AICc = FALSE} for an AIC table in that case.
 #'
 #' @usage
 #' aic_tab(mod_list,
@@ -218,62 +310,21 @@
 #' @importFrom AICcmodavg aictabCustom bictabCustom
 #'
 #' @examples
-#' ## Simulate data
-#' set.seed(555)
+#' ## Bundled counts simulated with a habitat scale of 75 map units
+#' data("pts")
+#' data("count_data")
+#' hab <- terra::rast(system.file("extdata", "hab.tif", package = "multiScaleR"))
+#' prepared <- kernel_prep(pts, hab, max_D = 300, sigma = 75, verbose = FALSE)
+#' dat <- data.frame(y = count_data$y, prepared$kernel_dat)
+#' fixed_model <- glm(y ~ hab, family = poisson(), data = dat)
+#' null_model <- glm(y ~ 1, family = poisson(), data = dat)
+#' spatial_model <- multiScale_optim(fixed_model, prepared, par = 75 / 300,
+#'                                   n_cores = 1, verbose = FALSE)
+#' models <- list(spatial = spatial_model, fixed = fixed_model, null = null_model)
 #'
-#' points <- vect(cbind(c(5,7,9,11,13),
-#'                      c(13,11,9,7,5)))
-#'
-#' mat_list <- list(r1 = rast(matrix(rnorm(20^2),
-#'                                   nrow = 20)),
-#'                  r2 = rast(matrix(rnorm(20^2),
-#'                                   nrow = 20)))
-#' rast_stack <- rast(mat_list)
-#' kernel_inputs <- kernel_prep(pts = points,
-#'                              raster_stack = rast_stack,
-#'                              max_D = 5,
-#'                              kernel = 'gaussian',
-#'                              sigma = NULL)
-#' ## Example response data
-#' y <- rnorm(5)
-#'
-#' ## Create data frame with raster variables
-#' dat <- data.frame(y = y,
-#'                   kernel_inputs$kernel_dat)
-#' mod1 <- glm(y ~ r1,
-#'             data = dat)
-#' mod2 <- glm(y ~ r2,
-#'             data = dat)
-#' mod3 <- glm(y ~ r1 + r2,
-#'             data = dat)
-#'
-#' ## NOTE: This code is only for demonstration
-#' ## Optimization results will have no meaning
-#'
-#' opt_mod1 <- multiScale_optim(fitted_mod = mod1,
-#'                              kernel_inputs = kernel_inputs,
-#'                              par = NULL,
-#'                              n_cores = NULL)
-#'
-#' opt_mod2 <- multiScale_optim(fitted_mod = mod2,
-#'                              kernel_inputs = kernel_inputs,
-#'                              par = NULL,
-#'                              n_cores = NULL)
-#' opt_mod3 <- multiScale_optim(fitted_mod = mod3,
-#'                              kernel_inputs = kernel_inputs,
-#'                              par = NULL,
-#'                              n_cores = NULL)
-#'
-#'  ## AIC table
-#'  mod_list <- list(opt_mod1, opt_mod2, opt_mod3)
-#'
-#'  aic_tab(mod_list = mod_list,
-#'          AICc = FALSE)
-#'
-#'  ## AICc table with specified names
-#'  aic_tab(mod_list = mod_list,
-#'          AICc = TRUE,
-#'          mod_names = c('mod1', 'mod2', 'mod3'))
+#' ## The spatial model pays for one extra estimated sigma parameter.
+#' aic_tab(models, AICc = FALSE, mod_names = names(models))
+#' aic_tab(models, AICc = TRUE, mod_names = names(models))
 aic_tab <- function(mod_list,
                     AICc = TRUE,
                     mod_names = NULL,
@@ -284,15 +335,19 @@ aic_tab <- function(mod_list,
 
   opt_list <- lapply(mod_list, .msr_selection_model)
   mod_df <- .msr_validate_comparable_models(opt_list)
-  mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
   k <- vapply(mod_list, .msr_selection_parameter_count, integer(1))
 
   if(is.null(mod_names)){
+    mod_eq <- vapply(opt_list, .msr_selection_formula_label, character(1))
     mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
   }
 
-  mod_loglik <- as.vector(sapply(opt_list, function(x) logLik(x)))
+  mod_loglik <- vapply(opt_list, .msr_model_loglik, numeric(1))
+  if (isTRUE(AICc) && any(mod_df <= k + 1L)) {
+    stop("AICc requires n > K + 1 for every model; use `AICc = FALSE` for AIC.",
+         call. = FALSE)
+  }
 
   # AIC ---------------------------------------------------------------------
   if(AICc == FALSE) {
@@ -368,6 +423,8 @@ aic_tab <- function(mod_list,
 #' than AIC as sample size grows, and is often preferred when the goal is
 #' identifying the single best-supported model rather than model averaging.
 #' Sigma (and shape for \code{"expow"}) is counted in K.
+#' Fitted parameter counts and log-likelihood validation follow
+#' \code{\link{aic_tab}}, including all estimated components of unmarked models.
 #' @export
 #'
 #' @usage
@@ -442,15 +499,15 @@ bic_tab <- function(mod_list,
 
   opt_list <- lapply(mod_list, .msr_selection_model)
   mod_df <- .msr_validate_comparable_models(opt_list)
-  mod_eq <- as.vector(sapply(opt_list, function(x) (find_formula(x)$conditional)[-2]))
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
   k <- vapply(mod_list, .msr_selection_parameter_count, integer(1))
 
   if(is.null(mod_names)){
+    mod_eq <- vapply(opt_list, .msr_selection_formula_label, character(1))
     mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
   }
 
-  mod_loglik <- as.vector(sapply(opt_list, function(x) logLik(x)))
+  mod_loglik <- vapply(opt_list, .msr_model_loglik, numeric(1))
   # * BIC ---------------------------------------------------------------------
 
   tab <- bictabCustom(logL = mod_loglik,

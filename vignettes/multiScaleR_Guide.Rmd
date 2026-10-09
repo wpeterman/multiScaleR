@@ -204,7 +204,7 @@ land_rast <- terra::rast(system.file("extdata",
                                      package = 'multiScaleR'))
 ```
 
-The `landscape_counts` data frame contains simulated counts from 100 spatial point locations as well as a scaled and centered site-level covariate ('site'). The `landscape.tif` file is a `spatRaster` object consisting of three surfaces (land1 = binary habitat; land2 = continuous habitat / environment; land3 = continuous / environment). The counts were simulated using the following parameters:
+The `landscape_counts` data frame contains simulated counts from 100 spatial point locations as well as a scaled and centered site-level covariate ('site'). The `landscape.tif` file is a `SpatRaster` object consisting of three surfaces (land1 = binary habitat; land2 = continuous habitat / environment; land3 = continuous / environment). The counts were simulated using the following parameters:
 
 - Poisson process
 
@@ -486,7 +486,7 @@ rast_opt <- terra::unwrap(vignette_cache$guide$rast_opt)
 plot(rast_opt)
 ```
 
-> **Note**: Because `site` is a non-spatial covariate (a site-level variable, not a raster), a constant dummy raster is created for it. This allows the `spatRaster` object to be passed directly to `terra::predict()`, which requires all model covariates to be present. See the `Spatial Projection and Clamping` vignette for a detailed treatment of projection, including how to handle cases where projected covariate values fall outside the range of the training data.
+> **Note**: Because `site` is a non-spatial covariate (a site-level variable, not a raster), a constant dummy raster is created for it. This allows the `SpatRaster` object to be passed directly to `terra::predict()`, which requires all model covariates to be present. See the `Spatial Projection and Clamping` vignette for a detailed treatment of projection, including how to handle cases where projected covariate values fall outside the range of the training data.
 
 ## Kernels
 
@@ -714,7 +714,7 @@ plot_marginal_effects(opt_umf.p)
 
 ### Project model
 
-Finally, we may want to project our fitted model to the landscape to make spatial predictions. To do this, we need to scale and center our raster surfaces after applying our kernel transformations. The `spatRaster` object can then be used with the `terra::predict` function. Depending upon the spatial coverage of your sample points, you may find predicted values across a broader region unrealistic. In these instances, you may need to clamp the scaled rasters to be within a reasonable range of those observed in your sample data.
+Finally, we may want to project our fitted model to the landscape to make spatial predictions. To do this, we need to scale and center our raster surfaces after applying our kernel transformations. The `SpatRaster` object can then be used with the `terra::predict` function. Depending upon the spatial coverage of your sample points, you may find predicted values across a broader region unrealistic. In these instances, you may need to clamp the scaled rasters to be within a reasonable range of those observed in your sample data.
 
 ```{r}
 ## Project model

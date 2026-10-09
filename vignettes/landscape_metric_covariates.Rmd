@@ -103,7 +103,7 @@ They require a categorical raster and use cell adjacency information.
 | Code | Name | Description |
 |------|------|-------------|
 | `ed` | Edge Density | Total internal edge length (m) per hectare of buffer area. Higher values indicate a more fragmented landscape. |
-| `te` | Total Edge | Total internal edge length in metres. |
+| `te` | Total Edge | Total internal edge length in meters. |
 | `lsi` | Landscape Shape Index | Total perimeter / minimum possible perimeter for the same number of cells. LSI = 1 for a perfectly compact (circular) patch; increases with irregularity. |
 
 ## Adjacency metrics

@@ -1,3 +1,13 @@
+multiScaleR 0.7.3
+---------
+* AIC, AICc, BIC, and sigma profiles count all free unmarked model parameters,
+  including detection and variance components, using validated native metadata.
+  Selection tables use explicit S4 likelihood dispatch; inconsistent metadata
+  now raises an error instead of counting predictor names. AICc tables reject
+  insufficient sample sizes, while profiles retain NA for undefined AICc.
+* Clarify installation guidance and standardize terminology in help files and
+  vignettes. Model-selection examples use bundled data with adequate sample size.
+
 multiScaleR 0.7.2
 ---------
 * `join_by` now preserves unmarked response and site-covariate row alignment,

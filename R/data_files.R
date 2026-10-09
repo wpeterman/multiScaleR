@@ -72,7 +72,7 @@ NULL
 #' land_rast <- terra::rast(system.file("extdata",
 #'                          "landscape.tif", package = 'multiScaleR'))
 #'
-#' @format A spatRaster object with three surfaces:
+#' @format A SpatRaster object with three surfaces:
 #' \describe{
 #'   \item{land1}{ --> A binary landscape surface with low autocorrelation}
 #'   \item{land2}{ --> A continuous landscape surface with low autocorrelation}

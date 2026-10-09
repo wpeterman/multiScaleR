@@ -155,7 +155,7 @@ values. The result is passed directly to \code{\link{multiScale_optim}}.
 Point locations and raster layers must share a defined CRS and both must be
 projected. All units (including \code{max_D} and any user-supplied
 \code{sigma}) must be in the same linear unit as the projection (typically
-metres or feet).
+meters or feet).
 
 The \code{max_D} buffer should be large enough to encompass the plausible
 range of the true scale of effect. A common rule of thumb is to set

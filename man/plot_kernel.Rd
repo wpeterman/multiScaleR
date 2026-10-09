@@ -22,7 +22,7 @@ use \code{\link{kernel_dist}} with \code{dimension = "2d"}.}
 
 \item{sigma}{Positive numeric. The scale parameter of the kernel, in the
 same units as the projection used with \code{\link{kernel_prep}} (e.g.,
-metres when using a metric CRS). Controls the width of the kernel: larger
+meters when using a metric CRS). Controls the width of the kernel: larger
 values spread influence over greater distances.}
 
 \item{beta}{Positive numeric. Shape parameter for the exponential power
