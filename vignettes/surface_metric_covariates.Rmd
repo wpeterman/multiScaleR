@@ -249,12 +249,16 @@ summary(opt)
 sigma for `land2_mean`, with its standard error and 95% confidence interval, in
 map units (meters here). Below it is the *effective distance*, which converts
 sigma into a distance you can interpret on the ground, reported two ways: the
-1D distance along a line through the point (about 1.65 sigma for a Gaussian
-kernel at the default 90%) and the 2D radius of the circle that holds 90% of
-the weight of an ideal, untruncated kernel on a plane (about 2.15 sigma). Use
+2D radius of the circle that holds 90% of the weight of an ideal, untruncated
+kernel on a plane (about 2.15 sigma for a Gaussian), selected by default, and
+the 1D comparison distance along a line (about 1.65 sigma). Use
 the 2D radius to describe the area associated with kernel weighting, while
 checking whether `max_D`, raster edges, or missing cells truncate that area.
-See `?kernel_dist` for both definitions. The two
+Use `dimension = "1d"` in `summary()`, `kernel_dist()`, or `plot()` to restore
+the original reporting definition used through version 0.7.3. Summaries expose
+both tables as `opt_dist_1d` and `opt_dist_2d`; their `opt_dist` and
+`opt_distance` entries follow the selection. See `?kernel_dist` for both
+definitions. The two
 fixed-radius surface metrics do not appear in the scale section because their
 radius was specified rather than estimated; they enter the model only as
 ordinary covariates.

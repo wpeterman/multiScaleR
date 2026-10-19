@@ -165,7 +165,25 @@ mod <- glm(counts ~ site + land1 + land2,
 
 `multiScale_optim()` searches over σ values for each raster layer while
 simultaneously updating regression coefficients to maximize the model
-likelihood. Use `n_cores` to parallelize and speed up the search.
+likelihood. Parallelization with `n_cores` can speed up expensive refits, but
+requires additional memory. Requests exceeding the estimated RAM-based worker
+limit now stop before screened starts or worker creation, rather than merely
+warning. Use `n_cores = 1` for serial execution. For kernel-only inputs, you can
+also rebuild the original `kernel_prep()` call with
+`bin = TRUE, store_cell_data = FALSE` and recheck the estimate. Landscape and
+surface metrics cannot use this lean mode.
+
+```{r parallel-memory-check, eval=FALSE}
+# The fitted model contributes to the payload copied to workers.
+ram <- estimate_multiscale_ram(kernel_inputs, fitted_mod = mod, n_cores = 3)
+print(ram)
+ram$component_bytes
+```
+
+The guard does not automatically reduce the requested count. Recommendations
+are estimates, not guarantees of sufficient memory, including when the limit
+is one. If RAM detection or estimation fails, the guard does not block the run.
+See the memory guidance in `vignette("multiScaleR_Guide", package = "multiScaleR")`.
 
 ```{r optim, eval = FALSE}
 opt <- multiScaleR::multiScale_optim(fitted_mod    = mod,
@@ -220,13 +238,31 @@ should fall within the reported confidence intervals.
 
 ## Visualize kernel decay and covariate effects
 
-`plot()` shows how kernel weight decreases with distance. Its vertical line
-marks the distance enclosing 90% of weight along a line through the point (1D).
-For the radius of a circle holding 90% of an ideal kernel's weight on a plane,
-use `kernel_dist(opt, dimension = "2d")`; `summary(opt)` reports both distances.
+`plot()` shows cell weight decreasing with distance. Its vertical line now
+marks the radius containing 90% of ideal kernel weight on a plane (2D), matching
+`kernel_dist(opt)` and the selected `summary(opt)$opt_dist`. For a Gaussian
+kernel this radius is about 2.15 sigma, not sigma itself. The curve is not the
+total weight in concentric rings, so the area under it to the marker is not 90%.
+The realized share can differ when `max_D`, raster edges, missing cells, or
+cell geometry restrict the landscape.
+
+**Changed reporting default:** Versions through 0.7.3 used line-based (1D)
+markers. Use `dimension = "1d"` in `plot()`, `plot_kernel()`, `kernel_dist()`,
+or `summary()` to restore that definition (about 1.65 sigma at 90% for a
+Gaussian). This does not change the fitted model. Summaries retain both tables
+as `opt_dist_1d` and `opt_dist_2d`; `opt_dist` and `opt_distance` follow the
+selected dimension. Stored optimization diagnostics and computational cutoffs
+remain on their historical 1D definition.
 
 ```{r plot-kernel, fig.cap = "***Distance-decay of kernel weight for each covariate.***"}
 plot(opt)
+```
+
+```{r original-kernel-distance, eval=FALSE}
+# Keep the original distance definition when reproducing older reports.
+plot(opt, dimension = "1d")
+kernel_dist(opt, dimension = "1d")
+summary(opt, dimension = "1d")
 ```
 
 `plot_marginal_effects()` shows the estimated effect of each covariate on the

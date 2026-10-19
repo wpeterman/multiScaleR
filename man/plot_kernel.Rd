@@ -11,14 +11,14 @@ plot_kernel(
   kernel,
   scale_dist = TRUE,
   add_label = TRUE,
+  dimension = c("2d", "1d"),
   ...
 )
 }
 \arguments{
-\item{prob}{Numeric between 0 and 1 (exclusive). Cumulative weight along a
-line through the point used to mark the plotted distance. Default:
-\code{0.9}. For the radius holding this proportion of weight on a plane,
-use \code{\link{kernel_dist}} with \code{dimension = "2d"}.}
+\item{prob}{Numeric between 0 and 1 (exclusive). Proportion of ideal kernel
+weight enclosed by the marked distance under the selected \code{dimension}.
+Default: \code{0.9}.}
 
 \item{sigma}{Positive numeric. The scale parameter of the kernel, in the
 same units as the projection used with \code{\link{kernel_prep}} (e.g.,
@@ -44,19 +44,22 @@ range is 1–50. Ignored for all other kernel types. Default: \code{NULL}.}
 }}
 
 \item{scale_dist}{Logical. If \code{TRUE} (default), a vertical dashed line
-is added to the plot at the distance where the cumulative density equals
-\code{prob}.}
+marks the distance enclosing \code{prob} of kernel weight under the
+selected dimensional definition.}
 
-\item{add_label}{Logical. If \code{TRUE} (default), an annotation showing
-the cumulative percentage and the effective distance value is added to the
+\item{add_label}{Logical. If \code{TRUE} (default), a caption reports the
+cumulative percentage, dimension, sigma, and effective distance below the
 plot. Requires \code{scale_dist = TRUE}.}
+
+\item{dimension}{Character. \code{"2d"} (default) marks the radius enclosing
+\code{prob} of ideal kernel weight on a plane. \code{"1d"} restores the
+original distance enclosing that proportion along a line through the point.}
 
 \item{...}{Not used.}
 }
 \value{
 A \code{ggplot2} object showing kernel weight (y-axis) as a function
-  of distance (x-axis). The object is printed as a side effect and returned
-  invisibly.
+  of distance in map units (x-axis), returned for display or customization.
 }
 \description{
 Visualizes the weight (density) of a kernel function as a
@@ -66,17 +69,29 @@ into spatial influence zones before running \code{\link{multiScale_optim}}.
 To plot the kernel from a fitted model, use \code{plot(opt)} instead.
 }
 \details{
-The x-axis range is set to cover 99.9\% of the one-dimensional cumulative
-weight so that the tails of the curve are visible. The \code{prob} marker is
-rounded to the nearest 10 distance units for display purposes. The marker
-describes the kernel along a line, not the share of weight across raster
-cells on a plane.
+The curve shows relative weight assigned to a cell at each distance,
+normalized over the plotted sample distances. It is not the distribution of
+total weight in concentric rings. Under the default \code{"2d"} definition,
+the marker accounts for ring area (proportional to distance), so the area
+under the displayed curve to its left is not \code{prob}.
+
+The x-axis covers at least 99.9\% of weight under the selected definition,
+or \code{prob} when larger. Marker positions use the unrounded distance;
+labels round to two decimal places. Sigma remains a kernel parameter, not
+the marked radius. For a Gaussian kernel with sigma = 300 m, the 90\% marker
+is about 644 m in 2D and 493 m in 1D.
+
+Development versions after 0.7.3 default to 2D; use
+\code{dimension = "1d"} to reproduce the original distance definition.
+These are ideal continuous-kernel distances, not site-specific retained
+weight after \code{max_D}, raster boundaries, missing cells, or cell geometry
+limit the extraction. See \code{\link{kernel_dist}} for both definitions.
 
 For fitted-model kernel plots (with confidence intervals), use
 \code{plot(multiScaleR_object)} instead.
 }
 \examples{
-#' ## General use of plot method
+## Default: radius containing 95\% of ideal planar weight
 plot_kernel(prob = 0.95,
             sigma = 100,
             kernel = 'gaussian')
@@ -90,4 +105,9 @@ plot_kernel(prob = 0.95,
             sigma = 100,
             beta = 2.5,
             kernel = 'expow')
+## Original line-based definition
+plot_kernel(sigma = 100, kernel = 'gaussian', dimension = '1d')
+}
+\seealso{
+\code{\link{kernel_dist}}, \code{\link{plot.multiScaleR}}
 }

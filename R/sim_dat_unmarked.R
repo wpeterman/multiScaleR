@@ -202,6 +202,7 @@ sim_dat_unmarked <- function(alpha = 1,
 
   if(is.null(max_D)){
     max_D <- kernel_dist(kernel = kernel,
+                         dimension = "1d",
                          prob = 0.99,
                          sigma = max(sigma)) * 1.1
   } else {

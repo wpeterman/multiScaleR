@@ -358,6 +358,7 @@ kernel_scale.raster <- function(raster_stack,
     lyr <- var[i]
 
     mx <- kernel_dist(kernel = kernel,
+                      dimension = "1d",
                       sigma = sigma[i],
                       shape = shape[i],
                       prob = pct_wt)

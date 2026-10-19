@@ -4,10 +4,16 @@
 \alias{print.multiScaleR}
 \title{Print method for multiScaleR}
 \usage{
-\method{print}{multiScaleR}(x, ...)
+\method{print}{multiScaleR}(x, dimension = c("2d", "1d"), prob = 0.9, ...)
 }
 \arguments{
 \item{x}{A \code{multiScaleR} object}
+
+\item{dimension}{Character. \code{"2d"} (default) prints the ideal planar
+radius first; \code{"1d"} prints the original line-based distance first.}
+
+\item{prob}{Numeric between 0 and 1 (exclusive). Cumulative kernel-weight
+proportion used for distances. Default: \code{0.9}.}
 
 \item{...}{Ignored}
 }

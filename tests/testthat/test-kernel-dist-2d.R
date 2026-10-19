@@ -17,8 +17,10 @@ test_that("two-dimensional kernel distances match their closed forms", {
   )
   # Fixed buffer: circle holding `prob` of the buffer's area
   expect_equal(kernel_dist(sigma = 100, kernel = "fixed", prob = 0.81, dimension = "2d"), 90)
-  # The default stays one-dimensional
+  # The default is planar; the historical definition requires an explicit switch.
   expect_equal(kernel_dist(sigma = 300, kernel = "gaussian"),
+               round(300 * sqrt(-2 * log(0.1)), 2))
+  expect_equal(kernel_dist(sigma = 300, kernel = "gaussian", dimension = "1d"),
                round(qnorm(0.95) * 300, 2))
   expect_error(kernel_dist(sigma = 300, kernel = "gaussian", dimension = "3d"))
 })
@@ -37,7 +39,8 @@ test_that("the 2D radius holds the stated share of weight on a raster grid", {
                 expow    = exp(-(d / sigma)^shape))
     r2 <- multiScaleR:::k_dist(sigma, prob = 0.9, kernel = kern, beta = shape,
                                dimension = "2d")
-    r1 <- multiScaleR:::k_dist(sigma, prob = 0.9, kernel = kern, beta = shape)
+    r1 <- multiScaleR:::k_dist(sigma, prob = 0.9, kernel = kern, beta = shape,
+                               dimension = "1d")
     expect_equal(sum(w[d <= r2]) / sum(w), 0.9, tolerance = 0.01)
     expect_lt(sum(w[d <= r1]) / sum(w), 0.85)
   }
@@ -48,14 +51,17 @@ test_that("summary and print report both distances", {
   sum_opt <- summary(fix$opt)
 
   expect_equal(sum_opt$opt_dist, kernel_dist(fix$opt))
+  expect_identical(sum_opt$dimension, "2d")
+  expect_identical(sum_opt$opt_dist, sum_opt$opt_distance)
+  expect_equal(sum_opt$opt_dist_1d, kernel_dist(fix$opt, dimension = "1d"))
   expect_equal(sum_opt$opt_dist_2d, kernel_dist(fix$opt, dimension = "2d"))
   sum_95 <- summary(fix$opt, prob = 0.95)
   expect_equal(sum_95$opt_dist_2d,
                kernel_dist(fix$opt, prob = 0.95, dimension = "2d"))
   expect_equal(colnames(sum_opt$opt_dist_2d), c("Mean", "2.5%", "97.5%"))
   if (identical(fix$opt$kernel_inputs$kernel, "gaussian")) {
-    expect_equal(sum_opt$opt_dist_2d$Mean / sum_opt$opt_dist$Mean,
-                 rep(sqrt(-2 * log(0.1)) / qnorm(0.95), nrow(sum_opt$opt_dist)),
+    expect_equal(sum_opt$opt_dist_2d$Mean / sum_opt$opt_dist_1d$Mean,
+                 rep(sqrt(-2 * log(0.1)) / qnorm(0.95), nrow(sum_opt$opt_dist_1d)),
                  tolerance = 1e-3)
   }
 
@@ -67,7 +73,11 @@ test_that("summary and print report both distances", {
 
   # Summary objects saved before `opt_dist_2d` existed still print
   old <- sum_opt
+  old$opt_dist <- old$opt_dist_1d
+  old$opt_distance <- old$opt_dist_1d
+  old$opt_dist_1d <- NULL
   old$opt_dist_2d <- NULL
+  old$dimension <- NULL
   printed_old <- capture.output(print(old))
   expect_true(any(grepl("1D: 90% kernel weight along a line", printed_old,
                         fixed = TRUE)))

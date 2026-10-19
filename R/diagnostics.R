@@ -43,6 +43,11 @@
 #' \code{\link{multiScale_optim}}. Console warnings are printed when any
 #' diagnostic is triggered. \code{diagnostics()} provides programmatic access
 #' to the same information without re-running the model.
+#' These stored diagnostics retain the historical 1D 90\% distance and
+#' threshold, independently of the new 2D reporting default in plots and
+#' summaries. Changing \code{dimension} when reporting a fit does not
+#' recompute its stored diagnostics. Use \code{kernel_dist(object)} to inspect
+#' the ideal planar radius separately.
 #'
 #' When \code{max_distance} is triggered, consider re-running
 #' \code{\link{kernel_prep}} with a larger \code{max_D} value. The suggested

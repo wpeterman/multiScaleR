@@ -4,36 +4,56 @@
 \alias{plot.multiScaleR}
 \title{Plot method for multiScaleR objects}
 \usage{
-\method{plot}{multiScaleR}(x, ...)
+\method{plot}{multiScaleR}(x, dimension = c("2d", "1d"), ...)
 }
 \arguments{
 \item{x}{A fitted \code{multiScaleR} object returned by
 \code{\link{multiScale_optim}}.}
 
+\item{dimension}{Character. \code{"2d"} (default) marks the radius containing
+the requested proportion of ideal planar kernel weight. \code{"1d"}
+restores the original distance along a line through the point.}
+
 \item{...}{Optional named arguments to customize the plot:
 \describe{
   \item{\code{prob}}{Numeric between 0 and 1 (exclusive). Cumulative kernel
-    weight along a line through the point used to mark the distance.
-    Default: \code{0.9}. The line-based marker is not the radius enclosing
-    90\% of weight across raster cells; see \code{\link{kernel_dist}} with
-    \code{dimension = "2d"} for that radius.}
+    weight enclosed by the marked distance under the selected
+    \code{dimension}. Default: \code{0.9}.}
   \item{\code{scale_dist}}{Logical. If \code{TRUE} (default), a vertical
     dashed line is drawn at the effective distance, and a shaded rectangle
     spans the 95\% confidence interval.}
-  \item{\code{add_label}}{Logical. If \code{TRUE} (default), an annotation
-    in the upper-right corner reports the cumulative percentage, the
-    effective distance, and the 95\% CI bounds (in projection units).}
+  \item{\code{add_label}}{Logical. If \code{TRUE} (default), a caption
+    below the plot reports sigma, the dimensional definition,
+    the effective distance, and 95\% CI bounds (in map units).}
 }}
 }
 \value{
-A list of \code{ggplot2} objects (one per covariate with a
-  non-\code{NaN} standard error), returned invisibly. Plots are printed as
+A list of \code{ggplot2} objects (one per covariate with a finite
+  scale and effective distance), returned invisibly. Plots are printed as
   a side effect.
 }
 \description{
 Plots the optimized kernel weight distribution for each spatial covariate in
 a fitted \code{multiScaleR} object, with optional annotations showing the
 effective scale of effect and its 95\% confidence interval.
+}
+\details{
+Development versions after 0.7.3 default to 2D reporting, as do
+\code{\link{kernel_dist}} and \code{\link{plot_kernel}}. Set
+\code{dimension = "1d"} to reproduce the original line-based distances.
+This switch changes distance markers and converted confidence limits, not
+the fitted sigma, regression coefficients, or likelihood.
+
+The curve shows cell weight declining with distance, normalized over the
+plotted sample distances. It is not a radial weight distribution. A planar
+marker accounts for the increasing area of concentric rings, so the area
+under the displayed curve to its left is not the stated proportion.
+Distances refer to an ideal untruncated kernel. Actual retained weight can
+differ with \code{max_D}, raster edges, missing cells, and cell geometry.
+
+Hard-radius covariates show a uniform buffer and mark its full radius,
+regardless of \code{prob} or \code{dimension}. A shaded interval is drawn
+only when finite limits are available.
 }
 \examples{
 \donttest{
@@ -57,6 +77,7 @@ opt <- multiScale_optim(fitted_mod = mod,
                         kernel_inputs = kernel_inputs)
 
 plot(opt)
+plot(opt, dimension = "1d")  # Original line-based distances
 
 plot(opt, prob = 0.95)
 

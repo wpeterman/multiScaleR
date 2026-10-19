@@ -989,6 +989,7 @@ print.multiScaleR_vars <- function(x, ...) {
                                    fft,
                                    na.rm) {
   mx <- kernel_dist(kernel = kernel,
+                    dimension = "1d",
                     sigma = sigma,
                     beta = shape,
                     prob = pct_wt)

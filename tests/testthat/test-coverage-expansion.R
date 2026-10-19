@@ -470,7 +470,7 @@ test_that("kernel_dist, summary, print, and plotting helpers cover alternate bra
   expect_length(no_scale_plots, 1)
   expect_s3_class(low_prob_kernel, "ggplot")
   expect_s3_class(no_scale_kernel, "ggplot")
-  expect_error(plot(fix$opt, prob = 2), "decimal between 0 and 1")
+  expect_error(plot(fix$opt, prob = 2), "within \\(0, 1\\)")
   expect_error(plot_kernel(sigma = NULL, kernel = "gaussian"), "sigma")
   expect_error(plot_kernel(sigma = 1, kernel = NULL), "kernel")
 })

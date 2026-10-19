@@ -72,6 +72,19 @@
 #' If \code{fitted_mod} is omitted, the RAM recommendation is based on
 #' \code{kernel_inputs} alone and may understate the true optimization payload.
 #'
+#' \code{multiScale_optim()} stops before starting parallel workers when
+#' \code{n_cores > 1} exceeds the RAM-based limit under the default settings
+#' of this helper. Use \code{n_cores = 1} for serial execution, or rebuild
+#' \code{kernel_prep()} inputs with \code{bin = TRUE} and
+#' \code{store_cell_data = FALSE} when all covariates are kernel-weighted.
+#' Landscape and surface metrics require cell-level data and cannot use this
+#' lean mode. Recheck the estimate after rebuilding inputs.
+#'
+#' Worker recommendations have a minimum of one; this does not guarantee that
+#' serial execution fits in memory. The budget check cannot enforce a limit
+#' when RAM detection or estimation fails, and a run below the estimated limit
+#' can still exhaust memory during a model refit.
+#'
 #' @examples
 #' library(terra)
 #'
@@ -168,7 +181,8 @@ estimate_multiscale_ram <- function(kernel_inputs,
         scale_vars = kernel_inputs$scale_vars,
         unit_conv = kernel_inputs$unit_conv,
         resolution = kernel_inputs$resolution,
-        n_cols = kernel_inputs$n_cols
+        n_cols = kernel_inputs$n_cols,
+        binned = binned
       ),
       error = function(e) {
         opt_context_error <<- conditionMessage(e)
@@ -333,7 +347,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
 }
 
 
-.msr_warn_unsafe_parallel_ram <- function(kernel_inputs,
+.msr_stop_unsafe_parallel_ram <- function(kernel_inputs,
                                           fitted_mod,
                                           join_by,
                                           refit_fn,
@@ -365,17 +379,18 @@ estimate_multiscale_ram <- function(kernel_inputs,
   peak <- ram$component_bytes$pretty[
     ram$component_bytes$component == "peak_parallel_estimate"
   ]
-  warning(
-    "Requested `n_cores = ", as.integer(n_cores),
-    "` may exceed the conservative RAM budget for this `kernel_prep()` payload. ",
-    "`estimate_multiscale_ram()` recommends at most ",
-    ram$max_cores_by_ram, " worker(s) by RAM for the ",
-    ram$backend, " backend; estimated peak use is ", peak,
-    ". Consider lowering `n_cores` or running `estimate_multiscale_ram()` first.",
+  stop(
+    "Parallel optimization was not started: requested `n_cores = ", as.integer(n_cores),
+    "` exceeds the conservative RAM budget for this `kernel_prep()` payload.\n",
+    "Estimated peak use: ", peak, " (", ram$backend,
+    " backend); RAM-based worker limit: ", ram$max_cores_by_ram, ".\n",
+    "Use `n_cores = 1` for serial execution, or rebuild `kernel_prep()` inputs ",
+    "with `bin = TRUE, store_cell_data = FALSE` for lean mode when all ",
+    "covariates are kernel-weighted (not landscape or surface metrics).\n",
+    "Inspect `estimate_multiscale_ram(kernel_inputs, fitted_mod = ...)` ",
+    "before retrying parallel execution.",
     call. = FALSE
   )
-
-  invisible(ram)
 }
 
 

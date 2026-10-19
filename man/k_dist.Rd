@@ -9,11 +9,11 @@ k_dist(
   prob = 0.95,
   kernel = c("gaussian", "exp", "expow", "fixed"),
   beta = NULL,
-  dimension = c("1d", "2d")
+  dimension = c("2d", "1d")
 )
 }
 \arguments{
-\item{sigma}{Numeric. Scale parameter. For Gaussian and exponential, this is standard deviation or decay rate. For expow, this is the kernel bandwidth.}
+\item{sigma}{Numeric. Scale parameter. For Gaussian and exponential, this is standard deviation or decay length. For expow, this is the kernel bandwidth.}
 
 \item{prob}{Numeric. Desired cumulative proportion (e.g., 0.95).}
 
@@ -21,9 +21,9 @@ k_dist(
 
 \item{beta}{Numeric. Shape parameter for exponential power kernel. Ignored unless kernel = "expow".}
 
-\item{dimension}{Character. \code{"1d"} (default) for the distance along a
-line through the point; \code{"2d"} for the radius of the circle holding
-\code{prob} of the total weight when the kernel weights cells on a plane.}
+\item{dimension}{Character. \code{"2d"} (default) for the radius of the
+circle holding \code{prob} of ideal planar weight; \code{"1d"} for the
+original distance along a line through the point.}
 }
 \value{
 Numeric distance in map units at which the cumulative kernel weight

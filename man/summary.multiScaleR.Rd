@@ -4,7 +4,7 @@
 \alias{summary.multiScaleR}
 \title{Summarize multiScaleR objects}
 \usage{
-\method{summary}{multiScaleR}(object, profile = FALSE, ...)
+\method{summary}{multiScaleR}(object, profile = FALSE, dimension = c("2d", "1d"), ...)
 }
 \arguments{
 \item{object}{An object of class \code{multiScaleR}.}
@@ -14,13 +14,20 @@ limits for `sigma` when feasible. Defaults to \code{FALSE} so summaries
 remain fast; profile results are cached for repeated calls on the same
 fitted object during the current R session.}
 
+\item{dimension}{Character. \code{"2d"} (default) reports the radius
+containing \code{prob} of ideal planar kernel weight as the selected
+distance. \code{"1d"} restores the original distance along a line.
+Both definitions remain available in the returned object and printed output.}
+
 \item{...}{Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).}
 }
 \value{
 An object of class \code{summary_multiScaleR}. Kernel-scale limits
   default to Wald intervals. Scale distances, in map units, come in two
-  forms: \code{opt_dist} (also \code{opt_distance}) holds the
-  one-dimensional distance from \code{\link{kernel_dist}}, the distance at
+  forms: \code{opt_dist} (also \code{opt_distance}) holds the selected
+  definition, which defaults to 2D rather than the 1D definition used through
+  version 0.7.3. \code{dimension} records that selection.
+  \code{opt_dist_1d} always holds the one-dimensional distance, the distance at
   which the kernel's cumulative density along a line through the point
   reaches \code{prob} (about 1.65 sigma for a Gaussian kernel at 90\%).
   \code{opt_dist_2d} holds the two-dimensional distance, the radius of the
@@ -36,4 +43,13 @@ An object of class \code{summary_multiScaleR}. Kernel-scale limits
 }
 \description{
 Summarizes output from \code{multiScale_optim}.
+}
+\details{
+Set \code{dimension = "1d"} to preserve the original \code{opt_dist} and
+\code{opt_distance} values in existing scripts. For a dimension-independent
+extraction, use \code{opt_dist_1d} or \code{opt_dist_2d}. Neither selection
+changes the fitted sigma, coefficients, or likelihood. The 2D radius is for
+an ideal continuous kernel; \code{max_D}, raster edges, missing cells, and
+cell geometry can change the realized weight in the prepared data. See
+\code{\link{kernel_dist}} for formulas and examples.
 }

@@ -60,7 +60,8 @@ format_max_distance_warning <- function(diagnostics) {
 # `print.summary_multiScaleR()`. `dist_2d` is NULL for summary objects created
 # before the planar distance was added; those print the one-dimensional table
 # alone, as before.
-.msr_print_distance <- function(dist_1d, dist_2d, prob, hard_radius) {
+.msr_print_distance <- function(dist_1d, dist_2d, prob, hard_radius,
+                                dimension = "2d") {
   pct <- paste0(prob * 100, "%")
   cat("\n\n***** Optimized Scale of Effect -- Distance *****\n")
   weighted <- setdiff(rownames(dist_1d), hard_radius)
@@ -81,21 +82,32 @@ format_max_distance_warning <- function(diagnostics) {
   if (length(hard_radius)) {
     cat("Hard-radius covariates show their radius in both tables.\n")
   }
-  cat("\n1D, along a line through the point (`kernel_dist()` default):\n")
-  print(dist_1d)
-  cat("\n2D, radius of the circle for the ideal untruncated kernel (`dimension = \"2d\"`):\n")
-  print(dist_2d)
+  tables <- list("2d" = dist_2d, "1d" = dist_1d)
+  labels <- c("2d" = "2D, radius of the circle for the ideal untruncated kernel",
+              "1d" = "1D, along a line through the point")
+  for (dim in c(dimension, setdiff(names(tables), dimension))) {
+    cat("\n", labels[[dim]], if (dim == dimension) " (selected)" else " (comparison)",
+        ":\n", sep = "")
+    print(tables[[dim]])
+  }
   invisible(NULL)
 }
 
 #' @title Print method for summary_multiScaleR
 #' @description Print method for objects of class \code{summary_multiScaleR}.
 #' @param x A \code{summary_multiScaleR} object
+#' @param dimension Character. \code{"2d"} or \code{"1d"}. Selects which
+#'   distance table is printed first. By default, use the definition stored in
+#'   \code{x}; summaries saved before this switch existed retain 1D reporting.
 #' @param ... Ignored
 #' @export
 #' @method print summary_multiScaleR
 #' @return Invisibly returns the input \code{summary_multiScaleR} object
-print.summary_multiScaleR <- function(x, ...){
+print.summary_multiScaleR <- function(x, dimension = NULL, ...){
+  if (is.null(dimension)) {
+    dimension <- if (is.null(x$dimension)) "1d" else x$dimension
+  }
+  dimension <- match.arg(dimension, c("2d", "1d"))
   cat("\nCall:\n")
   print(x$call)
 
@@ -124,10 +136,11 @@ print.summary_multiScaleR <- function(x, ...){
     cat("\n\n  ==================================== ")
   }
 
-  .msr_print_distance(dist_1d = x$opt_dist,
+  .msr_print_distance(dist_1d = if (is.null(x$opt_dist_1d)) x$opt_dist else x$opt_dist_1d,
                       dist_2d = x$opt_dist_2d,
                       prob = x$prob,
-                      hard_radius = hard_radius)
+                      hard_radius = hard_radius,
+                      dimension = dimension)
   cat("\n\n  ==================================== ")
 
 
@@ -183,12 +196,18 @@ print.summary_multiScaleR <- function(x, ...){
 #'   limits for `sigma` when feasible. Defaults to \code{FALSE} so summaries
 #'   remain fast; profile results are cached for repeated calls on the same
 #'   fitted object during the current R session.
+#' @param dimension Character. \code{"2d"} (default) reports the radius
+#'   containing \code{prob} of ideal planar kernel weight as the selected
+#'   distance. \code{"1d"} restores the original distance along a line.
+#'   Both definitions remain available in the returned object and printed output.
 #' @param ... Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).
 #'
 #' @return An object of class \code{summary_multiScaleR}. Kernel-scale limits
 #'   default to Wald intervals. Scale distances, in map units, come in two
-#'   forms: \code{opt_dist} (also \code{opt_distance}) holds the
-#'   one-dimensional distance from \code{\link{kernel_dist}}, the distance at
+#'   forms: \code{opt_dist} (also \code{opt_distance}) holds the selected
+#'   definition, which defaults to 2D rather than the 1D definition used through
+#'   version 0.7.3. \code{dimension} records that selection.
+#'   \code{opt_dist_1d} always holds the one-dimensional distance, the distance at
 #'   which the kernel's cumulative density along a line through the point
 #'   reaches \code{prob} (about 1.65 sigma for a Gaussian kernel at 90\%).
 #'   \code{opt_dist_2d} holds the two-dimensional distance, the radius of the
@@ -201,12 +220,22 @@ print.summary_multiScaleR <- function(x, ...){
 #'   surface metrics, Hessian standard errors and Wald limits are shown as
 #'   \code{NA}; use \code{profile = TRUE} for profile-likelihood limits.
 #'   Profiling errors are reported instead of silently returning invalid limits.
+#' @details
+#' Set \code{dimension = "1d"} to preserve the original \code{opt_dist} and
+#' \code{opt_distance} values in existing scripts. For a dimension-independent
+#' extraction, use \code{opt_dist_1d} or \code{opt_dist_2d}. Neither selection
+#' changes the fitted sigma, coefficients, or likelihood. The 2D radius is for
+#' an ideal continuous kernel; \code{max_D}, raster edges, missing cells, and
+#' cell geometry can change the realized weight in the prepared data. See
+#' \code{\link{kernel_dist}} for formulas and examples.
 #' @export
 #' @method summary multiScaleR
-summary.multiScaleR <- function(object, profile = FALSE, ...){
+summary.multiScaleR <- function(object, profile = FALSE,
+                                dimension = c("2d", "1d"), ...){
 
   param_list <- list(...)
   prob <- 0.9
+  dimension <- match.arg(dimension)
 
   if (!inherits(object, "multiScaleR")) {
     stop("`object` must inherit from class 'multiScaleR'.")
@@ -252,7 +281,7 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
 
   object_profile <- object
   object_profile$profile_scale_est <- tab_scale
-  opt_distance <- kernel_dist(object_profile, prob = prob)
+  opt_distance <- kernel_dist(object_profile, prob = prob, dimension = "1d")
   opt_distance_2d <- kernel_dist(object_profile, prob = prob, dimension = "2d")
   hard_radius <- intersect(rownames(tab_scale),
                            .msr_hard_radius_covariates(object$kernel_inputs$scale_vars))
@@ -275,9 +304,11 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
 
     out <- list(opt_scale = tab_scale,
                 opt_shape = tab_shape,
-                opt_dist = opt_distance,
-                opt_distance = opt_distance,
+                opt_dist = if (dimension == "2d") opt_distance_2d else opt_distance,
+                opt_distance = if (dimension == "2d") opt_distance_2d else opt_distance,
+                opt_dist_1d = opt_distance,
                 opt_dist_2d = opt_distance_2d,
+                dimension = dimension,
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
@@ -289,9 +320,11 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
   } else {
     out <- list(opt_scale = tab_scale,
                 opt_shape = NULL,
-                opt_dist = opt_distance,
-                opt_distance = opt_distance,
+                opt_dist = if (dimension == "2d") opt_distance_2d else opt_distance,
+                opt_distance = if (dimension == "2d") opt_distance_2d else opt_distance,
+                opt_dist_1d = opt_distance,
                 opt_dist_2d = opt_distance_2d,
+                dimension = dimension,
                 fitted_mod = object$opt_mod,
                 prob = prob,
                 kernel = object$kernel_inputs$kernel,
@@ -311,11 +344,16 @@ summary.multiScaleR <- function(object, profile = FALSE, ...){
 #' @title Print method for multiScaleR
 #' @description Print method for objects of class \code{multiScaleR}.
 #' @param x A \code{multiScaleR} object
+#' @param dimension Character. \code{"2d"} (default) prints the ideal planar
+#'   radius first; \code{"1d"} prints the original line-based distance first.
+#' @param prob Numeric between 0 and 1 (exclusive). Cumulative kernel-weight
+#'   proportion used for distances. Default: \code{0.9}.
 #' @param ... Ignored
 #' @export
 #' @method print multiScaleR
 #' @return Invisibly returns the input \code{multiScaleR} object
-print.multiScaleR <- function(x, ...){
+print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
+  dimension <- match.arg(dimension)
   cat("\nCall:\n")
   print(x$call)
 
@@ -338,16 +376,17 @@ print.multiScaleR <- function(x, ...){
     print(x$shape_est)
   }
 
-  display_distance <- kernel_dist(x)
-  display_distance_2d <- kernel_dist(x, dimension = "2d")
+  display_distance <- kernel_dist(x, prob = prob, dimension = "1d")
+  display_distance_2d <- kernel_dist(x, prob = prob, dimension = "2d")
   if (length(hard_radius)) {
     display_distance[hard_radius, c("2.5%", "97.5%")] <- NA_real_
     display_distance_2d[hard_radius, c("2.5%", "97.5%")] <- NA_real_
   }
   .msr_print_distance(dist_1d = display_distance,
                       dist_2d = display_distance_2d,
-                      prob = 0.9,
-                      hard_radius = hard_radius)
+                      prob = prob,
+                      hard_radius = hard_radius,
+                      dimension = dimension)
 
   cat("\n  ==================================== ")
   cat("\n\n ***** Fitted Model *****\n")

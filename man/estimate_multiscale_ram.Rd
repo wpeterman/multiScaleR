@@ -97,6 +97,19 @@ though each worker may require its own copy of the optimization payload.
 
 If \code{fitted_mod} is omitted, the RAM recommendation is based on
 \code{kernel_inputs} alone and may understate the true optimization payload.
+
+\code{multiScale_optim()} stops before starting parallel workers when
+\code{n_cores > 1} exceeds the RAM-based limit under the default settings
+of this helper. Use \code{n_cores = 1} for serial execution, or rebuild
+\code{kernel_prep()} inputs with \code{bin = TRUE} and
+\code{store_cell_data = FALSE} when all covariates are kernel-weighted.
+Landscape and surface metrics require cell-level data and cannot use this
+lean mode. Recheck the estimate after rebuilding inputs.
+
+Worker recommendations have a minimum of one; this does not guarantee that
+serial execution fits in memory. The budget check cannot enforce a limit
+when RAM detection or estimation fails, and a run below the estimated limit
+can still exhaust memory during a model refit.
 }
 \examples{
 library(terra)

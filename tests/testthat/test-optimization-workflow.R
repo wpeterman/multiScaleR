@@ -813,8 +813,8 @@ test_that("multiScale_optim covers parallel and unmarked branches via mocks", {
 
   expect_s3_class(par_out, "multiScaleR")
 
-  expect_warning(
-    unsafe_ram_out <- with_mocked_bindings(
+  expect_error(
+    with_mocked_bindings(
       multiScale_optim(
         fitted_mod = fix$fitted_mod,
         kernel_inputs = fix$kernel_inputs,
@@ -834,24 +834,12 @@ test_that("multiScale_optim covers parallel and unmarked branches via mocks", {
           )
         )
       },
-      makeCluster = function(...) "cl",
-      setDefaultCluster = function(cl = NULL) invisible(NULL),
-      cluster_prep = function(model, cl) "stats",
-      optimParallel = function(...) list(par = 0.2, hessian = matrix(1, 1, 1)),
-      stopCluster = function(cl) invisible(NULL),
-      kernel_scale_fn = function(..., mod_return = NULL) {
-        if (isTRUE(mod_return)) {
-          list(mod = fix$fitted_mod, scl_params = fix$kernel_inputs$scl_params)
-        } else {
-          0
-        }
-      },
-      kernel_dist = function(...) data.frame(Mean = 20, low = 10, high = 30),
+      makeCluster = function(...) stop("Workers must not start"),
+      optimParallel = function(...) stop("Optimization must not start"),
       .package = "multiScaleR"
     ),
-    "conservative RAM budget"
+    "Parallel optimization was not started.*conservative RAM budget"
   )
-  expect_s3_class(unsafe_ram_out, "multiScaleR")
 
   expect_error(
     with_mocked_bindings(

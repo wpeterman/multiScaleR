@@ -133,7 +133,17 @@ The key function is `multiScale_optim()`. It takes your fitted model and the `ke
 
 There are *many* different kernel transformations that could be used to quantify the contribution of environmental variables as a function of distance. The kernel function determines the *shape* of that decay: how quickly nearby cells lose influence relative to the focal point.
 
-Four kernel functions are implemented in `multiScaleR`. In each case, σ (sigma) is estimated during optimization and controls the spatial scale (width) of the kernel. All plots below show the weight assigned to a landscape cell as a function of its distance from a sample point. The vertical line marks the 1D distance capturing 90% of kernel weight along a line through the point, not the radius capturing 90% of weight on a plane.
+Four kernel functions are implemented in `multiScaleR`. In each case, σ (sigma) is estimated during optimization and controls the spatial scale (width) of the kernel. All plots below show the weight assigned to a landscape cell as a function of its distance from a sample point. By default, the vertical line marks the radius containing 90% of ideal kernel weight on a plane (2D). The curve still shows cell weight versus distance, not the total weight in concentric rings. Consequently, 90% of the area under the displayed curve need not lie to the left of the planar marker.
+
+**Reporting default change:** Version 0.7.4 and later use `dimension = "2d"` in `kernel_dist()`, `plot_kernel()`, fitted-model plots, and summaries. The original `dimension = "1d"` remains available explicitly. This is a change in how distance is reported, not in fitted sigma values or the model likelihood. Simulation extents, projection windows, and stored optimization warnings continue to use their historical 1D cutoffs.
+
+For a Gaussian kernel with sigma = 300 m, the 90% planar radius is about 644 m, while the original line-based distance is about 493 m. There are more cells in rings farther from a point, so a planar radius must account for ring area as well as each cell's declining weight. The 493 m circle contains only about 74% of total ideal planar weight. Neither distance measures site-specific retained weight after `max_D`, raster edges, missing cells, or cell geometry restrict the available landscape.
+
+```{r distance-definitions}
+# Compare definitions without fitting or changing a model.
+c(planar_2d = kernel_dist(sigma = 300, kernel = "gaussian"),
+  original_1d = kernel_dist(sigma = 300, kernel = "gaussian", dimension = "1d"))
+```
 
 - **Gaussian** (recommended for most uses): smooth, symmetric bell-curve decay. Governed by a single parameter σ.
 - **Negative Exponential**: faster initial decay than Gaussian; also governed by σ alone.
@@ -286,7 +296,7 @@ kernel_inputs <- kernel_prep(pts = pts,
                              verbose = FALSE)
 ```
 
-This "lean" mode can shrink the stored object by one to two orders of magnitude. It is available when every covariate is kernel-weighted; cell-level data are retained automatically when landscape metrics (see the *Landscape Metric Covariates* vignette) are present, because those require the full spatial detail. Use `estimate_multiscale_ram()` to gauge the footprint and a safe parallel worker count before running.
+This "lean" mode can shrink the stored object by one to two orders of magnitude. It is available when every covariate is kernel-weighted; cell-level data are retained automatically when landscape or surface metrics are present, because those require the full spatial detail. Use `estimate_multiscale_ram()` to gauge the footprint and a conservative parallel worker count before running.
 
 Next, combine the kernel-weighted covariate values with the response data to build the data frame for model fitting:
 
@@ -311,7 +321,23 @@ summary(mod0)
 
 We are now ready to optimize the scales of effect with `multiScale_optim()`. This function searches over σ values for each raster layer (and simultaneously updates regression coefficients) to find the combination that maximizes the likelihood of the fitted model. The full guide shows the optimization calls and then loads cached fitted objects bundled with the package so the printed summaries and plots remain available without making CRAN rebuild the slow fits.
 
-> **Parallelization**: For this vignette, the function is run without parallelization. In practice, optimization will be substantially faster when you specify `n_cores` (e.g., `n_cores = 4`) when fitting models with many locations.
+> **Parallelization**: This vignette uses serial optimization. Parallel runs can be faster for expensive model refits, but each worker can require its own copy of the optimization payload. Check the RAM estimate before choosing `n_cores`.
+
+**Parallel RAM guard:** Version 0.7.4 and later stop, rather than warn and continue, when a requested `n_cores > 1` exceeds the estimated RAM-based worker limit. The check runs before screened starts and worker creation. The error reports the requested count, estimated peak memory, backend, and RAM-based limit. It does not silently lower the worker count or restart the analysis in serial mode.
+
+```{r parallel-ram-budget, eval=FALSE}
+# Include the fitted model so the estimate covers the worker optimization context.
+ram <- estimate_multiscale_ram(kernel_inputs, fitted_mod = mod0, n_cores = 3)
+print(ram)
+ram$component_bytes  # Inspect which objects dominate the estimated payload.
+
+# A serial run avoids copying the payload to parallel workers.
+opt_serial <- multiScale_optim(mod0, kernel_inputs, n_cores = 1)
+```
+
+**How to read the RAM report:** Compare the requested count with `max_cores_by_ram` and inspect `peak_parallel_estimate`. These are conservative estimates, not observed memory use. The recommendation has a minimum of one, which does not guarantee that serial execution fits in RAM. A run at or below the limit can still run out of memory during a refit. If RAM detection or estimation is unavailable, the guard cannot enforce a limit and does not block execution.
+
+For a large kernel-only preparation, rebuild the original `kernel_prep()` call with `bin = TRUE, store_cell_data = FALSE`, keeping its other settings unchanged, then inspect the estimate again. This lean mode retains the binned summaries used during optimization. It is not available for landscape or surface metrics; those need cell-level data. Do not delete components manually or reduce a scientifically chosen `max_D` merely to bypass the guard.
 
 ```{r opt1, eval=FALSE}
 opt1 <- multiScale_optim(fitted_mod = mod0,
@@ -351,7 +377,9 @@ summary(opt1)
 
 **How to read the `summary()` output:**
 
-The top of the output shows the estimated σ (scale parameter) for each raster layer, with standard errors and 95% confidence intervals. Below the σ estimates is the *effective distance*, which converts σ into a distance in map units (meters in this case), reported two ways. The **1D** table gives the distance at which the kernel's cumulative weight along a line through the sample point reaches a specified proportion (default: 90%); for a Gaussian kernel this is about 1.65σ. The **2D** table gives the radius of the circle around the sample point that holds that proportion of the weight of an ideal, untruncated kernel on a plane, about 2.15σ for a Gaussian kernel. A Gaussian kernel with σ = 250 m has a 1D distance of about 411 m and a 2D radius of about 536 m. Use the 2D radius when describing the area associated with the modeled kernel weights. On an unbounded plane, the 1D distance captures only about 74% of the weight within a circle. Raster edges, missing cells, and the `max_D` cutoff can change the share realized in your data, so report the definition and extraction extent.
+The top of the output shows the estimated σ (scale parameter) for each raster layer, with standard errors and 95% confidence intervals. Below the σ estimates is the *effective distance*, which converts σ into a distance in map units (meters in this case), reported two ways. The selected **2D** table appears first by default and gives the radius of the circle containing the requested proportion (default: 90%) of the weight of an ideal, untruncated kernel on a plane, about 2.15σ for a Gaussian kernel. The **1D** comparison table gives the distance enclosing that proportion along a line through the sample point, about 1.65σ. A Gaussian kernel with σ = 250 m has a 2D radius of about 536 m and a 1D distance of about 411 m. Raster edges, missing cells, and the `max_D` cutoff can change the share realized in your data, so report the definition and extraction extent.
+
+The returned `opt_dist` and its alias `opt_distance` now follow the selected dimension, rather than always holding 1D distances as they did through version 0.7.3. Use `summary(opt2, dimension = "1d")` to recover the old values. For scripts that need a fixed definition regardless of the reporting selection, extract `summary(opt2)$opt_dist_1d` or `summary(opt2)$opt_dist_2d`. Both named tables remain available with either selection. Hard-radius covariates report their full buffer radius in both tables; they are not converted to a cumulative-weight distance.
 
 The bottom of the output is the standard model summary from your regression (GLM in this case), showing regression coefficients, standard errors, and p-values for each covariate, exactly as you would see from `summary(glm(...))`.
 
@@ -427,7 +455,7 @@ The true data-generating values were (see section 3):
 
 Overall, we do a good job recovering both the regression coefficients (β) and the scales of effect (σ) within reasonable uncertainty bounds. This is reassuring but also a good reminder: with real data, you will not have ground truth to check against. Careful model selection and biological reasoning are your guides.
 
-**Visualizing the kernel decay.** The `plot()` method shows how the kernel weight for each landscape variable falls off with distance. Its vertical line marks the 1D distance enclosing 90% of cumulative weight along a line through the point. Use `kernel_dist(opt2, dimension = "2d")` for the corresponding planar radius.
+**Visualizing the kernel decay.** The `plot()` method shows how the kernel weight for each landscape variable falls off with distance. Its vertical line now marks the 2D radius containing 90% of ideal planar weight by default, matching `kernel_dist(opt2)` and the selected summary distance. The annotation states sigma, the dimension, the radius, and its converted interval. It does not mean that 90% of the area under the displayed decay curve lies to the left of the marker. Use `plot(opt2, dimension = "1d")` for the original line-based distance and interval.
 
 ```{r}
 ## Kernel function
@@ -435,6 +463,15 @@ plot(opt2)
 
 ## Kernel function; 99% contribution
 plot(opt2, prob = 0.99)
+```
+
+```{r original-distance-reporting, eval=FALSE}
+# Explicit switches preserve the original line-based reporting in existing scripts.
+kernel_dist(opt2, dimension = "1d")
+summary(opt2, dimension = "1d")
+print(opt2, dimension = "1d")
+plot(opt2, dimension = "1d")
+plot_kernel(sigma = 300, kernel = "gaussian", dimension = "1d")
 ```
 
 **Visualizing marginal covariate effects.** `plot_marginal_effects()` shows the estimated effect of each covariate on the response, holding other covariates at their mean values. These are the standard partial effect plots from the regression model, applied to the optimally-scaled covariate values.
@@ -688,13 +725,17 @@ y_stacked <- do.call(rbind, counts_by_year)
 site_row <- rep(site_id, times = length(counts_by_year))
 site_covs <- kernel_inputs$kernel_dat[site_row, , drop = FALSE]
 site_covs$site_id <- site_id[site_row]
+site_covs$Year <- factor(rep(seq_along(counts_by_year), each = length(site_id)))
 
 umf_years <- unmarked::unmarkedFramePCount(y = y_stacked,
                                            siteCovs = site_covs)
-mod_years <- unmarked::pcount(~1 ~ bin1 + cont2, data = umf_years,
+mod_years <- unmarked::pcount(~Year ~ Year + bin1 + cont2, data = umf_years,
                               K = 100)
 opt_years <- multiScale_optim(mod_years, kernel_inputs,
                               join_by = join_by)
+
+# Factor Year is plotted by observed level; site_id remains a join key.
+plot_marginal_effects(opt_years, type = "state")
 ```
 
 Check that the rows of `y_stacked` and `site_covs` refer to the same site-year records before fitting. Without `join_by`, model rows must match prepared spatial sites one for one in the same order. An open-population `pcountOpen()` model instead stores one row per site and the repeated years across count columns; it can use the same static site covariates without `join_by`. For either model type, examine the scale profile and `diagnostics()` because sparse counts can yield weakly identified scales.
@@ -706,6 +747,22 @@ plogis(opt_umf.p$opt_mod@estimates@estimates$det@estimates[[1]])
 ```
 
 Assess kernel and effects plots
+
+For `unmarked` models, marginal-effect panels use the variables in the selected
+state or abundance formula. Factor contrasts such as `Year2` are coefficient
+labels, not separate data columns. Version 0.7.4 handles the factor itself and
+selects numeric columns by name, including when `join_by` links repeated
+site-year rows. Unused site keys and detection-only variables do not receive
+state-effect panels.
+
+In each panel, other numeric predictors are held at their observed means and
+other factors at their first observed values. Site random effects, when
+present, are set to zero (`re.form = NA`). These are conditional predictions,
+not predictions averaged over sites, years, or their random effects. To show a
+landscape curve separately for each year, condition an explicit prediction grid
+on the desired year and retain the fitted factor coding. Confidence intervals
+from these curves condition on the selected
+landscape scale. See `?plot_marginal_effects` for explicit-contrast handling.
 
 ```{r}
 plot(opt_umf.p)
@@ -904,12 +961,12 @@ kernel_dist(opt2)
 ## Distance of 95% kernel
 kernel_dist(opt2, prob = 0.95)
 
-## Radius of the circle holding 90% of ideal planar kernel weight
-kernel_dist(opt2, dimension = "2d")
+## Original distance enclosing 90% of weight along a line
+kernel_dist(opt2, dimension = "1d")
 
 ```
 
-By default, `kernel_dist()` measures along a line through the sample point (`dimension = "1d"`). Because a kernel weights raster cells across a plane, `dimension = "2d"` instead returns the radius of the circle around the point that holds the requested share of the total weight. It is always the larger of the two; `summary()` reports both.
+By default, `kernel_dist()` returns the radius of the circle containing the requested share of ideal planar kernel weight (`dimension = "2d"`). Set `dimension = "1d"` for the original distance along a line. For distance-weighted kernels, the planar radius is larger; hard-radius covariates report the same full radius for both. With manually supplied `kernel = "fixed"`, the function instead describes a uniform kernel: its cumulative-weight distance is `sigma * sqrt(prob)` in 2D or `sigma * prob` in 1D, not the full buffer radius of a fitted hard-radius metric.
 
 It's also possible to calculate the distance encompassed by specified kernels without a fitted model.
 
@@ -920,13 +977,13 @@ kernel_dist(kernel = "exp", sigma = 100, prob = 0.9)
 
 kernel_dist(kernel = "expow", sigma = 100, beta = 5, prob = 0.9)
 
-## The same Gaussian kernel, as the radius of a circle
-kernel_dist(kernel = "gaussian", sigma = 100, prob = 0.9, dimension = "2d")
+## The same Gaussian kernel, with the original line-based definition
+kernel_dist(kernel = "gaussian", sigma = 100, prob = 0.9, dimension = "1d")
 ```
 
 ## `plot_kernel`
 
-This is a generic function to visualize how kernel weight decays with distance
+This function visualizes how cell weight decays with distance. It uses the same 2D default as fitted-model plots, labels the radius definition, and reports sigma separately. Set `dimension = "1d"` for the original line-based marker.
 
 ```{r}
 plot_kernel(kernel = 'exp',
@@ -949,6 +1006,9 @@ plot_kernel(kernel = 'gaussian',
 plot_kernel(kernel = 'gaussian',
             sigma = 50,
             add_label = F)
+
+# Original line-based marker, without changing sigma.
+plot_kernel(kernel = 'gaussian', sigma = 50, dimension = "1d")
 ```
 
 ## `sim_rast`

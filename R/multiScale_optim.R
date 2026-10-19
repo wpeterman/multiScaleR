@@ -386,8 +386,14 @@
 #'   Parallel optimization is beneficial for models with many covariates or
 #'   slow log-likelihood evaluations. When \code{n_cores > 1},
 #'   \code{multiScale_optim()} checks \code{\link{estimate_multiscale_ram}} and
-#'   warns if the requested workers exceed the conservative RAM budget for the
-#'   current \code{kernel_inputs} payload.
+#'   stops before screened starts or worker creation if the requested workers
+#'   exceed the conservative RAM-based limit for the current inputs. Use
+#'   \code{n_cores = 1} for serial execution, or rebuild inputs with
+#'   \code{kernel_prep(..., bin = TRUE, store_cell_data = FALSE)} for lean mode
+#'   when every covariate is kernel-weighted. Landscape and surface metrics
+#'   cannot use lean mode. An unavailable RAM estimate does not block the run;
+#'   a passing estimate does not guarantee sufficient memory. No worker count
+#'   is reduced automatically.
 #' @param PSOCK Logical. On Windows, a PSOCK cluster is always used. On Unix,
 #'   a FORK cluster is used by default (faster). Set \code{TRUE} to force a
 #'   PSOCK cluster on Unix. Default: \code{FALSE}.
@@ -826,6 +832,16 @@ multiScale_optim <- function(fitted_mod,
     stop("\nYou have specified an Exponential Power kernel, which has starting values (`par`), for both the scale of effect and shape. The number of starting values should be 2x the number of covariates in the model. Please correct and run again. \n")
   }
 
+  # Reject an over-budget request before main setup, screening, or workers.
+  .msr_stop_unsafe_parallel_ram(
+    kernel_inputs = kernel_inputs,
+    fitted_mod = fitted_mod,
+    join_by = join_by,
+    refit_fn = refit_fn,
+    n_cores = n_cores,
+    PSOCK = (.Platform$OS.type != "unix" || isTRUE(PSOCK))
+  )
+
   opt_context <- build_opt_context(fitted_mod = fitted_mod,
                                    cov_df = kernel_inputs$raw_cov,
                                    join_by = join_by,
@@ -835,15 +851,6 @@ multiScale_optim <- function(fitted_mod,
                                    resolution = kernel_inputs$resolution,
                                    n_cols = kernel_inputs$n_cols,
                                    binned = kernel_inputs$binned)
-
-  .msr_warn_unsafe_parallel_ram(
-    kernel_inputs = kernel_inputs,
-    fitted_mod = fitted_mod,
-    join_by = join_by,
-    refit_fn = refit_fn,
-    n_cores = n_cores,
-    PSOCK = (.Platform$OS.type != "unix" || isTRUE(PSOCK))
-  )
 
   if(kernel_inputs$kernel == 'expow'){
     lwr <- c(lwr, rep(0.75, n_covs))
@@ -1063,7 +1070,8 @@ multiScale_optim <- function(fitted_mod,
 
     class(out) <- 'multiScaleR'
 
-    scale_D <- kernel_dist(out)
+    # Keep the existing warning threshold independent of distance reporting.
+    scale_D <- kernel_dist(out, dimension = "1d")
     max_dist_diag <- .max_distance_diagnostic(scale_D = scale_D,
                                               max_D = kernel_inputs$max_D)
     out$diagnostics$max_distance <- max_dist_diag

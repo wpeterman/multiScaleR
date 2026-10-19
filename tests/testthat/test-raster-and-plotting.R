@@ -117,18 +117,15 @@ test_that("plot helpers return ggplot objects without error", {
   expect_true(all(vapply(marginal_plots, inherits, logical(1), what = "ggplot")))
 })
 
-test_that("plot.multiScaleR includes the updated corner annotation label", {
+test_that("plot.multiScaleR includes the dimensional definition in its caption", {
   fix <- make_core_fixture()
 
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
 
   opt_plots <- plot(fix$opt, prob = 0.95, add_label = TRUE)
-  text_layer <- opt_plots[[1]]$layers[[3]]
-
-  expect_true(inherits(text_layer$geom, "GeomText"))
-  expect_match(text_layer$aes_params$label, "95% density")
-  expect_match(text_layer$aes_params$label, "95% CI")
+  expect_match(opt_plots[[1]]$labels$caption, "95% of ideal planar weight \\(2D\\)")
+  expect_match(opt_plots[[1]]$labels$caption, "95% CI")
 })
 
 test_that("plot_marginal_effects covers unmarked and zeroinfl models", {

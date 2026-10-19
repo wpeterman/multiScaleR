@@ -4,10 +4,14 @@
 \alias{print.summary_multiScaleR}
 \title{Print method for summary_multiScaleR}
 \usage{
-\method{print}{summary_multiScaleR}(x, ...)
+\method{print}{summary_multiScaleR}(x, dimension = NULL, ...)
 }
 \arguments{
 \item{x}{A \code{summary_multiScaleR} object}
+
+\item{dimension}{Character. \code{"2d"} or \code{"1d"}. Selects which
+distance table is printed first. By default, use the definition stored in
+\code{x}; summaries saved before this switch existed retain 1D reporting.}
 
 \item{...}{Ignored}
 }

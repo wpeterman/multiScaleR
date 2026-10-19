@@ -75,8 +75,14 @@ used for short screening attempts before the full optimization.
 Parallel optimization is beneficial for models with many covariates or
 slow log-likelihood evaluations. When \code{n_cores > 1},
 \code{multiScale_optim()} checks \code{\link{estimate_multiscale_ram}} and
-warns if the requested workers exceed the conservative RAM budget for the
-current \code{kernel_inputs} payload.}
+stops before screened starts or worker creation if the requested workers
+exceed the conservative RAM-based limit for the current inputs. Use
+\code{n_cores = 1} for serial execution, or rebuild inputs with
+\code{kernel_prep(..., bin = TRUE, store_cell_data = FALSE)} for lean mode
+when every covariate is kernel-weighted. Landscape and surface metrics
+cannot use lean mode. An unavailable RAM estimate does not block the run;
+a passing estimate does not guarantee sufficient memory. No worker count
+is reduced automatically.}
 
 \item{PSOCK}{Logical. On Windows, a PSOCK cluster is always used. On Unix,
 a FORK cluster is used by default (faster). Set \code{TRUE} to force a

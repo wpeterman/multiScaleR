@@ -40,11 +40,11 @@ A named list of \code{ggplot2} objects, one per covariate. Plots are
   printed as a side effect and the list is returned invisibly. Each plot
   shows:
   \itemize{
-    \item The predicted response (solid line) across the observed covariate
-      range, with x-axis values back-transformed to the original (unscaled)
-      units.
-    \item A shaded ribbon for the 95\% confidence interval (when available
-      from the model's \code{predict} method).
+    \item The predicted response as a solid line for numeric predictors or
+      points for categorical predictors, with x-axis values back-transformed
+      to the original (unscaled) units when applicable.
+    \item A shaded ribbon or categorical error bars for the 95\% confidence
+      interval (when available from the model's \code{predict} method).
     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
       terms that involve the covariate.
   }
@@ -53,7 +53,8 @@ A named list of \code{ggplot2} objects, one per covariate. Plots are
 Generates marginal effect plots with 95\% confidence intervals for each
 covariate in the optimized model stored within a \code{multiScaleR} object.
 Each panel sweeps one covariate across its observed range while holding all
-others at their sample mean.
+other numeric predictors at their sample mean. For \code{unmarked} models,
+other categorical predictors are held at their first observed level.
 }
 \details{
 Marginal effects are computed by constructing a \code{newdata} data frame
@@ -71,6 +72,24 @@ log-link models). Confidence intervals are constructed from
 For \code{unmarked} models, \code{predict(mod, newdata, type = type)} is
 used, and lower/upper bounds come from the \code{lower} and \code{upper}
 columns of the returned data frame.
+Predictors are recovered from the selected component's formula, so factor
+contrasts such as \code{Year2} are not mistaken for data columns. Factors
+receive one point and confidence interval per observed level. Site keys
+not used as fixed predictors and detection-only predictors do not receive
+state-effect panels.
+Numeric predictors not optimized by \code{multiScale_optim()} retain their
+original units and are held at their sample mean in other panels.
+
+For \code{unmarked} random-effects models, prediction uses
+\code{re.form = NA}, which sets random effects to zero. These curves are
+conditional predictions at the stated covariate values, not averages over
+years, sites, or the random-effect distribution. Confidence intervals are
+conditional on the fitted spatial scale.
+Explicit nondefault factor contrasts in ordinary \code{pcount} (Poisson or
+negative-binomial) and \code{occu} fits use \code{unmarked::linearComb()}
+and \code{unmarked::backTransform()} to preserve the fitted design and link.
+Other unmarked classes with such contrasts stop if their prediction method
+cannot safely retain that design.
 
 For models with interaction terms, a message is printed explaining that each
 panel represents a conditional slice (at the mean of the interacting

@@ -16,22 +16,22 @@
 #'   used to define the distance. Default: \code{0.9}. The proportion refers
 #'   to weight along a line for \code{dimension = "1d"} and weight on a plane
 #'   for \code{dimension = "2d"}.
-#' @param dimension Character. How the distance is measured. \code{"1d"}
-#'   (default) returns the distance at which the kernel's cumulative density,
-#'   read along a line through the point, reaches \code{prob}; this is the value
-#'   \code{kernel_dist()} has always returned. \code{"2d"} returns the radius of
+#' @param dimension Character. How the distance is measured. \code{"2d"}
+#'   (default) returns the radius of
 #'   the circle around the point that holds \code{prob} of the total weight the
 #'   ideal kernel gives to locations on an unbounded plane. Because raster cells
 #'   lie across a plane, the \code{"2d"} radius answers "within what
 #'   distance does the ideal kernel assign 90\% of its total weight?". For
 #'   distance-weighted kernels it is larger than the \code{"1d"} distance;
-#'   hard-radius covariates report the same radius for both. See Details.
+#'   hard-radius covariates report the same radius for both. \code{"1d"}
+#'   restores the original line-based distance, enclosing \code{prob} of the
+#'   area under the kernel curve along a transect through the point. See Details.
 #' @param ... Additional parameters used when \code{model} is not supplied:
 #'   \describe{
 #'     \item{\code{sigma}}{Numeric (positive). The kernel scale parameter in the
 #'       same units as the projection of \code{pts} and \code{raster_stack} passed
 #'       to \code{\link{kernel_prep}}. For Gaussian kernels this is the standard
-#'       deviation; for negative exponential kernels this is the decay rate.}
+#'       deviation; for negative exponential kernels this is the decay length.}
 #'     \item{\code{kernel}}{Character. The kernel function to use. One of
 #'       \code{"gaussian"}, \code{"exp"} (negative exponential),
 #'       \code{"fixed"} (fixed-radius buffer), or \code{"expow"} (exponential
@@ -55,6 +55,14 @@
 #' weight under the requested dimensional definition reaches \code{prob}.
 #'
 #' @details
+#' \strong{Default change.} Version 0.7.4 and later use
+#' \code{dimension = "2d"} for distances, summaries, and kernel plots. Earlier
+#' versions used \code{"1d"}. Set \code{dimension = "1d"} explicitly to
+#' reproduce earlier reported distances. This changes reporting, not fitted
+#' sigma values, kernel weights, or likelihoods. Existing simulation extents,
+#' projection cutoffs, and optimization diagnostics retain their explicit 1D
+#' definitions.
+#'
 #' \strong{One or two dimensions.} A kernel assigns each raster cell a weight
 #' that declines with the cell's distance from the point. Two distances can
 #' summarize how far that weight reaches:
@@ -82,7 +90,8 @@
 #'   \item \strong{Negative exponential}: \code{-sigma * log(1 - prob)}.
 #'   \item \strong{Fixed buffer}: \code{sigma * prob} (the fraction of
 #'     the buffer radius).
-#'   \item \strong{Exponential power}: integrates the density numerically; both
+#'   \item \strong{Exponential power}:
+#'     \code{sigma * qgamma(prob, shape = 1 / beta)^(1 / beta)}; both
 #'     \code{sigma} and \code{beta} (shape) must be specified.
 #' }
 #' In two dimensions:
@@ -106,6 +115,9 @@
 #' Hessian-based standard errors (or profile-likelihood intervals when
 #' \code{\link{profile_sigma}} has been run and stored on the object). Each
 #' limit of sigma is converted to a distance with the same formula.
+#' For exponential-power kernels, beta is held at its fitted estimate during
+#' this conversion; the limits do not include uncertainty in beta or in
+#' site-specific retained weight.
 #'
 #' \code{summary()} of a fitted model reports both distances; see
 #' \code{\link{summary.multiScaleR}}.
@@ -133,8 +145,8 @@
 #'                         kernel_inputs = kernel_inputs)
 #'
 #' ## Uses of `kernel_dist`
-#' kernel_dist(model = opt)                     # along a line (1D)
-#' kernel_dist(model = opt, dimension = "2d")   # radius of a circle (2D)
+#' kernel_dist(model = opt)                     # radius of a circle (2D)
+#' kernel_dist(model = opt, dimension = "1d")   # original distance along a line
 #' kernel_dist(model = opt, prob = 0.95)
 #' kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
 #' kernel_dist(sigma = 100, prob = 0.975, kernel = "exp")
@@ -143,8 +155,8 @@
 #' }
 #'
 #' ## The two definitions for a Gaussian kernel with sigma = 300
-#' kernel_dist(sigma = 300, kernel = "gaussian")                     # about 493
-#' kernel_dist(sigma = 300, kernel = "gaussian", dimension = "2d")   # about 644
+#' kernel_dist(sigma = 300, kernel = "gaussian")                     # about 644
+#' kernel_dist(sigma = 300, kernel = "gaussian", dimension = "1d")   # about 493
 #'
 #' @rdname kernel_dist
 #' @export
@@ -152,7 +164,7 @@
 
 kernel_dist <- function(model,
                         prob = 0.9,
-                        dimension = c("1d", "2d"),
+                        dimension = c("2d", "1d"),
                         ...){
   param_list <- list(...)
   dimension <- match.arg(dimension)
@@ -330,19 +342,19 @@ kernel_dist <- function(model,
 #'   kernel weight is reached for several kernel types, measured either along a
 #'   line through the point (one-dimensional) or as the radius of a circle
 #'   around it (two-dimensional).
-#' @param sigma Numeric. Scale parameter. For Gaussian and exponential, this is standard deviation or decay rate. For expow, this is the kernel bandwidth.
+#' @param sigma Numeric. Scale parameter. For Gaussian and exponential, this is standard deviation or decay length. For expow, this is the kernel bandwidth.
 #' @param prob Numeric. Desired cumulative proportion (e.g., 0.95).
 #' @param kernel Character. One of "gaussian", "exp", "expow", or "fixed".
 #' @param beta Numeric. Shape parameter for exponential power kernel. Ignored unless kernel = "expow".
-#' @param dimension Character. \code{"1d"} (default) for the distance along a
-#'   line through the point; \code{"2d"} for the radius of the circle holding
-#'   \code{prob} of the total weight when the kernel weights cells on a plane.
+#' @param dimension Character. \code{"2d"} (default) for the radius of the
+#'   circle holding \code{prob} of ideal planar weight; \code{"1d"} for the
+#'   original distance along a line through the point.
 #' @return Numeric distance in map units at which the cumulative kernel weight
 #'   reaches \code{prob} under the selected dimensional definition.
 #' @keywords internal
-#' @importFrom stats integrate qnorm qgamma uniroot
+#' @importFrom stats qnorm qgamma
 k_dist <- function(sigma, prob = 0.95, kernel = c("gaussian", "exp", "expow", "fixed"),
-                   beta = NULL, dimension = c("1d", "2d")) {
+                   beta = NULL, dimension = c("2d", "1d")) {
   kernel <- match.arg(kernel)
   dimension <- match.arg(dimension)
   if (prob <= 0 || prob >= 1) stop("prob must be between 0 and 1")
@@ -375,11 +387,8 @@ k_dist <- function(sigma, prob = 0.95, kernel = c("gaussian", "exp", "expow", "f
     return(-sigma * log(1 - prob))
 
   } else if (kernel == "expow") {
-    c_beta <- beta / (2 * sigma * gamma(1 / beta))
-    f <- function(x) c_beta * exp(-abs(x / sigma)^beta)
-    cdf <- function(x) integrate(f, -x, x, rel.tol = 1e-8)$value
-    target_fn <- function(d) cdf(d) - prob
-    return(uniroot(target_fn, c(1e-6, 10 * sigma))$root)
+    # Exact line-based quantile, including tails beyond the old 10-sigma bracket.
+    return(sigma * qgamma(prob, shape = 1 / beta)^(1 / beta))
 
   } else if (kernel == "fixed") {
     # Proportion of mass in 1D uniform kernel: step function

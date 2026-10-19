@@ -1,3 +1,26 @@
+multiScaleR 0.7.4
+---------
+* Marginal-effect plots for unmarked models recover predictor columns from
+  component formulas, including factors and repeated site-year data. Numeric
+  covariates are selected by name, categorical covariates retain their levels,
+  and random effects are set to zero explicitly for conditional predictions.
+* Parallel optimization now stops before screening or worker creation when the
+  requested workers exceed the estimated RAM budget, with guidance for serial
+  execution or eligible lean-mode inputs. RAM estimates include the binned
+  summaries sent to workers. Unknown RAM estimates do not block execution.
+* BREAKING REPORTING CHANGE: `kernel_dist()`, kernel plots, and the selected
+  summary distance now default to the 2D radius containing the requested share
+  of ideal untruncated planar kernel weight. Set `dimension = "1d"` to restore
+  the original line-based definition. Fitted sigma values are unchanged.
+* Summary `opt_dist` and `opt_distance` follow the selected dimension; use
+  `opt_dist_1d` or `opt_dist_2d` for explicitly defined tables. Print methods
+  show the selected definition first and retain the other for comparison.
+* Kernel plots identify sigma, dimension, and radius or distance, and mark
+  hard-radius covariates at their full buffer radius. Exponential-power 1D
+  quantiles use the exact gamma formula, including long-tailed kernels.
+* Simulation extents, projection windows, and stored optimization diagnostics
+  retain their explicit 1D cutoff definitions.
+
 multiScaleR 0.7.3
 ---------
 * AIC, AICc, BIC, and sigma profiles count all free unmarked model parameters,

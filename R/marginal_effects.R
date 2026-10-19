@@ -3,7 +3,8 @@
 #' Generates marginal effect plots with 95\% confidence intervals for each
 #' covariate in the optimized model stored within a \code{multiScaleR} object.
 #' Each panel sweeps one covariate across its observed range while holding all
-#' others at their sample mean.
+#' other numeric predictors at their sample mean. For \code{unmarked} models,
+#' other categorical predictors are held at their first observed level.
 #'
 #' @param x A fitted \code{multiScaleR} object returned by
 #'   \code{\link{multiScale_optim}}. Must contain \code{opt_mod} (the optimized
@@ -27,11 +28,11 @@
 #'   printed as a side effect and the list is returned invisibly. Each plot
 #'   shows:
 #'   \itemize{
-#'     \item The predicted response (solid line) across the observed covariate
-#'       range, with x-axis values back-transformed to the original (unscaled)
-#'       units.
-#'     \item A shaded ribbon for the 95\% confidence interval (when available
-#'       from the model's \code{predict} method).
+#'     \item The predicted response as a solid line for numeric predictors or
+#'       points for categorical predictors, with x-axis values back-transformed
+#'       to the original (unscaled) units when applicable.
+#'     \item A shaded ribbon or categorical error bars for the 95\% confidence
+#'       interval (when available from the model's \code{predict} method).
 #'     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
 #'       terms that involve the covariate.
 #'   }
@@ -52,6 +53,24 @@
 #' For \code{unmarked} models, \code{predict(mod, newdata, type = type)} is
 #' used, and lower/upper bounds come from the \code{lower} and \code{upper}
 #' columns of the returned data frame.
+#' Predictors are recovered from the selected component's formula, so factor
+#' contrasts such as \code{Year2} are not mistaken for data columns. Factors
+#' receive one point and confidence interval per observed level. Site keys
+#' not used as fixed predictors and detection-only predictors do not receive
+#' state-effect panels.
+#' Numeric predictors not optimized by \code{multiScale_optim()} retain their
+#' original units and are held at their sample mean in other panels.
+#'
+#' For \code{unmarked} random-effects models, prediction uses
+#' \code{re.form = NA}, which sets random effects to zero. These curves are
+#' conditional predictions at the stated covariate values, not averages over
+#' years, sites, or the random-effect distribution. Confidence intervals are
+#' conditional on the fitted spatial scale.
+#' Explicit nondefault factor contrasts in ordinary \code{pcount} (Poisson or
+#' negative-binomial) and \code{occu} fits use \code{unmarked::linearComb()}
+#' and \code{unmarked::backTransform()} to preserve the fitted design and link.
+#' Other unmarked classes with such contrasts stop if their prediction method
+#' cannot safely retain that design.
 #'
 #' For models with interaction terms, a message is printed explaining that each
 #' panel represents a conditional slice (at the mean of the interacting
@@ -131,39 +150,70 @@ plot_marginal_effects <- function(x,
 
   # Extract variables from fitted model
   if (any(grepl("^unmarked", class(mod)))) {
-    vars <- names(coef(mod, altNames = FALSE))[-1]
-    # Find the index of the second "Int"
-    second_int_index <- which(vars == "Int")[1]
-
-    # Subset the vector up to (but not including) the second "Int"
-    vars <- vars[1:(second_int_index - 1)]
-    # Strip I() terms: unmarked stores them as coefficient names; prediction handles
-    # them automatically from the base variable column in newdata
-    c_vars <- vars <- vars[!grepl("I\\(", vars)]
-    dat <- mod@data@siteCovs
-    dat_ns <- dat[which(names(scl$mean) %in% vars)]
-
     if(is.null(type) || !type %in% c("lambda", "state")){
       stop("`type` must be specified as either 'lambda' or 'state'.")
     }
 
-    plot_list <- lapply(vars, function(v) {
-      if(!v %in% names(scl$mean)){
-        dat_ns <- dat[!vars %in% names(scl$mean)]
-        x_unscaled <- x_seq <- seq(min(dat_ns[v]), max(dat_ns[v]), length.out = length.out)
+    component <- .msr_unmarked_marginal_formula(mod, type)
+    vars <- .msr_marginal_variables(component, offsets = TRUE)
+    c_vars <- .msr_marginal_variables(component, offsets = FALSE)
+    dat <- unmarked::siteCovs(unmarked::getData(mod))
+    missing_vars <- setdiff(vars, names(dat))
+    if (length(missing_vars)) {
+      stop("Could not recover site covariates for marginal effects: ",
+           paste(missing_vars, collapse = ", "), call. = FALSE)
+    }
+
+    # Use column names, not coefficient names or column positions. Repeated
+    # site-year keys may coexist with factors, offsets, and unscaled predictors.
+    pred_defaults <- lapply(dat[vars], function(values) {
+      if (is.numeric(values)) return(mean(values, na.rm = TRUE))
+      values[which(!is.na(values))[1]]
+    })
+    factor_vars <- vars[vapply(dat[vars], is.factor, logical(1))]
+    custom_contrasts <- any(vapply(dat[factor_vars], function(values) {
+      fitted <- attr(values, "contrasts")
+      if (is.null(fitted)) return(FALSE)
+      attr(values, "contrasts") <- NULL
+      !isTRUE(all.equal(fitted, stats::contrasts(values)))
+    }, logical(1)))
+    plot_list <- lapply(c_vars, function(v) {
+      values <- dat[[v]]
+      if (all(is.na(values))) {
+        stop("Covariate '", v, "' has no observed values.", call. = FALSE)
+      }
+      if (is.numeric(values)) {
+        x_seq <- seq(min(values, na.rm = TRUE), max(values, na.rm = TRUE),
+                     length.out = length.out)
+      } else if (is.factor(values)) {
+        # Retain factor levels, ordering, and any fitted contrast attributes.
+        x_seq <- values[match(levels(droplevels(values)), as.character(values))]
       } else {
-        x_seq <- seq(min(mod@data@siteCovs[[v]]), max(mod@data@siteCovs[[v]]), length.out = length.out)
+        x_seq <- unique(values[!is.na(values)])
+      }
+      x_unscaled <- x_seq
+      if (v %in% names(scl$mean)) {
         x_unscaled <- (x_seq * scl$sd[v]) + scl$mean[v]
       }
 
-      # Construct newdata with v varying, others at zero (all unmarked covariates
-      # are kernel-scaled with mean = 0, so this is equivalent to holding at mean)
-      newdata <- as.data.frame(matrix(rep(0, each = length.out * length(vars)), ncol = length(vars)))
-      names(newdata) <- vars
+      newdata <- as.data.frame(lapply(pred_defaults, function(value) {
+        rep(value, length(x_seq))
+      }), stringsAsFactors = FALSE)
       newdata[[v]] <- x_seq
 
+      # unmarked's data-frame prediction path drops explicit contrasts in
+      # model.frame(xlev = ...). Use its public linear-combination interface
+      # for supported custom designs; otherwise native prediction is unchanged.
+      for (factor_var in factor_vars) {
+        attr(newdata[[factor_var]], "contrasts") <-
+          if (custom_contrasts) attr(dat[[factor_var]], "contrasts") else NULL
+      }
       preds <- tryCatch(
-        predict(mod, newdata, type = type),
+        if (custom_contrasts) {
+          .msr_unmarked_contrast_prediction(mod, component, newdata, type)
+        } else {
+          unmarked::predict(mod, newdata = newdata, type = type, re.form = NA)
+        },
         error = function(e) {
           stop(
             sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
@@ -257,13 +307,12 @@ plot_marginal_effects <- function(x,
 
     plot_list <- lapply(c_vars, function(v) {
       if(!v %in% names(scl$mean)){
-        dat <- dat_all[, -1, drop = FALSE]
-        dat_ns <- dat[!vars %in% names(scl$mean)]
-        x_unscaled <- x_seq <- seq(min(dat_ns[v]), max(dat_ns[v]), length.out = length.out)
+        x_unscaled <- x_seq <- seq(min(dat_all[[v]], na.rm = TRUE),
+                                  max(dat_all[[v]], na.rm = TRUE),
+                                  length.out = length.out)
       } else {
-        rng_min <- suppressWarnings(apply(dat_all, 2, min)[-1])
-        rng_max <- suppressWarnings(apply(dat_all, 2, max)[-1])
-        x_seq <- seq(rng_min[v], rng_max[v], length.out = length.out)
+        x_seq <- seq(min(dat_all[[v]], na.rm = TRUE),
+                     max(dat_all[[v]], na.rm = TRUE), length.out = length.out)
         x_unscaled <- (x_seq * scl$sd[v]) + scl$mean[v]
       }
 
@@ -374,16 +423,27 @@ plot_marginal_effects <- function(x,
     subtitle <- if(length(subtitle_parts) > 0) paste(subtitle_parts, collapse = "; ") else NULL
 
     p <- ggplot(df, aes(x = x, y = fit)) +
-      geom_line(linewidth = 1) +
       xlab(df$variable[1]) +
       ylab(ylab) +
       theme_cowplot()
 
+    discrete <- !is.numeric(df$x)
+    if (discrete) {
+      p <- p + ggplot2::geom_point()
+    } else {
+      p <- p + geom_line(linewidth = 1)
+    }
+
     if(!is.null(subtitle))
       p <- p + labs(subtitle = subtitle)
 
-    if(!all(is.na(df$lwr)) && !all(is.na(df$upr)))
-      p <- p + geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.25)
+    if(!all(is.na(df$lwr)) && !all(is.na(df$upr))) {
+      if (discrete) {
+        p <- p + ggplot2::geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.15)
+      } else {
+        p <- p + geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.25)
+      }
+    }
 
     p
   })
@@ -392,6 +452,76 @@ plot_marginal_effects <- function(x,
 
   lapply(gg_list, print)
   invisible(gg_list)
+}
+
+
+# Recover the state/abundance formula without depending on coefficient names
+# or unmarked's private formula helpers. Older fits retain a double formula;
+# newer classes may retain named component formulas in a formlist slot.
+.msr_unmarked_marginal_formula <- function(mod, type) {
+  slots <- methods::slotNames(mod)
+  if ("formlist" %in% slots && inherits(mod@formlist[[type]], "formula")) {
+    return(mod@formlist[[type]])
+  }
+  if ("formula" %in% slots && inherits(mod@formula, "formula")) {
+    f <- mod@formula
+    if (length(f) == 3L) {
+      return(stats::as.formula(call("~", f[[3]]), env = environment(f)))
+    }
+    if (length(f) == 2L) return(f)
+  }
+  stop("Could not recover the '", type, "' formula for this unmarked model.",
+       call. = FALSE)
+}
+
+
+# Formula variables are data columns; factor contrasts are coefficient names.
+# Grouping variables describe random effects, and offset-only variables need
+# prediction defaults but do not describe a separate effect to plot.
+.msr_marginal_variables <- function(expr, offsets) {
+  if (!is.call(expr)) return(all.vars(expr))
+  fun <- as.character(expr[[1]])[1]
+  if (fun %in% c("|", "||") || (!offsets && fun == "offset")) {
+    return(character())
+  }
+  unique(unlist(lapply(as.list(expr)[-1], .msr_marginal_variables,
+                       offsets = offsets), use.names = FALSE))
+}
+
+
+# Preserve explicit contrasts when native data-frame prediction drops them.
+# Restrict the fallback to models whose state is a single linked estimate;
+# derived-state predictions (for example ZIP abundance) need their own method.
+.msr_unmarked_contrast_prediction <- function(mod, component, newdata, type) {
+  supported <- identical(class(mod)[1], "unmarkedFitOccu") ||
+    (identical(class(mod)[1], "unmarkedFitPCount") && mod@mixture %in% c("P", "NB"))
+  if (!supported) {
+    stop("Explicit nondefault factor contrasts cannot safely be predicted for ",
+         "this unmarked class by plot_marginal_effects(). Use its fitted design ",
+         "matrix and class-specific prediction method.", call. = FALSE)
+  }
+  terms <- stats::terms(component)
+  random <- which(grepl("|", attr(terms, "term.labels"), fixed = TRUE))
+  if (length(random)) terms <- stats::drop.terms(terms, random, keep.response = FALSE)
+  frame <- stats::model.frame(terms, newdata, na.action = stats::na.pass)
+  X <- stats::model.matrix(terms, frame)
+  offset <- stats::model.offset(frame)
+  coefficient_names <- names(unmarked::coef(mod, type = type, altNames = FALSE))
+  if (!identical(sub("^\\(Intercept\\)$", "Int", colnames(X)), coefficient_names)) {
+    stop("The prediction design does not match the fitted unmarked coefficients.",
+         call. = FALSE)
+  }
+  # One row at a time avoids constructing a dense covariance matrix over the
+  # whole plotting grid. Confidence bounds retain the fitted link function.
+  rows <- lapply(seq_len(nrow(X)), function(i) {
+    lc <- unmarked::linearComb(mod, X[i, , drop = FALSE], type = type,
+      offset = if (is.null(offset)) NULL else offset[i], re.form = NA)
+    prediction <- unmarked::backTransform(lc)
+    ci <- unmarked::confint(prediction, level = 0.95)
+    data.frame(Predicted = as.numeric(unmarked::coef(prediction)),
+      SE = as.numeric(unmarked::SE(prediction)), lower = ci[1], upper = ci[2])
+  })
+  do.call(rbind, rows)
 }
 
 
