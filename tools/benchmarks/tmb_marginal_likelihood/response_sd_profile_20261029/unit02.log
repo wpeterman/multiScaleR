@@ -1,0 +1,15 @@
+factorized-sd-profile: 1...........................
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Error ('test-factorized-sd-profile.R:35:5'): response SD traces retain exa
+Error: No method asJSON S3 class: msr_response_sd_profile
+Backtrace:
+    ▆
+ 1. └─jsonlite::write_json(...) at test-factorized-sd-profile.R:35:5
+ 2.   └─jsonlite::toJSON(x, ...)
+ 3.     ├─jsonlite:::asJSON(...)
+ 4.     └─jsonlite:::asJSON(...)
+ 5.       └─jsonlite (local) .local(x, ...)
+ 6.         └─jsonlite:::stop("No method asJSON S3 class: ", class(x))
+
+══ DONE ════════════════════════════════════════════════════════════════════════

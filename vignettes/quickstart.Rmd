@@ -54,6 +54,8 @@ with a standard error and confidence interval, returned alongside the familiar
 regression coefficients.
 
 This guide walks through a minimal working example to get you up and running.
+For a comparison of inferential targets and prediction uncertainty, see
+`vignette("inference-contracts", package = "multiScaleR")`.
 For conceptual background, full model-selection workflows, alternative kernel
 functions, and integration with `unmarked`, see
 `vignette("multiScaleR_Guide", package = "multiScaleR")`. For guidance on
@@ -66,6 +68,11 @@ Shannon diversity, see
 ---
 
 # Installation
+
+For stacked annual observations and partially pooled landscape scales, see
+`vignette("bayesian-scales", package = "multiScaleR")`. It includes optional
+sampling-software checks and actual fitted posterior results. The workflow
+below introduces the existing likelihood-based scale optimization.
 
 ```{r install, eval = FALSE}
 install.packages("multiScaleR")

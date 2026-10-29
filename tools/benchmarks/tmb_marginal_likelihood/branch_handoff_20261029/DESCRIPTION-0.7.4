@@ -1,0 +1,60 @@
+Package: multiScaleR
+Type: Package
+Title: Methods for Optimizing Scales of Effect
+Version: 0.7.4
+Description: A tool for optimizing scales of effect when modeling ecological processes in space. Specifically, the scale parameter of a distance-weighted kernel distribution is identified for all environmental layers included in the model. Includes functions to assist in model selection, model evaluation, efficient transformation of raster surfaces using fast Fourier transformation, and projecting models. For more details see Peterman (2026) <doi:10.1007/s10980-025-02267-x>.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    Rcpp,
+    Matrix,
+    cowplot,
+    dplyr,
+    fields,
+    ggplot2,
+    insight,
+    stats,
+    utils,
+    unmarked,
+    exactextractr,
+    crayon,
+    parallel,
+    optimParallel,
+    AICcmodavg,
+    methods,
+    pscl
+LinkingTo: 
+    Rcpp,
+    RcppArmadillo
+Depends: 
+    R (>= 4.3),
+    terra,
+    sf
+Suggests:
+    glmmTMB,
+    TMB,
+    RTMB (>= 2.0),
+    tmbstan (>= 1.2.1),
+    rstan,
+    posterior (>= 1.6.0),
+    knitr,
+    landscapemetrics,
+    geodiv,
+    rmarkdown,
+    MASS,
+    nlme,
+    pkgload,
+    survival,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+URL: https://github.com/wpeterman/multiScaleR
+BugReports: https://github.com/wpeterman/multiScaleR/issues
+BuildVignettes: true
+VignetteBuilder: knitr
+Authors@R: 
+    person("Bill", "Peterman", , "Peterman.73@osu.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-5229-9268"))
+Author: Bill Peterman [aut, cre] (<https://orcid.org/0000-0001-5229-9268>)
+Maintainer: Bill Peterman <Peterman.73@osu.edu>
+Config/roxygen2/version: 8.0.0

@@ -1,0 +1,14 @@
+{
+  "time": "2026-10-28T14:44:35.052996-04:00",
+  "checked_shared_files": 273,
+  "live_missing": [],
+  "live_changed": [],
+  "frozen_engine_changed": [],
+  "critical_identity": true,
+  "live_source_covered_by_reused_check": true,
+  "original_baseline_failure_retained": true,
+  "archive_byte_identity_claim": false,
+  "mathematical_gates": true,
+  "full_check": true,
+  "all_pilots_source_unchanged": true
+}

@@ -1,0 +1,60 @@
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/ci_func_cpp.cpp:
+   NumericMatrix ci_func_cpp(NumericMatrix x, int df, Nullable<double> min_D = R_NilValue, Nullable<CharacterVector> names = R_NilValue)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/kernel_derivatives.cpp:
+   Rcpp::LogicalVector msr_kernel_validate_cpp(Rcpp::NumericMatrix v, Rcpp::NumericMatrix c, Rcpp::IntegerVector rows)
+   Rcpp::List msr_kernel_eval_cpp(Rcpp::List V, Rcpp::List C, Rcpp::NumericVector distance, Rcpp::NumericVector log_scale, Rcpp::NumericVector log_shape, int kernel, bool standardize)
+   Rcpp::List msr_kernel_stream_cpp(Rcpp::List V, Rcpp::List C, Rcpp::NumericVector distance, Rcpp::NumericVector log_scale, Rcpp::NumericVector log_shape, int kernel, bool standardize)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/landscape_metrics_cpp.cpp:
+   NumericVector landscape_composition_metric_cpp(NumericVector d, NumericMatrix values, double radius, std::string metric, Nullable<NumericVector> weights_, double base, Nullable<double> resolution_, Nullable<double> classes_max_, Nullable<double> focal_class_)
+   NumericVector landscape_edge_metric_cpp(NumericVector d, NumericMatrix values, NumericVector cells, double radius, double resolution, int n_cols, std::string metric)
+   NumericVector landscape_adjacency_metric_cpp(NumericVector d, NumericMatrix values, NumericVector cells, double radius, int n_cols, std::string metric, double base, Nullable<double> focal_class_)
+   List msr_adjacency_prepare_cpp(NumericVector d, NumericVector values, NumericVector cells, int n_cols)
+   NumericVector msr_adjacency_eval_cpp(List prepared, NumericVector radii, CharacterVector metrics, NumericVector bases, NumericVector focals)
+   List msr_adjacency_events_prepare_cpp(List p)
+   NumericVector msr_adjacency_events_eval_cpp(List p, NumericVector radii, CharacterVector metrics, NumericVector bases, NumericVector focals)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/scale_type_cpp.cpp:
+   NumericVector scale_type_cpp(NumericVector d, std::string kernel = "gaussian", Nullable<NumericVector> sigma_ = R_NilValue, Nullable<NumericVector> shape_ = R_NilValue, Nullable<NumericMatrix> r_stack_df = R_NilValue, Nullable<int> output = R_NilValue)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/scale_type_sparse.cpp:
+   NumericVector scale_type_sparse(NumericVector d, std::string kernel = "gaussian", Nullable<NumericVector> sigma_ = R_NilValue, Nullable<NumericVector> shape_ = R_NilValue, Nullable<RObject> r_stack_df = R_NilValue, Nullable<std::string> output = R_NilValue)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/surface_metrics_cpp.cpp:
+   NumericMatrix surface_sa_focal_cpp(NumericMatrix values, NumericMatrix kernel)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/surface_sq_derivative.cpp:
+   NumericMatrix msr_surface_sq_derivative_cpp(List buffers, double sigma, std::string kernel)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/surface_sq_prefix.cpp:
+   NumericVector msr_surface_sq_prefix_cpp(NumericVector value)
+
+Exports from C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/surface_weighted_sq.cpp:
+   NumericVector msr_surface_weighted_sq_cpp(NumericVector d, NumericMatrix values, double sigma, double shape, std::string kernel)
+
+C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/src/RcppExports.cpp updated.
+C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR/R/RcppExports.R updated.
+── R CMD INSTALL ───────────────────────────────────────────────────────────────
+* installing *source* package 'multiScaleR' ...
+** this is package 'multiScaleR' version '0.7.5'
+** using staged installation
+** libs
+specified C++17
+using C compiler: 'gcc.exe (GCC) 14.2.0'
+using C++ compiler: 'G__~1.EXE (GCC) 14.2.0'
+using C++17
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c RcppExports.cpp -o RcppExports.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c ci_func_cpp.cpp -o ci_func_cpp.o
+gcc  -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"      -O2 -Wall -std=gnu2x -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0 -c init.c -o init.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c kernel_derivatives.cpp -o kernel_derivatives.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c landscape_metrics_cpp.cpp -o landscape_metrics_cpp.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c scale_type_cpp.cpp -o scale_type_cpp.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c scale_type_sparse.cpp -o scale_type_sparse.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c surface_metrics_cpp.cpp -o surface_metrics_cpp.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c surface_sq_derivative.cpp -o surface_sq_derivative.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c surface_sq_prefix.cpp -o surface_sq_prefix.o
+g++  -std=gnu++17 -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -include multiScaleR_Rcpp_compat.h -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c surface_weighted_sq.cpp -o surface_weighted_sq.o
+g++ -shared -static-libgcc -o multiScaleR.dll tmp.def RcppExports.o ci_func_cpp.o init.o kernel_derivatives.o landscape_metrics_cpp.o scale_type_cpp.o scale_type_sparse.o surface_metrics_cpp.o surface_sq_derivative.o surface_sq_prefix.o surface_weighted_sq.o -fopenmp -LC:/PROGRA~1/R/R-46~1.1/bin/x64 -lRlapack -LC:/PROGRA~1/R/R-46~1.1/bin/x64 -lRblas -lgfortran -lquadmath -LC:/rtools45/x86_64-w64-mingw32.static.posix/lib/x64 -LC:/rtools45/x86_64-w64-mingw32.static.posix/lib -LC:/PROGRA~1/R/R-46~1.1/bin/x64 -lR
+installing to C:/Users/peterman.73/AppData/Local/Temp/RtmpkhwwWd/devtools_install_114c4437354/00LOCK-multiScaleR/00new/multiScaleR/libs/x64
+* DONE (multiScaleR)

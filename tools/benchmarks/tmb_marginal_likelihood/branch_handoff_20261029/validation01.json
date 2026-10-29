@@ -1,0 +1,13 @@
+{
+  "workspace": "C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn",
+  "NOT_CRAN": true,
+  "tests_complete": true,
+  "check_status_OK": true,
+  "passed": true,
+  "timing_comparison_eligible": false,
+  "tests_from_exact_archive": true,
+  "check_phase": "check02",
+  "RAM_reserve_bytes": 4294967296,
+  "concurrency_exception": true,
+  "completed_at": "2026-10-29T10:33:49.0451462-04:00"
+}

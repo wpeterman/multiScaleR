@@ -5,6 +5,18 @@ ci_func_cpp <- function(x, df, min_D = NULL, names = NULL) {
     .Call(`_multiScaleR_ci_func_cpp`, x, df, min_D, names)
 }
 
+msr_kernel_validate_cpp <- function(v, c, rows) {
+    .Call(`_multiScaleR_msr_kernel_validate_cpp`, v, c, rows)
+}
+
+msr_kernel_eval_cpp <- function(V, C, distance, log_scale, log_shape, kernel, standardize) {
+    .Call(`_multiScaleR_msr_kernel_eval_cpp`, V, C, distance, log_scale, log_shape, kernel, standardize)
+}
+
+msr_kernel_stream_cpp <- function(V, C, distance, log_scale, log_shape, kernel, standardize) {
+    .Call(`_multiScaleR_msr_kernel_stream_cpp`, V, C, distance, log_scale, log_shape, kernel, standardize)
+}
+
 landscape_composition_metric_cpp <- function(d, values, radius, metric, weights_, base, resolution_, classes_max_, focal_class_) {
     .Call(`_multiScaleR_landscape_composition_metric_cpp`, d, values, radius, metric, weights_, base, resolution_, classes_max_, focal_class_)
 }
@@ -17,6 +29,22 @@ landscape_adjacency_metric_cpp <- function(d, values, cells, radius, n_cols, met
     .Call(`_multiScaleR_landscape_adjacency_metric_cpp`, d, values, cells, radius, n_cols, metric, base, focal_class_)
 }
 
+msr_adjacency_prepare_cpp <- function(d, values, cells, n_cols) {
+    .Call(`_multiScaleR_msr_adjacency_prepare_cpp`, d, values, cells, n_cols)
+}
+
+msr_adjacency_eval_cpp <- function(prepared, radii, metrics, bases, focals) {
+    .Call(`_multiScaleR_msr_adjacency_eval_cpp`, prepared, radii, metrics, bases, focals)
+}
+
+msr_adjacency_events_prepare_cpp <- function(p) {
+    .Call(`_multiScaleR_msr_adjacency_events_prepare_cpp`, p)
+}
+
+msr_adjacency_events_eval_cpp <- function(p, radii, metrics, bases, focals) {
+    .Call(`_multiScaleR_msr_adjacency_events_eval_cpp`, p, radii, metrics, bases, focals)
+}
+
 scale_type_cpp <- function(d, kernel = "gaussian", sigma_ = NULL, shape_ = NULL, r_stack_df = NULL, output = NULL) {
     .Call(`_multiScaleR_scale_type_cpp`, d, kernel, sigma_, shape_, r_stack_df, output)
 }
@@ -27,5 +55,17 @@ scale_type_sparse <- function(d, kernel = "gaussian", sigma_ = NULL, shape_ = NU
 
 surface_sa_focal_cpp <- function(values, kernel) {
     .Call(`_multiScaleR_surface_sa_focal_cpp`, values, kernel)
+}
+
+msr_surface_sq_derivative_cpp <- function(buffers, sigma, kernel) {
+    .Call(`_multiScaleR_msr_surface_sq_derivative_cpp`, buffers, sigma, kernel)
+}
+
+msr_surface_sq_prefix_cpp <- function(value) {
+    .Call(`_multiScaleR_msr_surface_sq_prefix_cpp`, value)
+}
+
+msr_surface_weighted_sq_cpp <- function(d, values, sigma, shape, kernel) {
+    .Call(`_multiScaleR_msr_surface_weighted_sq_cpp`, d, values, sigma, shape, kernel)
 }
 

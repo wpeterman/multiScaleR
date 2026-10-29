@@ -1,0 +1,7 @@
+{
+  "ProcessId": 36448,
+  "ParentProcessId": 50796,
+  "CreationDate": "2026-10-29T10:04:42.439476-04:00",
+  "ExecutablePath": "C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rcmd.exe",
+  "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rcmd.exe\" check multiScaleR_0.7.5.tar.gz --as-cran --no-manual --no-tests"
+}

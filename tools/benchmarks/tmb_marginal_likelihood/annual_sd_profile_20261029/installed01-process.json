@@ -1,0 +1,7 @@
+{
+  "ProcessId": 43648,
+  "ParentProcessId": 70984,
+  "CreationDate": "2026-10-29T03:05:56.946391-04:00",
+  "ExecutablePath": "C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rterm.exe",
+  "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rterm.exe\" --vanilla --no-echo --no-save --no-restore -f testthat.R"
+}

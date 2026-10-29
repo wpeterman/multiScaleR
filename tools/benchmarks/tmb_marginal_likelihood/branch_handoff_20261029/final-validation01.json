@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "branch": "inference-dev",
+  "version": "0.7.5",
+  "source_files": 323,
+  "package_source_staged_tree": "8b44cf050d88f57ac82f03c8e8be93256104ad59",
+  "package_source_unchanged_after_stage": true,
+  "archive_matched_sources": 287,
+  "archive_SHA256": "c9fae7d5263960c490e32e5056028098fcf51f8ae1f19ff0849303f5c5b499a4",
+  "exact_archive_tests_unchanged": true,
+  "check_status_OK": true,
+  "installed_tests": {
+    "failures": 0,
+    "warnings": 12,
+    "skips": 10,
+    "passed": 5560
+  },
+  "frozen_evidence_git_blobs_verified": 727,
+  "resource_samples": 62,
+  "frozen_manifests_git_blobs_verified": 9,
+  "maximum_owned_interpreters": 3,
+  "maximum_actual_interpreters": 4,
+  "maximum_foreign_interpreters": 1,
+  "minimum_RAM_GiB": 13.422798156738281,
+  "minimum_disk_GiB": 65.12076568603516,
+  "user_concurrency_exception": true,
+  "timing_comparison_eligible": false,
+  "retained_failed_attempt": {
+    "passed": false,
+    "classification": "operational resource stop, no package error reported before stop",
+    "free_RAM_GiB": 6.304828643798828,
+    "old_morning_reserve_GiB": 8,
+    "retry_reserve_GiB": 4,
+    "authority": "Human explicitly permits additional R despite foreign work and low memory. The 8 GiB floor was an agent precaution, not a scientific or user gate. Retry uses 4 GiB floor; all numerical/statistical gates unchanged.",
+    "owned_R_remaining_after_stop": false,
+    "foreign_RStudio_untouched": true,
+    "inventory_race": "One check child appeared between snapshots and was temporarily classified foreign; it exited with the stopped check. Controller now classifies descendants within the same snapshot and verifies owned identities before stopping."
+  },
+  "whitespace_review": "Nine inherited source EOF blanks retained; frozen -text CRLF evidence retained byte-exact. Large local verbose whitespace output is not staged."
+}

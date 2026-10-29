@@ -1,0 +1,18 @@
+adapter: ...1....2..................................
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-adapter.R:8:5'): spatial reference inputs match both exact 
+Expected `case$truth` to equal `old$comparison$truth`.
+Differences:
+`names(actual)` is a character vector ('1', '2', '3', '4', '5', ...)
+`names(expected)` is absent
+
+
+── 2. Failure ('test-adapter.R:8:5'): spatial reference inputs match both exact 
+Expected `case$truth` to equal `old$comparison$truth`.
+Differences:
+`names(actual)` is a character vector ('1', '2', '3', '4', '5', ...)
+`names(expected)` is absent
+
+
+══ DONE ════════════════════════════════════════════════════════════════════════

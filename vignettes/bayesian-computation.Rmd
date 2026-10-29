@@ -1,0 +1,462 @@
+---
+title: "Bayesian Computation and Diagnostics"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Bayesian Computation and Diagnostics}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5,
+  fig.height = 4.25)
+```
+
+Start with `vignette("bayesian-scales", package = "multiScaleR")` for annual
+data preparation, full NUTS sampling and scientific interpretation. This guide
+explains the alternative computations, what their diagnostics establish and
+how to assess numerical precision. They use the same posterior target when
+the likelihood, priors, formulas and prepared bins are held fixed.
+
+## Use the worked example
+
+The data are the five-year NB2 example from the annual-scale guide. Loading
+the stored numeric inputs and compact NUTS fit requires no optional Bayesian
+software. The long approximation calls below are shown rather than executed
+while building the package.
+
+```{r example-data}
+example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
+  package = "multiScaleR"))
+dat <- example$data
+inputs <- example$inputs
+response <- count ~ habitat + factor(year) + (1 | site)
+scales <- list(habitat = ~1 + (1 | year))
+fit <- example$fits$pooled
+```
+
+For uncorrected approximations, check RTMB with
+`check_bayes_setup("laplace")`. Importance correction also needs posterior:
+
+```{r approximation-setup}
+check_bayes_setup("marginal", correction = "importance")
+```
+
+`ready` describes package availability, not optimizer convergence, posterior
+accuracy or available memory. Full NUTS is more general than the current
+single-scale-SD marginal interface, but also needs its own raw and derived
+diagnostics. Priors and data support must be assessed under every computation.
+
+## Explore a joint Laplace approximation
+
+Set `method = "laplace"` to replace MCMC with a Gaussian approximation around
+a posterior mode. This option uses the same likelihood, priors, scale formulas,
+and fixed predictor standardization as sampling. It requires RTMB, but does not
+require tmbstan, rstan, or posterior.
+
+```{r laplace-fit, eval=FALSE}
+fast_fit <- multiScale_bayes(
+  response, inputs, dat, scales = scales, row_id = "site_year",
+  family = "nbinom2", priors = fit$specification$priors,
+  method = "laplace", laplace_draws = 2000, seed = 527001
+)
+summary(fast_fit)$diagnostics
+posterior_scales(fast_fit)
+summary(fast_fit)$group_sd$log_scale_group_sd
+```
+
+The approximation covers response coefficients, latent year and site effects,
+log group SDs, and dispersion jointly. Its covariance is the inverse Hessian,
+the matrix of second derivatives of the negative log posterior at the mode.
+Complete correlated draws are transformed through the original scale formulas.
+Pooling SDs retain uncertainty. This is a joint local approximation, rather
+than a nested method that integrates out random effects.
+
+The default uses six dispersed deterministic starts. `control = list(starts =
+10, iter.max = 1500)` spends more effort searching for a stationary mode.
+`laplace_draws` controls summary simulation error; increasing it cannot correct
+an inaccurate Gaussian approximation. A supplied seed preserves your previous
+random-number state. The sampling settings `chains`, `iter`, and `warmup` are
+unused for this method.
+
+**How to read the diagnostics:** `gradient_max` measures stationarity and must
+not exceed 0.0001. `min_eigenvalue` must be positive and `condition_number` no
+greater than one trillion for the covariance to be accepted. The function
+reports an error instead of adjusting invalid curvature. `successful_starts`
+counts converged stationary solutions. `competing_modes` flags distinct
+solutions within two log-posterior units of the selected mode and causes a
+warning. The starts are retained in `fast_fit$laplace$starts` for inspection.
+
+These are numerical checks. A passed flag does not establish interval
+calibration or accurate partial pooling. The approximation operates in
+unconstrained, noncentered coordinates, including the log-SD Jacobians in the
+prior. Its accuracy depends on that parameterization. Dependence between year
+effects and their SD, skewness, and weak scale information can make a local
+Gaussian misleading. Compare consequential annual-scale and pooling results
+with full sampling, especially with few years or weak habitat effects. No
+finite set of optimization starts guarantees that all posterior modes were
+found.
+
+## Integrate uncertainty in the between-year SD
+
+The joint Gaussian approximation can misrepresent pooling even when its
+optimizer converges. Use `method = "marginal"` to integrate one scale-group
+SD numerically while fitting a conditional Laplace approximation for the other
+parameters at each SD value. This allows an asymmetric SD posterior with mass
+near zero. The likelihood and priors remain the same as for full sampling.
+
+```{r marginal-fit, eval=FALSE}
+marginal_fit <- multiScale_bayes(
+  response, inputs, dat, scales = scales, row_id = "site_year",
+  family = "nbinom2", priors = fit$specification$priors,
+  method = "marginal", laplace_draws = 2000, seed = 527002
+)
+summary(marginal_fit)$diagnostics
+summary(marginal_fit)$group_sd$log_scale_group_sd
+posterior_scales(marginal_fit)
+```
+
+At a fixed SD, the inverse conditional Hessian describes uncertainty in the
+response effects, scale effects, and latent effects. Its determinant supplies
+the conditional posterior volume needed when comparing different SD values.
+Integration uses the half-normal prior's cumulative probability as its axis;
+the change of coordinates removes the corresponding log-SD prior density
+from the integrand so that the prior is counted exactly once. The method
+then combines the conditional distributions with their integration weights.
+SD draws are continuous, with conditional dependence retained through a
+mixture of the neighboring integration configurations.
+
+**How to read the diagnostics:** `grid_converged` checks whether refining
+the integration grid changes the SD distribution appreciably. `refinement`
+records changes in the CDF, central 95% interval and median, and log normalizing
+constant. `competing_mass` is the approximate node probability associated with
+discovered competing conditional modes; values above 0.01 fail the numerical
+screen. `upper_tail_mass` checks that numerical integration has not accumulated
+more than 0.001 posterior mass beyond prior cumulative probability 0.9999.
+A failed conditional optimization causes an error instead of dropping its
+integration point. Inspect all flags before interpreting the approximate draws.
+
+The default refines grids up to 129 ordinary points, with additional points
+in the upper prior tail. Set `control = list(max_grid = 257)` for a more
+demanding integration check. Increasing `laplace_draws` only reduces simulation
+error in the summaries. It cannot fix an inaccurate conditional Gaussian.
+
+This implementation integrates exactly one scale-group SD, such as the
+between-year SD in `~1 + (1 | year)`. Any response-site SD remains in the
+conditional Gaussian approximation. Multiple scale-group SDs are not yet
+supported by this method. It implements single-SD conditional Laplace integration. Numerical grid convergence does not
+establish calibration, particularly with weak effects or multiple posterior
+modes. Compare important results with NUTS.
+
+## Correct conditional skewness with importance sampling
+
+The SD grid can be accurate while conditional Gaussian annual intervals remain
+too narrow. An experimental correction uses the marginal approximation to
+propose parameter vectors, then weights each vector by the full posterior
+density divided by its actual proposal density. It targets the same posterior
+as NUTS. It does not multiply intervals by a fitted coverage adjustment.
+
+```{r marginal-importance, eval=FALSE}
+corrected_fit <- multiScale_bayes(
+  response, inputs, dat, scales = scales, row_id = "site_year",
+  family = "nbinom2", priors = fit$specification$priors,
+  method = "marginal", laplace_draws = 2000, seed = 527003,
+  control = list(correction = "importance", conditional_beta = FALSE,
+    nested_response = TRUE, importance_df = 5,
+    importance_min = 65536, importance_max = 131072,
+    importance_refinements = 2)
+)
+corrected_fit$diagnostics
+corrected_fit$importance$history
+corrected_fit$importance$proposal_diagnostics
+posterior_scales(corrected_fit, estimator = "weighted")
+```
+
+With response
+random intercepts, correction defaults to nested response-effect integration.
+This accounts for their conditional posterior volume when locating the other
+parameters. With one response grouping term, the site-effect proposal is also
+updated at every candidate's response SD. This avoids extending one Gaussian
+description across all possible strengths of site variation.
+
+A separate 16384-candidate pilot learns conditional proposal means and
+covariances. It is discarded from final estimation. Production sampling mixes
+the adapted proposal with the original heavy-tailed proposal, then evaluates
+the unchanged joint posterior. The code retains 2000 resampled vectors by
+default so that existing summary, prediction, and simulation methods work.
+Those resamples share a finite weighted population. Their count is not an
+effective sample size, and increasing `laplace_draws` cannot repair poor weights.
+
+The proposal mixes Student t coordinates that can explore individually with a
+multivariate Student t component that can explore jointly. A small uniform
+component preserves support over the SD's prior-CDF axis, and a log-SD tail
+proposal extends beyond the finite-precision inverse-CDF endpoint. Both
+components are included in the importance density and do not change the prior.
+The conditional proposal uses seven degrees of freedom by default.
+`importance_df = 5` gives it heavier tails, which can cover posterior regions
+that produce unstable ratios with the default proposal. The same exact
+importance correction and diagnostic thresholds apply. This is an efficiency
+choice: heavier tails can improve reliability but can also spend more
+candidates in regions with little posterior mass. Check all diagnostics and
+compare independent seeds before relying on the resulting intervals.
+For difficult joint scale and response-coefficient geometry, an experimental
+alternative is `conditional_beta = TRUE`. It draws response coefficients
+conditional on each proposed set of scales and response random effects. For
+Gaussian responses this conditional is exact. The other families use a local
+Student t proposal; full importance ratios still target the same posterior.
+A defensive component samples latent-scale parameters from the existing model
+priors. This improves support without changing those priors.
+
+```{r conditional-coefficient-control, eval=FALSE}
+conditional_control <- list(
+  correction = "importance", conditional_beta = TRUE, importance_df = 5,
+  importance_min = 65536, importance_max = 131072,
+  importance_refinements = 2
+)
+```
+
+This mode uses the full joint grid and automatically selects
+`nested_response = FALSE` unless specified. An explicit `TRUE` conflicts with
+conditional coefficients. It can cost substantially more per candidate; use
+NUTS when consequential tail probabilities remain unstable across runs.
+Passing a minimum indicator ESS of 400 is a numerical screen, not a guarantee
+of precise 2.5% or 97.5% endpoints. At probability 0.025, an indicator ESS of
+400 corresponds to a CDF Monte Carlo SE of about 0.0078 under its variance
+approximation. Missed regions can make even that estimate optimistic.
+By default, one
+failed production stage can train a further proposal; it is then discarded and
+a fresh stage is sampled. `importance_refinements = 0` disables that extra
+training, while 2 permits another stage. `importance_max` caps the final stage,
+so total candidate evaluations can exceed that setting. Check
+`production_candidates` when assessing cost.
+
+**How to read these diagnostics:** `pareto_k` measures how extreme importance
+ratios become; values above 0.7 fail the screen. `ess` must be at least 1000,
+and `min_tail_ess` at least 400. A single candidate may hold at most 0.01 of the
+total weight. `split_cdf_error` compares probability estimates from two
+production halves and must be at most 0.05. `history` shows whether additional
+candidates improved these checks. The original grid and mode flags remain in
+`proposal_diagnostics`; they describe the proposal, while the new checks
+describe the corrected estimate. Neither set proves that an unseen mode has
+been found. Compare important or failed results with full NUTS.
+
+Correction costs more than uncorrected marginal Laplace. It can be worthwhile
+when conditional skewness matters and a stable proposal gives enough effective
+samples quickly. Repeated-site models and weakly identified scales can still
+be difficult. More than one response grouping term uses a joint proposal whose
+reliability needs separate validation. The default `correction = "none"`
+preserves the original marginal behavior.
+
+## Compare actual computations of the worked example
+
+These are the first attempts from the three calls above, with the complete
+priors from the original NUTS fit. The package stores only their summary
+tables and diagnostics, so this comparison needs no sampler or RTMB.
+
+```{r actual-computation-status}
+comparison <- readRDS(system.file("extdata", "bayesian-computation-example.rds",
+  package = "multiScaleR"))
+knitr::kable(comparison$availability, digits = 2, row.names = FALSE)
+```
+
+`eligible` means the method passed its own stored numerical screen.
+In these tables, `nested` labels the corrected marginal fit with the nested
+response proposal; its function argument remains `method = "marginal"`.
+Uncorrected marginal Laplace is retained as `rejected` because its SD grid
+did not converge under the stated budget. Its intervals below illustrate
+that failure; they are not accepted estimates. The timings describe these
+particular computations on a shared computer, with different numerical
+precision. They are not a benchmark of equal-precision methods.
+The original NUTS fit recorded
+`r round(example$fit_info$seconds[example$fit_info$model == "Hierarchical"], 1)`
+seconds, so this example shows no elapsed-time advantage for correction.
+
+```{r actual-annual-comparison, fig.height=5.5}
+annual <- subset(comparison$quantiles, type == "annual_log_scale")
+annual$method <- factor(annual$method,
+  levels = c("nuts", "laplace", "marginal", "nested"),
+  labels = c("NUTS reference", "Joint Laplace", "Marginal (rejected)",
+    "Corrected marginal"))
+ggplot2::ggplot(annual, ggplot2::aes(x = label, y = median,
+    ymin = lower, ymax = upper, color = method, shape = method)) +
+  ggplot2::geom_pointrange(position = ggplot2::position_dodge(width = .6)) +
+  ggplot2::scale_color_brewer(palette = "Dark2") +
+  ggplot2::labs(x = "Year", y = "Annual log distance: median and 95% interval",
+    color = "Computation", shape = "Computation") +
+  ggplot2::theme_bw() +
+  ggplot2::theme(legend.position = "bottom") +
+  ggplot2::guides(color = ggplot2::guide_legend(nrow = 2, byrow = TRUE))
+```
+
+The annual axis uses natural log distance. Exponentiating an estimate returns
+map units. Joint Laplace places the annual medians higher than NUTS despite
+passing its optimizer and curvature checks. Corrected marginal medians are
+closer to the NUTS reference, although lower endpoints still differ. Both
+computations have finite numerical precision, and this one example cannot
+establish interval calibration.
+
+```{r actual-sd-comparison}
+sd_table <- subset(comparison$quantiles, type == "scale_sd",
+  select = c(method, status, lower, median, upper))
+knitr::kable(sd_table, digits = 3, row.names = FALSE,
+  caption = "Between-year SD on the log-distance axis: marginal 95% intervals.")
+```
+
+The NUTS median SD is about 0.235; joint Laplace gives about 0.619 and the
+corrected calculation about 0.230. The rejected marginal calculation gives
+about 0.085. Integrating one SD does not automatically improve its estimate
+when the remaining conditional approximation or integration is inadequate.
+A positive lower interval limit does not test the exact hypothesis of no
+annual variation: the continuous half-normal prior has no point mass at zero.
+
+```{r actual-corrected-diagnostics}
+unlist(comparison$diagnostics$nested[c("pareto_k", "ess", "min_tail_ess",
+  "max_weight", "split_cdf_error")])
+```
+
+Read these against the fixed cutoffs above. The compact NUTS reference retains
+2000 draw vectors from an original 12000 post-warmup draws; its original raw
+and derived checks were assessed before compaction. These compact vectors
+cannot reproduce chain-order diagnostics. The approximation SD table uses
+direct importance weights for the corrected method and simulated quantiles
+for the two uncorrected methods.
+
+### Evidence beyond one example
+
+On all 40 archived repeated-site simulation inputs, the nested response
+proposal passed the unchanged importance checks for 19 of 20 Gaussian and
+20 of 20 NB2 datasets. The conditional-coefficient alternative passed for
+10 of 20 and 13 of 20, respectively. Original NUTS passed for 20 of 20 and
+18 of 20. The remaining nested rejection had minimum indicator ESS 389,
+below the required 400, and remains a rejection.
+
+For the 19 Gaussian and 18 NB2 datasets where both nested correction and
+NUTS passed, annual log-scale RMSE ratios were 0.999 and 1.002, and mean
+95% interval-width ratios were 0.995 and 0.998. These reused-input comparisons
+support this proposal choice for these tested models. They do not establish
+equivalence, independent calibration, or reliability for crossed response
+effects. Different eligibility sets must not be compared as if they contained
+the same datasets.
+
+## Separate posterior uncertainty from Monte Carlo uncertainty
+
+A credible interval describes posterior uncertainty about a scale. Monte Carlo
+uncertainty describes how accurately a finite computation estimates that
+posterior interval or median. Passing convergence or importance diagnostics
+does not guarantee a precise annual median. A flat posterior CDF near its
+median can turn a small probability error into a substantial distance change.
+
+For corrected fits, summarize the retained joint candidate population directly
+to avoid the additional variability of multinomial resampling:
+
+```{r weighted-scale-summary, eval=FALSE}
+posterior_scales(corrected_fit, estimator = "weighted")
+posterior_scales(corrected_fit, estimator = "weighted", scale = "log")
+```
+
+These summaries use the same posterior target and importance weights. They do
+not improve candidate effective sample size or recover an unseen posterior
+region. The weighted SD describes the finite weighted population. The earlier
+cautions about infinite arithmetic distance moments still apply. Weighted
+summaries require `draws = NULL`; the default estimator still uses stored
+draws for every inference method. The plot method's automatic
+estimator uses direct weights for corrected fits. To compare a table and
+plot consistently, request `estimator = "weighted"` in both.
+
+`importance_max` is a cap. A smaller population can pass diagnostics and stop
+before reaching it. To require more production candidates, set a minimum too:
+
+```{r importance-precision, eval=FALSE}
+precision_control <- list(
+  correction = "importance",
+  importance_min = 65536, importance_max = 131072,
+  importance_refinements = 2
+)
+# Pass precision_control to multiScale_bayes(..., method = "marginal", control = ...).
+```
+
+The default minimum is 16384; it must not exceed the maximum. Larger populations
+cost more and do not guarantee a chosen quantile error. Inspect the retained
+candidate count, diagnostics, and independently seeded results. When NUTS and
+correction disagree, check both computations: extend sampling, compare seeds,
+and assess mixing and quantile precision for the derived annual log scales.
+The current NUTS eligibility flag checks unconstrained parameters and sampler
+behavior; it does not certify annual-median Monte Carlo precision.
+
+You can also check a probability that answers a specific question, such as
+whether a fitted kernel scale is no greater than 250 map units:
+
+```{r probability-precision}
+probability_check <- diagnose_bayes_probabilities(fit,
+  thresholds = list(habitat = c(100, 250)), mcse_target = 0.005)
+probability_check$available
+probability_check$reason
+```
+
+This compact teaching fit has no original sampler, so it cannot provide new
+chain diagnostics. With the original NUTS sampler retained, `probabilities`
+reports each fitted group's event probability, indicator ESS, Rhat and MCSE;
+`chain_probabilities` shows differences among chains. The target of 0.005 is
+half a percentage point of Monte Carlo standard error, not a credible interval width.
+An indicator that stays at zero or one has nonestimable precision. It cannot
+certify that an unseen tail is absent. Read this report alongside the original
+diagnostics and `diagnose_bayes_scales()`; meeting an MCSE target does not replace
+their checks. Thresholds refer to the kernel scale parameter, rather than an
+automatically transformed radius containing a chosen share of kernel weight.
+
+Indicator Rhat can be undefined for a balanced binary event even when its mean
+ESS and MCSE are finite. The report keeps that Rhat as `NA`; `rhat_available`
+and `rhat_reason` describe its availability. `precision_available` concerns
+mean precision. A computable probability MCSE still requires the original
+sampling and derived-scale checks before interpretation.
+
+## Decision checklist
+
+1. Keep likelihoods, priors, data alignment and predictor standardization fixed
+   when comparing computations of the same posterior.
+2. Inspect every method's own checks. Do not treat importance ESS as MCMC ESS,
+   resampled draw counts as independent information, or a converged grid as
+   evidence of calibrated annual intervals.
+3. For NUTS, inspect `diagnose_bayes_scales()` using the original sampler.
+   Compact or permuted draws cannot reconstruct chain-order diagnostics.
+4. Compare annual quantiles and the pooling SD, including their numerical
+   precision. Independent seeds can reveal instability, but do not discard a
+   failed first attempt or claim that a favorable repeat establishes accuracy.
+5. Assess response-model adequacy and prior sensitivity separately. None of
+   these numerical checks establishes that a landscape scale is identified.
+
+## Quick reference
+
+```{r computation-reference, eval=FALSE}
+check_bayes_setup("marginal", correction = "importance")
+corrected_fit <- multiScale_bayes(response, inputs, dat,
+  scales = scales, row_id = "site_year", family = "nbinom2",
+  priors = list(scale_median = 250), method = "marginal", seed = 521,
+  control = list(correction = "importance"))
+corrected_fit$diagnostics             # weight and probability-stability checks
+corrected_fit$importance$history      # includes discarded training effort
+posterior_scales(corrected_fit, estimator = "weighted")
+plot(corrected_fit, estimator = "weighted")
+# A failed flag calls for investigation or another computation, not weaker cutoffs.
+```
+
+| Output | What it tells you |
+|---|---|
+| `fit$diagnostics` | Stored checks for the selected computation |
+| `diagnose_bayes_scales(fit)` | Derived NUTS mixing and quantile MCSE when full chains exist |
+| `diagnose_bayes_probabilities(fit, thresholds)` | Chain precision for specified fitted-scale probabilities |
+| `fit$importance$proposal_diagnostics` | Original marginal grid and mode checks, separate from corrected weights |
+| `fit$importance$history` | Production, adaptation and discarded-stage effort |
+| `posterior_scales()` | Annual or shared distance quantiles, with explicit draw/weight estimator |
+
+See also `vignette("bayesian-scales", package = "multiScaleR")` for the main
+workflow, `vignette("bayesian-prediction", package = "multiScaleR")` for new
+observations and years, and `vignette("quickstart", package = "multiScaleR")`
+for preparation. Prediction uses the stored joint vectors under every method,
+including stored resamples for an importance-corrected fit. It does not add
+posterior effective information or remove approximation error.

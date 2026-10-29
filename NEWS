@@ -1,3 +1,48 @@
+multiScaleR 0.7.5 (development)
+---------
+* Consolidate likelihood and Bayesian development on one branch, with shared
+  prediction contracts, probability precision diagnostics, private SD traces,
+  source checks and documentation while retaining target-specific uncertainty.
+* A private annual log-scale SD trace shares fixed-SD nuisance audits with the
+  response-SD trace, retains exact-zero and kernel-limit distinctions, and
+  supplies no global-fit eligibility, confidence cutoff or calibration claim.
+* A shared inference guide distinguishes posterior and likelihood targets,
+  prediction quantities, group policies, native conditioning and numerical
+  precision using the existing bundled example without refitting.
+* A private spatial source report checks explicit CRS, coordinate and row-ID
+  agreement and nominal buffer/extent alignment. Historical source/unit lineage
+  and actual kernel-weight coverage remain unverified; fitting is unchanged.
+* A private Gaussian response-group SD profile trace includes exact zero and
+  retains all nuisance starts, cold audits and same-SD limiting witnesses.
+  It supplies no interval cutoff, global accepted-fit interface or calibration claim.
+* Probability MCSE availability is separate from indicator Rhat availability.
+  Balanced binary events can retain finite mean MCSE and ESS when indicator
+  Rhat is undefined; the report keeps that Rhat unavailable with an explicit
+  reason. Original sampling and derived-scale diagnostic gates are unchanged.
+* `diagnose_bayes_probabilities()` reports chain-based probabilities and Monte
+  Carlo precision at requested fitted-scale thresholds. Constant indicators,
+  unavailable chains and failed diagnostics remain explicit; fit gates and
+  posterior targets are unchanged.
+* Prediction summaries and prepared snapshots describe their targets, included
+  effects, conditioning and uncertainty through shared prediction contracts.
+  Raw posterior draw outputs and native numerical predictions retain their
+  existing structure; metadata does not establish eligibility or calibration.
+* Marginal importance correction rechecks invalid AD target values with the
+  ordinary full posterior evaluator. Valid zero posterior density no longer
+  aborts solely from AD overflow. All candidates, unresolved-value failures,
+  and diagnostic thresholds are retained, with explicit recovery counts.
+* `predict_scales()` predicts scales at new covariates and groups, including
+  future years with uncertainty in the between-year SD. Repeated scale
+  combinations are summarized without a full draws-by-observations matrix.
+* Bayesian `predict()` and `simulate()` accept new observations and prepared
+  landscapes. Separate explicit policies handle unseen scale and response
+  effects, retaining shared effects within each predicted dataset.
+* New-data prediction reuses trained designs and predictor standardization.
+  Grouped-binomial simulation requires explicit future trial totals; unseen
+  fixed-factor coefficients remain unsupported.
+* A worked prediction vignette explains future landscape scenarios, new years
+  and sites, expected responses, observation intervals and joint totals.
+
 multiScaleR 0.7.4
 ---------
 * Marginal-effect plots for unmarked models recover predictor columns from

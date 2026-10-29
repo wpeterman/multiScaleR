@@ -1083,3 +1083,179 @@ test_that("landscape_var validates the class argument", {
   expect_true("class" %in% names(vars))
   expect_equal(vars$class, c(3, NA_real_))
 })
+
+test_that("mixed binned kernels skip exact evaluation and preserve metric mappings", {
+  forest <- landscape_test_raster(808, 0:1, name = "forest")
+  vars <- msr_vars(
+    kernel_a = kernel_var("forest"),
+    diversity = landscape_var("forest", "shdi"),
+    kernel_b = kernel_var("forest"),
+    fixed_ed = landscape_var("forest", "ed", radius = 60),
+    fixed_sq = surface_var("forest", "sq", radius = 70)
+  )
+  ki <- kernel_prep(landscape_test_points(forest), forest, max_D = 80,
+                    scale_vars = vars, verbose = FALSE)
+  covs <- c("kernel_a", "diversity", "kernel_b")
+  ctx <- list(binned = ki$binned, covs = covs, n_covs = 3,
+              scale_vars = ki$scale_vars, unit_conv = ki$unit_conv,
+              resolution = ki$resolution, n_cols = ki$n_cols)
+  for (kernel in c("gaussian", "exp", "expow")) {
+    par <- c(.25, .6, .8)
+    shape <- if (kernel == "expow") c(1.2, 1.7, 2.1) else NULL
+    for (target in list(covs, c("fixed_ed", "kernel_b", "diversity", "fixed_sq", "kernel_a"),
+                        c("diversity", "kernel_b"), "fixed_sq")) {
+      expected <- vapply(target, function(nm) {
+        j <- match(nm, covs)
+        if (nm %in% ki$binned$covariates) {
+          .msr_binned_kernel_means(ki$binned, nm, covs, par, shape, kernel)[, 1]
+        } else {
+          vapply(seq_along(ki$d_list), function(i) {
+            .msr_eval_scale_vars(ki$d_list[[i]], ki$raw_cov[[i]], ki$scale_vars,
+              if (is.na(j)) numeric() else par[j],
+              if (is.null(shape) || is.na(j)) NULL else shape[j], kernel,
+              ki$unit_conv, ki$resolution, ki$n_cols, nm, validate = FALSE)[[1]]
+          }, 0)
+        }
+      }, numeric(length(ki$d_list)))
+      actual <- .msr_kernel_cov_w(c(par, shape), ki$d_list, ki$raw_cov,
+                                 kernel, ctx, covariates = target)
+      expect_equal(unname(actual), unname(expected), tolerance = 1e-12)
+      subset_ctx <- ctx
+      subset_ctx$complete_idx <- c(4L, 2L)
+      subset <- .msr_kernel_cov_w(c(par, shape), ki$d_list, ki$raw_cov,
+                                 kernel, subset_ctx, covariates = target)
+      expect_equal(subset, actual[c(4, 2), , drop = FALSE], tolerance = 1e-12)
+    }
+  }
+  original <- .msr_eval_scale_vars
+  requested <- list()
+  testthat::local_mocked_bindings(.msr_eval_scale_vars = function(...) {
+    args <- list(...)
+    requested[[length(requested) + 1L]] <<- args$covariates
+    original(...)
+  }, .package = "multiScaleR")
+  .msr_kernel_cov_w(c(.25, .6, .8), ki$d_list, ki$raw_cov, "gaussian", ctx)
+  expect_length(requested, length(ki$d_list))
+  expect_true(all(vapply(requested, identical, TRUE, "diversity")))
+})
+test_that("prepared edge thresholds preserve radius and metric contracts", {
+  specs <- data.frame(covariate=c("edge","total","shape"),
+    source="landcover",type="landscape",metric=c("ed","te","lsi"),
+    optimize=c(TRUE,TRUE,FALSE),radius=c(NA,NA,800),base=exp(1),class=NA_real_)
+  cells <- c(6,1,2,3,5,7,9,10,11,12,15,16)
+  z <- c(3,1,2,2,1,NA,3,2,1,NA,3,1)
+  d <- c(.7,.1,.2,.2,.4,.5,.6,.7,.8,.8,.9,1)
+  x <- matrix(z,ncol=1,dimnames=list(NULL,"landcover"));attr(x,"cell")<-cells
+  p <- .msr_prepare_edge_neighbors(list(d),list(x),specs,20,4L)[[1]]
+  for(radius in c(.1,.2,.2000001,.4,.7,.8,1,1.1)) {
+    got <- .msr_eval_edge_neighbors(p,specs,specs$covariate,c(radius,radius),c("edge","total"),1000)
+    ref <- vapply(1:3,function(i)landscape_edge_metric_cpp(d,x,cells,
+      if(i==3).8 else radius,20,4L,specs$metric[i]),numeric(1))
+    expect_equal(unname(got),ref,tolerance=1e-12)
+  }
+  p2 <- unserialize(serialize(p,NULL))
+  expect_equal(.msr_eval_edge_neighbors(p2,specs,"total",.7,"total",1000),
+    .msr_eval_edge_neighbors(p,specs,"total",.7,"total",1000))
+  changed <- specs;changed$radius[3]<-900
+  expect_length(.msr_eval_edge_neighbors(p,changed,"shape",numeric(),character(),1000),0)
+  expect_null(.msr_prepare_edge_neighbors(list(d),list(x),specs,NA_real_,4L))
+  expect_null(.msr_prepare_edge_neighbors(NULL,list(x),specs,30,4L))
+  expect_null(.msr_prepare_edge_neighbors(list(d),list(x),specs,30,NULL))
+})
+
+test_that("edge preparation preserves model rows and optimization covariates", {
+  r <- landscape_test_raster(808,1:3)
+  ki <- kernel_prep(landscape_test_points(r),r,max_D=120,
+    scale_vars=msr_vars(e=landscape_var("landcover","ed"),
+                       t=landscape_var("landcover","te")),verbose=FALSE)
+  dat <- data.frame(y=c(1,0,1,0,1),ki$kernel_dat)
+  mod <- glm(y~e+t,data=dat)
+  ctx <- build_opt_context(mod,ki$raw_cov,scale_vars=ki$scale_vars,unit_conv=ki$unit_conv,
+    resolution=ki$resolution,n_cols=ki$n_cols,d_list=ki$d_list)
+  expect_length(ctx$edge_neighbors,5)
+  ref <- ctx;ref$edge_neighbors<-NULL
+  ctx$complete_idx <- ref$complete_idx <- c(4L,2L)
+  expect_equal(.msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",ctx),
+    .msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",ref),tolerance=1e-12)
+})
+
+test_that("prepared adjacency matches all reference metrics at exact cutoffs", {
+  # Existing compact categorical geometry, with holes and shuffled input order.
+  cells <- c(6,1,2,3,5,7,9,10,11,12,15,16)
+  z <- c(3,1,2,2,1,NA,3,2,1,NA,3,1)
+  d <- c(.7,.1,.2,.2,.4,.5,.6,.7,.8,.8,.9,1)
+  p <- msr_adjacency_prepare_cpp(d,z,cells,4L)
+  metrics <- c("ai","pladj","contag","iji","ent","condent","joinent","mutinf","relmutinf","clumpy")
+  for (radius in c(.01,sort(unique(d)),1.1)) for (base in c(exp(1),2)) {
+    ref <- vapply(metrics,function(m)landscape_adjacency_metric_cpp(d,matrix(z,ncol=1),cells,radius,4L,m,base,2),numeric(1))
+    got <- msr_adjacency_eval_cpp(p,rep(radius,length(metrics)),metrics,rep(base,length(metrics)),rep(2,length(metrics)))
+    expect_equal(unname(ref),got,tolerance=1e-12)
+  }
+  expect_equal(msr_adjacency_eval_cpp(p,c(.2,.8,.4),c("ai","ent","contag"),rep(2,3),rep(NA_real_,3)),
+    vapply(seq_len(3),function(i)landscape_adjacency_metric_cpp(d,matrix(z,ncol=1),cells,c(.2,.8,.4)[i],4L,c("ai","ent","contag")[i],2,NULL),numeric(1)),tolerance=1e-12)
+  expect_error(msr_adjacency_eval_cpp(p,1,"ent",1,NA_real_),"base")
+  expect_error(msr_adjacency_eval_cpp(p,1,"clumpy",2,NA_real_),"class")
+  expect_error(msr_adjacency_eval_cpp(p,0,"ai",2,NA_real_),"radius")
+  expect_error(msr_adjacency_prepare_cpp(c(1,1),c(1,1),c(1,1),4L),"Duplicate")
+  expect_error(msr_adjacency_prepare_cpp(rep(1,201),1:201,1:201,20L),"200 classes")
+  empty <- msr_adjacency_prepare_cpp(c(1,NA),c(NA,1),c(1,2),4L)
+  expect_true(is.na(msr_adjacency_eval_cpp(empty,1,"ai",2,NA_real_)))
+  wrap <- msr_adjacency_prepare_cpp(c(1,1),c(1,2),c(4,5),4L)
+  expect_equal(msr_adjacency_eval_cpp(wrap,1,"pladj",2,NA_real_),0)
+})
+
+test_that("prepared adjacency respects context subset and memory contracts", {
+  skip_if_not_installed("terra")
+  # Reuse the package's existing categorical fixture.
+  r <- landscape_test_raster(808,1:3)
+  ki <- kernel_prep(landscape_test_points(r),r,max_D=120,
+    scale_vars=msr_vars(a=landscape_var("landcover","ai"),e=landscape_var("landcover","ent")),verbose=FALSE)
+  dat <- data.frame(y=c(1,0,1,0,1),ki$kernel_dat)
+  mod <- glm(y~a+e,data=dat)
+  ctx <- build_opt_context(mod,ki$raw_cov,scale_vars=ki$scale_vars,unit_conv=ki$unit_conv,
+    resolution=ki$resolution,n_cols=ki$n_cols,d_list=ki$d_list)
+  expect_length(ctx$adjacency_neighbors,5)
+  prepared <- ctx$adjacency_neighbors[[1]]
+  plain <- prepared
+  attr(plain,"metric_metadata") <- NULL
+  evaluate <- function(p, specs=ki$scale_vars, covariates=c("a","e"))
+    .msr_eval_prepared_adjacency(p,specs,covariates,c(.4,.7),c("a","e"),ki$unit_conv)
+  expect_equal(evaluate(prepared),evaluate(plain),tolerance=1e-12)
+  expect_equal(evaluate(prepared,covariates="e"),evaluate(plain,covariates="e"),tolerance=1e-12)
+  changed <- ki$scale_vars
+  changed$base[changed$covariate=="e"] <- 2
+  expect_equal(evaluate(prepared,changed),evaluate(plain,changed),tolerance=1e-12)
+  # Preserve specification source order, including nonalphabetical names.
+  multi_specs <- ki$scale_vars
+  multi_specs$source <- c("z_source", "a_source")
+  multi_cov <- lapply(ki$raw_cov, function(x) {
+    out <- cbind(x,z_source=x[,"landcover"],a_source=x[,"landcover"])
+    attr(out,"cell") <- attr(x,"cell",exact=TRUE)
+    out
+  })
+  multi <- .msr_prepare_adjacency(ki$d_list,multi_cov,multi_specs,ki$n_cols)[[1]]
+  multi_plain <- multi
+  attr(multi_plain,"metric_metadata") <- NULL
+  expect_equal(evaluate(multi,multi_specs),evaluate(multi_plain,multi_specs),tolerance=1e-12)
+  ref <- ctx;ref$adjacency_neighbors<-NULL
+  legacy <- ctx
+  legacy$adjacency_neighbors <- .msr_prepare_adjacency(ki$d_list,ki$raw_cov,
+    ki$scale_vars,ki$n_cols,events=FALSE)
+  expect_equal(.msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",ctx),
+               .msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",legacy),tolerance=1e-12)
+  ram <- testthat::with_mocked_bindings(
+    estimate_multiscale_ram(ki, fitted_mod=mod, n_cores=2),
+    .msr_detect_cores=function(logical=FALSE) 4L,
+    .msr_total_ram_bytes=function() 8*1024^3, .package="multiScaleR")
+  expect_equal(ram$component_bytes$bytes[ram$component_bytes$component=="opt_context"],
+               as.numeric(object.size(ctx)))
+  ctx$complete_idx <- ref$complete_idx <- c(4L,2L)
+  expect_equal(.msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",ctx),
+    .msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",ref),tolerance=1e-12)
+  expect_gt(as.numeric(object.size(ctx)),as.numeric(object.size(ref)))
+  # Cached storage must survive ordinary serialization to worker processes.
+  ctx2 <- unserialize(serialize(ctx,NULL))
+  expect_equal(.msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",ctx2),
+    .msr_kernel_cov_w(c(.4,.7),ki$d_list,ki$raw_cov,"gaussian",ref),tolerance=1e-12)
+  expect_null(.msr_prepare_adjacency(NULL,ki$raw_cov,ki$scale_vars,ki$n_cols))
+})

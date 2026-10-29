@@ -12,6 +12,23 @@ scale_ci_table <- function(object,
                            names = row.names(object$scale_est),
                            profile = FALSE) {
 
+  if (identical(object$backend, "joint_mixed")) {
+    if (isTRUE(profile)) stop("Scale profiling is not validated for joint_mixed.", call. = FALSE)
+    tab <- ci_func(object$scale_est, df = df, min_D = min_D, names = names)
+    attr(tab, "interval_method") <- stats::setNames(rep("unavailable", nrow(tab)), rownames(tab))
+    return(tab)
+  }
+
+  if (.msr_analytic_backend(object)) {
+    tab <- .msr_profile_wald_table(object)
+    if (isTRUE(profile)) {
+      pr <- .msr_profile_likelihood_intervals(object)
+      tab[, c("2.5%", "97.5%")] <- pr$intervals
+      attr(tab, "interval_method") <- pr$method
+      attr(tab, "bound_limited") <- pr$bound_limited
+    }
+    return(tab)
+  }
   tab <- ci_func(object$scale_est,
                  df = df,
                  min_D = min_D,
@@ -84,6 +101,8 @@ profile_sigma_intervals <- function(object,
                                     max_expand = 5,
                                     refine_steps = 4) {
 
+  if (.msr_analytic_backend(object))
+    return(.msr_profile_likelihood_intervals(object, level))
   if (!inherits(object, "multiScaleR")) {
     stop("`object` must inherit from class 'multiScaleR'.", call. = FALSE)
   }

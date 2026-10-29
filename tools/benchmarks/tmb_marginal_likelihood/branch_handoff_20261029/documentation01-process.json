@@ -1,0 +1,7 @@
+{
+  "ProcessId": 70852,
+  "ParentProcessId": 50796,
+  "CreationDate": "2026-10-29T10:01:13.574852-04:00",
+  "ExecutablePath": "C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rscript.exe",
+  "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rscript.exe\" --vanilla \"C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\tmb_marginal_likelihood\\branch_handoff_20261029\\document.R\" \"C:/Users/peterman.73/AppData/Local/Temp/msr-inference-handoff-cfouf1kn/multiScaleR\" \"C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\tmb_marginal_likelihood\\branch_handoff_20261029\" \"C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\joint_scale_assessment\\phase31\\library\" \"C:/Users/peterman.73/.codex/scratch/multiScaleR-bayes-library\""
+}

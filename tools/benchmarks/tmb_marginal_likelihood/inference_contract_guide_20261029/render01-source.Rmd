@@ -1,0 +1,222 @@
+---
+title: "Inference Targets and Prediction Uncertainty"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Inference Targets and Prediction Uncertainty}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+Two methods can use the same distance-weighted landscape predictor and answer
+different statistical questions. Before comparing estimates or intervals, identify
+the inferential target, the effects included in prediction and the uncertainty
+that the calculation carries forward. This guide connects those decisions across
+the existing optimization and Bayesian workflows.
+
+Start with `vignette("quickstart", package = "multiScaleR")` for spatial inputs and
+optimization, or `vignette("bayesian-scales", package = "multiScaleR")` for annual
+Bayesian scales. The example here reads the same bundled artificial annual data
+and stored NUTS fit used in the Bayesian guides. It does not fit a model or run a
+sampler.
+
+## Separate the target from the computation
+
+A likelihood describes the observed responses as a function of model parameters.
+A hierarchical marginal likelihood integrates over declared random effects using
+their normalized distributions. A posterior also includes population-parameter
+priors. A proper prior has total probability one. These targets remain different
+even when they share formulas, kernel arithmetic and response distributions.
+
+| Workflow | Target and computation | Interpretation to retain |
+|:---------|:-----------------------|:-------------------------|
+| `multiScale_optim()` | The selected backend's likelihood, profiling or native model calculation | Preserve that backend's conditioning and covariance restrictions. |
+| `multiScale_bayes(method = "sample")` | Posterior with proper population priors, sampled using NUTS | Read sampling and derived-scale diagnostics before interpreting posterior summaries. |
+| `multiScale_bayes(method = "laplace")` | Posterior with the same declared priors, approximated jointly by a Gaussian distribution | A finite approximation is not proof of accurate tails or intervals. |
+| `multiScale_bayes(method = "marginal")` | Posterior with proper priors, using the supported marginal approximation and optional importance correction | Integration and correction diagnostics belong to this posterior calculation. This is not unpenalized maximum likelihood. |
+
+The word *marginal* describes integration, not removal of priors. An empty
+`priors` list selects the documented Bayesian defaults; it does not turn a
+Bayesian fit into a likelihood fit. Likewise, Laplace is an approximation
+technique, not an inferential target. Do not substitute a posterior objective
+for the likelihood required by an AIC calculation. Use the comparison procedures
+documented for the fitted backend and its conditioning.
+
+Unpenalized hierarchical marginal-likelihood fitting and boundary-aware SD
+intervals remain development work. The public Bayesian method names above do
+not expose those private prototypes as likelihood fits or confidence procedures.
+See `?multiScale_bayes` for each public method's supported model structures and
+diagnostic requirements.
+
+## Read the prepared target before fitting
+
+Preparation checks rows, bins, formulas and priors and freezes the reference
+design. It supplies no posterior draws or fitted intervals. Here it uses the
+existing bundled inputs rather than extracting another landscape:
+
+```{r prepared-target}
+annual <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
+  package = "multiScaleR"))
+prepared <- multiScale_bayes(
+  count ~ habitat + factor(year) + (1 | site),
+  annual$inputs, annual$data,
+  scales = list(habitat = ~1 + (1 | year)), row_id = "site_year",
+  family = "nbinom2", priors = list(scale_median = 250), method = "prepare"
+)
+info <- prepared$inference_metadata
+info[c("target", "method", "population_priors", "uncertainty")]
+```
+
+**How to read the output:** `posterior` and `proper` describe the intended
+target and population priors. `prepare` identifies a checked specification,
+not a fitted posterior. The uncertainty entries say `not_computed` or
+`not_provided`. They do not supply intervals, establish convergence or authorize
+prediction from this prepared object.
+
+```{r prepared-assertions, include=FALSE}
+stopifnot(identical(info$target, "posterior"), identical(info$method, "prepare"),
+  identical(info$population_priors, "proper"),
+  identical(info$integration$scale_effects, "not_computed"),
+  identical(info$uncertainty$population_parameters, "not_computed"),
+  identical(info$uncertainty$intervals, "not_provided"),
+  identical(info$metadata_establishes_eligibility, FALSE))
+```
+
+## Choose the prediction quantity
+
+Use the stored fitted object, rather than `prepared`, to inspect predictions.
+The rows below represent another survey at known sites and years. Future
+responses are removed because they are not prediction inputs.
+
+```{r expected-response}
+fit <- annual$fits$pooled
+surveys <- annual$data[1:3, ]
+surveys$count <- NULL
+expected <- predict(fit, surveys, kernel_inputs = annual$inputs,
+  row_id = "site_year", draws = 400)
+knitr::kable(expected[c("point_id", "median", "lower", "upper")], digits = 2)
+contract <- attr(expected, "prediction_contract")
+contract[c("inference_target", "quantity", "diagnostics_status", "uncertainty")]
+```
+
+**How to read the output:** Each row summarizes an expected count under the
+included site and year effects. The lower and upper columns are central
+posterior quantiles for that expected response. They exclude observation
+sampling variation. The contract records joint posterior parameter treatment,
+omitted observation noise and the original fit's recorded diagnostic status.
+Those fields describe this calculation; the stored example is not evidence of
+calibration for a different dataset.
+
+```{r prediction-assertions, include=FALSE}
+stopifnot(identical(contract$inference_target, "posterior"),
+  identical(contract$quantity, "expected_response"),
+  identical(contract$uncertainty$observation_noise, FALSE),
+  identical(contract$metadata_establishes_eligibility, FALSE),
+  identical(contract$uncertainty$calibration, "not_established"))
+```
+
+| Question | Bayesian function | Observation sampling variation |
+|:---------|:------------------|:-------------------------------|
+| What is the kernel scale for these covariates or groups? | `predict_scales()` | Excluded |
+| What is the expected response? | `predict()` | Excluded |
+| What observations might be recorded? | `simulate()` | Included |
+
+For a binomial model, a response prediction is a success probability. For
+Poisson and negative-binomial models, it is an expected count. A Gaussian
+response prediction is a mean on the response scale. A median expected count
+need not be the median of future observed counts. See
+`vignette("bayesian-prediction", package = "multiScaleR")` for worked new-group
+predictions and observation replicates.
+
+## Keep group policies and uncertainty explicit
+
+Known groups use their retained joint posterior effects when included. An
+unseen group's sampled effect represents additional group variation; setting
+that effect to zero gives a reference calculation. Zeroing an effect does not
+integrate over its distribution. Within a prediction call, rows sharing an
+unseen group share one sampled effect in each joint vector. Keep those rows
+together when you need that dependence. Separate calls do not automatically
+reuse the same new-group effects.
+
+The response and scale formulas govern different quantities. A response year
+effect changes baseline response. A scale year effect changes how the landscape
+is weighted. Preserve their separate prediction policies, as well as offsets,
+trials, factor levels and row/site keys. A fixed factor coefficient cannot be
+invented for an unseen level.
+
+Uncertainty from optimization and native prediction has its own contract:
+
+| Prediction route | Uncertainty to check |
+|:-----------------|:---------------------|
+| Supported analytic GLM predictions | Requested joint coefficient/kernel uncertainty requires an available covariance and the original eligibility checks. Conditional uncertainty holds the selected kernel parameters fixed. |
+| Conditional-logistic predictions | Preserve supplied choice sets and request supported conditional standard errors. Kernel-parameter uncertainty is not added. |
+| Native mixed or unmarked predictions | Native standard errors and intervals condition on selected spatial scales and retain the native component's meaning and controls. |
+| Bayesian predictions | Retained joint vectors propagate their represented parameter uncertainty and the requested group policy. Observation noise belongs to replicates, not expected-response intervals. |
+
+For native mixed predictions, `re.form = NA` sets random effects to zero; it
+does not average over them. For unmarked models, retain the selected native
+state, detection or transition component. In dynamic occupancy, initial
+occupancy and colonization/extinction predictions are distinct from smoothed
+or projected occupancy trajectories.
+
+`prepare_prediction()` binds fixed rows, scales, standardization, choice sets
+and native controls in a reusable snapshot. Reusing it does not add uncertainty,
+update the fit or predict new locations. Prepare a new snapshot when those
+inputs or controls change. Bayesian summary tables and simulations store their
+contract in an attribute; prepared snapshots store a named `prediction_contract`
+list. Raw posterior matrices and native numerical outputs retain their usual
+structure. See `?prediction_contract` and `?prepare_prediction`.
+
+## Check units, support and numerical precision
+
+| Quantity | Meaning and units |
+|:---------|:------------------|
+| Kernel scale | Distance in the prepared map units. Log-scale model values are back-transformed with the model's retained distance scaling. |
+| Scale-group SD | Spread of group deviations in log kernel scale. It is not a buffer radius. For illustration, 0.3 log units corresponds to a one-SD multiplicative factor of about `exp(0.3)`, or 1.35. |
+| Response-group SD | Spread of group effects on the response linear-predictor scale. Its interpretation depends on the response link. |
+
+Keep source CRS, linear units and point identities with the analysis. Internal
+`unit_conv` scaling is not a conversion between meters and feet. Compact binned
+inputs cannot recover historical raster-value or distance-unit lineage. A buffer
+inside the raster extent can still contain missing cells. Neither geometric
+extent checks nor a large posterior scale reconstructs landscape data beyond
+the neighborhood actually extracted. Review support before interpreting scales
+near or beyond `max_D`.
+
+Finally, distinguish numerical diagnostics from precision for your reported
+quantity. Sampling diagnostics concern the original chains; importance
+diagnostics concern the weighted approximation. `diagnose_bayes_scales()` and
+`diagnose_bayes_probabilities()` address derived scales and requested fitted-scale
+probabilities. Monte Carlo standard error measures numerical uncertainty from
+finite sampling, not ecological uncertainty in a posterior interval. A precise
+probability does not by itself establish precise interval endpoints or general
+coverage. Compact or permuted draws do not reconstruct the original chains.
+Unavailable precision, constant events and failed diagnostics remain explicit.
+See `vignette("bayesian-computation", package = "multiScaleR")`.
+
+Descriptive metadata never upgrades a rejected fit. A structural check of stored
+parameter dimensions does not prove a valid transformation or recover missing
+joint dependence. Read the original diagnostics and the conditioning before
+interpreting any estimate, map or interval.
+
+## Quick reference
+
+| Check | Where to look |
+|:------|:--------------|
+| Target, method, priors and integration | Bayesian `inference_metadata` and the fitted backend's help |
+| Expected response versus observation replicate | Prediction function and `prediction_contract$quantity` |
+| Included effects and omitted uncertainty | `prediction_contract$effects` and `$uncertainty` |
+| Fit status and functional precision | Original diagnostics, then the diagnostic function for the quantity reported |
+| Fixed snapshot rows and native controls | `?prepare_prediction` |
+
+Continue with `vignette("quickstart", package = "multiScaleR")` for optimization,
+`vignette("bayesian-scales", package = "multiScaleR")` for annual Bayesian models,
+and `vignette("bayesian-prediction", package = "multiScaleR")` for prediction.

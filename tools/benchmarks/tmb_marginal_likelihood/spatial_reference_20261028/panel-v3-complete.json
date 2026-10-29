@@ -1,0 +1,33 @@
+{
+  "completed": [
+    {
+      "elapsed_seconds": 796.8090446,
+      "qualified": false,
+      "id": "null-a",
+      "completed": true
+    },
+    {
+      "elapsed_seconds": 659.7325186,
+      "qualified": false,
+      "id": "null-b",
+      "completed": true
+    },
+    {
+      "elapsed_seconds": 1242.5943893,
+      "qualified": false,
+      "id": "smooth-a",
+      "completed": true
+    },
+    {
+      "elapsed_seconds": 1252.2316039,
+      "qualified": false,
+      "id": "smooth-b",
+      "completed": true
+    }
+  ],
+  "state": "all_four_completed",
+  "paired_agreement": "pending analysis",
+  "planned_runs": 4,
+  "cumulative_seconds": 3972.5896151999996,
+  "time": "2026-10-29T00:02:41.1420854-04:00"
+}

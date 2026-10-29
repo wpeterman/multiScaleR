@@ -46,6 +46,10 @@ test_that("TMB count includes all components and variance but excludes latent ef
   expect_equal(.msr_model_loglik(fix$model), as.numeric(unmarked::logLik(fix$model)))
   expect_equal((fix$model@AIC + 2 * unmarked::logLik(fix$model)) / 2, 8)
   expect_gt(length(fix$model@TMB$env$random), 8)
+  prepared <- prepare_prediction(fix$fit, component = "state",
+    native_args = list(re.form = NA))
+  expect_equal(predict(prepared), unmarked::predict(fix$model, type = "state", re.form = NA))
+  expect_equal(predict(unserialize(serialize(prepared, NULL))), predict(prepared))
   expow <- fix$fit
   expow$kernel_inputs$kernel <- "expow"
   expow$shape_est <- data.frame(Mean = 2, SE = NA_real_, row.names = "hab")

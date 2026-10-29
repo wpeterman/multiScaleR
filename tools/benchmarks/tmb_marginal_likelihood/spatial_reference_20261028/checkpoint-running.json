@@ -1,0 +1,14 @@
+{
+  "remaining": [
+    "null-a",
+    "null-b",
+    "smooth-a",
+    "smooth-b"
+  ],
+  "time": "2026-10-28T22:31:53.0031297-04:00",
+  "cumulative_seconds": 0.0,
+  "completed": [],
+  "planned_runs": 4,
+  "active_run": "null-a",
+  "state": "running"
+}

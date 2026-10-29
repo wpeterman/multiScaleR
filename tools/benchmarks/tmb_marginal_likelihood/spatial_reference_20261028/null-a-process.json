@@ -1,0 +1,7 @@
+{
+  "ProcessId": 79764,
+  "ParentProcessId": 63660,
+  "CreationDate": "2026-10-28T22:31:57.585695-04:00",
+  "ExecutablePath": "C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rscript.exe",
+  "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rscript.exe\" --vanilla \"C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\tmb_marginal_likelihood\\spatial_reference_20261028\\run-fit.R\" null-a"
+}

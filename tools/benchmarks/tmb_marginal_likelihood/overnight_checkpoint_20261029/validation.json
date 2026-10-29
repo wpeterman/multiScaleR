@@ -1,0 +1,40 @@
+{
+  "source_files": 322,
+  "source_changed": [],
+  "additional_source": [],
+  "closed_studies": 8,
+  "closed_evidence_changed": [],
+  "historic_evidence_changed": [],
+  "closed_manifest_sha256": {
+    "prediction_contracts_20261028": "6f14039c437cd0c427bb310a1a4d89206745e5bebb0c13d0d7342acef0d6aca6",
+    "functional_precision_20261028": "f62e197137416f922a4fa8f2409a8b4b17c100a3c374c108c36cf643b44a2719",
+    "spatial_reference_20261028": "6349152eac55ef7b6d302a02d5dbc61e731181bd693ac22c14d367f105d4b5f6",
+    "probability_precision_20261029": "e47c3b51434f23486a3cbebbae1e3db31e633a635d97eb41cc772ad326904f9d",
+    "response_sd_profile_20261029": "451cb9274ca0d8961ec23f8a6b4bcb59b82e159f0b1f439df9fc888ac5a55b5a",
+    "spatial_source_contract_20261029": "d3d0a4300892d871584c85e90e216e18923bce1bfa1274efdb84a5ef4f7ff5a9",
+    "inference_contract_guide_20261029": "da08f61e95df4a7735d580955a38d3039ffb6c49ed2990715ceb12d395629713",
+    "annual_sd_profile_20261029": "528fd3a3e6fd9ae696eced969b5a5064e4d7131cc499c4632b7765c94d6409fa"
+  },
+  "evidence_files_excluding_manifests": 720,
+  "evidence_MiB": 4.993414878845215,
+  "branch": "codex/inference-dev",
+  "head": "87bf8779fe571921f2fd5d3e45c0f9e478530022",
+  "index_empty": true,
+  "version_0_7_4": true,
+  "latest_complete_suite": {
+    "passed": 5560,
+    "failures": 0,
+    "warnings": 12,
+    "skips": 10
+  },
+  "latest_check_status_OK": true,
+  "archive_SHA256": "6E8586DA94DCA93A176633B9C183FE5D390EFDA281C8F9F27FB31A7D9D61533F",
+  "latest_archive_identity": true,
+  "smooth_reference_qualified_only_under_declared_numerical_gates": true,
+  "divergent_null_reference_remains_unqualified": true,
+  "SD_traces_global_fit_eligible": false,
+  "SD_intervals_available": false,
+  "interval_design_sha256": "6f16ccfa07f5810708f59816c636c6e2972a0af91a19b8e5f7f8d4d3c01be08c",
+  "scope": "Read-only source/evidence integrity; no tests, fitting, sampling or calibration rerun.",
+  "passed": true
+}

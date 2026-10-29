@@ -1,0 +1,24 @@
+$passed
+[1] TRUE
+
+$stage
+[1] "gradient"
+
+$values
+[1] 174.3458 179.1098 183.0516 182.1169
+
+$gradient_max
+[1] 107.2703 119.3822 134.0853 137.0006
+
+$parameter_names
+ [1] "beta"           "beta"           "beta"           "scale_beta"    
+ [5] "scale_z"        "scale_z"        "scale_z"        "scale_z"       
+ [9] "scale_z"        "scale_z"        "log_scale_sd"   "log_scale_sd"  
+[13] "log_dispersion"
+
+$objective_class
+[1] "list"
+
+$note
+[1] "No sampler called."
+

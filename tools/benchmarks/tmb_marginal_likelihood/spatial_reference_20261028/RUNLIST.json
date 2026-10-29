@@ -1,0 +1,45 @@
+{
+  "declared_at": "2026-10-28T22:17:02.6930857-04:00",
+  "status": "declared_not_launched",
+  "protocol_sha256": "33cf7df6fac389501b4b4be44be8545d7b78538553d873f11f5a9ef3972cd713",
+  "settings": {
+    "iter": 16000,
+    "warmup": 4000,
+    "chains": 4,
+    "metric": "diag_e",
+    "laplace": false,
+    "adapt_delta": 0.999,
+    "max_treedepth": 14,
+    "threads": 1,
+    "cores": 1
+  },
+  "fit_wall_limit_seconds": 2700,
+  "cumulative_wall_limit_seconds": 10800,
+  "runs": [
+    {
+      "case": "null",
+      "id": "null-a",
+      "input_hash": "3358c75d2932234d9ddbbbf92675299c108498168eb7f5d161396e3e5d8a8a84",
+      "seed": 202610301
+    },
+    {
+      "case": "null",
+      "id": "null-b",
+      "input_hash": "3358c75d2932234d9ddbbbf92675299c108498168eb7f5d161396e3e5d8a8a84",
+      "seed": 202610302
+    },
+    {
+      "case": "smooth",
+      "id": "smooth-a",
+      "input_hash": "ad7ddf193d56d26b94ab8eb69ebe37e142c25a5977012fc93ee49d2579d450b0",
+      "seed": 202610303
+    },
+    {
+      "case": "smooth",
+      "id": "smooth-b",
+      "input_hash": "ad7ddf193d56d26b94ab8eb69ebe37e142c25a5977012fc93ee49d2579d450b0",
+      "seed": 202610304
+    }
+  ],
+  "prelaunch_clarification": "Before sampling: document 15-second guard observation resolution; no targets, seeds, sampling controls, priors or statistical gates changed."
+}

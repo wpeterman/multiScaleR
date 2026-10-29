@@ -184,7 +184,9 @@
 
     V <- binned$vsum[[cov_name]]
     C <- binned$csum[[cov_name]]
-    if (!is.null(eval_idx)) {
+    # Complete-case indices frequently select every row. Reuse these read-only
+    # matrices instead of copying both for every optimizer/model refit call.
+    if (!is.null(eval_idx) && !identical(eval_idx, seq_len(nrow(V)))) {
       V <- V[eval_idx, , drop = FALSE]
       C <- C[eval_idx, , drop = FALSE]
     }

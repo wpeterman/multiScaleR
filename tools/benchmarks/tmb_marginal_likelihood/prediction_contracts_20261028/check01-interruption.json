@@ -1,0 +1,90 @@
+{
+  "reason": "Interrupted retained check because parallel test workers exceeded global interpreter budget; external R CMD check avoids an extra supervising interpreter",
+  "time": "2026-10-28T20:48:01.0584786-04:00",
+  "processes": [
+    {
+      "ProcessId": 72328,
+      "ParentProcessId": 72868,
+      "CreationDate": "2026-10-28T20:35:20.821724-04:00",
+      "Name": "Rscript.exe",
+      "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\Rscript.exe\" --vanilla \"C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\tmb_marginal_likelihood\\prediction_contracts_20261028\\.\\check.R\" check01"
+    },
+    {
+      "ProcessId": 42636,
+      "ParentProcessId": 72328,
+      "CreationDate": "2026-10-28T20:35:20.86889-04:00",
+      "Name": "cmd.exe",
+      "CommandLine": "C:\\Windows\\system32\\cmd.exe /c \"\"C:\\PROGRA~1\\R\\R-46~1.1\\bin\\x64\\Rscript.exe\" \"--vanilla\" \"C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\tmb_marginal_likelihood\\prediction_contracts_20261028\\.\\check.R\" \"check01\"\""
+    },
+    {
+      "ProcessId": 64276,
+      "ParentProcessId": 42636,
+      "CreationDate": "2026-10-28T20:35:20.971051-04:00",
+      "Name": "Rscript.exe",
+      "CommandLine": "\"C:\\PROGRA~1\\R\\R-46~1.1\\bin\\x64\\Rscript.exe\"  \"--vanilla\" \"C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\tmb_marginal_likelihood\\prediction_contracts_20261028\\.\\check.R\" \"check01\""
+    },
+    {
+      "ProcessId": 46384,
+      "ParentProcessId": 64276,
+      "CreationDate": "2026-10-28T20:37:42.008643-04:00",
+      "Name": "Rcmd.exe",
+      "CommandLine": "C:/PROGRA~1/R/R-46~1.1/bin/x64/Rcmd.exe check multiScaleR_0.7.4.tar.gz --as-cran --no-manual --no-manual"
+    },
+    {
+      "ProcessId": 57048,
+      "ParentProcessId": 46384,
+      "CreationDate": "2026-10-28T20:37:42.023676-04:00",
+      "Name": "conhost.exe",
+      "CommandLine": "\\??\\C:\\Windows\\system32\\conhost.exe 0x4"
+    },
+    {
+      "ProcessId": 64616,
+      "ParentProcessId": 46384,
+      "CreationDate": "2026-10-28T20:37:42.098497-04:00",
+      "Name": "cmd.exe",
+      "CommandLine": "C:\\Windows\\system32\\cmd.exe /c \"\"C:\\PROGRA~1\\R\\R-46~1.1/bin/x64/Rterm.exe\" -e tools:::.check_packages() R_DEFAULT_PACKAGES= LC_COLLATE=C --no-restore --no-echo --args nextArg\"multiScaleR_0.7.4.tar.gz\"nextArg\"--as-cran\"nextArg\"--no-manual\"nextArg\"--no-manual\"\""
+    },
+    {
+      "ProcessId": 65380,
+      "ParentProcessId": 64616,
+      "CreationDate": "2026-10-28T20:37:42.141019-04:00",
+      "Name": "Rterm.exe",
+      "CommandLine": "\"C:\\PROGRA~1\\R\\R-46~1.1/bin/x64/Rterm.exe\"  -e tools:::.check_packages() R_DEFAULT_PACKAGES= LC_COLLATE=C --no-restore --no-echo --args nextArg\"multiScaleR_0.7.4.tar.gz\"nextArg\"--as-cran\"nextArg\"--no-manual\"nextArg\"--no-manual\""
+    },
+    {
+      "ProcessId": 39256,
+      "ParentProcessId": 65380,
+      "CreationDate": "2026-10-28T20:43:32.109277-04:00",
+      "Name": "Rterm.exe",
+      "CommandLine": "C:\\PROGRA~1\\R\\R-46~1.1\\bin\\x64\\Rterm.exe LANGUAGE=en _R_CHECK_INTERNALS2_=1 R_LIBS=C:\\Users\\peterman.73\\AppData\\Local\\Temp\\RtmpgZNRcr\\RLIBS_ff64798d1c37 R_ENVIRON_USER='no_such_file' R_LIBS_USER='NULL' R_LIBS_SITE='NULL' --vanilla --no-echo -f \"C:\\Users\\peterman.73\\AppData\\Local\\Temp\\RtmpgZNRcr\\Rinff647ef79a1\""
+    },
+    {
+      "ProcessId": 47472,
+      "ParentProcessId": 39256,
+      "CreationDate": "2026-10-28T20:43:32.305001-04:00",
+      "Name": "R.exe",
+      "CommandLine": "C:\\PROGRA~1\\R\\R-46~1.1\\bin\\x64\\R.exe CMD BATCH --vanilla  \"testthat.R\" \"testthat.Rout\""
+    },
+    {
+      "ProcessId": 80588,
+      "ParentProcessId": 47472,
+      "CreationDate": "2026-10-28T20:43:32.492296-04:00",
+      "Name": "Rterm.exe",
+      "CommandLine": "\"C:\\PROGRA~1\\R\\R-46~1.1/bin/x64/Rterm.exe\" -f \"testthat.R\" --restore --save --vanilla"
+    },
+    {
+      "ProcessId": 30608,
+      "ParentProcessId": 80588,
+      "CreationDate": "2026-10-28T20:47:56.700769-04:00",
+      "Name": "Rscript.exe",
+      "CommandLine": "C:\\PROGRA~1\\R\\R-46~1.1\\bin\\x64\\Rscript.exe --default-packages=datasets,utils,grDevices,graphics,stats,methods -e \"tryCatch(parallel:::.workRSOCK,error=function(e)parallel:::.slaveRSOCK)()\" MASTER=localhost PORT=11109 OUT=\"/dev/null\" SETUPTIMEOUT=120 TIMEOUT=2592000 XDR=TRUE SETUPSTRATEGY=parallel"
+    },
+    {
+      "ProcessId": 79700,
+      "ParentProcessId": 80588,
+      "CreationDate": "2026-10-28T20:47:56.71274-04:00",
+      "Name": "Rscript.exe",
+      "CommandLine": "C:\\PROGRA~1\\R\\R-46~1.1\\bin\\x64\\Rscript.exe --default-packages=datasets,utils,grDevices,graphics,stats,methods -e \"tryCatch(parallel:::.workRSOCK,error=function(e)parallel:::.slaveRSOCK)()\" MASTER=localhost PORT=11109 OUT=\"/dev/null\" SETUPTIMEOUT=120 TIMEOUT=2592000 XDR=TRUE SETUPSTRATEGY=parallel"
+    }
+  ]
+}

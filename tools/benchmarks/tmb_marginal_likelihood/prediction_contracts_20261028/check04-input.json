@@ -1,0 +1,10 @@
+{
+  "coverage": "Standard vignette-enabled R CMD check without nested tests, followed by all unchanged archive tests against its installed package",
+  "reused_completed_build": true,
+  "Rscript_forwarder_SHA256": "D829BCF7E9FA1D7E3E828C565C3CDBB1ED416F551F4FA6FD4DFCDF231E33E5E8",
+  "SHA256": "4F1106F83DE12EB7937FE83FCC2ED6B6D805265D76F6831C178699D9C9FE7DBB",
+  "check_root": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-contract-phases-65a1ccae1a1d",
+  "tests_run_separately": true,
+  "R_BATCH_forwarder_SHA256": "496E6685D38BA01E89AA4C2DDED69F3AC33F4B1A85E7D9EEED83AAE8AF02BDD8",
+  "archive": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-prediction-contract-fb143a4d7606\\check\\multiScaleR_0.7.4.tar.gz"
+}

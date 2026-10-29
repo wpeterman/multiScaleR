@@ -1,0 +1,16 @@
+factorized-sd-profile: ...........................................................................................................................................................................................................12.....
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-factorized-sd-profile.R:131:3'): profile scope and identifi
+Expected `all(...)` to be TRUE.
+Differences:
+`actual`:   FALSE
+`expected`: TRUE 
+
+
+── 2. Failure ('test-factorized-sd-profile.R:132:3'): profile scope and identifi
+Expected `result$curve$reason[1L]` to match regexp "unbounded".
+Actual text:
+x | Same-SD limiting witnesses reject finite-kernel identification.
+
+══ DONE ════════════════════════════════════════════════════════════════════════

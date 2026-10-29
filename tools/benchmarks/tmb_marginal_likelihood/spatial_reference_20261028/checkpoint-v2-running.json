@@ -1,0 +1,21 @@
+{
+  "remaining": [
+    "null-b",
+    "smooth-a",
+    "smooth-b"
+  ],
+  "state": "attention_required",
+  "completed": [
+    {
+      "completed": true,
+      "elapsed_seconds": 796.8090446,
+      "id": "null-a",
+      "qualified": false
+    }
+  ],
+  "error": "Exception calling \"Replace\" with \"3\" argument(s): \"Unable to remove the file to be replaced.\"",
+  "active_run": "null-b",
+  "cumulative_seconds": 818.0311034,
+  "time": "2026-10-28T22:55:41.4718703-04:00",
+  "planned_runs": 4
+}

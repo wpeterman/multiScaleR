@@ -1,0 +1,11 @@
+{
+  "installed_test_directory": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-contract-phases-65a1ccae1a1d\\exact-archive-tests",
+  "passed": true,
+  "archive_SHA256": "4F1106F83DE12EB7937FE83FCC2ED6B6D805265D76F6831C178699D9C9FE7DBB",
+  "check_status_OK": true,
+  "tests_complete": true,
+  "tests_run_separately": true,
+  "source_stable": true,
+  "completed_at": "2026-10-28T21:22:00.4848117-04:00",
+  "check_root": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-contract-phases-65a1ccae1a1d"
+}

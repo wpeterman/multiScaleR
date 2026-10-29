@@ -1,0 +1,4 @@
+{
+  "passed": false,
+  "reason": "Finalizer compared raw build-generated DESCRIPTION metadata before accounting for standard R CMD build fields. Check/test success remains unchanged. Exact diff retained in DESCRIPTION-build-diff.txt for review."
+}

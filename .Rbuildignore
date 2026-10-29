@@ -3,6 +3,7 @@
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
 ^\.github$
+^\.gitattributes$
 ^README\.Rmd$
 ^inst/extdata/.*\.RData$
 ^vignettes/build_vignettes\.R$
@@ -22,3 +23,6 @@
 ^bench_tmp$
 ^doc$
 ^Meta$
+^tools/benchmarks/joint_scale_assessment$
+^tools/benchmarks/bayesian_scales$
+^tools/benchmarks/tmb_marginal_likelihood$

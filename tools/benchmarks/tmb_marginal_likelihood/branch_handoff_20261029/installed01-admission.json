@@ -1,0 +1,25 @@
+{
+  "disk_bytes": 70212665344,
+  "RAM_bytes": 23447379968,
+  "actual_interpreters": 1,
+  "RAM_reserve_bytes": 4294967296,
+  "owned_interpreters": 0,
+  "user_concurrency_exception": true,
+  "time": "2026-10-29T10:22:35.1901324-04:00",
+  "one_owned_validation_pipeline": true,
+  "disk_reserve_bytes": 5368709120,
+  "states": [
+    {
+      "command_sha256": "0efb384b7d476c5097eb6da7395a9910613a46b81ef1daca31e09938e5cdda10",
+      "creation": "2026-10-29T08:04:04.257579-04:00",
+      "PID": 39076,
+      "state": "R_interpreter",
+      "parent": 50572,
+      "path": "C:\\Program Files\\RStudio\\resources\\app\\bin\\rsession-utf8.exe",
+      "owned": false
+    }
+  ],
+  "foreign": 1,
+  "unknown": 0,
+  "threads": 1
+}

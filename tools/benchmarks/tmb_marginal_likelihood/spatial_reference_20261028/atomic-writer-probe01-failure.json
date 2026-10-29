@@ -1,0 +1,4 @@
+{
+  "PowerShell": "7.6.6",
+  "Error": "File.Replace with PowerShell $null converted to an empty backup path; first writer probe failed before any R launch."
+}

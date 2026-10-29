@@ -1,0 +1,11 @@
+{
+  "initial_disk_bytes": 55774617600,
+  "reused_completed_build": true,
+  "no_supervising_R_interpreter": true,
+  "archive": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-prediction-contract-fb143a4d7606\\check\\multiScaleR_0.7.4.tar.gz",
+  "SHA256": "4F1106F83DE12EB7937FE83FCC2ED6B6D805265D76F6831C178699D9C9FE7DBB",
+  "source_manifest": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\R\\Packages\\multiScaleR\\tools\\benchmarks\\tmb_marginal_likelihood\\prediction_contracts_20261028\\check01\\checked-source-md5.csv",
+  "check_root": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-contract-direct-5de7424e8113",
+  "initial_RAM_bytes": 22690930688,
+  "initial_foreign_R": 0
+}

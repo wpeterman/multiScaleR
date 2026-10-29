@@ -1,0 +1,41 @@
+{
+  "source_stable": true,
+  "source_files": 318,
+  "changed": [],
+  "additional": [],
+  "protected_source_changed": [],
+  "closed_evidence_changed": [],
+  "historic_evidence_changed": [],
+  "existing_vignette_code_unchanged": {
+    "vignettes/quickstart.Rmd": true,
+    "vignettes/bayesian-scales.Rmd": true
+  },
+  "render_passed": true,
+  "rendered_content_valid": true,
+  "visual_inspection_claimed": false,
+  "branch": "codex/inference-dev",
+  "head": "87bf8779fe571921f2fd5d3e45c0f9e478530022",
+  "index_empty": true,
+  "state": "completed",
+  "check_status_OK": true,
+  "check_passed": true,
+  "resource_passed": true,
+  "resource_samples": 30,
+  "maximum_actual_interpreters": 3,
+  "minimum_RAM_GiB": 14.803153991699219,
+  "minimum_disk_GiB": 46.60548400878906,
+  "new_archive_SHA256": "81787612CB9E445390BBE3A05467744CDA6A26617C157742402F31489511D8D6",
+  "archive_identity": true,
+  "previous_archive_identity": true,
+  "archived_code_test_data_help_and_namespace_unchanged": true,
+  "retained_installed_test_evidence": {
+    "passed": 5325,
+    "failures": 0,
+    "warnings": 12,
+    "skips": 10
+  },
+  "retained_installed_tests_NOT_CRAN": true,
+  "installed_tests_rerun": false,
+  "coverage_scope": "New archive examples/vignettes checked; prior complete suite covers byte-identical executable/test/data sources, not a new-archive test rerun.",
+  "passed": true
+}

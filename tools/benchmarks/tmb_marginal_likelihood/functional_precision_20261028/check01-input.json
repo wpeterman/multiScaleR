@@ -1,0 +1,9 @@
+{
+  "Rscript_forwarder_SHA256": "D829BCF7E9FA1D7E3E828C565C3CDBB1ED416F551F4FA6FD4DFCDF231E33E5E8",
+  "tests_run_separately": true,
+  "source_files": 311,
+  "started_at": "2026-10-28T22:02:32.9852105-04:00",
+  "R_BATCH_forwarder_SHA256": "496E6685D38BA01E89AA4C2DDED69F3AC33F4B1A85E7D9EEED83AAE8AF02BDD8",
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-probability-precision-6xvyatp6",
+  "NOT_CRAN": true
+}

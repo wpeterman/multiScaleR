@@ -1,0 +1,37 @@
+[
+  {
+    "file": "automation-deleted.json",
+    "bytes": 258,
+    "sha256": "ffff95727fd228de548f2dad5dea8326b98c9b91a0e4d19b267471ba5a1f4e5c"
+  },
+  {
+    "file": "checkpoint.json",
+    "bytes": 362,
+    "sha256": "7befd1277316dab2fd0a2370eb72933f875cb3a21933f22c40b6ca6db7688929"
+  },
+  {
+    "file": "final-state.json",
+    "bytes": 2389,
+    "sha256": "20bdd4ed50f36f8bef561394c86033d0bcbf37af96156a07a3e17896f082ffd4"
+  },
+  {
+    "file": "REPORT.md",
+    "bytes": 9594,
+    "sha256": "fc14ddf02a9431bedfbfa384bf476e6536bed8c4c6bb8522227b5f987eefd8c5"
+  },
+  {
+    "file": "RESUME.md",
+    "bytes": 1861,
+    "sha256": "5c57bdfa1e9fc0c9b12f48ed1c0d75d441392062b7ff15708d0f37fdb470ae98"
+  },
+  {
+    "file": "validation.json",
+    "bytes": 1990,
+    "sha256": "0acf6a7d1afb6cd43b61e68d23f713722b1357e036386804f547a435d762ba99"
+  },
+  {
+    "file": "verify.py",
+    "bytes": 5834,
+    "sha256": "83a385ddbf142db2c94baba16352c3fba324be577b4bda68b0b59deba112a249"
+  }
+]

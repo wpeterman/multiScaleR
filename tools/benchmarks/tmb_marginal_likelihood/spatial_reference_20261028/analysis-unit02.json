@@ -1,0 +1,9 @@
+{
+  "tests": 10,
+  "time": "2026-10-28T23:11:48.0252120-04:00",
+  "test_sha256": "E27AE2421AA4B5968072878C0F74A052525AAFB927FFE1CC922CE41C20FEF6C1",
+  "exit_code": 0,
+  "analysis_sha256": "8849FB292804218781E350283946BBD6BF8D33F7D52F7AFBB09AEB17F229D057",
+  "scope": "Compact consumer; preserves original reference decisions while describing finite mean precision separately from undefined Rhat.",
+  "passed": true
+}

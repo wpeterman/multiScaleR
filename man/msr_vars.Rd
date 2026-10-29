@@ -79,7 +79,10 @@ mean. The weighted form estimates the scale of effect of heterogeneity with
 a likelihood that is smooth in sigma. It is available only for the
 distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
 not the slope metric (\code{"sdq"}), and the scale is always optimized, so
-\code{radius} must be \code{NULL}.}
+\code{radius} must be \code{NULL}.
+Within a buffer evaluation, weighted metrics reuse weights and centered
+moments only when the source, scale, shape and valid-cell mask match exactly.
+This does not tie their fitted scales or reuse results across evaluations.}
 }
 \value{
 \describe{
@@ -202,8 +205,9 @@ in \code{landscapemetrics}:
     complexity that remains once composition is accounted for: the uncertainty
     about a neighbor's class given the focal cell's class.}
   \item{\code{"mutinf"}}{Mutual information, I(y, x). How much knowing a cell's
-    class tells you about its neighbor; it rises as like classes cluster
-    together. This is the configuration signal separated from composition.}
+    class tells you about its neighbor. Both clumping and regular alternation
+    can make neighboring classes predictable. Its magnitude also depends on
+    marginal entropy, so it is not a composition-independent aggregation index.}
   \item{\code{"relmutinf"}}{Relative mutual information, I(y, x) / H(x). Mutual
     information rescaled by marginal entropy to the range 0 to 1, so that
     configuration can be compared across landscapes of differing composition.
@@ -232,6 +236,14 @@ The current ceilings are 200 classes for the like-adjacency metrics
 built from the full class-pair matrix (\code{"contag"}, \code{"iji"}, and the
 information-theory family), whose cost scales with the square of the class
 count.
+
+During model optimization, categorical adjacency metrics reuse sorted cell
+and neighbor-pair entry distances instead of rescanning every buffered cell
+at each radius. Metrics on the same source and radius share their counts.
+This can reduce repeated fitting time, at the cost of additional retained
+cache memory, which is included in the package's worker-memory estimates.
+Radius boundaries and metric definitions are unchanged. This optimization
+does not make hard-radius metrics smooth or remove local-optimum concerns.
 
 Before optimizing the scale of \code{"iji"}, \code{"siei"}, or \code{"msiei"},
 inspect a pilot \code{kernel_prep()} result or a few fixed radii. These

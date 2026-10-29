@@ -1,0 +1,179 @@
+#' Prepare a fixed set of multiscale predictions for repeated use
+#'
+#' @description Prepare a spatial prediction design or native prediction output
+#'   once and retain a compact snapshot for repeated summaries of fixed rows.
+#' @param object A fitted \code{multiScaleR} object using \code{profile_glm},
+#'   \code{joint_nb2}, \code{conditional_logit}, or \code{joint_mixed}, or
+#'   containing a native \code{unmarkedFit} in \code{opt_mod}.
+#' @param newdata,kernel_inputs Prediction data and matching prepared spatial
+#'   inputs, with the same requirements as \code{\link{predict.multiScaleR}}.
+#'   The default \code{NULL} for both uses the retained fitting rows.
+#' @param max_bytes A positive finite byte limit for the returned snapshot.
+#'   The default is 64 MiB. Exceeding the limit raises an error. This limit
+#'   applies to retained size, not temporary memory used during preparation.
+#' @param component For unmarked models, the required native prediction
+#'   \code{type}, such as \code{"state"}, \code{"psi"}, \code{"det"}, \code{"col"}, or
+#'   \code{"ext"}, as supported by the fitted model. For \code{joint_mixed},
+#'   optionally select one native glmmTMB prediction type, such as
+#'   \code{"zprob"}; \code{NULL} prepares both response and link predictions.
+#'   Leave \code{NULL} for the analytic GLM and conditional-logistic backends.
+#' @param native_args A named list of native prediction controls to bind during
+#'   preparation. For \code{joint_mixed}, supports \code{re.form},
+#'   \code{allow.new.levels}, and \code{na.action}. For unmarked, supports
+#'   \code{backTransform}, \code{na.rm}, \code{appendData}, \code{level}, and
+#'   \code{re.form}. Defaults to an empty list, preserving native defaults.
+#' @param join_by For unmarked spatial predictions, explicit site keys with
+#'   one row per prepared prediction site, in spatial input order. Requires
+#'   both \code{newdata} and \code{kernel_inputs}. See
+#'   \code{\link{prepare_unmarked_data}}. The default \code{NULL} preserves
+#'   native prediction on already prepared data. Unsupported for other models.
+#' @param include_fixed Logical. The default \code{FALSE} keeps fixed-radius
+#'   predictors explicit. For unmarked spatial snapshots, set \code{TRUE} to
+#'   use the verified fixed-radius preparation in
+#'   \code{\link{prepare_unmarked_data}}. Requires spatial inputs and site keys.
+#' @details
+#' The snapshot binds coefficients, covariance, spatial scales, training
+#' standardization, row order, and any choice sets to the supplied model and
+#' inputs. It does not retain raw spatial buffers or the fitted native model.
+#' Later changes to the original model or data do not update the snapshot.
+#' Call \code{prepare_prediction()} again after changing the model, locations,
+#' choice sets, metric definitions, or distance units. New data cannot be
+#' supplied to \code{predict()} on a snapshot.
+#'
+#' Reuse avoids rebuilding the spatial engine when requesting several output
+#' types for the same rows. Uncertainty restrictions remain those of the fitted
+#' model. In particular, conditional-logistic standard errors require
+#' \code{uncertainty = "conditional"}; scale uncertainty is not added.
+#' Snapshots can be saved with \code{saveRDS()} and restored with \code{readRDS()}.
+#'
+#' Mixed and unmarked snapshots cache the native numerical prediction outputs
+#' for the fixed controls, rather than retaining a native model or rebuilding
+#' its prediction machinery. Native warnings are recorded and repeated when
+#' the corresponding cached output is requested. Native errors abort preparation.
+#' Mixed standard errors remain conditional on selected scales. Changing
+#' random-effect settings requires a new snapshot. Native glmmTMB \code{re.form = NA}
+#' sets random effects to zero and does not integrate over their distribution.
+#'
+#' For unmarked without \code{kernel_inputs}, \code{newdata} is passed unchanged
+#' to native prediction. Supply spatial covariates on the fitted standardized
+#' scale. With \code{kernel_inputs}, supply explicit \code{join_by} keys and
+#' native prediction rows. \code{\link{prepare_unmarked_data}} computes spatial
+#' columns and applies training standardization without changing native
+#' observation/year ordering or nonspatial factor/offset inputs. Spatial
+#' snapshots retain prediction row names and site keys in their provenance.
+#' The returned
+#' table preserves native columns, intervals, missing-value handling, and
+#' component interpretation. Native standard errors and intervals condition on
+#' selected spatial scales. Their native confidence level and transformation
+#' are bound by \code{native_args}, not changed at prediction time.
+#' For dynamic occupancy, \code{"psi"} describes initial occupancy and
+#' \code{"col"}/\code{"ext"} describe transitions. These native component
+#' predictions are distinct from smoothed or projected occupancy trajectories.
+#' @return An object of class \code{multiScaleR_prediction}. Its \code{predict()}
+#'   method returns the same output as \code{predict()} on the original model
+#'   and fixed prediction inputs. \code{max_bytes} counts its R object size.
+#'   Unmarked snapshots return the native \code{predict(object$opt_mod, ...)}
+#'   table, including its \code{Predicted}, \code{SE}, \code{lower}, and
+#'   \code{upper} columns. Mixed snapshots return native glmmTMB vectors or
+#'   standard-error lists for the bound prediction type and controls.
+#' @examples
+#' \dontrun{
+#' # Prepare once for several summaries at the same locations.
+#' prepared <- prepare_prediction(fit, newdata = sites, kernel_inputs = inputs)
+#' predict(prepared)
+#' predict(prepared, type = "link", se.fit = TRUE,
+#'         uncertainty = "conditional")
+#'
+#' # Bind a native zero-inflation probability with random effects set to zero.
+#' zero_prob <- prepare_prediction(mixed_fit, component = "zprob",
+#'   native_args = list(re.form = NA))
+#' predict(zero_prob)
+#'
+#' # Preserve native unmarked state predictions and their conditional intervals.
+#' state <- prepare_prediction(unmarked_fit, component = "state")
+#' predict(state)
+#' }
+#' @seealso \code{\link{predict.multiScaleR}}
+#' @export
+prepare_prediction <- function(object, newdata = NULL, kernel_inputs = NULL,
+                               max_bytes = 64 * 1024^2,
+                               component = NULL, native_args = list(), join_by = NULL,
+                               include_fixed = FALSE) {
+  validate_scalar_numeric(max_bytes, "max_bytes", positive = TRUE)
+  validate_scalar_logical(include_fixed, "include_fixed")
+  if (include_fixed && !methods::is(object$opt_mod, "unmarkedFit"))
+    stop("include_fixed applies only to unmarked spatial predictions.", call. = FALSE)
+  if (!is.null(join_by) && !methods::is(object$opt_mod, "unmarkedFit"))
+    stop("join_by applies only to unmarked spatial predictions.", call. = FALSE)
+  if (inherits(object, "multiScaleR") &&
+      (identical(object$backend, "joint_mixed") || methods::is(object$opt_mod, "unmarkedFit")))
+    return(.msr_prepare_native_prediction(object, newdata, kernel_inputs,
+                                         max_bytes, component, native_args, join_by,
+                                         include_fixed))
+  if (!is.null(component) || length(native_args))
+    stop("component and native_args apply only to native mixed or unmarked snapshots.", call. = FALSE)
+  if (!inherits(object, "multiScaleR") ||
+      !isTRUE(object$backend %in% c("profile_glm", "joint_nb2", "conditional_logit")))
+    stop("Preparation requires a profile_glm, joint_nb2, or conditional_logit fit.", call. = FALSE)
+  contract <- object$profile_fit$contract
+  groups <- contract$groups
+  if (identical(object$backend, "conditional_logit") &&
+      (!is.null(newdata) || !is.null(kernel_inputs))) {
+    if (!is.data.frame(newdata) || !contract$strata_name %in% names(newdata))
+      stop("New predictions require explicit choice-set IDs in newdata.", call. = FALSE)
+    groups <- .msr_clogit_groups(newdata[[contract$strata_name]])
+  }
+  design <- .msr_profile_prediction_design(object, newdata, kernel_inputs)
+  out <- list(backend = object$backend, design = design,
+    profile_fit = list(contract = list(covariates = contract$covariates,
+      groups = groups, strata_name = contract$strata_name)),
+    kernel_inputs = list(kernel = object$kernel_inputs$kernel),
+    provenance = list(scale_parameters = object$profile_fit$par,
+      distance_unit_conversion = object$kernel_inputs$unit_conv,
+      surface_specs = contract$objective$engine$surface_specs))
+  if (identical(object$backend, "conditional_logit")) {
+    model <- .analysis_model(object$opt_mod)
+    out$coefficients <- stats::coef(model)[colnames(design$X)]
+    out$conditional_vcov <- stats::vcov(model)[colnames(design$X), colnames(design$X), drop = FALSE]
+  } else {
+    out$uncertainty <- object$uncertainty
+    out$opt_mod <- list(family = object$opt_mod$family)
+  }
+  class(out) <- "multiScaleR_prediction"
+  if (as.numeric(utils::object.size(out)) > max_bytes)
+    stop("Prepared predictions exceed max_bytes; use fewer rows or an explicit larger budget.", call. = FALSE)
+  out
+}
+
+#' @rdname prepare_prediction
+#' @param type,se.fit,uncertainty,interval,level Output and uncertainty controls
+#'   passed to \code{\link{predict.multiScaleR}}, with the same defaults and
+#'   safeguards. They change the summary of the fixed prediction design.
+#' @param ... Reserved. Additional arguments, including new prediction data,
+#'   raise an error; create a new snapshot for changed data.
+#' @exportS3Method stats::predict
+predict.multiScaleR_prediction <- function(object, type = c("response", "link"),
+    se.fit = FALSE, uncertainty = c("joint", "conditional"),
+    interval = c("none", "confidence"), level = .95, ...) {
+  if (length(list(...)))
+    stop("Prepared predictions have fixed inputs; call prepare_prediction() again for new data.", call. = FALSE)
+  if (!is.null(object$native_kind)) {
+    if (identical(object$native_kind, "unmarked") &&
+        (!missing(se.fit) || !missing(uncertainty) || !missing(interval) || !missing(level)))
+      stop("Unmarked snapshots return native prediction tables; bind native controls in prepare_prediction().", call. = FALSE)
+    return(.msr_predict_native_snapshot(object,
+      if (missing(type)) object$default_type else type, se.fit, uncertainty, interval))
+  }
+  predict.multiScaleR(object, type = type, se.fit = se.fit,
+    uncertainty = uncertainty, interval = interval, level = level)
+}
+
+#' @rdname prepare_prediction
+#' @param x A prepared prediction snapshot.
+#' @export
+print.multiScaleR_prediction <- function(x, ...) {
+  cat("Prepared multiscale predictions (", x$backend, "): ",
+      if (is.null(x$native_kind)) nrow(x$design$X) else x$n_rows, " fixed predictions, ",
+      format(utils::object.size(x), units = "auto"), ".\n", sep = "")
+  invisible(x)
+}

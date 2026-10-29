@@ -130,6 +130,8 @@ profile_sigma <- function(x,
   if (!inherits(x, "multiScaleR")) {
     stop("`x` must be a fitted `multiScaleR` object.", call. = FALSE)
   }
+  if (identical(x$backend, "joint_mixed"))
+    stop("Scale profiling is not validated for joint_mixed.", call. = FALSE)
   validate_scalar_logical(verbose, "verbose")
   if (!is.null(n_cores)) {
     validate_scalar_numeric(n_cores, "n_cores", integerish = TRUE, positive = TRUE)
@@ -208,6 +210,23 @@ profile_sigma <- function(x,
     grid_type <- spacing
   }
   n_grid <- length(sigma_seq)
+
+  if (.msr_analytic_backend(x)) {
+    if (!is.null(n_cores) && n_cores > 1L)
+      stop("profile_glm likelihood profiling is serial.", call. = FALSE)
+    if (any(sigma_seq < min_D | sigma_seq > max_D))
+      stop("profile_glm sigma values must remain within the fitted bounds.", call. = FALSE)
+    profiles <- do.call(rbind, lapply(seq_len(n_covs), function(j) {
+      ll <- -vapply(log(sigma_seq / unit_conv), function(z)
+        .msr_profile_at(x, j, z, reoptimize = FALSE), numeric(1))
+      data.frame(variable = covs[j], sigma = sigma_seq, LL = ll,
+        AICc = if (n > k_total + 1) -2 * ll + 2 * k_total +
+          2 * k_total * (k_total + 1) / (n - k_total - 1) else NA_real_)
+    }))
+    return(structure(list(profiles = profiles,
+      opt_sigma = stats::setNames(scale_est$Mean, covs), metric = metric,
+      spacing = grid_type, sigma_grid = sigma_seq), class = "sigma_profile"))
+  }
 
   # Only the profiled covariate's sigma changes across the grid; every other
   # covariate sits at its optimum and produces an identical kernel-weighted

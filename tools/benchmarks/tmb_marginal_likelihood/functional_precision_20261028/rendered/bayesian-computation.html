@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Bill Peterman" />
+
+
+<title>Bayesian Computation and Diagnostics</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Bayesian Computation and Diagnostics</h1>
+<h4 class="author">Bill Peterman</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#use-the-worked-example" id="toc-use-the-worked-example"><span class="toc-section-number">1</span> Use the worked example</a></li>
+<li><a href="#explore-a-joint-laplace-approximation" id="toc-explore-a-joint-laplace-approximation"><span class="toc-section-number">2</span> Explore a joint Laplace
+approximation</a></li>
+<li><a href="#integrate-uncertainty-in-the-between-year-sd" id="toc-integrate-uncertainty-in-the-between-year-sd"><span class="toc-section-number">3</span> Integrate uncertainty in the
+between-year SD</a></li>
+<li><a href="#correct-conditional-skewness-with-importance-sampling" id="toc-correct-conditional-skewness-with-importance-sampling"><span class="toc-section-number">4</span> Correct conditional skewness with
+importance sampling</a></li>
+<li><a href="#compare-actual-computations-of-the-worked-example" id="toc-compare-actual-computations-of-the-worked-example"><span class="toc-section-number">5</span> Compare actual computations of the
+worked example</a>
+<ul>
+<li><a href="#evidence-beyond-one-example" id="toc-evidence-beyond-one-example"><span class="toc-section-number">5.1</span> Evidence beyond one
+example</a></li>
+</ul></li>
+<li><a href="#separate-posterior-uncertainty-from-monte-carlo-uncertainty" id="toc-separate-posterior-uncertainty-from-monte-carlo-uncertainty"><span class="toc-section-number">6</span> Separate posterior uncertainty from
+Monte Carlo uncertainty</a></li>
+<li><a href="#decision-checklist" id="toc-decision-checklist"><span class="toc-section-number">7</span> Decision checklist</a></li>
+<li><a href="#quick-reference" id="toc-quick-reference"><span class="toc-section-number">8</span> Quick reference</a></li>
+</ul>
+</div>
+
+<p>Start with
+<code>vignette(&quot;bayesian-scales&quot;, package = &quot;multiScaleR&quot;)</code> for
+annual data preparation, full NUTS sampling and scientific
+interpretation. This guide explains the alternative computations, what
+their diagnostics establish and how to assess numerical precision. They
+use the same posterior target when the likelihood, priors, formulas and
+prepared bins are held fixed.</p>
+<div id="use-the-worked-example" class="section level2" number="1">
+<h2><span class="header-section-number">1</span> Use the worked
+example</h2>
+<p>The data are the five-year NB2 example from the annual-scale guide.
+Loading the stored numeric inputs and compact NUTS fit requires no
+optional Bayesian software. The long approximation calls below are shown
+rather than executed while building the package.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>example <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;bayesian-annual-example.rds&quot;</span>,</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>  <span class="at">package =</span> <span class="st">&quot;multiScaleR&quot;</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>dat <span class="ot">&lt;-</span> example<span class="sc">$</span>data</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>inputs <span class="ot">&lt;-</span> example<span class="sc">$</span>inputs</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>response <span class="ot">&lt;-</span> count <span class="sc">~</span> habitat <span class="sc">+</span> <span class="fu">factor</span>(year) <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> site)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>scales <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">habitat =</span> <span class="sc">~</span><span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> year))</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>fit <span class="ot">&lt;-</span> example<span class="sc">$</span>fits<span class="sc">$</span>pooled</span></code></pre></div>
+<p>For uncorrected approximations, check RTMB with
+<code>check_bayes_setup(&quot;laplace&quot;)</code>. Importance correction also
+needs posterior:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">check_bayes_setup</span>(<span class="st">&quot;marginal&quot;</span>, <span class="at">correction =</span> <span class="st">&quot;importance&quot;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="co">#&gt; Bayesian package setup: marginal </span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt; Package checks passed.</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt;    package minimum version loadable meets_version passed message</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt;       RTMB     2.0     2.0     TRUE          TRUE   TRUE        </span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt;  posterior   1.6.0   1.7.0     TRUE          TRUE   TRUE        </span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; Checks R packages only; does not install software or run a model.</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; Compiler configuration, memory and sampling diagnostics require a separate small fit.</span></span></code></pre></div>
+<p><code>ready</code> describes package availability, not optimizer
+convergence, posterior accuracy or available memory. Full NUTS is more
+general than the current single-scale-SD marginal interface, but also
+needs its own raw and derived diagnostics. Priors and data support must
+be assessed under every computation.</p>
+</div>
+<div id="explore-a-joint-laplace-approximation" class="section level2" number="2">
+<h2><span class="header-section-number">2</span> Explore a joint Laplace
+approximation</h2>
+<p>Set <code>method = &quot;laplace&quot;</code> to replace MCMC with a Gaussian
+approximation around a posterior mode. This option uses the same
+likelihood, priors, scale formulas, and fixed predictor standardization
+as sampling. It requires RTMB, but does not require tmbstan, rstan, or
+posterior.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>fast_fit <span class="ot">&lt;-</span> <span class="fu">multiScale_bayes</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  response, inputs, dat, <span class="at">scales =</span> scales, <span class="at">row_id =</span> <span class="st">&quot;site_year&quot;</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;nbinom2&quot;</span>, <span class="at">priors =</span> fit<span class="sc">$</span>specification<span class="sc">$</span>priors,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;laplace&quot;</span>, <span class="at">laplace_draws =</span> <span class="dv">2000</span>, <span class="at">seed =</span> <span class="dv">527001</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="fu">summary</span>(fast_fit)<span class="sc">$</span>diagnostics</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="fu">posterior_scales</span>(fast_fit)</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="fu">summary</span>(fast_fit)<span class="sc">$</span>group_sd<span class="sc">$</span>log_scale_group_sd</span></code></pre></div>
+<p>The approximation covers response coefficients, latent year and site
+effects, log group SDs, and dispersion jointly. Its covariance is the
+inverse Hessian, the matrix of second derivatives of the negative log
+posterior at the mode. Complete correlated draws are transformed through
+the original scale formulas. Pooling SDs retain uncertainty. This is a
+joint local approximation, rather than a nested method that integrates
+out random effects.</p>
+<p>The default uses six dispersed deterministic starts.
+<code>control = list(starts = 10, iter.max = 1500)</code> spends more
+effort searching for a stationary mode. <code>laplace_draws</code>
+controls summary simulation error; increasing it cannot correct an
+inaccurate Gaussian approximation. A supplied seed preserves your
+previous random-number state. The sampling settings <code>chains</code>,
+<code>iter</code>, and <code>warmup</code> are unused for this
+method.</p>
+<p><strong>How to read the diagnostics:</strong>
+<code>gradient_max</code> measures stationarity and must not exceed
+0.0001. <code>min_eigenvalue</code> must be positive and
+<code>condition_number</code> no greater than one trillion for the
+covariance to be accepted. The function reports an error instead of
+adjusting invalid curvature. <code>successful_starts</code> counts
+converged stationary solutions. <code>competing_modes</code> flags
+distinct solutions within two log-posterior units of the selected mode
+and causes a warning. The starts are retained in
+<code>fast_fit$laplace$starts</code> for inspection.</p>
+<p>These are numerical checks. A passed flag does not establish interval
+calibration or accurate partial pooling. The approximation operates in
+unconstrained, noncentered coordinates, including the log-SD Jacobians
+in the prior. Its accuracy depends on that parameterization. Dependence
+between year effects and their SD, skewness, and weak scale information
+can make a local Gaussian misleading. Compare consequential annual-scale
+and pooling results with full sampling, especially with few years or
+weak habitat effects. No finite set of optimization starts guarantees
+that all posterior modes were found.</p>
+</div>
+<div id="integrate-uncertainty-in-the-between-year-sd" class="section level2" number="3">
+<h2><span class="header-section-number">3</span> Integrate uncertainty
+in the between-year SD</h2>
+<p>The joint Gaussian approximation can misrepresent pooling even when
+its optimizer converges. Use <code>method = &quot;marginal&quot;</code> to
+integrate one scale-group SD numerically while fitting a conditional
+Laplace approximation for the other parameters at each SD value. This
+allows an asymmetric SD posterior with mass near zero. The likelihood
+and priors remain the same as for full sampling.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>marginal_fit <span class="ot">&lt;-</span> <span class="fu">multiScale_bayes</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  response, inputs, dat, <span class="at">scales =</span> scales, <span class="at">row_id =</span> <span class="st">&quot;site_year&quot;</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;nbinom2&quot;</span>, <span class="at">priors =</span> fit<span class="sc">$</span>specification<span class="sc">$</span>priors,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;marginal&quot;</span>, <span class="at">laplace_draws =</span> <span class="dv">2000</span>, <span class="at">seed =</span> <span class="dv">527002</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">summary</span>(marginal_fit)<span class="sc">$</span>diagnostics</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">summary</span>(marginal_fit)<span class="sc">$</span>group_sd<span class="sc">$</span>log_scale_group_sd</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="fu">posterior_scales</span>(marginal_fit)</span></code></pre></div>
+<p>At a fixed SD, the inverse conditional Hessian describes uncertainty
+in the response effects, scale effects, and latent effects. Its
+determinant supplies the conditional posterior volume needed when
+comparing different SD values. Integration uses the half-normal prior’s
+cumulative probability as its axis; the change of coordinates removes
+the corresponding log-SD prior density from the integrand so that the
+prior is counted exactly once. The method then combines the conditional
+distributions with their integration weights. SD draws are continuous,
+with conditional dependence retained through a mixture of the
+neighboring integration configurations.</p>
+<p><strong>How to read the diagnostics:</strong>
+<code>grid_converged</code> checks whether refining the integration grid
+changes the SD distribution appreciably. <code>refinement</code> records
+changes in the CDF, central 95% interval and median, and log normalizing
+constant. <code>competing_mass</code> is the approximate node
+probability associated with discovered competing conditional modes;
+values above 0.01 fail the numerical screen.
+<code>upper_tail_mass</code> checks that numerical integration has not
+accumulated more than 0.001 posterior mass beyond prior cumulative
+probability 0.9999. A failed conditional optimization causes an error
+instead of dropping its integration point. Inspect all flags before
+interpreting the approximate draws.</p>
+<p>The default refines grids up to 129 ordinary points, with additional
+points in the upper prior tail. Set
+<code>control = list(max_grid = 257)</code> for a more demanding
+integration check. Increasing <code>laplace_draws</code> only reduces
+simulation error in the summaries. It cannot fix an inaccurate
+conditional Gaussian.</p>
+<p>This implementation integrates exactly one scale-group SD, such as
+the between-year SD in <code>~1 + (1 | year)</code>. Any response-site
+SD remains in the conditional Gaussian approximation. Multiple
+scale-group SDs are not yet supported by this method. It implements
+single-SD conditional Laplace integration. Numerical grid convergence
+does not establish calibration, particularly with weak effects or
+multiple posterior modes. Compare important results with NUTS.</p>
+</div>
+<div id="correct-conditional-skewness-with-importance-sampling" class="section level2" number="4">
+<h2><span class="header-section-number">4</span> Correct conditional
+skewness with importance sampling</h2>
+<p>The SD grid can be accurate while conditional Gaussian annual
+intervals remain too narrow. An experimental correction uses the
+marginal approximation to propose parameter vectors, then weights each
+vector by the full posterior density divided by its actual proposal
+density. It targets the same posterior as NUTS. It does not multiply
+intervals by a fitted coverage adjustment.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>corrected_fit <span class="ot">&lt;-</span> <span class="fu">multiScale_bayes</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  response, inputs, dat, <span class="at">scales =</span> scales, <span class="at">row_id =</span> <span class="st">&quot;site_year&quot;</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;nbinom2&quot;</span>, <span class="at">priors =</span> fit<span class="sc">$</span>specification<span class="sc">$</span>priors,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;marginal&quot;</span>, <span class="at">laplace_draws =</span> <span class="dv">2000</span>, <span class="at">seed =</span> <span class="dv">527003</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">list</span>(<span class="at">correction =</span> <span class="st">&quot;importance&quot;</span>, <span class="at">conditional_beta =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="at">nested_response =</span> <span class="cn">TRUE</span>, <span class="at">importance_df =</span> <span class="dv">5</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    <span class="at">importance_min =</span> <span class="dv">65536</span>, <span class="at">importance_max =</span> <span class="dv">131072</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>    <span class="at">importance_refinements =</span> <span class="dv">2</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>corrected_fit<span class="sc">$</span>diagnostics</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>corrected_fit<span class="sc">$</span>importance<span class="sc">$</span>history</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>corrected_fit<span class="sc">$</span>importance<span class="sc">$</span>proposal_diagnostics</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="fu">posterior_scales</span>(corrected_fit, <span class="at">estimator =</span> <span class="st">&quot;weighted&quot;</span>)</span></code></pre></div>
+<p>With response random intercepts, correction defaults to nested
+response-effect integration. This accounts for their conditional
+posterior volume when locating the other parameters. With one response
+grouping term, the site-effect proposal is also updated at every
+candidate’s response SD. This avoids extending one Gaussian description
+across all possible strengths of site variation.</p>
+<p>A separate 16384-candidate pilot learns conditional proposal means
+and covariances. It is discarded from final estimation. Production
+sampling mixes the adapted proposal with the original heavy-tailed
+proposal, then evaluates the unchanged joint posterior. The code retains
+2000 resampled vectors by default so that existing summary, prediction,
+and simulation methods work. Those resamples share a finite weighted
+population. Their count is not an effective sample size, and increasing
+<code>laplace_draws</code> cannot repair poor weights.</p>
+<p>The proposal mixes Student t coordinates that can explore
+individually with a multivariate Student t component that can explore
+jointly. A small uniform component preserves support over the SD’s
+prior-CDF axis, and a log-SD tail proposal extends beyond the
+finite-precision inverse-CDF endpoint. Both components are included in
+the importance density and do not change the prior. The conditional
+proposal uses seven degrees of freedom by default.
+<code>importance_df = 5</code> gives it heavier tails, which can cover
+posterior regions that produce unstable ratios with the default
+proposal. The same exact importance correction and diagnostic thresholds
+apply. This is an efficiency choice: heavier tails can improve
+reliability but can also spend more candidates in regions with little
+posterior mass. Check all diagnostics and compare independent seeds
+before relying on the resulting intervals. For difficult joint scale and
+response-coefficient geometry, an experimental alternative is
+<code>conditional_beta = TRUE</code>. It draws response coefficients
+conditional on each proposed set of scales and response random effects.
+For Gaussian responses this conditional is exact. The other families use
+a local Student t proposal; full importance ratios still target the same
+posterior. A defensive component samples latent-scale parameters from
+the existing model priors. This improves support without changing those
+priors.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>conditional_control <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">correction =</span> <span class="st">&quot;importance&quot;</span>, <span class="at">conditional_beta =</span> <span class="cn">TRUE</span>, <span class="at">importance_df =</span> <span class="dv">5</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">importance_min =</span> <span class="dv">65536</span>, <span class="at">importance_max =</span> <span class="dv">131072</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">importance_refinements =</span> <span class="dv">2</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>)</span></code></pre></div>
+<p>This mode uses the full joint grid and automatically selects
+<code>nested_response = FALSE</code> unless specified. An explicit
+<code>TRUE</code> conflicts with conditional coefficients. It can cost
+substantially more per candidate; use NUTS when consequential tail
+probabilities remain unstable across runs. Passing a minimum indicator
+ESS of 400 is a numerical screen, not a guarantee of precise 2.5% or
+97.5% endpoints. At probability 0.025, an indicator ESS of 400
+corresponds to a CDF Monte Carlo SE of about 0.0078 under its variance
+approximation. Missed regions can make even that estimate optimistic. By
+default, one failed production stage can train a further proposal; it is
+then discarded and a fresh stage is sampled.
+<code>importance_refinements = 0</code> disables that extra training,
+while 2 permits another stage. <code>importance_max</code> caps the
+final stage, so total candidate evaluations can exceed that setting.
+Check <code>production_candidates</code> when assessing cost.</p>
+<p><strong>How to read these diagnostics:</strong> <code>pareto_k</code>
+measures how extreme importance ratios become; values above 0.7 fail the
+screen. <code>ess</code> must be at least 1000, and
+<code>min_tail_ess</code> at least 400. A single candidate may hold at
+most 0.01 of the total weight. <code>split_cdf_error</code> compares
+probability estimates from two production halves and must be at most
+0.05. <code>history</code> shows whether additional candidates improved
+these checks. The original grid and mode flags remain in
+<code>proposal_diagnostics</code>; they describe the proposal, while the
+new checks describe the corrected estimate. Neither set proves that an
+unseen mode has been found. Compare important or failed results with
+full NUTS.</p>
+<p>Correction costs more than uncorrected marginal Laplace. It can be
+worthwhile when conditional skewness matters and a stable proposal gives
+enough effective samples quickly. Repeated-site models and weakly
+identified scales can still be difficult. More than one response
+grouping term uses a joint proposal whose reliability needs separate
+validation. The default <code>correction = &quot;none&quot;</code> preserves the
+original marginal behavior.</p>
+</div>
+<div id="compare-actual-computations-of-the-worked-example" class="section level2" number="5">
+<h2><span class="header-section-number">5</span> Compare actual
+computations of the worked example</h2>
+<p>These are the first attempts from the three calls above, with the
+complete priors from the original NUTS fit. The package stores only
+their summary tables and diagnostics, so this comparison needs no
+sampler or RTMB.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;bayesian-computation-example.rds&quot;</span>,</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="at">package =</span> <span class="st">&quot;multiScaleR&quot;</span>))</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(comparison<span class="sc">$</span>availability, <span class="at">digits =</span> <span class="dv">2</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="left">method</th>
+<th align="left">status</th>
+<th align="right">seconds</th>
+<th align="left">reason</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">laplace</td>
+<td align="left">eligible</td>
+<td align="right">0.31</td>
+<td align="left"></td>
+</tr>
+<tr class="even">
+<td align="left">marginal</td>
+<td align="left">rejected</td>
+<td align="right">14.21</td>
+<td align="left">grid converged FALSE</td>
+</tr>
+<tr class="odd">
+<td align="left">nested</td>
+<td align="left">eligible</td>
+<td align="right">207.30</td>
+<td align="left"></td>
+</tr>
+</tbody>
+</table>
+<p><code>eligible</code> means the method passed its own stored
+numerical screen. In these tables, <code>nested</code> labels the
+corrected marginal fit with the nested response proposal; its function
+argument remains <code>method = &quot;marginal&quot;</code>. Uncorrected marginal
+Laplace is retained as <code>rejected</code> because its SD grid did not
+converge under the stated budget. Its intervals below illustrate that
+failure; they are not accepted estimates. The timings describe these
+particular computations on a shared computer, with different numerical
+precision. They are not a benchmark of equal-precision methods. The
+original NUTS fit recorded 145 seconds, so this example shows no
+elapsed-time advantage for correction.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>annual <span class="ot">&lt;-</span> <span class="fu">subset</span>(comparison<span class="sc">$</span>quantiles, type <span class="sc">==</span> <span class="st">&quot;annual_log_scale&quot;</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>annual<span class="sc">$</span>method <span class="ot">&lt;-</span> <span class="fu">factor</span>(annual<span class="sc">$</span>method,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;nuts&quot;</span>, <span class="st">&quot;laplace&quot;</span>, <span class="st">&quot;marginal&quot;</span>, <span class="st">&quot;nested&quot;</span>),</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;NUTS reference&quot;</span>, <span class="st">&quot;Joint Laplace&quot;</span>, <span class="st">&quot;Marginal (rejected)&quot;</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>    <span class="st">&quot;Corrected marginal&quot;</span>))</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(annual, ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">x =</span> label, <span class="at">y =</span> median,</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>    <span class="at">ymin =</span> lower, <span class="at">ymax =</span> upper, <span class="at">color =</span> method, <span class="at">shape =</span> method)) <span class="sc">+</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">geom_pointrange</span>(<span class="at">position =</span> ggplot2<span class="sc">::</span><span class="fu">position_dodge</span>(<span class="at">width =</span> .<span class="dv">6</span>)) <span class="sc">+</span></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">scale_color_brewer</span>(<span class="at">palette =</span> <span class="st">&quot;Dark2&quot;</span>) <span class="sc">+</span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;Year&quot;</span>, <span class="at">y =</span> <span class="st">&quot;Annual log distance: median and 95% interval&quot;</span>,</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>    <span class="at">color =</span> <span class="st">&quot;Computation&quot;</span>, <span class="at">shape =</span> <span class="st">&quot;Computation&quot;</span>) <span class="sc">+</span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">theme_bw</span>() <span class="sc">+</span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">&quot;bottom&quot;</span>) <span class="sc">+</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">guides</span>(<span class="at">color =</span> ggplot2<span class="sc">::</span><span class="fu">guide_legend</span>(<span class="at">nrow =</span> <span class="dv">2</span>, <span class="at">byrow =</span> <span class="cn">TRUE</span>))</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+<p>The annual axis uses natural log distance. Exponentiating an estimate
+returns map units. Joint Laplace places the annual medians higher than
+NUTS despite passing its optimizer and curvature checks. Corrected
+marginal medians are closer to the NUTS reference, although lower
+endpoints still differ. Both computations have finite numerical
+precision, and this one example cannot establish interval
+calibration.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>sd_table <span class="ot">&lt;-</span> <span class="fu">subset</span>(comparison<span class="sc">$</span>quantiles, type <span class="sc">==</span> <span class="st">&quot;scale_sd&quot;</span>,</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="at">select =</span> <span class="fu">c</span>(method, status, lower, median, upper))</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(sd_table, <span class="at">digits =</span> <span class="dv">3</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">&quot;Between-year SD on the log-distance axis: marginal 95% intervals.&quot;</span>)</span></code></pre></div>
+<table>
+<caption>Between-year SD on the log-distance axis: marginal 95%
+intervals.</caption>
+<thead>
+<tr class="header">
+<th align="left">method</th>
+<th align="left">status</th>
+<th align="right">lower</th>
+<th align="right">median</th>
+<th align="right">upper</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">nuts</td>
+<td align="left">eligible</td>
+<td align="right">0.010</td>
+<td align="right">0.235</td>
+<td align="right">0.855</td>
+</tr>
+<tr class="even">
+<td align="left">laplace</td>
+<td align="left">eligible</td>
+<td align="right">0.217</td>
+<td align="right">0.619</td>
+<td align="right">1.800</td>
+</tr>
+<tr class="odd">
+<td align="left">marginal</td>
+<td align="left">rejected</td>
+<td align="right">0.004</td>
+<td align="right">0.085</td>
+<td align="right">0.415</td>
+</tr>
+<tr class="even">
+<td align="left">nested</td>
+<td align="left">eligible</td>
+<td align="right">0.010</td>
+<td align="right">0.230</td>
+<td align="right">0.849</td>
+</tr>
+</tbody>
+</table>
+<p>The NUTS median SD is about 0.235; joint Laplace gives about 0.619
+and the corrected calculation about 0.230. The rejected marginal
+calculation gives about 0.085. Integrating one SD does not automatically
+improve its estimate when the remaining conditional approximation or
+integration is inadequate. A positive lower interval limit does not test
+the exact hypothesis of no annual variation: the continuous half-normal
+prior has no point mass at zero.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">unlist</span>(comparison<span class="sc">$</span>diagnostics<span class="sc">$</span>nested[<span class="fu">c</span>(<span class="st">&quot;pareto_k&quot;</span>, <span class="st">&quot;ess&quot;</span>, <span class="st">&quot;min_tail_ess&quot;</span>,</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="st">&quot;max_weight&quot;</span>, <span class="st">&quot;split_cdf_error&quot;</span>)])</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt;        pareto_k             ess    min_tail_ess      max_weight split_cdf_error </span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt;    3.757608e-01    4.570553e+03    1.049449e+03    3.082416e-03    3.086738e-02</span></span></code></pre></div>
+<p>Read these against the fixed cutoffs above. The compact NUTS
+reference retains 2000 draw vectors from an original 12000 post-warmup
+draws; its original raw and derived checks were assessed before
+compaction. These compact vectors cannot reproduce chain-order
+diagnostics. The approximation SD table uses direct importance weights
+for the corrected method and simulated quantiles for the two uncorrected
+methods.</p>
+<div id="evidence-beyond-one-example" class="section level3" number="5.1">
+<h3><span class="header-section-number">5.1</span> Evidence beyond one
+example</h3>
+<p>On all 40 archived repeated-site simulation inputs, the nested
+response proposal passed the unchanged importance checks for 19 of 20
+Gaussian and 20 of 20 NB2 datasets. The conditional-coefficient
+alternative passed for 10 of 20 and 13 of 20, respectively. Original
+NUTS passed for 20 of 20 and 18 of 20. The remaining nested rejection
+had minimum indicator ESS 389, below the required 400, and remains a
+rejection.</p>
+<p>For the 19 Gaussian and 18 NB2 datasets where both nested correction
+and NUTS passed, annual log-scale RMSE ratios were 0.999 and 1.002, and
+mean 95% interval-width ratios were 0.995 and 0.998. These reused-input
+comparisons support this proposal choice for these tested models. They
+do not establish equivalence, independent calibration, or reliability
+for crossed response effects. Different eligibility sets must not be
+compared as if they contained the same datasets.</p>
+</div>
+</div>
+<div id="separate-posterior-uncertainty-from-monte-carlo-uncertainty" class="section level2" number="6">
+<h2><span class="header-section-number">6</span> Separate posterior
+uncertainty from Monte Carlo uncertainty</h2>
+<p>A credible interval describes posterior uncertainty about a scale.
+Monte Carlo uncertainty describes how accurately a finite computation
+estimates that posterior interval or median. Passing convergence or
+importance diagnostics does not guarantee a precise annual median. A
+flat posterior CDF near its median can turn a small probability error
+into a substantial distance change.</p>
+<p>For corrected fits, summarize the retained joint candidate population
+directly to avoid the additional variability of multinomial
+resampling:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">posterior_scales</span>(corrected_fit, <span class="at">estimator =</span> <span class="st">&quot;weighted&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">posterior_scales</span>(corrected_fit, <span class="at">estimator =</span> <span class="st">&quot;weighted&quot;</span>, <span class="at">scale =</span> <span class="st">&quot;log&quot;</span>)</span></code></pre></div>
+<p>These summaries use the same posterior target and importance weights.
+They do not improve candidate effective sample size or recover an unseen
+posterior region. The weighted SD describes the finite weighted
+population. The earlier cautions about infinite arithmetic distance
+moments still apply. Weighted summaries require
+<code>draws = NULL</code>; the default estimator still uses stored draws
+for every inference method. The plot method’s automatic estimator uses
+direct weights for corrected fits. To compare a table and plot
+consistently, request <code>estimator = &quot;weighted&quot;</code> in both.</p>
+<p><code>importance_max</code> is a cap. A smaller population can pass
+diagnostics and stop before reaching it. To require more production
+candidates, set a minimum too:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>precision_control <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>  <span class="at">correction =</span> <span class="st">&quot;importance&quot;</span>,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="at">importance_min =</span> <span class="dv">65536</span>, <span class="at">importance_max =</span> <span class="dv">131072</span>,</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">importance_refinements =</span> <span class="dv">2</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>)</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co"># Pass precision_control to multiScale_bayes(..., method = &quot;marginal&quot;, control = ...).</span></span></code></pre></div>
+<p>The default minimum is 16384; it must not exceed the maximum. Larger
+populations cost more and do not guarantee a chosen quantile error.
+Inspect the retained candidate count, diagnostics, and independently
+seeded results. When NUTS and correction disagree, check both
+computations: extend sampling, compare seeds, and assess mixing and
+quantile precision for the derived annual log scales. The current NUTS
+eligibility flag checks unconstrained parameters and sampler behavior;
+it does not certify annual-median Monte Carlo precision.</p>
+<p>You can also check a probability that answers a specific question,
+such as whether a fitted kernel scale is no greater than 250 map
+units:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>probability_check <span class="ot">&lt;-</span> <span class="fu">diagnose_bayes_probabilities</span>(fit,</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="at">thresholds =</span> <span class="fu">list</span>(<span class="at">habitat =</span> <span class="fu">c</span>(<span class="dv">100</span>, <span class="dv">250</span>)), <span class="at">mcse_target =</span> <span class="fl">0.005</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>probability_check<span class="sc">$</span>available</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt; [1] FALSE</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>probability_check<span class="sc">$</span>reason</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Full unpermuted NUTS chains are not retained; stored permuted or thinned draws cannot recover them.&quot;</span></span></code></pre></div>
+<p>This compact teaching fit has no original sampler, so it cannot
+provide new chain diagnostics. With the original NUTS sampler retained,
+<code>probabilities</code> reports each fitted group’s event
+probability, indicator ESS, Rhat and MCSE;
+<code>chain_probabilities</code> shows differences among chains. The
+target of 0.005 is half a percentage point of Monte Carlo standard
+error, not a credible interval width. An indicator that stays at zero or
+one has nonestimable precision. It cannot certify that an unseen tail is
+absent. Read this report alongside the original diagnostics and
+<code>diagnose_bayes_scales()</code>; meeting an MCSE target does not
+replace their checks. Thresholds refer to the kernel scale parameter,
+rather than an automatically transformed radius containing a chosen
+share of kernel weight.</p>
+</div>
+<div id="decision-checklist" class="section level2" number="7">
+<h2><span class="header-section-number">7</span> Decision checklist</h2>
+<ol style="list-style-type: decimal">
+<li>Keep likelihoods, priors, data alignment and predictor
+standardization fixed when comparing computations of the same
+posterior.</li>
+<li>Inspect every method’s own checks. Do not treat importance ESS as
+MCMC ESS, resampled draw counts as independent information, or a
+converged grid as evidence of calibrated annual intervals.</li>
+<li>For NUTS, inspect <code>diagnose_bayes_scales()</code> using the
+original sampler. Compact or permuted draws cannot reconstruct
+chain-order diagnostics.</li>
+<li>Compare annual quantiles and the pooling SD, including their
+numerical precision. Independent seeds can reveal instability, but do
+not discard a failed first attempt or claim that a favorable repeat
+establishes accuracy.</li>
+<li>Assess response-model adequacy and prior sensitivity separately.
+None of these numerical checks establishes that a landscape scale is
+identified.</li>
+</ol>
+</div>
+<div id="quick-reference" class="section level2" number="8">
+<h2><span class="header-section-number">8</span> Quick reference</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="fu">check_bayes_setup</span>(<span class="st">&quot;marginal&quot;</span>, <span class="at">correction =</span> <span class="st">&quot;importance&quot;</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>corrected_fit <span class="ot">&lt;-</span> <span class="fu">multiScale_bayes</span>(response, inputs, dat,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="at">scales =</span> scales, <span class="at">row_id =</span> <span class="st">&quot;site_year&quot;</span>, <span class="at">family =</span> <span class="st">&quot;nbinom2&quot;</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>  <span class="at">priors =</span> <span class="fu">list</span>(<span class="at">scale_median =</span> <span class="dv">250</span>), <span class="at">method =</span> <span class="st">&quot;marginal&quot;</span>, <span class="at">seed =</span> <span class="dv">521</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">list</span>(<span class="at">correction =</span> <span class="st">&quot;importance&quot;</span>))</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>corrected_fit<span class="sc">$</span>diagnostics             <span class="co"># weight and probability-stability checks</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>corrected_fit<span class="sc">$</span>importance<span class="sc">$</span>history      <span class="co"># includes discarded training effort</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="fu">posterior_scales</span>(corrected_fit, <span class="at">estimator =</span> <span class="st">&quot;weighted&quot;</span>)</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a><span class="fu">plot</span>(corrected_fit, <span class="at">estimator =</span> <span class="st">&quot;weighted&quot;</span>)</span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a><span class="co"># A failed flag calls for investigation or another computation, not weaker cutoffs.</span></span></code></pre></div>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Output</th>
+<th>What it tells you</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>fit$diagnostics</code></td>
+<td>Stored checks for the selected computation</td>
+</tr>
+<tr class="even">
+<td><code>diagnose_bayes_scales(fit)</code></td>
+<td>Derived NUTS mixing and quantile MCSE when full chains exist</td>
+</tr>
+<tr class="odd">
+<td><code>diagnose_bayes_probabilities(fit, thresholds)</code></td>
+<td>Chain precision for specified fitted-scale probabilities</td>
+</tr>
+<tr class="even">
+<td><code>fit$importance$proposal_diagnostics</code></td>
+<td>Original marginal grid and mode checks, separate from corrected
+weights</td>
+</tr>
+<tr class="odd">
+<td><code>fit$importance$history</code></td>
+<td>Production, adaptation and discarded-stage effort</td>
+</tr>
+<tr class="even">
+<td><code>posterior_scales()</code></td>
+<td>Annual or shared distance quantiles, with explicit draw/weight
+estimator</td>
+</tr>
+</tbody>
+</table>
+<p>See also
+<code>vignette(&quot;bayesian-scales&quot;, package = &quot;multiScaleR&quot;)</code> for
+the main workflow,
+<code>vignette(&quot;bayesian-prediction&quot;, package = &quot;multiScaleR&quot;)</code>
+for new observations and years, and
+<code>vignette(&quot;quickstart&quot;, package = &quot;multiScaleR&quot;)</code> for
+preparation. Prediction uses the stored joint vectors under every
+method, including stored resamples for an importance-corrected fit. It
+does not add posterior effective information or remove approximation
+error.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

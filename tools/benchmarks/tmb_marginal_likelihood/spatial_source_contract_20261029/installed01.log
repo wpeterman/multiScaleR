@@ -1,0 +1,355 @@
+
+
+Optimization complete
+
+
+Optimization complete
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=6.02 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=227.28 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=227.3 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=181.46 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=181.46 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=11.9 to ensure accurate estimation of scale.
+
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=400 to ensure accurate estimation of scale.
+
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+ WARNING!!!
+ The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.
+ Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+ WARNING!!!
+ The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.
+ Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.
+
+
+
+*** Standard optimization failed ***
+Error message:
+mock standard failure
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+*** Parallel optimization failed ***
+Error message:
+mock parallel failure
+Parallel optimization aborted.
+Try running with `n_cores = 1` to use standard optimization.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+
+Optimization complete
+
+
+Optimization complete
+
+
+Optimization complete
+
+
+Optimization complete
+
+
+Optimization complete
+
+
+Optimization complete
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=110.6 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=110.6 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=25.62 to ensure accurate estimation of scale.
+
+
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+[ FAIL 0 | WARN 12 | SKIP 10 | PASS 5325 ]
+
+══ Skipped tests (10) ══════════════════════════════════════════════════════════
+• Development-only benchmark policy (2):
+  'test-benchmark-cold-diagnostics.R:7:3',
+  'test-benchmark-cold-diagnostics.R:21:3'
+• Development benchmark helper is not packaged (5):
+  'test-benchmark-bound-roundoff-alias.R:4:3',
+  'test-benchmark-bound-roundoff.R:8:3',
+  'test-benchmark-bound-roundoff.R:23:3',
+  'test-benchmark-resource-handoff.R:4:3', 'test-benchmark-warm-nb2.R:9:3'
+• file.exists(file.path(root, "boundary-policy/policy.R")) is not TRUE (2):
+  'test-benchmark-near-boundary.R:19:3', 'test-benchmark-near-boundary.R:29:3'
+• file.exists(path) is not TRUE (1): 'test-benchmark-boundary-manifest.R:3:3'
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+── Warning ('test-kernel-bins.R:39:3'): binned optimization recovers the same sigma as the exact path ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:39:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:39:3'): binned optimization recovers the same sigma as the exact path ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:39:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:41:3'): binned optimization recovers the same sigma as the exact path ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:41:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:41:3'): binned optimization recovers the same sigma as the exact path ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:41:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:73:3'): lean mode drops cell data, still optimizes, and matches binned ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:73:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:73:3'): lean mode drops cell data, still optimizes, and matches binned ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:73:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:75:3'): lean mode drops cell data, still optimizes, and matches binned ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:75:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:75:3'): lean mode drops cell data, still optimizes, and matches binned ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:75:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-kernel-bins.R:111:3'): store_cell_data = FALSE is ignored when landscape metrics are present ──
+No CRS specified for polygons; assuming they have the same CRS as the raster.
+Backtrace:
+    ▆
+ 1. └─multiScaleR::kernel_prep(...) at test-kernel-bins.R:111:3
+ 2.   ├─exactextractr::exact_extract(...)
+ 3.   └─exactextractr::exact_extract(...)
+ 4.     └─exactextractr (local) .local(x, y, ...)
+── Warning ('test-surface-metrics.R:309:3'): optimized surface specs evaluate during model refits ──
+glm.fit: fitted probabilities numerically 0 or 1 occurred
+Backtrace:
+    ▆
+ 1. └─stats::glm(y ~ elev_sq, family = binomial(), data = dat) at test-surface-metrics.R:309:3
+ 2.   ├─base::eval(...)
+ 3.   │ └─base::eval(...)
+ 4.   └─stats::glm.fit(...)
+── Warning ('test-surface-metrics.R:319:3'): optimized surface specs evaluate during model refits ──
+glm.fit: fitted probabilities numerically 0 or 1 occurred
+Backtrace:
+     ▆
+  1. └─multiScaleR:::kernel_scale_fn(...) at test-surface-metrics.R:319:3
+  2.   ├─base::tryCatch(...)
+  3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  6.   └─multiScaleR:::.refit_model(mod, data = dat, opt_context = opt_context)
+  7.     └─multiScaleR:::.update_model_data(model, data = data)
+  8.       ├─base::try(stats::update(model, data = data), silent = TRUE)
+  9.       │ └─base::tryCatch(...)
+ 10.       │   └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 11.       │     └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 12.       │       └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 13.       ├─stats::update(model, data = data)
+ 14.       ├─stats::update.default(model, data = data)
+ 15.       │ └─base::eval(call, parent.frame())
+ 16.       │   └─base::eval(call, parent.frame())
+ 17.       └─stats::glm(formula = y ~ elev_sq, family = binomial(), data = data)
+ 18.         ├─base::eval(...)
+ 19.         │ └─base::eval(...)
+ 20.         └─stats::glm.fit(...)
+── Warning ('test-surface-metrics.R:327:3'): optimized surface specs evaluate during model refits ──
+glm.fit: fitted probabilities numerically 0 or 1 occurred
+Backtrace:
+     ▆
+  1. └─multiScaleR:::kernel_scale_fn(...) at test-surface-metrics.R:327:3
+  2.   ├─base::tryCatch(...)
+  3.   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  4.   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  5.   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  6.   └─multiScaleR:::.refit_model(mod, data = dat, opt_context = opt_context)
+  7.     └─multiScaleR:::.update_model_data(model, data = data)
+  8.       ├─base::try(stats::update(model, data = data), silent = TRUE)
+  9.       │ └─base::tryCatch(...)
+ 10.       │   └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 11.       │     └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 12.       │       └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 13.       ├─stats::update(model, data = data)
+ 14.       ├─stats::update.default(model, data = data)
+ 15.       │ └─base::eval(call, parent.frame())
+ 16.       │   └─base::eval(call, parent.frame())
+ 17.       └─stats::glm(formula = y ~ elev_sq, family = binomial(), data = data)
+ 18.         ├─base::eval(...)
+ 19.         │ └─base::eval(...)
+ 20.         └─stats::glm.fit(...)
+
+[ FAIL 0 | WARN 12 | SKIP 10 | PASS 5325 ]

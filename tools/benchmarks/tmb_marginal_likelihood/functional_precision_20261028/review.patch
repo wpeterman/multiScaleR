@@ -1,0 +1,566 @@
+--- predecessor/NAMESPACE
++++ NAMESPACE
+@@ -25,6 +25,7 @@
+ export(aic_tab)
+ export(bic_tab)
+ export(check_bayes_setup)
++export(diagnose_bayes_probabilities)
+ export(diagnose_bayes_scales)
+ export(diagnostics)
+ export(estimate_multiscale_ram)
+--- predecessor/NEWS
++++ NEWS
+@@ -1,5 +1,9 @@
+ Bayesian development (unreleased)
+ ---------
++* `diagnose_bayes_probabilities()` reports chain-based probabilities and Monte
++  Carlo precision at requested fitted-scale thresholds. Constant indicators,
++  unavailable chains and failed diagnostics remain explicit; fit gates and
++  posterior targets are unchanged.
+ * Prediction summaries and prepared snapshots describe their targets, included
+   effects, conditioning and uncertainty through shared prediction contracts.
+   Raw posterior draw outputs and native numerical predictions retain their
+--- predecessor/tests/testthat/test-simulation-and-selection.R
++++ tests/testthat/test-simulation-and-selection.R
+@@ -23,6 +23,7 @@
+     "aic_tab",
+     "bic_tab",
+     "check_bayes_setup",
++    "diagnose_bayes_probabilities",
+     "diagnose_bayes_scales",
+     "diagnostics",
+     "estimate_multiscale_ram",
+--- predecessor/vignettes/bayesian-computation.Rmd
++++ vignettes/bayesian-computation.Rmd
+@@ -388,6 +388,27 @@
+ The current NUTS eligibility flag checks unconstrained parameters and sampler
+ behavior; it does not certify annual-median Monte Carlo precision.
+ 
++You can also check a probability that answers a specific question, such as
++whether a fitted kernel scale is no greater than 250 map units:
++
++```{r probability-precision}
++probability_check <- diagnose_bayes_probabilities(fit,
++  thresholds = list(habitat = c(100, 250)), mcse_target = 0.005)
++probability_check$available
++probability_check$reason
++```
++
++This compact teaching fit has no original sampler, so it cannot provide new
++chain diagnostics. With the original NUTS sampler retained, `probabilities`
++reports each fitted group's event probability, indicator ESS, Rhat and MCSE;
++`chain_probabilities` shows differences among chains. The target of 0.005 is
++half a percentage point of Monte Carlo standard error, not a credible interval width.
++An indicator that stays at zero or one has nonestimable precision. It cannot
++certify that an unseen tail is absent. Read this report alongside the original
++diagnostics and `diagnose_bayes_scales()`; meeting an MCSE target does not replace
++their checks. Thresholds refer to the kernel scale parameter, rather than an
++automatically transformed radius containing a chosen share of kernel weight.
++
+ ## Decision checklist
+ 
+ 1. Keep likelihoods, priors, data alignment and predictor standardization fixed
+@@ -422,6 +443,7 @@
+ |---|---|
+ | `fit$diagnostics` | Stored checks for the selected computation |
+ | `diagnose_bayes_scales(fit)` | Derived NUTS mixing and quantile MCSE when full chains exist |
++| `diagnose_bayes_probabilities(fit, thresholds)` | Chain precision for specified fitted-scale probabilities |
+ | `fit$importance$proposal_diagnostics` | Original marginal grid and mode checks, separate from corrected weights |
+ | `fit$importance$history` | Production, adaptation and discarded-stage effort |
+ | `posterior_scales()` | Annual or shared distance quantiles, with explicit draw/weight estimator |
+--- predecessor/R/bayes_scale_probabilities.R
++++ R/bayes_scale_probabilities.R
+@@ -0,0 +1,188 @@
++#' Check Monte Carlo Precision of Scale Probabilities
++#'
++#' Estimate probabilities that fitted kernel scales fall below specified
++#' thresholds, and diagnose their simulation precision using the original chains.
++#'
++#' @param object A \code{\link{multiScale_bayes}} fit retaining its original
++#'   unpermuted, post-warmup NUTS sampler. Compact and approximate fits return
++#'   an unavailable report; permuted draws cannot recover chain order.
++#' @param thresholds A nonempty named list of numeric vectors. Each name selects
++#'   a fitted kernel predictor, and each vector contains distinct finite scale
++#'   thresholds. The thresholds apply to every distinct fitted scale-formula
++#'   combination for that predictor. For example,
++#'   \code{list(habitat = c(100, 250))} checks two scales in projected map units.
++#' @param scale \code{"distance"} (default) supplies positive kernel-scale
++#'   parameters in map units. \code{"log"} supplies their natural logarithms.
++#'   These are the parameters summarized by \code{\link{posterior_scales}},
++#'   not automatically transformed kernel-weight radii.
++#' @param mcse_target Optional absolute Monte Carlo standard error target on the
++#'   probability axis, strictly between zero and one. For example, \code{0.005}
++#'   requests a probability MCSE no greater than half a percentage point.
++#'   The default \code{NULL} reports precision without judging a target.
++#' @return A list containing:
++#'   \describe{
++#'     \item{available, reason}{Whether original chains could be read, and an
++#'       explanation when unavailable. Individual events can have unavailable
++#'       precision even when the chain report is available.}
++#'     \item{raw_diagnostics}{The fit's original diagnostics, unchanged.}
++#'     \item{probabilities}{A data frame with \code{covariate}, \code{group}, and
++#'       representative fitted \code{row}; the supplied \code{threshold} and
++#'       \code{threshold_scale}; estimated event probability \code{estimate};
++#'       indicator \code{mcse}, \code{ess_mean}, and \code{rhat}; \code{constant},
++#'       \code{precision_available}, \code{precision_target_met}, and \code{reason}.
++#'       The event includes equality: kernel scale is less than or equal to the
++#'       threshold. Probability estimates and MCSE use the probability axis.
++#'       Undefined diagnostics and unrequested target decisions remain \code{NA}.}
++#'     \item{chain_probabilities}{The same event identifiers plus \code{chain},
++#'       its empirical probability \code{estimate}, and whether its indicator
++#'       is \code{constant}. This retains chain differences without storing draws.}
++#'     \item{chains, iterations}{Numbers of original chains and post-warmup
++#'       iterations per chain, or \code{NA} when unavailable.}
++#'     \item{mcse_target, event, notes}{The requested precision target, event
++#'       definition, and interpretation limits.}
++#'     \item{metadata_establishes_eligibility}{Always \code{FALSE}. This report
++#'       does not change the fit's sampling or derived-scale diagnostic gates.}
++#'   }
++#' @details Each event is evaluated on fitted log scales in map units, avoiding
++#'   overflow from exponentiating distances. The \code{posterior} package
++#'   computes mean ESS, MCSE and rank-normalized Rhat of the binary indicators.
++#'   At least two chains with four retained iterations each are required for
++#'   precision diagnostics. Constant indicators have nonestimable precision,
++#'   even when their empirical probability is zero or one. Nonfinite derived
++#'   log scales remain explicit failures; iterations are never dropped.
++#'
++#'   MCSE describes computational uncertainty in a probability estimate, not
++#'   posterior uncertainty about the scale or observation sampling variation.
++#'   \code{precision_target_met} only compares that MCSE with the requested
++#'   target. It does not override Rhat, ESS, raw sampler diagnostics, or model
++#'   checks. A small estimated MCSE cannot rule out an unvisited tail or mode.
++#'   Read \code{\link{diagnose_bayes_scales}} alongside this report and compare
++#'   independent runs when consequential probabilities remain uncertain.
++#'
++#'   The function does not fit a model, change priors, simulate future groups,
++#'   or use stored importance candidates as MCMC chains. Private Gaussian
++#'   projection blocks require a dedicated diagnostic adapter. Reading a full
++#'   retained sampler can require substantial memory; the returned report keeps
++#'   only summaries and retains neither a sampler nor chain arrays.
++#' @seealso \code{\link{diagnose_bayes_scales}},
++#'   \code{\link{posterior_scales}}, \code{\link{predict_scales}}
++#' @examples
++#' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
++#'   package = "multiScaleR"))
++#' report <- diagnose_bayes_probabilities(example$fits$pooled,
++#'   thresholds = list(habitat = c(100, 250)), mcse_target = 0.005)
++#' report$available  # FALSE: this compact example retains no original sampler
++#' report$reason
++#' @export
++diagnose_bayes_probabilities <- function(object, thresholds,
++    scale = c("distance", "log"), mcse_target = NULL) {
++  if (!inherits(object, "multiScaleR_bayes"))
++    stop("object must be a multiScaleR_bayes fit.", call. = FALSE)
++  scale <- match.arg(scale)
++  if (!is.list(thresholds) || !length(thresholds) || is.null(names(thresholds)) ||
++      anyNA(names(thresholds)) || any(!nzchar(names(thresholds))) || anyDuplicated(names(thresholds)) ||
++      !all(names(thresholds) %in% object$specification$covariates) ||
++      any(vapply(thresholds, function(x) !is.numeric(x) || is.complex(x) || !is.null(dim(x)) || !length(x) ||
++        any(!is.finite(x)) || anyDuplicated(x) > 0L || (scale == "distance" && any(x <= 0)), TRUE)))
++    stop("thresholds must uniquely name fitted kernel predictors with distinct finite numeric thresholds; distance thresholds must be positive.", call. = FALSE)
++  if (!is.null(mcse_target)) {
++    if (!is.null(dim(mcse_target)) || is.complex(mcse_target))
++      stop("mcse_target must be a numeric scalar strictly between zero and one.", call. = FALSE)
++    validate_scalar_numeric(mcse_target, "mcse_target", lower = 0,
++      upper = 1, inclusive_lower = FALSE, inclusive_upper = FALSE)
++  }
++  identifiers <- data.frame(covariate = character(), group = character(), row = integer(),
++    threshold = numeric(), threshold_scale = character())
++  out <- list(available = FALSE, reason = "", raw_diagnostics = object$diagnostics,
++    probabilities = cbind(identifiers, estimate = numeric(), mcse = numeric(), ess_mean = numeric(),
++      rhat = numeric(), constant = logical(), precision_available = logical(),
++      precision_target_met = logical(), reason = character()),
++    chain_probabilities = cbind(identifiers, chain = integer(), estimate = numeric(), constant = logical()),
++    chains = NA_integer_, iterations = NA_integer_, mcse_target = mcse_target,
++    event = "kernel_scale <= threshold", metadata_establishes_eligibility = FALSE,
++    notes = c("MCSE measures computational precision, not posterior or observation uncertainty.",
++      "A target decision does not replace original Rhat, ESS or sampler gates.",
++      "Constant indicators cannot certify an absent tail or an unvisited mode."))
++  if (!is.null(object$laplace) || !is.null(object$marginal) || !is.null(object$importance)) {
++    out$reason <- "MCMC probability diagnostics are unavailable for approximate draws or importance candidates."
++    return(out)
++  }
++  if (is.null(object$sampler)) {
++    out$reason <- "Full unpermuted NUTS chains are not retained; stored permuted or thinned draws cannot recover them."
++    return(out)
++  }
++  if (.msr_has_gaussian_blocks(object$specification)) {
++    out$reason <- "Private Gaussian projection blocks require a dedicated diagnostic adapter."
++    return(out)
++  }
++  if (!requireNamespace("posterior", quietly = TRUE))
++    stop("Install posterior to compute probability diagnostics.", call. = FALSE)
++  a <- .msr_bayes_sampler_array(object$sampler)
++  if (!is.numeric(a) || length(dim(a)) != 3L || any(dim(a) < 1L) ||
++      is.null(dimnames(a)[[3L]]) || anyNA(dimnames(a)[[3L]]) ||
++      any(!nzchar(dimnames(a)[[3L]])) || anyDuplicated(dimnames(a)[[3L]]))
++    stop("Sampler output must have named iterations-by-chains-by-parameters dimensions.", call. = FALSE)
++  out$iterations <- dim(a)[1L]; out$chains <- dim(a)[2L]
++  p <- list()
++  # Validate every original block, but copy only the blocks needed for scales.
++  for (nm in names(object$parameters)) {
++    n <- length(object$parameters[[nm]])
++    bracketed <- paste0(nm, "[", seq_len(n), "]")
++    if (n == 1L && nm %in% dimnames(a)[[3L]] && bracketed %in% dimnames(a)[[3L]])
++      stop("Sampler output has an ambiguous original parameter layout.", call. = FALSE)
++    columns <- if (n == 1L && nm %in% dimnames(a)[[3L]]) nm else bracketed
++    if (n && !all(columns %in% dimnames(a)[[3L]]))
++      stop("Sampler output did not preserve the original parameter layout.", call. = FALSE)
++    if (nm %in% c("scale_beta", "scale_z", "log_scale_sd"))
++      p[[nm]] <- if (!n) matrix(numeric(), prod(dim(a)[1:2]), 0L) else
++        matrix(a[, , columns, drop = FALSE], nrow = prod(dim(a)[1:2]))
++  }
++  validate_scalar_numeric(object$specification$unit_conv, "fitted unit_conv", positive = TRUE)
++  summaries <- list(); chains <- list()
++  for (nm in names(thresholds)) {
++    sm <- object$specification$scales[[nm]]
++    for (j in seq_along(sm$representatives)) {
++      row <- sm$representatives[j]
++      log_scale <- drop(p$scale_beta[, sm$beta_index, drop = FALSE] %*% sm$X[row, ])
++      for (term in sm$random)
++        log_scale <- log_scale + exp(p$log_scale_sd[, term$sd_index]) *
++          p$scale_z[, term$z_index[term$index[row]]]
++      log_scale <- log_scale + log(object$specification$unit_conv)
++      for (threshold in thresholds[[nm]]) {
++        id <- data.frame(covariate = nm, group = sm$labels[j], row = as.integer(row),
++          threshold = unname(threshold), threshold_scale = scale)
++        metrics <- c(mcse = NA_real_, ess_mean = NA_real_, rhat = NA_real_)
++        finite <- all(is.finite(log_scale)); reason <- ""
++        indicator <- matrix(NA_real_, out$iterations, out$chains)
++        if (finite) indicator[] <- as.numeric(log_scale <= if (scale == "log") threshold else log(threshold))
++        constant <- if (finite) length(unique(as.vector(indicator))) == 1L else NA
++        if (!finite) reason <- "Nonfinite derived log scales; no iterations were dropped." else
++          if (constant) reason <- "Constant indicator; probability precision is nonestimable." else
++            if (out$chains < 2L || out$iterations < 4L)
++              reason <- "At least two chains with four iterations each are required." else {
++                metrics <- tryCatch(c(mcse = posterior::mcse_mean(indicator),
++                  ess_mean = posterior::ess_mean(indicator), rhat = posterior::rhat(indicator)),
++                  error = function(e) { reason <<- conditionMessage(e); metrics })
++                if (any(!is.finite(metrics)) || metrics[["mcse"]] <= 0 || metrics[["ess_mean"]] <= 0)
++                  if (!nzchar(reason)) reason <- "Indicator precision diagnostics are nonestimable; inspect chain mixing."
++              }
++        usable <- !nzchar(reason)
++        summaries[[length(summaries) + 1L]] <- cbind(id,
++          estimate = if (finite) mean(indicator) else NA_real_,
++          mcse = unname(metrics[["mcse"]]), ess_mean = unname(metrics[["ess_mean"]]),
++          rhat = unname(metrics[["rhat"]]), constant = constant,
++          precision_available = usable, precision_target_met = if (usable && !is.null(mcse_target))
++            metrics[["mcse"]] <= mcse_target else NA, reason = reason)
++        chains[[length(chains) + 1L]] <- cbind(id[rep(1L, out$chains), , drop = FALSE],
++          chain = seq_len(out$chains), estimate = if (finite) colMeans(indicator) else rep(NA_real_, out$chains),
++          constant = if (finite) apply(indicator, 2L, function(x) length(unique(x)) == 1L) else
++            rep(NA, out$chains))
++      }
++    }
++  }
++  out$probabilities <- do.call(rbind, summaries)
++  out$chain_probabilities <- do.call(rbind, chains)
++  rownames(out$probabilities) <- rownames(out$chain_probabilities) <- NULL
++  out$available <- TRUE
++  out
++}
+--- predecessor/man/diagnose_bayes_probabilities.Rd
++++ man/diagnose_bayes_probabilities.Rd
+@@ -0,0 +1,99 @@
++% Generated by roxygen2: do not edit by hand
++% Please edit documentation in R/bayes_scale_probabilities.R
++\name{diagnose_bayes_probabilities}
++\alias{diagnose_bayes_probabilities}
++\title{Check Monte Carlo Precision of Scale Probabilities}
++\usage{
++diagnose_bayes_probabilities(
++  object,
++  thresholds,
++  scale = c("distance", "log"),
++  mcse_target = NULL
++)
++}
++\arguments{
++\item{object}{A \code{\link{multiScale_bayes}} fit retaining its original
++unpermuted, post-warmup NUTS sampler. Compact and approximate fits return
++an unavailable report; permuted draws cannot recover chain order.}
++
++\item{thresholds}{A nonempty named list of numeric vectors. Each name selects
++a fitted kernel predictor, and each vector contains distinct finite scale
++thresholds. The thresholds apply to every distinct fitted scale-formula
++combination for that predictor. For example,
++\code{list(habitat = c(100, 250))} checks two scales in projected map units.}
++
++\item{scale}{\code{"distance"} (default) supplies positive kernel-scale
++parameters in map units. \code{"log"} supplies their natural logarithms.
++These are the parameters summarized by \code{\link{posterior_scales}},
++not automatically transformed kernel-weight radii.}
++
++\item{mcse_target}{Optional absolute Monte Carlo standard error target on the
++probability axis, strictly between zero and one. For example, \code{0.005}
++requests a probability MCSE no greater than half a percentage point.
++The default \code{NULL} reports precision without judging a target.}
++}
++\value{
++A list containing:
++  \describe{
++    \item{available, reason}{Whether original chains could be read, and an
++      explanation when unavailable. Individual events can have unavailable
++      precision even when the chain report is available.}
++    \item{raw_diagnostics}{The fit's original diagnostics, unchanged.}
++    \item{probabilities}{A data frame with \code{covariate}, \code{group}, and
++      representative fitted \code{row}; the supplied \code{threshold} and
++      \code{threshold_scale}; estimated event probability \code{estimate};
++      indicator \code{mcse}, \code{ess_mean}, and \code{rhat}; \code{constant},
++      \code{precision_available}, \code{precision_target_met}, and \code{reason}.
++      The event includes equality: kernel scale is less than or equal to the
++      threshold. Probability estimates and MCSE use the probability axis.
++      Undefined diagnostics and unrequested target decisions remain \code{NA}.}
++    \item{chain_probabilities}{The same event identifiers plus \code{chain},
++      its empirical probability \code{estimate}, and whether its indicator
++      is \code{constant}. This retains chain differences without storing draws.}
++    \item{chains, iterations}{Numbers of original chains and post-warmup
++      iterations per chain, or \code{NA} when unavailable.}
++    \item{mcse_target, event, notes}{The requested precision target, event
++      definition, and interpretation limits.}
++    \item{metadata_establishes_eligibility}{Always \code{FALSE}. This report
++      does not change the fit's sampling or derived-scale diagnostic gates.}
++  }
++}
++\description{
++Estimate probabilities that fitted kernel scales fall below specified
++thresholds, and diagnose their simulation precision using the original chains.
++}
++\details{
++Each event is evaluated on fitted log scales in map units, avoiding
++  overflow from exponentiating distances. The \code{posterior} package
++  computes mean ESS, MCSE and rank-normalized Rhat of the binary indicators.
++  At least two chains with four retained iterations each are required for
++  precision diagnostics. Constant indicators have nonestimable precision,
++  even when their empirical probability is zero or one. Nonfinite derived
++  log scales remain explicit failures; iterations are never dropped.
++
++  MCSE describes computational uncertainty in a probability estimate, not
++  posterior uncertainty about the scale or observation sampling variation.
++  \code{precision_target_met} only compares that MCSE with the requested
++  target. It does not override Rhat, ESS, raw sampler diagnostics, or model
++  checks. A small estimated MCSE cannot rule out an unvisited tail or mode.
++  Read \code{\link{diagnose_bayes_scales}} alongside this report and compare
++  independent runs when consequential probabilities remain uncertain.
++
++  The function does not fit a model, change priors, simulate future groups,
++  or use stored importance candidates as MCMC chains. Private Gaussian
++  projection blocks require a dedicated diagnostic adapter. Reading a full
++  retained sampler can require substantial memory; the returned report keeps
++  only summaries and retains neither a sampler nor chain arrays.
++}
++\examples{
++example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
++  package = "multiScaleR"))
++report <- diagnose_bayes_probabilities(example$fits$pooled,
++  thresholds = list(habitat = c(100, 250)), mcse_target = 0.005)
++report$available  # FALSE: this compact example retains no original sampler
++report$reason
++}
++\seealso{
++\code{\link{diagnose_bayes_scales}},
++  \code{\link{posterior_scales}}, \code{\link{predict_scales}}
++}
+--- predecessor/tests/testthat/test-bayesian-probabilities.R
++++ tests/testthat/test-bayesian-probabilities.R
+@@ -0,0 +1,200 @@
++probability_chain_fixture <- function(fit, iterations = 600L, chains = 4L) {
++  set.seed(82917)
++  columns <- unlist(lapply(names(fit$parameters), function(nm) {
++    n <- length(fit$parameters[[nm]])
++    if (!n) character() else if (n == 1L) nm else paste0(nm, "[", seq_len(n), "]")
++  }))
++  n <- iterations * chains
++  values <- matrix(rep(unlist(fit$parameters), each = n), nrow = n)
++  values <- values + matrix(rnorm(length(values), sd = .25), nrow = n)
++  array(values, c(iterations, chains, ncol(values)), dimnames = list(NULL, NULL, columns))
++}
++
++test_that("probability diagnostics validate requests without extracting unavailable chains", {
++  fit <- prepare_bayesian_fixture(bayesian_scale_fixture(n_site = 3, n_year = 2))
++  fit$diagnostics <- list(passed = FALSE, marker = "original failure")
++  local_mocked_bindings(.msr_bayes_sampler_array = function(sampler) stop("must not extract"),
++    .package = "multiScaleR")
++  d <- diagnose_bayes_probabilities(fit, list(habitat = 100))
++  expect_false(d$available)
++  expect_match(d$reason, "not retained")
++  expect_identical(d$raw_diagnostics, fit$diagnostics)
++  expect_equal(nrow(d$probabilities), 0L)
++  expect_equal(nrow(d$chain_probabilities), 0L)
++  expect_identical(d$probabilities$precision_target_met, logical())
++  expect_false(d$metadata_establishes_eligibility)
++  expect_false("passed" %in% names(d))
++  fit <- fake_bayesian_draws(fit)
++  expect_false(diagnose_bayes_probabilities(fit, list(habitat = 100))$available)
++  for (nm in c("laplace", "marginal", "importance")) {
++    f <- fit; f[[nm]] <- list(passed = TRUE); f$sampler <- "mock"
++    expect_match(diagnose_bayes_probabilities(f, list(habitat = 100))$reason, "approximate draws")
++  }
++  expect_error(diagnose_bayes_probabilities(list(), list(habitat = 100)), "multiScaleR_bayes")
++  for (x in list(NULL, list(), 100, list(100), list(unknown = 100),
++      list(habitat = numeric()), list(habitat = NA_real_), list(habitat = Inf),
++      list(habitat = c(100, 100)), list(habitat = "100"), list(habitat = matrix(100)),
++      list(habitat = 0), list(habitat = -1), list(habitat = 1 + 1i), setNames(list(100), NA_character_),
++      setNames(list(100), ""), setNames(list(100, 200), c("habitat", "habitat"))))
++    expect_error(diagnose_bayes_probabilities(fit, x), "thresholds")
++  for (target in list(0, 1, NA_real_, Inf, c(.01, .02), ".01", matrix(.01), .01 + .01i))
++    expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100), mcse_target = target), "mcse_target")
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100), scale = "radius"), "arg")
++  expect_false(diagnose_bayes_probabilities(fit, list(habitat = c(-2, 0)), scale = "log")$available)
++  fit$sampler <- "mock"
++  local_mocked_bindings(.msr_has_gaussian_blocks = function(spec) TRUE, .package = "multiScaleR")
++  expect_match(diagnose_bayes_probabilities(fit, list(habitat = 100))$reason, "dedicated diagnostic adapter")
++})
++
++test_that("probabilities use original ordered indicators and preserve fit and RNG", {
++  skip_if_not_installed("posterior")
++  fit <- prepare_bayesian_fixture(bayesian_scale_fixture(n_site = 3, n_year = 2))
++  a <- probability_chain_fixture(fit)
++  fit$sampler <- "mock"; fit$diagnostics <- list(passed = FALSE, marker = "retain raw failure")
++  fit <- fake_bayesian_draws(fit, n = 3)
++  fit$draws$scale_beta[,] <- 1000
++  local_mocked_bindings(.msr_bayes_sampler_array = function(sampler) a, .package = "multiScaleR")
++  thresholds <- c(250, 100, 400)
++  before <- serialize(fit, NULL); rng <- .Random.seed
++  d <- diagnose_bayes_probabilities(fit, list(habitat = thresholds), mcse_target = .03)
++  expect_true(d$available)
++  expect_identical(d$chains, 4L)
++  expect_identical(d$iterations, 600L)
++  expect_identical(d$raw_diagnostics, fit$diagnostics)
++  expect_identical(serialize(fit, NULL), before)
++  expect_identical(.Random.seed, rng)
++  expect_false("passed" %in% names(d))
++  expect_false(d$metadata_establishes_eligibility)
++  expect_false(any(c("draws", "sampler", "parameters") %in% names(d)))
++  sm <- fit$specification$scales$habitat
++  expect_identical(d$probabilities$group, rep(sm$labels, each = 3L))
++  expect_identical(d$probabilities$row, rep(sm$representatives, each = 3L))
++  expect_identical(d$probabilities$threshold, rep(thresholds, 2L))
++  # Reconstruct each chain independently, without the function's flattening code.
++  for (j in seq_along(sm$representatives)) {
++    expected <- a[, , "scale_beta"] + exp(a[, , "log_scale_sd"]) *
++      a[, , paste0("scale_z[", j, "]")] + log(fit$specification$unit_conv)
++    for (k in seq_along(thresholds)) {
++      indicator <- 1 * (expected <= log(thresholds[k]))
++      row <- (j - 1L) * 3L + k
++      expect_equal(d$probabilities$estimate[row], mean(indicator))
++      expect_equal(d$probabilities$mcse[row], posterior::mcse_mean(indicator))
++      expect_equal(d$probabilities$ess_mean[row], posterior::ess_mean(indicator))
++      expect_equal(d$probabilities$rhat[row], posterior::rhat(indicator))
++      expect_true(d$probabilities$precision_available[row])
++      expect_identical(d$probabilities$precision_target_met[row],
++        posterior::mcse_mean(indicator) <= .03)
++      rows <- (row - 1L) * 4L + seq_len(4L)
++      expect_equal(d$chain_probabilities$estimate[rows], colMeans(indicator))
++      expect_identical(d$chain_probabilities$chain[rows], seq_len(4L))
++    }
++  }
++  log_report <- diagnose_bayes_probabilities(fit, list(habitat = log(thresholds)), scale = "log")
++  columns <- c("estimate", "mcse", "ess_mean", "rhat", "precision_available")
++  expect_equal(log_report$probabilities[columns], d$probabilities[columns])
++  expect_true(all(is.na(log_report$probabilities$precision_target_met)))
++  dimnames(a)[[3L]] <- ifelse(grepl("[", dimnames(a)[[3L]], fixed = TRUE),
++    dimnames(a)[[3L]], paste0(dimnames(a)[[3L]], "[1]"))
++  expect_equal(diagnose_bayes_probabilities(fit, list(habitat = thresholds),
++    mcse_target = .03), d)
++  # Equivalent fitted map units must give the same events.
++  fit$specification$unit_conv <- fit$specification$unit_conv * 2
++  a[, , "scale_beta[1]"] <- a[, , "scale_beta[1]"] - log(2)
++  expect_equal(diagnose_bayes_probabilities(fit, list(habitat = thresholds),
++    mcse_target = .03), d)
++})
++
++test_that("constant, nonfinite and undersized chains retain explicit precision limits", {
++  skip_if_not_installed("posterior")
++  f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
++  fit <- multiScale_bayes(count ~ habitat, f$inputs, f$data, row_id = "key", method = "prepare")
++  fit$sampler <- "mock"; fit$specification$unit_conv <- 1
++  a <- probability_chain_fixture(fit)
++  local_mocked_bindings(.msr_bayes_sampler_array = function(sampler) a, .package = "multiScaleR")
++  a[, , "scale_beta"] <- 0
++  d <- diagnose_bayes_probabilities(fit, list(habitat = c(-1, 0, 1)), scale = "log", mcse_target = .001)
++  expect_identical(d$probabilities$estimate, c(0, 1, 1))
++  expect_true(all(d$probabilities$constant))
++  expect_true(all(d$chain_probabilities$constant))
++  expect_false(any(d$probabilities$precision_available))
++  expect_true(all(is.na(d$probabilities$precision_target_met)))
++  expect_true(all(is.na(as.matrix(d$probabilities[c("mcse", "ess_mean", "rhat")]))))
++  expect_true(all(grepl("Constant indicator", d$probabilities$reason)))
++  a[1, 1, "scale_beta"] <- NA_real_
++  d <- diagnose_bayes_probabilities(fit, list(habitat = 1))
++  expect_true(d$available)
++  expect_match(d$probabilities$reason, "no iterations were dropped")
++  expect_true(is.na(d$probabilities$estimate))
++  expect_true(all(is.na(d$chain_probabilities$estimate)))
++  a <- probability_chain_fixture(fit, chains = 1L)
++  a[, , "scale_beta"] <- a[, , "scale_beta"] - fit$parameters$scale_beta
++  d <- diagnose_bayes_probabilities(fit, list(habitat = 0), scale = "log")
++  expect_match(d$probabilities$reason, "two chains")
++  expect_true(is.na(d$probabilities$mcse))
++  a <- probability_chain_fixture(fit, iterations = 3L)
++  a[, , "scale_beta"] <- a[, , "scale_beta"] - fit$parameters$scale_beta
++  d <- diagnose_bayes_probabilities(fit, list(habitat = 0), scale = "log")
++  expect_match(d$probabilities$reason, "four iterations")
++  # Finite log scales beyond exp()'s range remain valid event comparisons.
++  a <- probability_chain_fixture(fit)
++  a[, , "scale_beta"] <- a[, , "scale_beta"] - fit$parameters$scale_beta + 1000
++  d <- diagnose_bayes_probabilities(fit, list(habitat = 1000), scale = "log")
++  expect_true(is.finite(d$probabilities$estimate))
++  expect_true(d$probabilities$precision_available)
++  # A computable MCSE does not turn poor chain mixing into a model pass.
++  a[, 4, "scale_beta"] <- a[, 4, "scale_beta"] + 1
++  d <- diagnose_bayes_probabilities(fit, list(habitat = 1000), scale = "log", mcse_target = .99)
++  expect_gt(d$probabilities$rhat, 1.01)
++  expect_false("passed" %in% names(d))
++})
++
++test_that("multiple scale designs and crossed group maps preserve event identities", {
++  skip_if_not_installed("posterior")
++  f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
++  counts <- f$inputs$binned$csum$habitat
++  f$inputs$binned$vsum$forest <- cos(f$inputs$binned$vsum$habitat / pmax(1, counts)) * counts
++  f$inputs$binned$csum$forest <- counts
++  fit <- multiScale_bayes(count ~ habitat + forest + (1 | site) + (1 | year),
++    f$inputs, f$data, row_id = "key", method = "prepare", scales = list(
++      habitat = ~1 + temp + (1 | year) + (1 | site), forest = ~0 + year))
++  fit$sampler <- "mock"
++  a <- probability_chain_fixture(fit)
++  local_mocked_bindings(.msr_bayes_sampler_array = function(sampler) a, .package = "multiScaleR")
++  d <- diagnose_bayes_probabilities(fit, list(forest = 250, habitat = c(100, 250)))
++  expect_identical(d$probabilities$covariate, c(rep("forest", 2), rep("habitat", 12)))
++  for (i in seq_len(nrow(d$probabilities))) {
++    target <- d$probabilities[i, ]; sm <- fit$specification$scales[[target$covariate]]
++    expected <- matrix(0, dim(a)[1L], dim(a)[2L])
++    for (k in seq_along(sm$beta_index))
++      expected <- expected + a[, , paste0("scale_beta[", sm$beta_index[k], "]")] * sm$X[target$row, k]
++    for (term in sm$random)
++      expected <- expected + exp(a[, , paste0("log_scale_sd[", term$sd_index, "]")]) *
++        a[, , paste0("scale_z[", term$z_index[term$index[target$row]], "]")]
++    expected <- expected + log(fit$specification$unit_conv)
++    expect_equal(target$estimate, mean(expected <= log(target$threshold)))
++  }
++})
++
++test_that("malformed original parameter layouts fail before event calculation", {
++  skip_if_not_installed("posterior")
++  fit <- prepare_bayesian_fixture(bayesian_scale_fixture(n_site = 3, n_year = 2))
++  fit$sampler <- "mock"
++  a <- probability_chain_fixture(fit)
++  original <- a
++  local_mocked_bindings(.msr_bayes_sampler_array = function(sampler) a, .package = "multiScaleR")
++  a <- matrix(1, 2, 2)
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "dimensions")
++  a <- original; dimnames(a) <- NULL
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "dimensions")
++  a <- original; dimnames(a)[[3L]][1L] <- NA_character_
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "dimensions")
++  a <- original; dimnames(a)[[3L]][1L] <- ""
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "dimensions")
++  a <- original; dimnames(a)[[3L]][1L] <- dimnames(a)[[3L]][2L]
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "dimensions")
++  a <- original[, , -1L, drop = FALSE]
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "original parameter layout")
++  a <- array(c(original, original[, , "scale_beta"]), c(dim(original)[1:2], dim(original)[3] + 1L),
++    dimnames = list(NULL, NULL, c(dimnames(original)[[3L]], "scale_beta[1]")))
++  expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "ambiguous original parameter layout")
++})

@@ -75,8 +75,9 @@ scale_center_raster <- function(r,
     if(!all(covs %in% names(dat))){
       stop("Original model data needed for clamping do not contain all raster layers in `r`.")
     }
-    min_vals <- apply(dat, 2, min) * (pct_mx + 1)
-    max_vals <- apply(dat, 2, max) * (pct_mx + 1)
+    # Nonspatial site keys or factors must not coerce numeric raster columns.
+    min_vals <- vapply(dat[covs], min, numeric(1)) * (pct_mx + 1)
+    max_vals <- vapply(dat[covs], max, numeric(1)) * (pct_mx + 1)
 
     for(i in 1:length(covs)){
       lyr <- as.character(covs[[i]])

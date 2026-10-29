@@ -116,10 +116,29 @@
 
 
 .model_data <- function(model, ...) {
-  suppressWarnings(tryCatch(
+  dat <- suppressWarnings(tryCatch(
     get_data(model, ...),
     error = function(e) NULL
   ))
+  # Some insight/survival combinations rename a saved conditional-logistic
+  # response to `x`. Reconstruct its original name from the retained frame
+  # before accepting data that cannot be used to refit the model.
+  if (inherits(model, "coxph")) {
+    formula <- stats::formula(model)
+    response <- formula[[2L]]
+    # Limit recovery to the constant-time, direct-response contract used by
+    # clogit. Do not invert transformed event times or response expressions.
+    direct_response <- is.call(response) && length(all.vars(response)) == 1L &&
+      is.symbol(response[[length(response)]])
+    required <- all.vars(formula)
+    if (direct_response && (is.null(dat) || !all(required %in% names(dat)))) {
+      recovered <- extract_model_data(model)
+      if (!is.null(recovered) && all(required %in% names(recovered))) {
+        dat <- recovered
+      }
+    }
+  }
+  dat
 }
 
 
@@ -258,9 +277,9 @@
   n_covs <- opt_context$n_covs
   scale_vars <- opt_context$scale_vars
 
-  sigma <- par[1:n_covs]
+  sigma <- par[seq_len(n_covs)]
   if (kernel == 'expow') {
-    shape <- par[(n_covs + 1):(n_covs * 2)]
+    shape <- par[n_covs + seq_len(n_covs)]
   } else {
     shape <- NULL
   }
@@ -315,23 +334,35 @@
       )
     }
 
-    # Exact per-cell evaluation over the requested covariates. `sig_idx` maps the
-    # requested columns back to their positions in the full sigma/shape vectors so
-    # a subset is weighted with exactly the same parameters as the full matrix.
-    sig_idx <- match(target_covs, covs)
+    # Binned kernel columns are filled below. Evaluate only the remaining
+    # transforms here, retaining their requested order and parameter mapping.
+    # Legacy inputs without scale_vars keep their existing exact path.
+    exact_covs <- if (is.null(scale_vars)) target_covs else
+      setdiff(target_covs, binned_covs)
+    exact_params <- if (is.null(scale_vars)) exact_covs else
+      exact_covs[exact_covs %in% param_covariates]
+    sig_idx <- match(exact_params, covs)
+    prepared_adjacency <- opt_context$adjacency_neighbors
+    prepared_edges <- opt_context$edge_neighbors
+    if (!is.null(prepared_edges) && !is.null(eval_idx))
+      prepared_edges <- prepared_edges[eval_idx]
+    if (!is.null(prepared_adjacency) && !is.null(eval_idx))
+      prepared_adjacency <- prepared_adjacency[eval_idx]
+    prepared_neighbors <- opt_context$surface_neighbors
+    if (!is.null(prepared_neighbors) && !is.null(eval_idx))
+      prepared_neighbors <- prepared_neighbors[eval_idx]
     for (i in seq_len(n_ind)) {
       if (is.null(scale_vars)) {
-        cov.w[i, ] <-
+        cov.w[i, exact_covs] <-
           scale_type(d_list[[i]],
                      kernel = kernel,
                      sigma = sigma[sig_idx],
                      shape = if (is.null(shape)) NULL else shape[sig_idx],
-                     r_stack.df = cov_df[[i]][, target_covs, drop = FALSE])
+                     r_stack.df = cov_df[[i]][, exact_covs, drop = FALSE])
       } else {
-        # `.msr_eval_scale_vars()` indexes `sigma`/`shape` by each covariate's
-        # position within the `covariates` it is handed, so a subset must receive
-        # the subset-ordered parameters (`sig_idx` maps back to the full vector).
-        cov.w[i, ] <- .msr_eval_scale_vars(
+        # Fixed-radius metrics have no parameter; pass only optimized scales
+        # and shapes in the order expected by the remaining transforms.
+        cov.w[i, exact_covs] <- .msr_eval_scale_vars(
           d = d_list[[i]],
           cov_df = cov_df[[i]],
           scale_vars = scale_vars,
@@ -341,14 +372,16 @@
           unit_conv = opt_context$unit_conv,
           resolution = opt_context$resolution,
           n_cols = opt_context$n_cols,
-          covariates = target_covs,
-          validate = FALSE
+          covariates = exact_covs,
+          validate = FALSE,
+          prepared_neighbors = prepared_neighbors[[i]],
+          prepared_adjacency = prepared_adjacency[[i]],
+          prepared_edges = prepared_edges[[i]]
         )
       }
     } ## End for loop
 
-    # Overwrite the kernel covariate columns with their (faster, equivalent)
-    # binned values so mixed kernel + landscape models still benefit.
+    # Fill kernel columns once from the same binned summaries as before.
     if (length(binned_covs) > 0 && !is.null(scale_vars)) {
       cov.w[, binned_covs] <- .msr_binned_kernel_means(
         binned = binned,
@@ -407,6 +440,9 @@ kernel_scale_fn <- function(par,
   }
 
   mod <- opt_context$fitted_mod
+  # Tell custom refitters when model metadata/uncertainty must be retained.
+  # This local list copy does not mutate the shared optimization context.
+  opt_context$return_model <- !is.null(mod_return)
   mod_class <- opt_context$mod_class
   n_covs <- opt_context$n_covs
 
@@ -573,7 +609,8 @@ build_opt_context <- function(fitted_mod,
                               unit_conv = 1,
                               resolution = NULL,
                               n_cols = NULL,
-                              binned = NULL) {
+                              binned = NULL,
+                              d_list = NULL) {
   mod <- fitted_mod
   analysis_mod <- .analysis_model(mod)
   cov_names <- .msr_optimized_covariates(scale_vars, cov_df = cov_df)
@@ -628,6 +665,18 @@ build_opt_context <- function(fitted_mod,
               resolution = resolution,
               n_cols = n_cols,
               binned = .msr_subset_binned(binned, covs))
+  out$surface_neighbors <- .msr_prepare_surface_neighbors(
+    d_list, cov_df, if (is.null(scale_vars)) NULL else
+      scale_vars[scale_vars$covariate %in% covs, , drop = FALSE],
+    resolution, n_cols)
+
+  out$adjacency_neighbors <- .msr_prepare_adjacency(
+    d_list, cov_df, if (is.null(scale_vars)) NULL else
+      scale_vars[scale_vars$covariate %in% covs, , drop = FALSE], n_cols)
+
+  out$edge_neighbors <- .msr_prepare_edge_neighbors(
+    d_list, cov_df, if (is.null(scale_vars)) NULL else
+      scale_vars[scale_vars$covariate %in% covs, , drop = FALSE], resolution, n_cols)
 
   n_sites <- if (!is.null(cov_df)) {
     length(cov_df)

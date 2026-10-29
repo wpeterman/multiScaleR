@@ -1,0 +1,362 @@
+[
+  {
+    "file": "baseline.json",
+    "bytes": 32696,
+    "sha256": "dd45ef566ee46e88a264668fd0f63db4df4d6f68ed2c304fde67254511c90464"
+  },
+  {
+    "file": "build01-exit.json",
+    "bytes": 111,
+    "sha256": "8f720e45b81a91f84278b07314a1da699eac969462ce2ef778bcdda8a8ebd51e"
+  },
+  {
+    "file": "build01-process.json",
+    "bytes": 279,
+    "sha256": "38c1e9d4ad176dcab265b9bb84bf231c79414494d42cc6745a67383a376f7d6e"
+  },
+  {
+    "file": "build01-resources.jsonl",
+    "bytes": 6563,
+    "sha256": "7813439352e9a82544bdfadc3d00c1d64caa9f6999e7103a5665828747252ffe"
+  },
+  {
+    "file": "build01.err",
+    "bytes": 2,
+    "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6"
+  },
+  {
+    "file": "build01.json",
+    "bytes": 237,
+    "sha256": "b08178c96f0b189433a20cd1a33e6b80e4b7d36a8e0448b966abac0ef07110a2"
+  },
+  {
+    "file": "build01.log",
+    "bytes": 411,
+    "sha256": "66de41c1a92241b1c08d335e0b5a9f17846afe35e76c4700c0c1918bfcab1f0a"
+  },
+  {
+    "file": "check-phases.ps1",
+    "bytes": 4078,
+    "sha256": "e675a67c69a3ab9fb846a8e309c6e2793a92070d572b8d66723e8fd146f5f138"
+  },
+  {
+    "file": "check01-exit.json",
+    "bytes": 111,
+    "sha256": "ef3f56196db99b315a7ad172cd6d95a15e182882e99d247c368b5af8282bf4e8"
+  },
+  {
+    "file": "check01-input.json",
+    "bytes": 435,
+    "sha256": "bc524c0c2b730b26c9c38af190994c4346465637184f6889b339cf446690405f"
+  },
+  {
+    "file": "check01-process.json",
+    "bytes": 325,
+    "sha256": "bcad584d7bd85de8691f649b6a787278f96962a8b2e402d7e8b0439b1c6ab2fe"
+  },
+  {
+    "file": "check01-resources.jsonl",
+    "bytes": 25367,
+    "sha256": "833a2e8f380395bee73756dfe8f1b0253e8cf94671b27ef1470e99b22e010304"
+  },
+  {
+    "file": "check01.err",
+    "bytes": 4,
+    "sha256": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563"
+  },
+  {
+    "file": "check01.json",
+    "bytes": 540,
+    "sha256": "73294305b9345e84ffc8a3124c0489f5f55429afe938968a60a964fd7f430ce8"
+  },
+  {
+    "file": "check01.log",
+    "bytes": 4113,
+    "sha256": "5e6a839ac17340f4d5c29ecc45e55d006a62901f2f724e965dd0c72416e3235e"
+  },
+  {
+    "file": "checkpoint-running.json",
+    "bytes": 862,
+    "sha256": "fd7b4e0a679aaa36b110f2dc56fb4a6be2bfc29fa922270b2b77b92345abbc6d"
+  },
+  {
+    "file": "closeout.py",
+    "bytes": 2273,
+    "sha256": "a7e8d2ae9388b4d1f8a44f96eb77f78463c44ed4ebcd4f5777828bdb663917f9"
+  },
+  {
+    "file": "compatibility01-exit.json",
+    "bytes": 111,
+    "sha256": "a0ab9a899c0dbba5dec4d4dcc1f5b26895f935047f4b57c68548ea70c9eb8037"
+  },
+  {
+    "file": "compatibility01-process.json",
+    "bytes": 471,
+    "sha256": "55992684d2fc0216db878cbca46dd319519546ee0effb9db3b63e0244afa42c9"
+  },
+  {
+    "file": "compatibility01-resources.jsonl",
+    "bytes": 627,
+    "sha256": "6824f690dd3f2dfb12b3ff87fbebe9be7aa53134406da8cda186a4ab9dc5a13c"
+  },
+  {
+    "file": "compatibility01-test-bayesian-derived-diagnostics.json",
+    "bytes": 111,
+    "sha256": "e12e00acbd5c1636bf42c1dde84d79029ea330b436cd1809b85806a2bd20d205"
+  },
+  {
+    "file": "compatibility01-test-bayesian-log-summaries.json",
+    "bytes": 105,
+    "sha256": "108a285194cbb88f8c6d419a3c5f5f69cde53ff82d19f562684d96be7a939e8b"
+  },
+  {
+    "file": "compatibility01-test-bayesian-scales.json",
+    "bytes": 98,
+    "sha256": "4c7bab66758f259e7b94cf33c02e7291f65849c0eedd9883c147402e573a4605"
+  },
+  {
+    "file": "compatibility01-test-prediction-contract.json",
+    "bytes": 103,
+    "sha256": "24fd3bb56299157ae1d1d7e63cdb3d6c39c0e25927d36172c0ef57b37ada38aa"
+  },
+  {
+    "file": "compatibility01-test-simulation-and-selection.json",
+    "bytes": 107,
+    "sha256": "48032ba199ff574b822348e41ef02aae1df79abb28bd60f38f1bb1326fc588ea"
+  },
+  {
+    "file": "compatibility01.err",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "compatibility01.json",
+    "bytes": 16590,
+    "sha256": "8b0ee23f1c663ba2a33ecb72a0ae7848a7dec1aca86d452ed2cfa097c09c100c"
+  },
+  {
+    "file": "compatibility01.log",
+    "bytes": 1587,
+    "sha256": "b97043c0b18b56eae5ffb63e785c19e5f0192666bf2755c8016080e322b05212"
+  },
+  {
+    "file": "document.R",
+    "bytes": 1625,
+    "sha256": "7d5d18aa517d04e63caf563e623ac71f5605c615ae0d4fad70e147ec16cdf8f8"
+  },
+  {
+    "file": "documentation01-exit.json",
+    "bytes": 111,
+    "sha256": "1f053a4ebe5d4f1ae8d53aaea36493ecac4ecdc064a43e036e08809e07274db8"
+  },
+  {
+    "file": "documentation01-process.json",
+    "bytes": 471,
+    "sha256": "a189738f7fbd8a7d5a124c7f69b50e6c70e75b67bbc408daa1e380df4e115537"
+  },
+  {
+    "file": "documentation01-resources.jsonl",
+    "bytes": 627,
+    "sha256": "1c7c93ed2219c34c8e89f9396ba8c6bc2b7da7023f0d6f4c7eb09ab908d37dff"
+  },
+  {
+    "file": "documentation01.err",
+    "bytes": 229,
+    "sha256": "658145f6e99bc8fefd97d4dead6d12dc47a91fbe751ece7e6ff47be48defd079"
+  },
+  {
+    "file": "documentation01.json",
+    "bytes": 491,
+    "sha256": "2e386e5b5ee7b2bdafcc42499aacae5ded179f2a553e992ddac82d9df73b9232"
+  },
+  {
+    "file": "documentation01.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "extract-tests.py",
+    "bytes": 1346,
+    "sha256": "f2a75ebf72c1f6908ce6e2b44107f8b4bd0b3e8cf69987d6b0f72fe26b99878a"
+  },
+  {
+    "file": "final-source-evidence.json",
+    "bytes": 33803,
+    "sha256": "ad52448a7bdde42b16e4b09b2dc31e734f9dec035470f6a2bc217c83b27f2aea"
+  },
+  {
+    "file": "installed01-exit.json",
+    "bytes": 111,
+    "sha256": "eab19cc830072c8f810ee42dac9acdd8eb640c4395fa3acb6a7669475b3454f4"
+  },
+  {
+    "file": "installed01-process.json",
+    "bytes": 320,
+    "sha256": "c9b6843bb53029d72db95cdf571728bba19821b35d6bef5f4d4824206b6c8385"
+  },
+  {
+    "file": "installed01-resources.jsonl",
+    "bytes": 11602,
+    "sha256": "6263f0406d57f16e07f723a6e93acfaed1095c953338cb135522ad989db800e7"
+  },
+  {
+    "file": "installed01.err",
+    "bytes": 347,
+    "sha256": "f3a4c01f27ae1b86d980c4a03e0ce6e582944910f475ecc6c5a2a5be2b90adb0"
+  },
+  {
+    "file": "installed01.log",
+    "bytes": 13970,
+    "sha256": "d35a12c52537f6cc3514891228ba2fa3b79bb81b119b32282f6b607156c05a14"
+  },
+  {
+    "file": "predecessor/NAMESPACE",
+    "bytes": 4489,
+    "sha256": "0afaff5e42b25f82989bc513efa98419a2f5d38a6f7eec0474154eb8f13093c5"
+  },
+  {
+    "file": "predecessor/NEWS",
+    "bytes": 29976,
+    "sha256": "17445bc1485488bb2da7ee968ce15cc7172454280c887bbd1be25df0516dde72"
+  },
+  {
+    "file": "predecessor/R/bayes_scale_diagnostics.R",
+    "bytes": 9868,
+    "sha256": "089254b0689c72325f4c2bdc27197a177d7b34c5157651f284249fe81ab72cd3"
+  },
+  {
+    "file": "predecessor/tests/testthat/test-simulation-and-selection.R",
+    "bytes": 3357,
+    "sha256": "09a32a388eb589e43bc39621c5f8e23fccae7194cbd67fc5595aad8c15ad98b6"
+  },
+  {
+    "file": "predecessor/vignettes/bayesian-computation.Rmd",
+    "bytes": 22733,
+    "sha256": "2173ee59b46b60e8657880329123cc7debc8438792c0e114ca35dc788ba15235"
+  },
+  {
+    "file": "R-CMD-check.log",
+    "bytes": 4113,
+    "sha256": "5e6a839ac17340f4d5c29ecc45e55d006a62901f2f724e965dd0c72416e3235e"
+  },
+  {
+    "file": "rendered/bayesian-computation.html",
+    "bytes": 64012,
+    "sha256": "aa24b11e9b30aec7a3e215cfe75e265d2de509f5be686c9bd05b028b5cbb0ff7"
+  },
+  {
+    "file": "REPORT.md",
+    "bytes": 4089,
+    "sha256": "8c4f8b9ce7afd79e63c427f07512f4c1fdb5ff0c376192a6bcc9415139196b20"
+  },
+  {
+    "file": "resource-controller.ps1",
+    "bytes": 5500,
+    "sha256": "cf709b0c744ca054c20b46da745066682047bd7754581aa8b06add2e7da6f0a1"
+  },
+  {
+    "file": "RESUME.md",
+    "bytes": 5656,
+    "sha256": "aaf30b75999fe97ec1b1dbbca9406a01adda2a7bc4af3aa46705fc48fb89d13f"
+  },
+  {
+    "file": "review.patch",
+    "bytes": 33765,
+    "sha256": "8988c9084b3f247b9935b06f5af80578a2ccad37fa1ee39eb600c625c6ee6f8e"
+  },
+  {
+    "file": "run-focused.ps1",
+    "bytes": 1780,
+    "sha256": "903cfccb1ca4efd72ebd421ccebeb989019ab189490bba2447fe7d2f7dffdf91"
+  },
+  {
+    "file": "snapshot.py",
+    "bytes": 3481,
+    "sha256": "b59d1f6f491426537a5e8d1955ff0550129ca87ec3c496363f435dca45154786"
+  },
+  {
+    "file": "snapshot01-input.json",
+    "bytes": 33470,
+    "sha256": "4f8f06e2c0ce22de339b6df72d0c5271af3c161e68177d423c746cec961b7f86"
+  },
+  {
+    "file": "unit01-exit.json",
+    "bytes": 111,
+    "sha256": "fa018893bd7b86c8ce3abf0444dab60015220fe4648416bd9f56196ff38dfa2b"
+  },
+  {
+    "file": "unit01-process.json",
+    "bytes": 461,
+    "sha256": "e8e20ed554eb6f617c6c2c9f4f5a556928f64a210e80ff8551303fc57429a2be"
+  },
+  {
+    "file": "unit01-resources.jsonl",
+    "bytes": 608,
+    "sha256": "f51d945e0523de5d5e3ed992108f3f1f38f7d61c2dfcd090faa4a1347e223e53"
+  },
+  {
+    "file": "unit01-test-bayesian-probabilities.json",
+    "bytes": 106,
+    "sha256": "c0aa2b6728bbbf0d5d15a7ba1a9f79487e1b89549e74cdeb98ccb897ae8d6fc9"
+  },
+  {
+    "file": "unit01.err",
+    "bytes": 43,
+    "sha256": "8f8aba852ffdfad97a200eae82b7e5eab3121b3f2a72367f648ed4b349ce35ec"
+  },
+  {
+    "file": "unit01.json",
+    "bytes": 16104,
+    "sha256": "e578da3e59e42e321f7b6c46bb8d2a32a337cfef777c365c46f0ada27f7ee31f"
+  },
+  {
+    "file": "unit01.log",
+    "bytes": 1672,
+    "sha256": "e4dba53c307f0f62b24f53f0869c96731b244bf3fcb46d409305dba88771f49a"
+  },
+  {
+    "file": "unit02-exit.json",
+    "bytes": 111,
+    "sha256": "3699b7d5ef693550ca5f4db082ba8df25321807c1502ba4dc5f40b811ace54f0"
+  },
+  {
+    "file": "unit02-process.json",
+    "bytes": 462,
+    "sha256": "a071b650c8369d2b3e414c0e006ab99e1cdb559b8515917cd5f151db99871b38"
+  },
+  {
+    "file": "unit02-resources.jsonl",
+    "bytes": 609,
+    "sha256": "190fb95289eafb67b3893c4e9286f8538b1ac235da142bdc061b3cbb9acc06c7"
+  },
+  {
+    "file": "unit02-test-bayesian-probabilities.json",
+    "bytes": 106,
+    "sha256": "a240727012824b975e1d756da99c679884ef616876b57aeac2a29d9f3511ee8a"
+  },
+  {
+    "file": "unit02.err",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "unit02.json",
+    "bytes": 16103,
+    "sha256": "e57bf630858802717d4e0b6218bfae9c208cf6806e2d03995174f445b4a46eb3"
+  },
+  {
+    "file": "unit02.log",
+    "bytes": 400,
+    "sha256": "bf925201ab6db94b46c2a63c387a65aae17b661990924a7869d05bcc237359f1"
+  },
+  {
+    "file": "validate.R",
+    "bytes": 2095,
+    "sha256": "5656695184d2eadd1bc7b1505bf67bdabbd76f36293c1c49c94dda11f83f3c47"
+  },
+  {
+    "file": "verify-candidate.py",
+    "bytes": 4369,
+    "sha256": "17da1fe4cc5fcc78a0b22d43b8adf485e9d7254c391bbb5f5db3712d59963650"
+  }
+]

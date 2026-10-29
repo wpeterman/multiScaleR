@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Bill Peterman" />
+
+
+<title>Inference Targets and Prediction Uncertainty</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Inference Targets and Prediction
+Uncertainty</h1>
+<h4 class="author">Bill Peterman</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#separate-the-target-from-the-computation" id="toc-separate-the-target-from-the-computation"><span class="toc-section-number">1</span> Separate the target from the
+computation</a></li>
+<li><a href="#read-the-prepared-target-before-fitting" id="toc-read-the-prepared-target-before-fitting"><span class="toc-section-number">2</span> Read the prepared target before
+fitting</a></li>
+<li><a href="#choose-the-prediction-quantity" id="toc-choose-the-prediction-quantity"><span class="toc-section-number">3</span> Choose the prediction
+quantity</a></li>
+<li><a href="#keep-group-policies-and-uncertainty-explicit" id="toc-keep-group-policies-and-uncertainty-explicit"><span class="toc-section-number">4</span> Keep group policies and uncertainty
+explicit</a></li>
+<li><a href="#check-units-support-and-numerical-precision" id="toc-check-units-support-and-numerical-precision"><span class="toc-section-number">5</span> Check units, support and numerical
+precision</a></li>
+<li><a href="#quick-reference" id="toc-quick-reference"><span class="toc-section-number">6</span> Quick reference</a></li>
+</ul>
+</div>
+
+<p>Two methods can use the same distance-weighted landscape predictor
+and answer different statistical questions. Before comparing estimates
+or intervals, identify the inferential target, the effects included in
+prediction and the uncertainty that the calculation carries forward.
+This guide connects those decisions across the existing optimization and
+Bayesian workflows.</p>
+<p>Start with
+<code>vignette(&quot;quickstart&quot;, package = &quot;multiScaleR&quot;)</code> for spatial
+inputs and optimization, or
+<code>vignette(&quot;bayesian-scales&quot;, package = &quot;multiScaleR&quot;)</code> for
+annual Bayesian scales. The example here reads the same bundled
+artificial annual data and stored NUTS fit used in the Bayesian guides.
+It does not fit a model or run a sampler.</p>
+<div id="separate-the-target-from-the-computation" class="section level2" number="1">
+<h2><span class="header-section-number">1</span> Separate the target
+from the computation</h2>
+<p>A likelihood describes the observed responses as a function of model
+parameters. A hierarchical marginal likelihood integrates over declared
+random effects using their normalized distributions. A posterior also
+includes population-parameter priors. A proper prior has total
+probability one. These targets remain different even when they share
+formulas, kernel arithmetic and response distributions.</p>
+<table>
+<colgroup>
+<col width="16%" />
+<col width="40%" />
+<col width="43%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Workflow</th>
+<th align="left">Target and computation</th>
+<th align="left">Interpretation to retain</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left"><code>multiScale_optim()</code></td>
+<td align="left">The selected backend’s likelihood, profiling or native
+model calculation</td>
+<td align="left">Preserve that backend’s conditioning and covariance
+restrictions.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>multiScale_bayes(method = &quot;sample&quot;)</code></td>
+<td align="left">Posterior with proper population priors, sampled using
+NUTS</td>
+<td align="left">Read sampling and derived-scale diagnostics before
+interpreting posterior summaries.</td>
+</tr>
+<tr class="odd">
+<td align="left"><code>multiScale_bayes(method = &quot;laplace&quot;)</code></td>
+<td align="left">Posterior with the same declared priors, approximated
+jointly by a Gaussian distribution</td>
+<td align="left">A finite approximation is not proof of accurate tails
+or intervals.</td>
+</tr>
+<tr class="even">
+<td align="left"><code>multiScale_bayes(method = &quot;marginal&quot;)</code></td>
+<td align="left">Posterior with proper priors, using the supported
+marginal approximation and optional importance correction</td>
+<td align="left">Integration and correction diagnostics belong to this
+posterior calculation. This is not unpenalized maximum likelihood.</td>
+</tr>
+</tbody>
+</table>
+<p>The word <em>marginal</em> describes integration, not removal of
+priors. An empty <code>priors</code> list selects the documented
+Bayesian defaults; it does not turn a Bayesian fit into a likelihood
+fit. Likewise, Laplace is an approximation technique, not an inferential
+target. Do not substitute a posterior objective for the likelihood
+required by an AIC calculation. Use the comparison procedures documented
+for the fitted backend and its conditioning.</p>
+<p>Unpenalized hierarchical marginal-likelihood fitting and
+boundary-aware SD intervals remain development work. The public Bayesian
+method names above do not expose those private prototypes as likelihood
+fits or confidence procedures. See <code>?multiScale_bayes</code> for
+each public method’s supported model structures and diagnostic
+requirements.</p>
+</div>
+<div id="read-the-prepared-target-before-fitting" class="section level2" number="2">
+<h2><span class="header-section-number">2</span> Read the prepared
+target before fitting</h2>
+<p>Preparation checks rows, bins, formulas and priors and freezes the
+reference design. It supplies no posterior draws or fitted intervals.
+Here it uses the existing bundled inputs rather than extracting another
+landscape:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>annual <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;bayesian-annual-example.rds&quot;</span>,</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>  <span class="at">package =</span> <span class="st">&quot;multiScaleR&quot;</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>prepared <span class="ot">&lt;-</span> <span class="fu">multiScale_bayes</span>(</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>  count <span class="sc">~</span> habitat <span class="sc">+</span> <span class="fu">factor</span>(year) <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> site),</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>  annual<span class="sc">$</span>inputs, annual<span class="sc">$</span>data,</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  <span class="at">scales =</span> <span class="fu">list</span>(<span class="at">habitat =</span> <span class="sc">~</span><span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> year)), <span class="at">row_id =</span> <span class="st">&quot;site_year&quot;</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">&quot;nbinom2&quot;</span>, <span class="at">priors =</span> <span class="fu">list</span>(<span class="at">scale_median =</span> <span class="dv">250</span>), <span class="at">method =</span> <span class="st">&quot;prepare&quot;</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>)</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>info <span class="ot">&lt;-</span> prepared<span class="sc">$</span>inference_metadata</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>info[<span class="fu">c</span>(<span class="st">&quot;target&quot;</span>, <span class="st">&quot;method&quot;</span>, <span class="st">&quot;population_priors&quot;</span>, <span class="st">&quot;uncertainty&quot;</span>)]</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; $target</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; [1] &quot;posterior&quot;</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co">#&gt; $method</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="co">#&gt; [1] &quot;prepare&quot;</span></span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="co">#&gt; $population_priors</span></span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a><span class="co">#&gt; [1] &quot;proper&quot;</span></span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a><span class="co">#&gt; $uncertainty</span></span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a><span class="co">#&gt; $uncertainty$intervals</span></span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a><span class="co">#&gt; [1] &quot;not_provided&quot;</span></span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a><span class="co">#&gt; $uncertainty$population_parameters</span></span>
+<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a><span class="co">#&gt; [1] &quot;not_computed&quot;</span></span>
+<span id="cb1-26"><a href="#cb1-26" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-27"><a href="#cb1-27" tabindex="-1"></a><span class="co">#&gt; $uncertainty$annual_scales</span></span>
+<span id="cb1-28"><a href="#cb1-28" tabindex="-1"></a><span class="co">#&gt; [1] &quot;not_computed&quot;</span></span>
+<span id="cb1-29"><a href="#cb1-29" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb1-30"><a href="#cb1-30" tabindex="-1"></a><span class="co">#&gt; $uncertainty$calibration</span></span>
+<span id="cb1-31"><a href="#cb1-31" tabindex="-1"></a><span class="co">#&gt; [1] &quot;not_established&quot;</span></span></code></pre></div>
+<p><strong>How to read the output:</strong> <code>posterior</code> and
+<code>proper</code> describe the intended target and population priors.
+<code>prepare</code> identifies a checked specification, not a fitted
+posterior. The uncertainty entries say <code>not_computed</code> or
+<code>not_provided</code>. They do not supply intervals, establish
+convergence or authorize prediction from this prepared object.</p>
+</div>
+<div id="choose-the-prediction-quantity" class="section level2" number="3">
+<h2><span class="header-section-number">3</span> Choose the prediction
+quantity</h2>
+<p>Use the stored fitted object, rather than <code>prepared</code>, to
+inspect predictions. The rows below represent another survey at known
+sites and years. Future responses are removed because they are not
+prediction inputs.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>fit <span class="ot">&lt;-</span> annual<span class="sc">$</span>fits<span class="sc">$</span>pooled</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>surveys <span class="ot">&lt;-</span> annual<span class="sc">$</span>data[<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>, ]</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>surveys<span class="sc">$</span>count <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>expected <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit, surveys, <span class="at">kernel_inputs =</span> annual<span class="sc">$</span>inputs,</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">row_id =</span> <span class="st">&quot;site_year&quot;</span>, <span class="at">draws =</span> <span class="dv">400</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(expected[<span class="fu">c</span>(<span class="st">&quot;point_id&quot;</span>, <span class="st">&quot;median&quot;</span>, <span class="st">&quot;lower&quot;</span>, <span class="st">&quot;upper&quot;</span>)], <span class="at">digits =</span> <span class="dv">2</span>)</span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="left">point_id</th>
+<th align="right">median</th>
+<th align="right">lower</th>
+<th align="right">upper</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">s1_2021</td>
+<td align="right">3.15</td>
+<td align="right">1.80</td>
+<td align="right">5.36</td>
+</tr>
+<tr class="even">
+<td align="left">s2_2021</td>
+<td align="right">3.98</td>
+<td align="right">2.43</td>
+<td align="right">6.40</td>
+</tr>
+<tr class="odd">
+<td align="left">s3_2021</td>
+<td align="right">15.28</td>
+<td align="right">9.90</td>
+<td align="right">23.24</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>contract <span class="ot">&lt;-</span> <span class="fu">attr</span>(expected, <span class="st">&quot;prediction_contract&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>contract[<span class="fu">c</span>(<span class="st">&quot;inference_target&quot;</span>, <span class="st">&quot;quantity&quot;</span>, <span class="st">&quot;diagnostics_status&quot;</span>, <span class="st">&quot;uncertainty&quot;</span>)]</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; $inference_target</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; [1] &quot;posterior&quot;</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; $quantity</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; [1] &quot;expected_response&quot;</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; $diagnostics_status</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; [1] &quot;passed&quot;</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; $uncertainty</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt; $uncertainty$population_parameters</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; [1] &quot;joint_posterior_vectors&quot;</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; $uncertainty$kernel_parameters</span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; [1] &quot;joint_posterior_vectors&quot;</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt; $uncertainty$observation_noise</span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt; [1] FALSE</span></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt; $uncertainty$intervals</span></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; [1] &quot;conditional_posterior_quantiles&quot;</span></span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt; $uncertainty$omitted</span></span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#&gt; [1] &quot;observation_noise&quot;</span></span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a><span class="co">#&gt; $uncertainty$calibration</span></span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a><span class="co">#&gt; [1] &quot;not_established&quot;</span></span></code></pre></div>
+<p><strong>How to read the output:</strong> Each row summarizes an
+expected count under the included site and year effects. The lower and
+upper columns are central posterior quantiles for that expected
+response. They exclude observation sampling variation. The contract
+records joint posterior parameter treatment, omitted observation noise
+and the original fit’s recorded diagnostic status. Those fields describe
+this calculation; the stored example is not evidence of calibration for
+a different dataset.</p>
+<table>
+<colgroup>
+<col width="16%" />
+<col width="31%" />
+<col width="52%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Question</th>
+<th align="left">Bayesian function</th>
+<th align="left">Observation sampling variation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">What is the kernel scale for these covariates or
+groups?</td>
+<td align="left"><code>predict_scales()</code></td>
+<td align="left">Excluded</td>
+</tr>
+<tr class="even">
+<td align="left">What is the expected response?</td>
+<td align="left"><code>predict()</code></td>
+<td align="left">Excluded</td>
+</tr>
+<tr class="odd">
+<td align="left">What observations might be recorded?</td>
+<td align="left"><code>simulate()</code></td>
+<td align="left">Included</td>
+</tr>
+</tbody>
+</table>
+<p>For a binomial model, a response prediction is a success probability.
+For Poisson and negative-binomial models, it is an expected count. A
+Gaussian response prediction is a mean on the response scale. A median
+expected count need not be the median of future observed counts. See
+<code>vignette(&quot;bayesian-prediction&quot;, package = &quot;multiScaleR&quot;)</code>
+for worked new-group predictions and observation replicates.</p>
+</div>
+<div id="keep-group-policies-and-uncertainty-explicit" class="section level2" number="4">
+<h2><span class="header-section-number">4</span> Keep group policies and
+uncertainty explicit</h2>
+<p>Known groups use their retained joint posterior effects when
+included. An unseen group’s sampled effect represents additional group
+variation; setting that effect to zero gives a reference calculation.
+Zeroing an effect does not integrate over its distribution. Within a
+prediction call, rows sharing an unseen group share one sampled effect
+in each joint vector. Keep those rows together when you need that
+dependence. Separate calls do not automatically reuse the same new-group
+effects.</p>
+<p>The response and scale formulas govern different quantities. A
+response year effect changes baseline response. A scale year effect
+changes how the landscape is weighted. Preserve their separate
+prediction policies, as well as offsets, trials, factor levels and
+row/site keys. A fixed factor coefficient cannot be invented for an
+unseen level.</p>
+<p>Uncertainty from optimization and native prediction has its own
+contract:</p>
+<table>
+<colgroup>
+<col width="45%" />
+<col width="55%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Prediction route</th>
+<th align="left">Uncertainty to check</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Supported analytic GLM predictions</td>
+<td align="left">Requested joint coefficient/kernel uncertainty requires
+an available covariance and the original eligibility checks. Conditional
+uncertainty holds the selected kernel parameters fixed.</td>
+</tr>
+<tr class="even">
+<td align="left">Conditional-logistic predictions</td>
+<td align="left">Preserve supplied choice sets and request supported
+conditional standard errors. Kernel-parameter uncertainty is not
+added.</td>
+</tr>
+<tr class="odd">
+<td align="left">Native mixed or unmarked predictions</td>
+<td align="left">Native standard errors and intervals condition on
+selected spatial scales and retain the native component’s meaning and
+controls.</td>
+</tr>
+<tr class="even">
+<td align="left">Bayesian predictions</td>
+<td align="left">Retained joint vectors propagate their represented
+parameter uncertainty and the requested group policy. Observation noise
+belongs to replicates, not expected-response intervals.</td>
+</tr>
+</tbody>
+</table>
+<p>For native mixed predictions, <code>re.form = NA</code> sets random
+effects to zero; it does not average over them. For unmarked models,
+retain the selected native state, detection or transition component. In
+dynamic occupancy, initial occupancy and colonization/extinction
+predictions are distinct from smoothed or projected occupancy
+trajectories.</p>
+<p><code>prepare_prediction()</code> binds fixed rows, scales,
+standardization, choice sets and native controls in a reusable snapshot.
+Reusing it does not add uncertainty, update the fit or predict new
+locations. Prepare a new snapshot when those inputs or controls change.
+Bayesian summary tables and simulations store their contract in an
+attribute; prepared snapshots store a named
+<code>prediction_contract</code> list. Raw posterior matrices and native
+numerical outputs retain their usual structure. See
+<code>?prediction_contract</code> and
+<code>?prepare_prediction</code>.</p>
+</div>
+<div id="check-units-support-and-numerical-precision" class="section level2" number="5">
+<h2><span class="header-section-number">5</span> Check units, support
+and numerical precision</h2>
+<table>
+<colgroup>
+<col width="34%" />
+<col width="65%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Quantity</th>
+<th align="left">Meaning and units</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Kernel scale</td>
+<td align="left">Distance in the prepared map units. Log-scale model
+values are back-transformed with the model’s retained distance
+scaling.</td>
+</tr>
+<tr class="even">
+<td align="left">Scale-group SD</td>
+<td align="left">Spread of group deviations in log kernel scale. It is
+not a buffer radius. For illustration, 0.3 log units corresponds to a
+one-SD multiplicative factor of about <code>exp(0.3)</code>, or
+1.35.</td>
+</tr>
+<tr class="odd">
+<td align="left">Response-group SD</td>
+<td align="left">Spread of group effects on the response
+linear-predictor scale. Its interpretation depends on the response
+link.</td>
+</tr>
+</tbody>
+</table>
+<p>Keep source CRS, linear units and point identities with the analysis.
+Internal <code>unit_conv</code> scaling is not a conversion between
+meters and feet. Compact binned inputs cannot recover historical
+raster-value or distance-unit lineage. A buffer inside the raster extent
+can still contain missing cells. Neither geometric extent checks nor a
+large posterior scale reconstructs landscape data beyond the
+neighborhood actually extracted. Review support before interpreting
+scales near or beyond <code>max_D</code>.</p>
+<p>Finally, distinguish numerical diagnostics from precision for your
+reported quantity. Sampling diagnostics concern the original chains;
+importance diagnostics concern the weighted approximation.
+<code>diagnose_bayes_scales()</code> and
+<code>diagnose_bayes_probabilities()</code> address derived scales and
+requested fitted-scale probabilities. Monte Carlo standard error
+measures numerical uncertainty from finite sampling, not ecological
+uncertainty in a posterior interval. A precise probability does not by
+itself establish precise interval endpoints or general coverage. Compact
+or permuted draws do not reconstruct the original chains. Unavailable
+precision, constant events and failed diagnostics remain explicit. See
+<code>vignette(&quot;bayesian-computation&quot;, package = &quot;multiScaleR&quot;)</code>.</p>
+<p>Descriptive metadata never upgrades a rejected fit. A structural
+check of stored parameter dimensions does not prove a valid
+transformation or recover missing joint dependence. Read the original
+diagnostics and the conditioning before interpreting any estimate, map
+or interval.</p>
+</div>
+<div id="quick-reference" class="section level2" number="6">
+<h2><span class="header-section-number">6</span> Quick reference</h2>
+<table>
+<colgroup>
+<col width="31%" />
+<col width="68%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Check</th>
+<th align="left">Where to look</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Target, method, priors and integration</td>
+<td align="left">Bayesian <code>inference_metadata</code> and the fitted
+backend’s help</td>
+</tr>
+<tr class="even">
+<td align="left">Expected response versus observation replicate</td>
+<td align="left">Prediction function and
+<code>prediction_contract$quantity</code></td>
+</tr>
+<tr class="odd">
+<td align="left">Included effects and omitted uncertainty</td>
+<td align="left"><code>prediction_contract$effects</code> and
+<code>$uncertainty</code></td>
+</tr>
+<tr class="even">
+<td align="left">Fit status and functional precision</td>
+<td align="left">Original diagnostics, then the diagnostic function for
+the quantity reported</td>
+</tr>
+<tr class="odd">
+<td align="left">Fixed snapshot rows and native controls</td>
+<td align="left"><code>?prepare_prediction</code></td>
+</tr>
+</tbody>
+</table>
+<p>Continue with
+<code>vignette(&quot;quickstart&quot;, package = &quot;multiScaleR&quot;)</code> for
+optimization,
+<code>vignette(&quot;bayesian-scales&quot;, package = &quot;multiScaleR&quot;)</code> for
+annual Bayesian models, and
+<code>vignette(&quot;bayesian-prediction&quot;, package = &quot;multiScaleR&quot;)</code>
+for prediction.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,723 @@
+--- before/NEWS
++++ after/NEWS
+@@ -1,5 +1,9 @@
+ Bayesian development (unreleased)
+ ---------
++* Prediction summaries and prepared snapshots describe their targets, included
++  effects, conditioning and uncertainty through shared prediction contracts.
++  Raw posterior draw outputs and native numerical predictions retain their
++  existing structure; metadata does not establish eligibility or calibration.
+ * Marginal importance correction rechecks invalid AD target values with the
+   ordinary full posterior evaluator. Valid zero posterior density no longer
+   aborts solely from AD overflow. All candidates, unresolved-value failures,
+--- before/R/bayes_scale_methods.R
++++ after/R/bayes_scale_methods.R
+@@ -295,6 +295,10 @@
+ #'   The mean and SD are empirical draw summaries. A finite Monte Carlo result
+ #'   does not establish that the corresponding posterior or new-group moment
+ #'   exists; medians and quantiles are preferable for heavy-tailed predictions.
++#'   Summaries have a \code{prediction_contract} attribute describing the target,
++#'   included effects, uncertainty, and stored original-parameter map. Its
++#'   diagnostic status reports the fit's existing status; prediction does not
++#'   make a failed fit eligible. Raw draw matrices keep their existing attributes.
+ #' @details Fitting standardization, fixed-effect bases and contrasts are reused.
+ #'   Prediction does not refit the model, learn a new scale reference or condition
+ #'   on response values in \code{newdata}. An unseen fixed year factor remains an
+@@ -330,6 +334,7 @@
+ #'   without clipping or replacing draws. Large draws-by-observations matrices
+ #'   require memory; \code{draws} reduces size at a cost in simulation precision.
+ #' @seealso \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
++#'   \code{\link{prediction_contract}},
+ #'   \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
+ #'   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+ #' @examples
+@@ -388,5 +393,8 @@
+     }
+   }
+   if (!is.null(newdata)) attr(ans, "new_groups") <- context$new_groups
++  if (summary) attr(ans, "prediction_contract") <- .msr_bayes_prediction_contract(
++    object, context, if (type == "link") "linear_predictor" else "expected_response",
++    type, include_scale, include_response)
+   ans
+ }
+--- before/R/bayes_scale_predict_scales.R
++++ after/R/bayes_scale_predict_scales.R
+@@ -29,6 +29,11 @@
+ #'   \code{"log"} returns natural log distances in those map units.
+ #' @param seed Optional positive integer seed for new effects. Supplying it
+ #'   restores the caller's random-number state, including on failure.
++#' @details Summary tables have a \code{prediction_contract} attribute describing
++#'   their posterior target, included scale effects, and uncertainty. Setting
++#'   effects to zero remains a reference calculation rather than integration
++#'   over group variation. Metadata does not establish diagnostic eligibility
++#'   or calibration; raw draw lists retain their existing attributes.
+ #' @return With \code{summary = TRUE}, a data frame with one row per predictor
+ #'   and distinct active scale-formula combination. \code{covariate} names the
+ #'   predictor, \code{group} labels the covariates and groups, and \code{row}
+@@ -73,6 +78,7 @@
+ #'   ordinary R formula rules. Use a prediction-aware basis or precomputed
+ #'   training constants when the original centering must be retained.
+ #' @seealso \code{\link{posterior_scales}},
++#'   \code{\link{prediction_contract}},
+ #'   \code{\link{predict.multiScaleR_bayes}},
+ #'   \code{\link{simulate.multiScaleR_bayes}},
+ #'   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+@@ -152,5 +158,7 @@
+   })
+   ans <- do.call(rbind, tables); rownames(ans) <- NULL
+   attr(ans, "new_groups") <- context$new_groups
++  attr(ans, "prediction_contract") <- .msr_bayes_prediction_contract(
++    object, context, "kernel_scale", scale, include, FALSE)
+   ans
+ }
+--- before/R/bayes_scale_simulate.R
++++ after/R/bayes_scale_simulate.R
+@@ -22,6 +22,9 @@
+ #'   complete posterior vector and the requested included random effects.
+ #'   For new data, \code{point_ids} and \code{new_groups} attributes identify
+ #'   original row order and sampled/zeroed levels, as in \code{predict()}.
++#'   The \code{prediction_contract} attribute identifies posterior predictive
++#'   replicates, which include observation noise, and records the included
++#'   effect policies. It does not establish diagnostic eligibility or calibration.
+ #' @details Compare summaries of these replicate datasets with the observed
+ #'   response to assess model adequacy. Good sampling diagnostics do not
+ #'   establish that the observation model fits the data.
+@@ -32,6 +35,7 @@
+ #'   Summaries of individual predictive intervals cannot be summed to obtain
+ #'   an interval for a total; sum each complete replicate instead.
+ #' @seealso \code{\link{multiScale_bayes}}, \code{\link{simulate_bayes_prior}},
++#'   \code{\link{prediction_contract}},
+ #'   \code{\link{predict.multiScaleR_bayes}};
+ #'   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+ #' @examples
+@@ -98,5 +102,8 @@
+     attr(ans, "point_ids") <- spec$observation_ids
+     attr(ans, "new_groups") <- context$new_groups
+   }
++  attr(ans, "prediction_contract") <- .msr_bayes_prediction_contract(
++    object, context, "replicate_response", "response",
++    .msr_bayes_prediction_re_form(scale_re.form, "scale_re.form"), include_response)
+   ans
+ }
+--- before/R/factorized_scale_posterior.R
++++ after/R/factorized_scale_posterior.R
+@@ -176,5 +176,14 @@
+   output$scale_quantiles <- exp(output$log_quantiles)
+   output$scale_draw <- if (is.null(output$log_draw)) NULL else exp(output$log_draw)
+   output$log_group_normalizers <- normalizers
++  output$prediction_contract <- .msr_prediction_contract("likelihood", "factorized",
++    "kernel_scale", "log_and_distance", population = "conditioned_on_supplied_vector",
++    kernel = "conditional_latent_distribution_at_fixed_population",
++    effects = list(scale = "existing_groups_conditional_on_supplied_population"),
++    conditioning = c("observed_training_responses", "supplied_population_parameters"),
++    integration = list(scale_effects = "independent_scalar_quadrature"),
++    intervals = if (groups) "conditional_latent_quantiles" else "deterministic_at_supplied_population",
++    omitted = c("population_parameter_uncertainty", "new_group_variation", "observation_noise"),
++    coordinates = "conditional_original_latent_reconstruction")
+   output
+ }
+--- before/R/prepare_native_prediction.R
++++ after/R/prepare_native_prediction.R
+@@ -71,6 +71,8 @@
+       site_keys = stats::setNames(lapply(names(join_by), function(nm) newdata[[nm]]),
+                                  names(join_by)))
+   }
++  out$prediction_contract <- stats::setNames(lapply(types, function(type)
++    .msr_native_prediction_contract(object, kind, type, native_args)), types)
+   if (as.numeric(utils::object.size(out)) > max_bytes)
+     stop("Prepared predictions exceed max_bytes; use fewer rows or an explicit larger budget.", call. = FALSE)
+   out
+--- before/R/prepare_prediction.R
++++ after/R/prepare_prediction.R
+@@ -76,6 +76,11 @@
+ #'   table, including its \code{Predicted}, \code{SE}, \code{lower}, and
+ #'   \code{upper} columns. Mixed snapshots return native glmmTMB vectors or
+ #'   standard-error lists for the bound prediction type and controls.
++#'   The named \code{prediction_contract} list describes each prepared output
++#'   type: its target, conditioning, random-effect policy, and uncertainty
++#'   restrictions. This descriptive metadata does not establish fit eligibility
++#'   or interval calibration. Numerical prediction outputs retain their usual
++#'   structure, including native attributes.
+ #' @examples
+ #' \dontrun{
+ #' # Prepare once for several summaries at the same locations.
+@@ -93,7 +98,7 @@
+ #' state <- prepare_prediction(unmarked_fit, component = "state")
+ #' predict(state)
+ #' }
+-#' @seealso \code{\link{predict.multiScaleR}}
++#' @seealso \code{\link{predict.multiScaleR}}, \code{\link{prediction_contract}}
+ #' @export
+ prepare_prediction <- function(object, newdata = NULL, kernel_inputs = NULL,
+                                max_bytes = 64 * 1024^2,
+@@ -139,6 +144,8 @@
+     out$uncertainty <- object$uncertainty
+     out$opt_mod <- list(family = object$opt_mod$family)
+   }
++  out$prediction_contract <- stats::setNames(lapply(c("response", "link"),
++    function(type) .msr_analytic_prediction_contract(object, type)), c("response", "link"))
+   class(out) <- "multiScaleR_prediction"
+   if (as.numeric(utils::object.size(out)) > max_bytes)
+     stop("Prepared predictions exceed max_bytes; use fewer rows or an explicit larger budget.", call. = FALSE)
+--- before/man/predict.multiScaleR_bayes.Rd
++++ after/man/predict.multiScaleR_bayes.Rd
+@@ -90,6 +90,10 @@
+   The mean and SD are empirical draw summaries. A finite Monte Carlo result
+   does not establish that the corresponding posterior or new-group moment
+   exists; medians and quantiles are preferable for heavy-tailed predictions.
++  Summaries have a \code{prediction_contract} attribute describing the target,
++  included effects, uncertainty, and stored original-parameter map. Its
++  diagnostic status reports the fit's existing status; prediction does not
++  make a failed fit eligible. Raw draw matrices keep their existing attributes.
+ }
+ \description{
+ Predict fitted or new-observation means using joint scale, coefficient,
+@@ -149,6 +153,7 @@
+ }
+ \seealso{
+ \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
++  \code{\link{prediction_contract}},
+   \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
+   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+ }
+--- before/man/predict_scales.Rd
++++ after/man/predict_scales.Rd
+@@ -77,6 +77,12 @@
+ covariates, including new years when the model contains annual random effects.
+ }
+ \details{
++Summary tables have a \code{prediction_contract} attribute describing
++  their posterior target, included scale effects, and uncertainty. Setting
++  effects to zero remains a reference calculation rather than integration
++  over group variation. Metadata does not establish diagnostic eligibility
++  or calibration; raw draw lists retain their existing attributes.
++
+ A new year's sampled effect is shared by that year's rows within
+   one posterior vector. Different new years are independent conditional on
+   the population parameters, whose posterior dependence is retained.
+@@ -115,6 +121,7 @@
+ }
+ \seealso{
+ \code{\link{posterior_scales}},
++  \code{\link{prediction_contract}},
+   \code{\link{predict.multiScaleR_bayes}},
+   \code{\link{simulate.multiScaleR_bayes}},
+   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+--- before/man/prepare_prediction.Rd
++++ after/man/prepare_prediction.Rd
+@@ -83,6 +83,11 @@
+   table, including its \code{Predicted}, \code{SE}, \code{lower}, and
+   \code{upper} columns. Mixed snapshots return native glmmTMB vectors or
+   standard-error lists for the bound prediction type and controls.
++  The named \code{prediction_contract} list describes each prepared output
++  type: its target, conditioning, random-effect policy, and uncertainty
++  restrictions. This descriptive metadata does not establish fit eligibility
++  or interval calibration. Numerical prediction outputs retain their usual
++  structure, including native attributes.
+ }
+ \description{
+ Prepare a spatial prediction design or native prediction output
+@@ -146,5 +151,5 @@
+ }
+ }
+ \seealso{
+-\code{\link{predict.multiScaleR}}
++\code{\link{predict.multiScaleR}}, \code{\link{prediction_contract}}
+ }
+--- before/man/simulate.multiScaleR_bayes.Rd
++++ after/man/simulate.multiScaleR_bayes.Rd
+@@ -75,6 +75,9 @@
+   complete posterior vector and the requested included random effects.
+   For new data, \code{point_ids} and \code{new_groups} attributes identify
+   original row order and sampled/zeroed levels, as in \code{predict()}.
++  The \code{prediction_contract} attribute identifies posterior predictive
++  replicates, which include observation noise, and records the included
++  effect policies. It does not establish diagnostic eligibility or calibration.
+ }
+ \description{
+ Generate replicate responses for fitted or new observations, including
+@@ -104,6 +107,7 @@
+ }
+ \seealso{
+ \code{\link{multiScale_bayes}}, \code{\link{simulate_bayes_prior}},
++  \code{\link{prediction_contract}},
+   \code{\link{predict.multiScaleR_bayes}};
+   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+ }
+--- before/tests/testthat/test-bayesian-prediction.R
++++ after/tests/testthat/test-bayesian-prediction.R
+@@ -198,7 +198,9 @@
+     rows <- tab[tab$covariate == name, ]
+     rownames(rows) <- NULL
+     expected <- multiScaleR:::.msr_bayes_intervals(x[[name]][, rows$row, drop = FALSE])
+-    expect_equal(rows[c("mean", "median", "sd", "lower", "upper")], expected)
++    # Compare the numerical summaries independently of call-level metadata.
++    expect_equal(as.matrix(rows[c("mean", "median", "sd", "lower", "upper")]),
++                 as.matrix(expected))
+     expect_identical(rows$row, if (name == "habitat") c(1L, 3L) else c(1L, 2L))
+   }
+   expect_identical(attr(tab, "new_groups"), attr(x, "new_groups"))
+--- before/vignettes/bayesian-prediction.Rmd
++++ after/vignettes/bayesian-prediction.Rmd
+@@ -71,6 +71,29 @@
+ The `draws` limit makes the teaching example quick; use all retained draws for
+ final summaries and assess Monte Carlo precision.
+ 
++The prediction also carries a compact description of its target:
++
++```{r prediction-contract}
++contract <- attr(known, "prediction_contract")
++contract$quantity
++contract$uncertainty[c("population_parameters", "observation_noise", "intervals")]
++```
++
++These are expected-response summaries from joint posterior vectors. Observation
++noise is excluded. The contract records that distinction without changing the
++prediction or deciding whether the fit is reliable. Read the fit's original
++diagnostics separately. `simulate()` records posterior predictive replicates,
++which include observation noise. Predictions that sample an unseen year's or
++site's effect identify the added group variation; setting an effect to zero
++remains a reference calculation. See `?prediction_contract` for the fields.
++
++Prepared native predictions use the same descriptions in
++`snapshot$prediction_contract`, with one entry per prepared output type.
++Their native standard errors and confidence intervals condition on selected
++spatial scales. They do not acquire the population-parameter uncertainty of
++Bayesian predictions. Raw Bayesian draw matrices and cached native numerical
++outputs retain their original structure and attributes.
++
+ `kernel_inputs` supplies prepared bins for the prediction locations and maps.
+ Each unique prepared location has a unique `binned$point_ids` entry. The
+ `row_id` column matches observations to those entries. Observation rows can be
+--- before/R/prediction_contract.R
++++ after/R/prediction_contract.R
+@@ -0,0 +1,182 @@
++#' Read Prediction Contracts
++#'
++#' Shared metadata describes which quantity a prediction represents, which
++#' effects it includes, and which uncertainty it propagates.
++#'
++#' @name prediction_contract
++#' @details
++#' Bayesian prediction summaries and posterior predictive simulations store this
++#' list in \code{attr(result, "prediction_contract")}. Raw posterior draw matrices
++#' and lists retain their existing attributes. Prepared prediction snapshots
++#' instead store a named \code{prediction_contract} list, one entry per prepared
++#' output type. Their native numerical outputs retain native attributes.
++#'
++#' The fields describe the calculation:
++#' \describe{
++#'   \item{schema_version}{Version of the metadata structure.}
++#'   \item{inference_target, method}{The posterior, likelihood, conditional
++#'     likelihood, or native target, and its retained computation label.}
++#'   \item{quantity, output_scale}{Expected response, linear predictor, kernel
++#'     scale, replicate response, choice probability, or named native component,
++#'     on the stated output scale. Native component meanings remain model specific.}
++#'   \item{target_population, effects}{The supplied prediction rows and policies
++#'     for known and unseen groups. Sampled new effects are shared by each group's
++#'     rows within a complete joint vector. Zero deviations are reference values,
++#'     not integration over the group's distribution.}
++#'   \item{conditioning, integration}{The quantities held fixed and the recorded
++#'     treatment of uncertainty. Missing historical solver metadata is marked
++#'     unrecorded rather than inferred.}
++#'   \item{uncertainty}{Population and kernel parameter treatment, inclusion of
++#'     observation noise, interval meaning, and omitted uncertainty. Analytic
++#'     snapshots also record whether joint covariance was available at preparation.
++#'     This does not bypass the prediction method's covariance checks.}
++#'   \item{original_coordinates, joint_parameter_map_complete}{The parameter
++#'     representation used by the adapter. For Bayesian predictions, completeness
++#'     checks stored block dimensions against the original prepared parameter map.
++#'     This structural check does not validate a coordinate transformation,
++#'     reconstruct integrated coefficients, or establish posterior accuracy.}
++#'   \item{diagnostics_status}{The existing fit status when available. It can be
++#'     \code{"passed"}, \code{"failed"}, or \code{"unavailable"}. Joint covariance
++#'     availability is separate from this status.}
++#'   \item{metadata_establishes_eligibility}{Always \code{FALSE}. Read the original
++#'     fit diagnostics before interpreting predictions.}
++#'   \item{fixed_inputs, component}{Whether the rows and controls are bound to a
++#'     snapshot, and its native component when applicable.}
++#' }
++#' Contracts describe the original prediction call. Ordinary data-frame
++#' subsetting can retain its attributes; it does not recompute the contract for
++#' a smaller batch. Use the existing row-level new-group flags for individual rows.
++#'
++#' Posterior intervals for expected responses exclude observation noise.
++#' Posterior predictive replicates include it. New-group predictions also carry
++#' the explicitly requested group variation. Native confidence intervals and
++#' standard errors condition on selected kernel parameters. Likelihood summaries
++#' conditional on one population parameter vector omit its estimation uncertainty.
++#' These uncertainty targets are distinct. No contract establishes interval
++#' calibration or upgrades a rejected fit.
++#' @seealso \code{\link{predict.multiScaleR_bayes}},
++#'   \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}},
++#'   \code{\link{prepare_prediction}}
++NULL
++
++# Prediction metadata describes the calculation and its conditioning. It does
++# not grant fit eligibility, add uncertainty or change the original diagnostics.
++.msr_prediction_contract <- function(target, method, quantity, output_scale,
++    population, kernel, effects = list(), conditioning = character(),
++    integration = list(), intervals = "not_provided", omitted = character(),
++    coordinates = "not_applicable", joint_map = NA, diagnostics = NULL,
++    fixed_inputs = FALSE, component = NULL) {
++  target <- match.arg(target, c("posterior", "likelihood", "conditional_likelihood", "native"))
++  quantity <- match.arg(quantity, c("expected_response", "linear_predictor",
++    "replicate_response", "kernel_scale", "choice_probability", "native_component"))
++  status <- if (isTRUE(diagnostics$passed)) "passed" else
++    if (isFALSE(diagnostics$passed)) "failed" else "unavailable"
++  list(schema_version = 1L, inference_target = target, method = method,
++    quantity = quantity, output_scale = output_scale,
++    target_population = "specified_prediction_rows", effects = effects,
++    conditioning = conditioning, integration = integration,
++    uncertainty = list(population_parameters = population,
++      kernel_parameters = kernel, observation_noise = quantity == "replicate_response",
++      intervals = intervals, omitted = omitted, calibration = "not_established"),
++    original_coordinates = coordinates, joint_parameter_map_complete = joint_map,
++    diagnostics_status = status, metadata_establishes_eligibility = FALSE,
++    fixed_inputs = fixed_inputs, component = component)
++}
++
++# Keep new-group sampling distinct from setting effects to zero. The existing
++# new_groups attribute supplies row/group identities without duplicating them.
++.msr_bayes_prediction_contract <- function(object, context, quantity,
++    output_scale, include_scale = TRUE, include_response = TRUE) {
++  spec <- object$specification
++  group_contract <- function(present, include, policy, count) {
++    if (!present) return(list(known = "not_applicable", unseen = "not_applicable",
++                             unseen_present = FALSE))
++    list(known = if (include) "joint_posterior_effects" else "zero_deviation_reference",
++      unseen = if (!include) "zero_deviation_reference" else switch(policy,
++        error = "reject", sample = "sample_once_per_group_and_joint_vector",
++        zero = "zero_deviation_reference"), unseen_present = count > 0L)
++  }
++  scale_groups <- any(vapply(spec$scales, function(sm) length(sm$random) > 0L, TRUE))
++  response_groups <- quantity != "kernel_scale" && length(spec$response$random) > 0L
++  effects <- list(
++    scale = group_contract(scale_groups, include_scale, context$scale_policy, context$n_scale),
++    response = group_contract(response_groups, include_response,
++      context$response_policy, context$n_response),
++    dependence = "complete_joint_vectors_and_shared_effects_within_each_call")
++  n <- nrow(object$draws$beta)
++  complete <- !is.null(n) && all(vapply(names(spec$parameters), function(nm) {
++    x <- object$draws[[nm]]
++    is.matrix(x) && nrow(x) == n && ncol(x) == length(spec$parameters[[nm]])
++  }, TRUE))
++  info <- object$inference_metadata
++  sampled_new <- (include_scale && context$n_scale > 0L && context$scale_policy == "sample") ||
++    (response_groups && include_response && context$n_response > 0L && context$response_policy == "sample")
++  reference <- (scale_groups && !include_scale) || (response_groups && !include_response) ||
++    (context$n_scale > 0L && context$scale_policy == "zero") ||
++    (response_groups && context$n_response > 0L && context$response_policy == "zero")
++  out <- .msr_prediction_contract("posterior", object$inference, quantity, output_scale,
++    population = "joint_posterior_vectors", kernel = "joint_posterior_vectors",
++    effects = effects, conditioning = c("observed_training_responses",
++      "frozen_training_design_and_normalization", "declared_prediction_covariates"),
++    integration = if (is.null(info)) list(recorded = FALSE) else info$integration,
++    intervals = if (quantity == "replicate_response") "posterior_predictive_replicates" else
++      if (sampled_new) "new_group_predictive_quantiles" else
++        if (reference) "posterior_reference_quantiles" else "conditional_posterior_quantiles",
++    omitted = if (quantity == "replicate_response") character() else "observation_noise",
++    coordinates = "original_stored_parameter_blocks", joint_map = complete,
++    diagnostics = object$diagnostics)
++  out$integration$prediction_vectors <- if (!is.null(object$importance$resample_ids))
++    "stored_joint_resamples" else "stored_joint_draws"
++  out
++}
++
++# Analytic snapshots bind a design, while uncertainty is selected later by
++# predict(). Describe available controls without treating availability as a gate.
++.msr_analytic_prediction_contract <- function(object, type) {
++  conditional <- identical(object$backend, "conditional_logit")
++  out <- .msr_prediction_contract(if (conditional) "conditional_likelihood" else "likelihood",
++    object$backend, if (type == "link") "linear_predictor" else
++      if (conditional) "choice_probability" else "expected_response", type,
++    population = "estimated_coefficients_with_requested_covariance",
++    kernel = if (conditional) "fixed_at_estimate" else "joint_or_conditional_by_request",
++    effects = list(choice_sets = if (conditional) "supplied_complete_choice_sets" else "not_applicable"),
++    conditioning = c("frozen_training_design_and_normalization", "fixed_prediction_rows",
++      if (conditional) "supplied_choice_sets" else character()),
++    integration = list(uncertainty = "delta_method_when_requested"),
++    intervals = if (conditional) "not_provided" else "mean_confidence_when_eligible",
++    omitted = c("observation_noise", if (conditional) "kernel_parameter_uncertainty" else character()),
++    diagnostics = object$diagnostics,
++    fixed_inputs = TRUE)
++  out$uncertainty$joint_available <- !conditional && isTRUE(object$uncertainty$available)
++  out
++}
++
++# Native tables/vectors retain their exact attributes and component meaning.
++# Store this description on the snapshot, never on the cached native values.
++.msr_native_prediction_contract <- function(object, kind, type, native_args) {
++  zero <- if (!"re.form" %in% names(native_args)) FALSE else {
++    value <- native_args$re.form
++    (length(value) == 1L && is.atomic(value) && is.na(value)) ||
++      (inherits(value, "formula") && identical(as.character(value), c("~", "0")))
++  }
++  re_policy <- if (zero) "zero_deviation_reference" else
++    if ("re.form" %in% names(native_args) && is.null(native_args$re.form)) "native_conditional_effects" else
++      if (kind == "glmmTMB" && !"re.form" %in% names(native_args)) "native_conditional_effects" else
++        "native_re_form_or_default"
++  .msr_prediction_contract("native", kind, if (kind == "unmarked" ||
++      !type %in% c("response", "link")) "native_component" else
++      if (type == "link") "linear_predictor" else "expected_response",
++    output_scale = if (kind == "unmarked")
++      if (isFALSE(native_args$backTransform)) "native_link" else "native_component_scale" else type,
++    population = "native_parameter_uncertainty_conditional_on_kernel_estimate",
++    kernel = "fixed_at_estimate",
++    effects = list(response = re_policy, new_groups = if (kind == "glmmTMB")
++      if (isTRUE(native_args$allow.new.levels)) "native_new_level_handling" else "reject" else
++        "native_component_handling"),
++    conditioning = c("fixed_prediction_rows_and_native_controls",
++      "selected_kernel_parameters", "native_component_and_observation_year_layout"),
++    integration = list(random_effects = if (zero) "set_to_zero_not_integrated" else "native_method"),
++    intervals = if (kind == "unmarked") "native_conditional_confidence" else "conditional_standard_errors_only",
++    omitted = c("kernel_parameter_uncertainty", "observation_noise"),
++    fixed_inputs = TRUE, component = type)
++}
+--- before/man/prediction_contract.Rd
++++ after/man/prediction_contract.Rd
+@@ -0,0 +1,65 @@
++% Generated by roxygen2: do not edit by hand
++% Please edit documentation in R/prediction_contract.R
++\name{prediction_contract}
++\alias{prediction_contract}
++\title{Read Prediction Contracts}
++\description{
++Shared metadata describes which quantity a prediction represents, which
++effects it includes, and which uncertainty it propagates.
++}
++\details{
++Bayesian prediction summaries and posterior predictive simulations store this
++list in \code{attr(result, "prediction_contract")}. Raw posterior draw matrices
++and lists retain their existing attributes. Prepared prediction snapshots
++instead store a named \code{prediction_contract} list, one entry per prepared
++output type. Their native numerical outputs retain native attributes.
++
++The fields describe the calculation:
++\describe{
++  \item{schema_version}{Version of the metadata structure.}
++  \item{inference_target, method}{The posterior, likelihood, conditional
++    likelihood, or native target, and its retained computation label.}
++  \item{quantity, output_scale}{Expected response, linear predictor, kernel
++    scale, replicate response, choice probability, or named native component,
++    on the stated output scale. Native component meanings remain model specific.}
++  \item{target_population, effects}{The supplied prediction rows and policies
++    for known and unseen groups. Sampled new effects are shared by each group's
++    rows within a complete joint vector. Zero deviations are reference values,
++    not integration over the group's distribution.}
++  \item{conditioning, integration}{The quantities held fixed and the recorded
++    treatment of uncertainty. Missing historical solver metadata is marked
++    unrecorded rather than inferred.}
++  \item{uncertainty}{Population and kernel parameter treatment, inclusion of
++    observation noise, interval meaning, and omitted uncertainty. Analytic
++    snapshots also record whether joint covariance was available at preparation.
++    This does not bypass the prediction method's covariance checks.}
++  \item{original_coordinates, joint_parameter_map_complete}{The parameter
++    representation used by the adapter. For Bayesian predictions, completeness
++    checks stored block dimensions against the original prepared parameter map.
++    This structural check does not validate a coordinate transformation,
++    reconstruct integrated coefficients, or establish posterior accuracy.}
++  \item{diagnostics_status}{The existing fit status when available. It can be
++    \code{"passed"}, \code{"failed"}, or \code{"unavailable"}. Joint covariance
++    availability is separate from this status.}
++  \item{metadata_establishes_eligibility}{Always \code{FALSE}. Read the original
++    fit diagnostics before interpreting predictions.}
++  \item{fixed_inputs, component}{Whether the rows and controls are bound to a
++    snapshot, and its native component when applicable.}
++}
++Contracts describe the original prediction call. Ordinary data-frame
++subsetting can retain its attributes; it does not recompute the contract for
++a smaller batch. Use the existing row-level new-group flags for individual rows.
++
++Posterior intervals for expected responses exclude observation noise.
++Posterior predictive replicates include it. New-group predictions also carry
++the explicitly requested group variation. Native confidence intervals and
++standard errors condition on selected kernel parameters. Likelihood summaries
++conditional on one population parameter vector omit its estimation uncertainty.
++These uncertainty targets are distinct. No contract establishes interval
++calibration or upgrades a rejected fit.
++}
++\seealso{
++\code{\link{predict.multiScaleR_bayes}},
++  \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}},
++  \code{\link{prepare_prediction}}
++}
+--- before/tests/testthat/test-prediction-contract.R
++++ after/tests/testthat/test-prediction-contract.R
+@@ -0,0 +1,176 @@
++test_that("posterior contracts separate means, replicates and zeroed effects", {
++  f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
++  fit <- fake_bayesian_draws(prepare_bayesian_fixture(f, "gaussian"))
++  fit$diagnostics <- list(passed = FALSE, reasons = "retained diagnostic failure")
++  before <- fit
++  set.seed(31); state <- .Random.seed
++  mean <- predict(fit)
++  contract <- attr(mean, "prediction_contract")
++  expect_identical(contract$inference_target, "posterior")
++  expect_identical(contract$quantity, "expected_response")
++  expect_false(contract$uncertainty$observation_noise)
++  expect_identical(contract$uncertainty$intervals, "conditional_posterior_quantiles")
++  expect_identical(contract$diagnostics_status, "failed")
++  expect_false(contract$metadata_establishes_eligibility)
++  expect_true(contract$joint_parameter_map_complete)
++  expect_identical(.Random.seed, state)
++  expect_null(attr(predict(fit, summary = FALSE), "prediction_contract"))
++  expect_identical(attr(predict(fit, type = "link"), "prediction_contract")$quantity,
++                   "linear_predictor")
++  simulated <- simulate(fit, nsim = 2, seed = 41)
++  predictive <- attr(simulated, "prediction_contract")
++  expect_identical(predictive$quantity, "replicate_response")
++  expect_true(predictive$uncertainty$observation_noise)
++  expect_identical(predictive$uncertainty$intervals, "posterior_predictive_replicates")
++  expect_identical(.Random.seed, state)
++  reference <- attr(predict(fit, re.form = NA, scale_re.form = NA), "prediction_contract")
++  expect_identical(reference$effects$scale$known, "zero_deviation_reference")
++  expect_identical(reference$effects$response$known, "zero_deviation_reference")
++  expect_identical(reference$uncertainty$intervals, "posterior_reference_quantiles")
++  expect_identical(fit, before)
++})
++
++test_that("new-group contracts preserve joint effects, row order and unused responses", {
++  f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
++  fit <- fake_bayesian_draws(prepare_bayesian_fixture(f, "gaussian"))
++  nd <- f$data[c(2, 1, 2), ]
++  nd$year <- c("future", "y1", "future")
++  nd$site <- c("new_site", "s1", "new_site")
++  p <- predict(fit, nd, kernel_inputs = f$inputs, new_scale_levels = "sample",
++    new_response_levels = "zero", seed = 91)
++  contract <- attr(p, "prediction_contract")
++  expect_identical(contract$effects$scale$unseen, "sample_once_per_group_and_joint_vector")
++  expect_identical(contract$effects$response$unseen, "zero_deviation_reference")
++  expect_true(contract$effects$scale$unseen_present)
++  expect_true(contract$effects$response$unseen_present)
++  expect_identical(contract$uncertainty$intervals, "new_group_predictive_quantiles")
++  expect_identical(p$point_id, as.character(nd$key))
++  changed <- nd; changed$count <- c(NA, -1, 1e6)
++  expect_identical(p, predict(fit, changed, kernel_inputs = f$inputs,
++    new_scale_levels = "sample", new_response_levels = "zero", seed = 91))
++  draws <- predict(fit, nd, kernel_inputs = f$inputs, summary = FALSE,
++    new_scale_levels = "sample", new_response_levels = "zero", seed = 91)
++  expect_identical(draws[, 1], draws[, 3])
++  expect_null(attr(draws, "prediction_contract"))
++  scale <- predict_scales(fit, nd, new_levels = "sample", seed = 91)
++  expect_identical(attr(scale, "prediction_contract")$quantity, "kernel_scale")
++  expect_identical(attr(scale, "prediction_contract")$effects$response$known, "not_applicable")
++  expect_identical(attr(predict_scales(fit, nd, re.form = NA),
++    "prediction_contract")$effects$scale$known, "zero_deviation_reference")
++  permutation <- c(3, 1, 2)
++  reordered <- predict(fit, nd[permutation, ], kernel_inputs = f$inputs,
++    new_scale_levels = "sample", new_response_levels = "zero", seed = 91)
++  expect_identical(attr(reordered, "prediction_contract"), contract)
++  expect_identical(reordered$median[order(permutation)], p$median)
++  restored <- unserialize(serialize(fit, NULL))
++  expect_identical(predict(restored, nd, kernel_inputs = f$inputs,
++    new_scale_levels = "sample", new_response_levels = "zero", seed = 91), p)
++  expect_error(predict(fit, nd, kernel_inputs = f$inputs), "New scale group levels")
++})
++
++test_that("older fits describe missing provenance without manufacturing eligibility", {
++  f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
++  fit <- fake_bayesian_draws(prepare_bayesian_fixture(f, "gaussian"))
++  expected <- predict(fit, summary = FALSE)
++  fit$inference_metadata <- NULL
++  restored <- unserialize(serialize(fit, NULL))
++  expect_identical(predict(restored, summary = FALSE), expected)
++  info <- attr(predict(restored), "prediction_contract")
++  expect_identical(info$integration, list(recorded = FALSE, prediction_vectors = "stored_joint_draws"))
++  expect_identical(info$diagnostics_status, "unavailable")
++  expect_true(info$joint_parameter_map_complete)
++  context <- multiScaleR:::.msr_bayes_prediction_prepare(restored, NULL, NULL,
++    NULL, "error", "error", TRUE, TRUE)
++  restored$draws$response_z <- NULL
++  incomplete <- multiScaleR:::.msr_bayes_prediction_contract(restored, context,
++    "expected_response", "response")
++  expect_false(incomplete$joint_parameter_map_complete)
++  expect_false(incomplete$metadata_establishes_eligibility)
++})
++
++test_that("analytic contracts preserve point values and covariance restrictions", {
++  f <- profile_glm_fixture(n = 120)
++  fit <- profile_glm_fit(f, profile_control = list(n_starts = 3))
++  expected <- predict(fit)
++  snapshot <- prepare_prediction(fit)
++  expect_identical(predict(snapshot), expected)
++  info <- snapshot$prediction_contract$response
++  expect_identical(info$inference_target, "likelihood")
++  expect_identical(info$quantity, "expected_response")
++  expect_identical(info$uncertainty$intervals, "mean_confidence_when_eligible")
++  expect_false(info$uncertainty$observation_noise)
++  expect_true(info$fixed_inputs)
++  old <- snapshot; old$prediction_contract <- NULL
++  expect_identical(predict(unserialize(serialize(old, NULL))), expected)
++  bad <- fit; bad$uncertainty$available <- FALSE
++  bad$uncertainty$reasons <- "retained weak identification"
++  weak <- prepare_prediction(bad)
++  expect_false(weak$prediction_contract$response$uncertainty$joint_available)
++  expect_identical(predict(weak), expected)
++  expect_error(predict(weak, se.fit = TRUE), "Joint Wald uncertainty unavailable")
++  expect_identical(predict(weak, se.fit = TRUE, uncertainty = "conditional"),
++    predict(bad, se.fit = TRUE, uncertainty = "conditional"))
++  expect_error(prepare_prediction(fit, max_bytes = as.numeric(object.size(snapshot)) - 1),
++    "exceed max_bytes")
++  conditional <- fit; conditional$backend <- "conditional_logit"
++  choice <- multiScaleR:::.msr_analytic_prediction_contract(conditional, "response")
++  expect_identical(choice$quantity, "choice_probability")
++  expect_identical(choice$inference_target, "conditional_likelihood")
++  expect_identical(choice$uncertainty$intervals, "not_provided")
++  expect_false(choice$uncertainty$joint_available)
++})
++
++test_that("native contracts retain components and never equate zeroing with integration", {
++  describe <- multiScaleR:::.msr_native_prediction_contract
++  for (zero in list(NA, local(~0))) {
++    info <- describe(NULL, "glmmTMB", "response", list(re.form = zero))
++    expect_identical(info$effects$response, "zero_deviation_reference")
++    expect_identical(info$integration$random_effects, "set_to_zero_not_integrated")
++    expect_identical(info$uncertainty$kernel_parameters, "fixed_at_estimate")
++  }
++  expect_identical(describe(NULL, "glmmTMB", "response", list())$effects$response,
++                   "native_conditional_effects")
++  expect_identical(describe(NULL, "glmmTMB", "zprob", list())$quantity, "native_component")
++  for (type in c("psi", "col", "ext", "det", "state")) {
++    info <- describe(NULL, "unmarked", type, list(backTransform = FALSE))
++    expect_identical(info$component, type)
++    expect_identical(info$quantity, "native_component")
++    expect_identical(info$output_scale, "native_link")
++    expect_identical(info$uncertainty$intervals, "native_conditional_confidence")
++    expect_false(info$uncertainty$observation_noise)
++    expect_false(info$metadata_establishes_eligibility)
++  }
++})
++
++test_that("native snapshots retain exact native output and survive metadata-free reload", {
++  skip_if_not_installed("unmarked")
++  f <- make_unmarked_fixture()
++  object <- f$obj
++  snapshot <- prepare_prediction(object, component = "state")
++  expected <- unmarked::predict(object$opt_mod, type = "state")
++  expect_identical(predict(snapshot), expected)
++  expect_identical(snapshot$prediction_contract$state$component, "state")
++  expect_null(snapshot$opt_mod)
++  expect_null(snapshot$kernel_inputs)
++  expect_lt(as.numeric(object.size(snapshot)), 64 * 1024^2)
++  snapshot$prediction_contract <- NULL
++  expect_identical(predict(unserialize(serialize(snapshot, NULL))), expected)
++  expect_error(predict(snapshot, uncertainty = "joint"), "native prediction tables")
++})
++
++test_that("factorized quantiles remain conditional on the supplied population vector", {
++  skip_if_not_installed("RTMB")
++  f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
++  spec <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp,
++    f$inputs, f$data, list(habitat = ~1), "gaussian", "key", 200)
++  p <- spec$parameters; p$scale_z <- numeric()
++  result <- multiScaleR:::.msr_factorized_reconstruct(spec, p)
++  info <- result$prediction_contract
++  expect_identical(info$inference_target, "likelihood")
++  expect_identical(info$uncertainty$population_parameters, "conditioned_on_supplied_vector")
++  expect_identical(info$uncertainty$intervals, "deterministic_at_supplied_population")
++  expect_contains(info$uncertainty$omitted, "population_parameter_uncertainty")
++  expect_false(info$uncertainty$observation_noise)
++  expect_true(result$conditional_only)
++  expect_identical(info$diagnostics_status, "unavailable")
++})

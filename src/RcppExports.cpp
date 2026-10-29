@@ -25,6 +25,50 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// msr_kernel_validate_cpp
+Rcpp::LogicalVector msr_kernel_validate_cpp(Rcpp::NumericMatrix v, Rcpp::NumericMatrix c, Rcpp::IntegerVector rows);
+RcppExport SEXP _multiScaleR_msr_kernel_validate_cpp(SEXP vSEXP, SEXP cSEXP, SEXP rowsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type v(vSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type c(cSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type rows(rowsSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_kernel_validate_cpp(v, c, rows));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_kernel_eval_cpp
+Rcpp::List msr_kernel_eval_cpp(Rcpp::List V, Rcpp::List C, Rcpp::NumericVector distance, Rcpp::NumericVector log_scale, Rcpp::NumericVector log_shape, int kernel, bool standardize);
+RcppExport SEXP _multiScaleR_msr_kernel_eval_cpp(SEXP VSEXP, SEXP CSEXP, SEXP distanceSEXP, SEXP log_scaleSEXP, SEXP log_shapeSEXP, SEXP kernelSEXP, SEXP standardizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type V(VSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type C(CSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type distance(distanceSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type log_scale(log_scaleSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type log_shape(log_shapeSEXP);
+    Rcpp::traits::input_parameter< int >::type kernel(kernelSEXP);
+    Rcpp::traits::input_parameter< bool >::type standardize(standardizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_kernel_eval_cpp(V, C, distance, log_scale, log_shape, kernel, standardize));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_kernel_stream_cpp
+Rcpp::List msr_kernel_stream_cpp(Rcpp::List V, Rcpp::List C, Rcpp::NumericVector distance, Rcpp::NumericVector log_scale, Rcpp::NumericVector log_shape, int kernel, bool standardize);
+RcppExport SEXP _multiScaleR_msr_kernel_stream_cpp(SEXP VSEXP, SEXP CSEXP, SEXP distanceSEXP, SEXP log_scaleSEXP, SEXP log_shapeSEXP, SEXP kernelSEXP, SEXP standardizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type V(VSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type C(CSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type distance(distanceSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type log_scale(log_scaleSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type log_shape(log_shapeSEXP);
+    Rcpp::traits::input_parameter< int >::type kernel(kernelSEXP);
+    Rcpp::traits::input_parameter< bool >::type standardize(standardizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_kernel_stream_cpp(V, C, distance, log_scale, log_shape, kernel, standardize));
+    return rcpp_result_gen;
+END_RCPP
+}
 // landscape_composition_metric_cpp
 NumericVector landscape_composition_metric_cpp(NumericVector d, NumericMatrix values, double radius, std::string metric, Nullable<NumericVector> weights_, double base, Nullable<double> resolution_, Nullable<double> classes_max_, Nullable<double> focal_class_);
 RcppExport SEXP _multiScaleR_landscape_composition_metric_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP radiusSEXP, SEXP metricSEXP, SEXP weights_SEXP, SEXP baseSEXP, SEXP resolution_SEXP, SEXP classes_max_SEXP, SEXP focal_class_SEXP) {
@@ -79,6 +123,61 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// msr_adjacency_prepare_cpp
+List msr_adjacency_prepare_cpp(NumericVector d, NumericVector values, NumericVector cells, int n_cols);
+RcppExport SEXP _multiScaleR_msr_adjacency_prepare_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP cellsSEXP, SEXP n_colsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type d(dSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type cells(cellsSEXP);
+    Rcpp::traits::input_parameter< int >::type n_cols(n_colsSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_adjacency_prepare_cpp(d, values, cells, n_cols));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_adjacency_eval_cpp
+NumericVector msr_adjacency_eval_cpp(List prepared, NumericVector radii, CharacterVector metrics, NumericVector bases, NumericVector focals);
+RcppExport SEXP _multiScaleR_msr_adjacency_eval_cpp(SEXP preparedSEXP, SEXP radiiSEXP, SEXP metricsSEXP, SEXP basesSEXP, SEXP focalsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type prepared(preparedSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type radii(radiiSEXP);
+    Rcpp::traits::input_parameter< CharacterVector >::type metrics(metricsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type bases(basesSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type focals(focalsSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_adjacency_eval_cpp(prepared, radii, metrics, bases, focals));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_adjacency_events_prepare_cpp
+List msr_adjacency_events_prepare_cpp(List p);
+RcppExport SEXP _multiScaleR_msr_adjacency_events_prepare_cpp(SEXP pSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type p(pSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_adjacency_events_prepare_cpp(p));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_adjacency_events_eval_cpp
+NumericVector msr_adjacency_events_eval_cpp(List p, NumericVector radii, CharacterVector metrics, NumericVector bases, NumericVector focals);
+RcppExport SEXP _multiScaleR_msr_adjacency_events_eval_cpp(SEXP pSEXP, SEXP radiiSEXP, SEXP metricsSEXP, SEXP basesSEXP, SEXP focalsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type p(pSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type radii(radiiSEXP);
+    Rcpp::traits::input_parameter< CharacterVector >::type metrics(metricsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type bases(basesSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type focals(focalsSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_adjacency_events_eval_cpp(p, radii, metrics, bases, focals));
+    return rcpp_result_gen;
+END_RCPP
+}
 // scale_type_cpp
 NumericVector scale_type_cpp(NumericVector d, std::string kernel, Nullable<NumericVector> sigma_, Nullable<NumericVector> shape_, Nullable<NumericMatrix> r_stack_df, Nullable<int> output);
 RcppExport SEXP _multiScaleR_scale_type_cpp(SEXP dSEXP, SEXP kernelSEXP, SEXP sigma_SEXP, SEXP shape_SEXP, SEXP r_stack_dfSEXP, SEXP outputSEXP) {
@@ -120,6 +219,45 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericMatrix >::type values(valuesSEXP);
     Rcpp::traits::input_parameter< NumericMatrix >::type kernel(kernelSEXP);
     rcpp_result_gen = Rcpp::wrap(surface_sa_focal_cpp(values, kernel));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_surface_sq_derivative_cpp
+NumericMatrix msr_surface_sq_derivative_cpp(List buffers, double sigma, std::string kernel);
+RcppExport SEXP _multiScaleR_msr_surface_sq_derivative_cpp(SEXP buffersSEXP, SEXP sigmaSEXP, SEXP kernelSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type buffers(buffersSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< std::string >::type kernel(kernelSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_surface_sq_derivative_cpp(buffers, sigma, kernel));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_surface_sq_prefix_cpp
+NumericVector msr_surface_sq_prefix_cpp(NumericVector value);
+RcppExport SEXP _multiScaleR_msr_surface_sq_prefix_cpp(SEXP valueSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type value(valueSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_surface_sq_prefix_cpp(value));
+    return rcpp_result_gen;
+END_RCPP
+}
+// msr_surface_weighted_sq_cpp
+NumericVector msr_surface_weighted_sq_cpp(NumericVector d, NumericMatrix values, double sigma, double shape, std::string kernel);
+RcppExport SEXP _multiScaleR_msr_surface_weighted_sq_cpp(SEXP dSEXP, SEXP valuesSEXP, SEXP sigmaSEXP, SEXP shapeSEXP, SEXP kernelSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type d(dSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type values(valuesSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
+    Rcpp::traits::input_parameter< std::string >::type kernel(kernelSEXP);
+    rcpp_result_gen = Rcpp::wrap(msr_surface_weighted_sq_cpp(d, values, sigma, shape, kernel));
     return rcpp_result_gen;
 END_RCPP
 }

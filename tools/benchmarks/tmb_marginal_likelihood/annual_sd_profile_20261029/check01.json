@@ -1,0 +1,12 @@
+{
+  "source_stable": true,
+  "check_status_OK": true,
+  "NOT_CRAN": true,
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-annual-sd-profile-exobtcqd",
+  "tests_run_separately": true,
+  "tests_complete": true,
+  "completed_at": "2026-10-29T03:16:03.8281932-04:00",
+  "installed_test_directory": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-annual-sd-profile-exobtcqd\\exact-archive-tests",
+  "passed": true,
+  "archive_SHA256": "6E8586DA94DCA93A176633B9C183FE5D390EFDA281C8F9F27FB31A7D9D61533F"
+}

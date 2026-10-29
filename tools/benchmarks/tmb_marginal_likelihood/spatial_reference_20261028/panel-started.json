@@ -1,0 +1,13 @@
+{
+  "planned_runs": 4,
+  "started_at": "2026-10-28T22:31:51.4331485-04:00",
+  "protocol_sha256": "33cf7df6fac389501b4b4be44be8545d7b78538553d873f11f5a9ef3972cd713",
+  "worker_limit": 1,
+  "controller": {
+    "ProcessId": 63660,
+    "ParentProcessId": 12180,
+    "CreationDate": "2026-10-28T22:31:39.866709-04:00",
+    "ExecutablePath": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+    "CommandLine": "\"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -NoProfile -Command \"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\n& 'C:/Users/peterman.73/AppData/Local/Programs/Python/Python312/python.exe' tools/benchmarks/tmb_marginal_likelihood/spatial_reference_20261028/freeze-study.py; if ($LASTEXITCODE -ne 0) {throw 'Study freeze failed'}; & 'C:/Users/peterman.73/AppData/Local/Programs/Python/Python312/python.exe' tools/benchmarks/tmb_marginal_likelihood/spatial_reference_20261028/verify-study.py; if ($LASTEXITCODE -ne 0) {throw 'Study identity gate failed'}; & tools/benchmarks/tmb_marginal_likelihood/spatial_reference_20261028/run-panel.ps1\""
+  }
+}

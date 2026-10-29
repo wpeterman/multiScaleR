@@ -1,0 +1,18 @@
+Loading required package: terra
+terra 1.9.34
+
+Attaching package: 'terra'
+
+The following objects are masked from 'package:testthat':
+
+    compare, describe
+
+Loading required package: sf
+Linking to GEOS 3.14.1, GDAL 3.12.1, PROJ 9.7.1; sf_use_s2() is TRUE
+
+Attaching package: 'MASS'
+
+The following object is masked from 'package:terra':
+
+    area
+

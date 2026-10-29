@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "archive_SHA256": "D0F606A9A7EE7E5BC62F872D7D1BE0F52E89816611FF0EF2DE69A441BC8FF31F",
+  "tests_complete": true,
+  "check_status_OK": true,
+  "tests_run_separately": true,
+  "installed_test_directory": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-response-sd-profile-tk5mswzp\\exact-archive-tests",
+  "completed_at": "2026-10-29T01:37:01.3531854-04:00",
+  "NOT_CRAN": true,
+  "source_stable": true,
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-response-sd-profile-tk5mswzp"
+}

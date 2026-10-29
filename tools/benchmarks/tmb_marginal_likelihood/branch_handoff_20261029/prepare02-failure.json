@@ -1,0 +1,4 @@
+{
+  "passed": false,
+  "reason": "Windows rename retained existing first staging plan; numbered replacement plan used. No validation producer launched and no source/evidence changed."
+}

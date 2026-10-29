@@ -1,0 +1,30 @@
+$passed
+[1] TRUE
+
+$original_unnamed_preflight_loses_RTMB_names
+[1] TRUE
+
+$named_preflight_retains_names
+[1] TRUE
+
+$all_four_numeric_starts_identical
+[1] TRUE
+
+$values
+[1] 174.3458 179.1098 183.0516 182.1169
+
+$gradient_max
+[1] 107.2703 119.3822 134.0853 137.0006
+
+$tmbstan_initial_mapping_valid
+[1] TRUE
+
+$driver_parses
+[1] TRUE
+
+$note
+[1] "No sampler called; no target, prior, numeric start or gate changed."
+
+$repaired_driver_md5
+[1] "4ad3a994cd13bca095c7829902887f4c"
+

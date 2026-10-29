@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "tests_complete": true,
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-probability-precision-6xvyatp6",
+  "check_status_OK": true,
+  "archive_SHA256": "E8BC0137D2073AB6C1CFA0E01146415C9EDFBFAC89DD529D7C63BA054DE1154F",
+  "NOT_CRAN": true,
+  "installed_test_directory": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-probability-precision-6xvyatp6\\exact-archive-tests",
+  "source_stable": true,
+  "tests_run_separately": true,
+  "completed_at": "2026-10-28T22:18:20.6063809-04:00"
+}

@@ -1,0 +1,655 @@
+--- predecessor/NEWS
++++ NEWS
+@@ -1,5 +1,8 @@
+ Inference development (unreleased)
+ ---------
++* A private annual log-scale SD trace shares fixed-SD nuisance audits with the
++  response-SD trace, retains exact-zero and kernel-limit distinctions, and
++  supplies no global-fit eligibility, confidence cutoff or calibration claim.
+ * A shared inference guide distinguishes posterior and likelihood targets,
+   prediction quantities, group policies, native conditioning and numerical
+   precision using the existing bundled example without refitting.
+--- predecessor/R/factorized_scale_profile.R
++++ R/factorized_scale_profile.R
+@@ -1,89 +1,11 @@
+-# A fixed response SD is excluded from nuisance optimization, never replaced by
+-# a zero gradient in the full objective. These closures stay inside one attempt.
++# Preserve the original response-profile interfaces and output while sharing
++# fixed-SD optimization/audits with the annual log-scale profile.
+ .msr_response_profile_problem <- function(spec, sd, parameters) {
+-  if (sd == 0) spec <- .msr_marginal_reduce(spec, "response")
+-  parameters$scale_z <- parameters$response_z <- numeric()
+-  parameters$log_response_sd <- if (sd == 0) numeric() else log(sd)
+-  object <- .msr_factorized_optimizer(spec, parameters, step = 1)
+-  fixed <- which(names(object$par) == "log_response_sd")
+-  free <- setdiff(seq_along(object$par), fixed)
+-  if (length(fixed) != as.integer(sd > 0))
+-    stop("The response-SD profile requires exactly one fixed SD coordinate.", call. = FALSE)
+-  full <- function(x) {
+-    if (length(x) != length(free) || any(!is.finite(x)))
+-      stop("Invalid nuisance parameter vector.", call. = FALSE)
+-    p <- object$par
+-    p[free] <- as.numeric(x)
+-    if (length(fixed)) p[fixed] <- log(sd)
+-    p
+-  }
+-  list(spec = spec, object = object, full = full, free = free, fixed = fixed,
+-    par = object$par[free], fn = function(x) object$fn(full(x)),
+-    gr = function(x) object$gr(full(x))[free],
+-    he = function(x) object$he(full(x))[free, free, drop = FALSE],
+-    parameters = function(x) {
+-      p <- full(x)
+-      object$fn(p) # Restore accepted state after any rejected trial.
+-      object$env$parList(x = p, par = object$env$last.par)
+-    })
++  .msr_fixed_sd_profile_problem(spec, sd, parameters, "response")
+ }
+ 
+ .msr_response_profile_attempt <- function(spec, sd, initial, iter.max) {
+-  warnings <- character(); candidate <- Inf; parameters <- NULL; par <- NULL
+-  imposed_initial <- initial
+-  imposed_initial$scale_z <- imposed_initial$response_z <- numeric()
+-  imposed_initial$log_response_sd <- if (sd == 0) numeric() else log(sd)
+-  stage <- "objective construction"
+-  answer <- tryCatch(withCallingHandlers({
+-    problem <- .msr_response_profile_problem(spec, sd, imposed_initial)
+-    stage <- "nuisance optimization"
+-    fit <- stats::nlminb(problem$par, problem$fn, problem$gr,
+-      control = list(iter.max = iter.max, eval.max = 3L * iter.max, rel.tol = 1e-11))
+-    candidate <- fit$objective; par <- fit$par
+-    parameters <- problem$parameters(par)
+-    stage <- "Newton certification"
+-    fit$refinement <- .msr_marginal_polish(par, problem$fn, problem$gr, problem$he, maxit = 6L)
+-    if (isTRUE(fit$refinement$passed) && fit$refinement$objective <= fit$objective + 1e-10) {
+-      fit$optimizer_par <- fit$par; fit$optimizer_objective <- fit$objective
+-      fit$par <- fit$refinement$par; fit$objective <- fit$refinement$objective
+-    }
+-    par <- fit$par; value <- as.numeric(problem$fn(par)); candidate <- value
+-    gradient <- as.numeric(problem$gr(par)); H <- problem$he(par)
+-    geometry <- .msr_marginal_curvature(H)
+-    parameters <- problem$parameters(par)
+-    full_par <- problem$full(par)
+-    full_gradient <- as.numeric(problem$object$gr(full_par))
+-    names(full_gradient) <- names(full_par)
+-    full_hessian <- problem$object$he(full_par)
+-    stage <- "cold nuisance audit"
+-    cold <- .msr_response_profile_problem(spec, sd, parameters)
+-    cold_value <- as.numeric(cold$fn(par)); cold_gradient <- as.numeric(cold$gr(par))
+-    ordinary <- .msr_factorized_objective(cold$spec, FALSE, rel.tol = 1e-10, step = .5)(parameters)
+-    error <- max(abs(c(value - cold_value, value - ordinary)))
+-    gradient_error <- max(abs(gradient - cold_gradient))
+-    audited <- all(is.finite(c(value, cold_value, ordinary, gradient, cold_gradient, full_gradient))) && error <= 1e-6
+-    stationary <- audited && (fit$convergence == 0L || isTRUE(fit$refinement$passed)) &&
+-      max(abs(gradient)) <= 1e-4 && max(abs(cold_gradient)) <= 1e-4 && gradient_error <= 1e-4 &&
+-      all(is.finite(full_hessian))
+-    list(eligible_nuisance = stationary && geometry$passed, stationary = stationary,
+-      audited_value = audited, objective = as.numeric(ordinary), par = par, parameters = parameters,
+-      optim = fit, nuisance_hessian = H, full_hessian = full_hessian, full_gradient = full_gradient,
+-      full_curvature = .msr_marginal_curvature(full_hessian),
+-      parameter_blocks = names(full_par),
+-      free_indices = problem$free, fixed_indices = problem$fixed, full_par = full_par,
+-      nuisance_gradient_max = max(abs(gradient)), condition = geometry$condition,
+-      minimum_eigenvalue = geometry$minimum, cold_error = abs(value - cold_value),
+-      reference_error = abs(value - ordinary), gradient_error = gradient_error,
+-      fixed_sd = sd, zero_sd_response = sd == 0, global_fit_eligible = FALSE)
+-  }, warning = function(w) {
+-    warnings <<- c(warnings, conditionMessage(w)); invokeRestart("muffleWarning")
+-  }), error = function(e) list(eligible_nuisance = FALSE, stationary = FALSE,
+-    audited_value = FALSE, objective = candidate, parameters = parameters, par = par,
+-    fixed_sd = sd, zero_sd_response = sd == 0, global_fit_eligible = FALSE,
+-    error_stage = stage, error = conditionMessage(e)))
+-  answer$initial <- imposed_initial; answer$supplied_initial <- initial
+-  answer$warnings <- unique(warnings)
+-  answer
++  .msr_fixed_sd_profile_attempt(spec, sd, initial, iter.max, "response")
+ }
+ 
+ # Kernel-limit witnesses retain the same response SD. The unrestricted fitter's
+--- predecessor/R/factorized_profile_attempt.R
++++ R/factorized_profile_attempt.R
+@@ -0,0 +1,112 @@
++# Conditional profile targets share the numerical audit, while the fixed
++# block, zero reduction and structurally irrelevant limits remain explicit.
++.msr_fixed_sd_profile_problem <- function(spec, sd, parameters, component,
++    allow_irrelevant = FALSE, cold = FALSE) {
++  component <- match.arg(component, c("response", "scale"))
++  block <- paste0("log_", component, "_sd")
++  if (allow_irrelevant && !(component == "scale" && !length(spec$scales[[1L]]$random) &&
++      ncol(spec$scales[[1L]]$X) == 0L && !length(spec$parameters$scale_beta)))
++    stop("Only an exact kernel limit can omit a positive scale SD.", call. = FALSE)
++  if (sd == 0) spec <- .msr_marginal_reduce(spec, component)
++  parameters$scale_z <- parameters$response_z <- numeric()
++  parameters[[block]] <- if (sd == 0 || allow_irrelevant) numeric() else log(sd)
++  object <- if (component == "scale" && cold)
++    .msr_factorized_adfun(spec, parameters, rel.tol = 1e-10, step = .5) else
++      .msr_factorized_optimizer(spec, parameters, step = 1)
++  fixed <- which(names(object$par) == block)
++  free <- setdiff(seq_along(object$par), fixed)
++  if (length(fixed) != as.integer(sd > 0 && !allow_irrelevant))
++    stop(paste0("The ", component, "-SD profile requires exactly one fixed SD coordinate."), call. = FALSE)
++  full <- function(x) {
++    if (length(x) != length(free) || any(!is.finite(x)))
++      stop("Invalid nuisance parameter vector.", call. = FALSE)
++    p <- object$par
++    p[free] <- as.numeric(x)
++    if (length(fixed)) p[fixed] <- log(sd)
++    p
++  }
++  list(spec = spec, object = object, full = full, free = free, fixed = fixed,
++    par = object$par[free], fn = function(x) object$fn(full(x)),
++    gr = function(x) object$gr(full(x))[free],
++    he = function(x) object$he(full(x))[free, free, drop = FALSE],
++    parameters = function(x) {
++      p <- full(x)
++      object$fn(p) # Restore accepted state after any rejected trial.
++      object$env$parList(x = p, par = object$env$last.par)
++    })
++}
++
++.msr_fixed_sd_profile_attempt <- function(spec, sd, initial, iter.max, component,
++    allow_irrelevant = FALSE) {
++  component <- match.arg(component, c("response", "scale"))
++  block <- paste0("log_", component, "_sd")
++  build <- function(s, p, cold = FALSE) {
++    if (component == "response") .msr_response_profile_problem(s, sd, p) else
++      .msr_fixed_sd_profile_problem(s, sd, p, "scale", allow_irrelevant, cold)
++  }
++  warnings <- character(); candidate <- Inf; parameters <- NULL; par <- NULL
++  imposed_initial <- initial
++  imposed_initial$scale_z <- imposed_initial$response_z <- numeric()
++  imposed_initial[[block]] <- if (sd == 0 || allow_irrelevant) numeric() else log(sd)
++  stage <- "objective construction"
++  answer <- tryCatch(withCallingHandlers({
++    problem <- build(spec, imposed_initial)
++    stage <- "nuisance optimization"
++    fit <- stats::nlminb(problem$par, problem$fn, problem$gr,
++      control = list(iter.max = iter.max, eval.max = 3L * iter.max, rel.tol = 1e-11))
++    candidate <- fit$objective; par <- fit$par
++    parameters <- problem$parameters(par)
++    stage <- "Newton certification"
++    fit$refinement <- .msr_marginal_polish(par, problem$fn, problem$gr, problem$he, maxit = 6L)
++    if (isTRUE(fit$refinement$passed) && fit$refinement$objective <= fit$objective + 1e-10) {
++      fit$optimizer_par <- fit$par; fit$optimizer_objective <- fit$objective
++      fit$par <- fit$refinement$par; fit$objective <- fit$refinement$objective
++    }
++    par <- fit$par; value <- as.numeric(problem$fn(par)); candidate <- value
++    gradient <- as.numeric(problem$gr(par)); H <- problem$he(par)
++    geometry <- .msr_marginal_curvature(H)
++    parameters <- problem$parameters(par)
++    full_par <- problem$full(par)
++    full_gradient <- as.numeric(problem$object$gr(full_par))
++    names(full_gradient) <- names(full_par)
++    full_hessian <- problem$object$he(full_par)
++    stage <- "cold nuisance audit"
++    cold <- build(spec, parameters, cold = TRUE)
++    cold_value <- as.numeric(cold$fn(par)); cold_gradient <- as.numeric(cold$gr(par))
++    ordinary <- .msr_factorized_objective(cold$spec, FALSE, rel.tol = 1e-10, step = .5)(parameters)
++    coordinate <- if (component == "scale" && length(parameters$log_scale_sd) &&
++        exp(parameters$log_scale_sd) >= 8) .msr_factorized_scale_objective(cold$spec, FALSE)(parameters) else ordinary
++    error <- max(abs(c(value - cold_value, value - ordinary)))
++    if (component == "scale") error <- max(error, abs(value - coordinate))
++    gradient_error <- max(abs(gradient - cold_gradient))
++    audited <- all(is.finite(c(value, cold_value, ordinary, gradient, cold_gradient, full_gradient, coordinate))) && error <= 1e-6
++    stationary <- audited && (fit$convergence == 0L || isTRUE(fit$refinement$passed)) &&
++      max(abs(gradient)) <= 1e-4 && max(abs(cold_gradient)) <= 1e-4 && gradient_error <= 1e-4 &&
++      all(is.finite(full_hessian))
++    list(eligible_nuisance = stationary && geometry$passed, stationary = stationary,
++      audited_value = audited, objective = as.numeric(ordinary), par = par, parameters = parameters,
++      optim = fit, nuisance_hessian = H, full_hessian = full_hessian, full_gradient = full_gradient,
++      full_curvature = .msr_marginal_curvature(full_hessian),
++      parameter_blocks = names(full_par),
++      free_indices = problem$free, fixed_indices = problem$fixed, full_par = full_par,
++      nuisance_gradient_max = max(abs(gradient)), condition = geometry$condition,
++      minimum_eigenvalue = geometry$minimum, cold_error = abs(value - cold_value),
++      reference_error = abs(value - ordinary), gradient_error = gradient_error,
++      fixed_sd = sd, zero_sd = sd == 0, global_fit_eligible = FALSE)
++  }, warning = function(w) {
++    warnings <<- c(warnings, conditionMessage(w)); invokeRestart("muffleWarning")
++  }), error = function(e) list(eligible_nuisance = FALSE, stationary = FALSE,
++    audited_value = FALSE, objective = candidate, parameters = parameters, par = par,
++    fixed_sd = sd, zero_sd = sd == 0, global_fit_eligible = FALSE,
++    error_stage = stage, error = conditionMessage(e)))
++  names(answer)[names(answer) == "zero_sd"] <- paste0("zero_sd_", component)
++  if (component == "scale") {
++    answer$sd_coordinate <- if (allow_irrelevant) "structurally_omitted_kernel_limit" else
++      if (sd == 0) "exact_zero_reduction" else "fixed_log_scale_sd"
++    if (exists("coordinate", inherits = FALSE)) answer$coordinate_error <- abs(candidate - coordinate)
++  }
++  answer$initial <- imposed_initial; answer$supplied_initial <- initial
++  answer$warnings <- unique(warnings)
++  answer
++}
++
+--- predecessor/R/factorized_scale_sd_profile.R
++++ R/factorized_scale_sd_profile.R
+@@ -0,0 +1,179 @@
++# Exact broad/nearest kernels no longer depend on any annual scale. Their
++# normalized latent prior integrates to one, so the SD coordinate is omitted.
++.msr_scale_profile_limits <- function(spec, sd, parameters, candidate_nll) {
++  references <- list(); witnesses <- character()
++  for (kernel in c("broad", "nearest")) {
++    limit <- .msr_factorized_limit_spec(spec, kernel)
++    p <- parameters; p$scale_beta <- p$scale_z <- p$log_scale_sd <- numeric()
++    attempts <- lapply(seq_len(3L), function(i) {
++      initial <- p
++      if (i > 1L) {
++        sizes <- lengths(initial); flat <- unlist(initial, use.names = FALSE)
++        flat <- flat + .05 * sin(seq_along(flat) + i)
++        at <- 0L
++        for (j in seq_along(initial)) {
++          n <- sizes[j]
++          initial[[j]] <- if (n) flat[at + seq_len(n)] else numeric()
++          at <- at + n
++        }
++      }
++      .msr_fixed_sd_profile_attempt(limit, sd, initial, 250L, "scale", allow_irrelevant = TRUE)
++    })
++    usable <- which(vapply(attempts, function(a) isTRUE(a$audited_value), TRUE))
++    best <- if (length(usable)) min(vapply(attempts[usable], `[[`, 0, "objective")) else Inf
++    references[[kernel]] <- list(completed = length(usable) > 0L, objective = best, attempts = attempts,
++      sd_coordinate = "structurally_omitted_kernel_limit")
++    if (is.finite(best) && best <= candidate_nll + 1e-5) witnesses <- c(witnesses, kernel)
++  }
++  list(completed = all(vapply(references, function(x) isTRUE(x$completed), TRUE)),
++    witnesses = witnesses, references = references, tolerance = 1e-5, fixed_sd = sd,
++    interpretation = "Kernel limits are independent of annual SD because the normalized latent prior integrates to one; feasible exclusions, never accepted finite fits.")
++}
++
++#' Trace a Private Gaussian Annual Log-Scale SD Profile
++#'
++#' Fix the SD of one independent kernel-scale group, including exact zero, and
++#' audit the remaining likelihood parameters. This private trace supplies no CI.
++#'
++#' @param spec An unpenalized specification from \code{.msr_marginal_prepare}
++#'   with Gaussian response, one kernel, an intercept-only fixed scale and one
++#'   independent scale random intercept. Response random effects, population
++#'   priors and Gaussian projection blocks are unsupported.
++#' @param sd Distinct finite nonnegative SDs, including zero, in log kernel-scale
++#'   deviations. Requested order is retained. These are not distance radii.
++#' @param control List with \code{starts} (default three) and \code{iter.max}
++#'   (default 250). Numerical audit and integration thresholds remain fixed.
++#' @param initial_parameters Optional additional parameter lists retaining the
++#'   original block names. All starts remain explicit, including duplicates and
++#'   failures; integrated latent coordinates are omitted and the requested SD fixed.
++#' @return A private \code{msr_scale_sd_profile} list. \code{curve} records each
++#'   requested SD, exact-zero flag, availability, objective/log likelihood and
++#'   objective relative only to the best requested valid point. \code{points}
++#'   retain all attempts, full/nuisance gradients and curvature, selected parameters,
++#'   failures and required limiting audits. \code{control}, target, parameter,
++#'   units, group/covariate and observation/group counts describe the calculation.
++#'   \code{diagnostics} reports trace completeness. \code{global_fit_eligible}
++#'   and \code{uncertainty$available} remain false. No interval is returned.
++#' @details Positive annual SD stays fixed in the normalized full marginal
++#'   likelihood while independent latent scale effects are integrated. Exact zero
++#'   removes their block, without a floor. Cold integration uses a fresh, stricter
++#'   partition and ordinary-value audit. The existing alternate integration
++#'   coordinate is also checked for SDs of eight or more. Population priors and
++#'   a REML adjustment are absent. Nuisance stationarity/curvature does not imply
++#'   a global fit; the full fixed-direction score is retained.
++#'
++#'   Broad/nearest kernel limits remove annual scale dependence exactly. Their
++#'   normalized latent density integrates to one at any requested SD, so its
++#'   coordinate is recorded as structurally omitted rather than reoptimized or
++#'   given artificial curvature. Both limits retain three starts and cold/ordinary
++#'   audits. An audited feasible limit can exclude a finite kernel even if its
++#'   curvature is singular; it is never accepted as a finite fit.
++#'
++#'   Groups are independent and exchangeable, without temporal correlation.
++#'   Annual log-scale SD is distinct from response-group SD and spatial-field
++#'   amplitude. Every requested point, lower ineligible candidate and competing
++#'   nuisance optimum remains explicit. A later boundary-aware bootstrap or
++#'   test-inversion design is required before reporting confidence intervals.
++#' @keywords internal
++.msr_factorized_scale_sd_profile <- function(spec, sd, control = list(), initial_parameters = list()) {
++  if (!is.list(spec) || !is.null(spec$priors) || is.null(spec$zero_sd))
++    stop("A prepared unpenalized marginal-likelihood specification is required.", call. = FALSE)
++  .msr_factorized_validate(spec)
++  sm <- spec$scales[[1L]]
++  if (spec$family != "gaussian" || length(spec$response$random) ||
++      length(sm$random) != 1L || ncol(sm$X) != 1L || any(sm$X[, 1L] != 1) ||
++      .msr_has_gaussian_blocks(spec))
++    stop("Annual-SD profiles require Gaussian response, no response group and one intercept-only kernel with one independent scale group.", call. = FALSE)
++  if (!is.numeric(sd) || is.complex(sd) || !is.null(dim(sd)) || !length(sd) ||
++      any(!is.finite(sd) | sd < 0) || anyDuplicated(sd) || !any(sd == 0))
++    stop("sd must contain distinct finite nonnegative values including exact zero.", call. = FALSE)
++  if (!is.list(control) || (length(control) && (is.null(names(control)) ||
++      anyDuplicated(names(control)) || any(!names(control) %in% c("starts", "iter.max")))))
++    stop("Profile control supports starts and iter.max only.", call. = FALSE)
++  ctl <- utils::modifyList(list(starts = 3L, iter.max = 250L), control)
++  for (nm in names(ctl)) {
++    if (!is.null(dim(ctl[[nm]]))) stop("Profile controls must be numeric scalars.", call. = FALSE)
++    validate_scalar_numeric(ctl[[nm]], nm, integerish = TRUE, lower = 1)
++  }
++  if (!is.list(initial_parameters)) stop("initial_parameters must be a list.", call. = FALSE)
++  for (p in initial_parameters) {
++    if (!is.list(p) || !identical(names(p), names(spec$parameters)) ||
++        any(!vapply(p, function(x) is.numeric(x) && !is.complex(x) && is.null(dim(x)) && all(is.finite(x)), TRUE)))
++      stop("Each supplied start must retain finite numeric original parameter blocks.", call. = FALSE)
++    population <- setdiff(names(p), c("scale_z", "response_z", "log_scale_sd"))
++    if (any(lengths(p[population]) != lengths(spec$parameters[population])) ||
++        !length(p$log_scale_sd) %in% 0:1 ||
++        !length(p$scale_z) %in% c(0L, length(spec$parameters$scale_z)) || length(p$response_z))
++      stop("Supplied starts must preserve original population and latent block dimensions.", call. = FALSE)
++  }
++  reason <- spec$identification
++  index <- sm$random[[1L]]$index
++  out <- list(target = "unpenalized full marginal likelihood", parameter = "annual_log_scale_sd",
++    units = "log kernel scale deviations", scale_group = sm$random[[1L]]$group,
++    covariate = spec$covariates, observations = length(spec$y),
++    scale_groups = length(unique(index)), control = ctl, points = list(), global_fit_eligible = FALSE,
++    uncertainty = list(available = FALSE, reason = "Profile trace only; no interval cutoff or boundary calibration."))
++  class(out) <- "msr_scale_sd_profile"
++  curve <- data.frame(sd = unname(sd), zero_sd_scale = sd == 0, available = FALSE,
++    objective = NA_real_, log_likelihood = NA_real_, relative_to_best_requested = NA_real_, reason = "")
++  if (length(reason)) {
++    curve$reason <- paste(reason, collapse = " "); out$curve <- curve
++    out$points <- lapply(sd, function(value) list(sd = value, available = FALSE, attempts = list(), reason = reason))
++    out$diagnostics <- list(trace_complete = FALSE, reason = reason)
++    return(out)
++  }
++  for (k in seq_along(sd)) {
++    value <- sd[k]; p <- spec$parameters
++    p$scale_z <- p$response_z <- numeric()
++    p$log_scale_sd <- if (value == 0) numeric() else log(value)
++    initials <- lapply(seq_len(ctl$starts), function(i) {
++      sizes <- lengths(p); flat <- unlist(p, use.names = FALSE); names(flat) <- rep(names(p), sizes)
++      if (i > 1L) {
++        flat <- flat + .05 * sin(seq_along(flat) + i)
++        flat[names(flat) == "scale_beta"] <- flat[names(flat) == "scale_beta"] + if (i %% 2L == 0L) -.6 else .6
++      }
++      answer <- p; at <- 0L
++      for (j in seq_along(answer)) {
++        n <- sizes[j]; answer[[j]] <- if (n) unname(flat[at + seq_len(n)]) else numeric(); at <- at + n
++      }
++      answer$log_scale_sd <- if (value == 0) numeric() else log(value)
++      answer
++    })
++    initials <- c(initials, initial_parameters) # Keep duplicates and failed starts explicitly.
++    attempts <- lapply(initials, function(initial) .msr_fixed_sd_profile_attempt(spec, value, initial, ctl$iter.max, "scale"))
++    eligible <- which(vapply(attempts, function(a) isTRUE(a$eligible_nuisance), TRUE))
++    point <- list(sd = value, zero_sd_scale = value == 0, available = FALSE,
++      attempts = attempts, selected = NA_integer_, global_fit_eligible = FALSE)
++    if (!length(eligible)) point$reason <- "No nuisance start passed the fixed numerical gates." else {
++      best <- eligible[which.min(vapply(attempts[eligible], `[[`, 0, "objective"))]
++      selected <- attempts[[best]]
++      better <- any(vapply(attempts, function(a) is.finite(a$objective) && a$objective < selected$objective - 1e-5, TRUE))
++      competing <- any(vapply(attempts[eligible], function(a) {
++        d <- as.numeric(a$par - selected$par)
++        a$objective - selected$objective <= 2 && sqrt(max(0, drop(crossprod(d, selected$nuisance_hessian %*% d)))) > 1
++      }, TRUE))
++      limits <- tryCatch(.msr_scale_profile_limits(spec, value, selected$parameters, selected$objective),
++        error = function(e) list(completed = FALSE, witnesses = character(), error = conditionMessage(e)))
++      point$selected <- best; point$parameters <- selected$parameters
++      point$objective <- selected$objective; point$limits <- limits
++      point$better_ineligible_candidate <- better; point$competing_nuisance_optima <- competing
++      point$available <- !better && !competing && isTRUE(limits$completed) && !length(limits$witnesses)
++      point$reason <- if (better) "A lower ineligible nuisance candidate was retained." else if (competing)
++        "Competing nuisance optima remain unresolved." else if (!isTRUE(limits$completed))
++          "Required SD-independent kernel-limit audit failed." else if (length(limits$witnesses))
++            "SD-independent kernel-limit witnesses reject finite-kernel identification." else "Conditional nuisance and limiting audits passed; not a global fit or interval."
++    }
++    out$points[[k]] <- point; curve$available[k] <- point$available; curve$reason[k] <- point$reason
++    if (isTRUE(point$available)) {
++      curve$objective[k] <- point$objective; curve$log_likelihood[k] <- -point$objective
++    }
++    gc(FALSE)
++  }
++  if (any(curve$available)) curve$relative_to_best_requested[curve$available] <-
++    curve$objective[curve$available] - min(curve$objective[curve$available])
++  out$curve <- curve
++  out$diagnostics <- list(trace_complete = all(curve$available), attempted_points = length(sd),
++    available_points = sum(curve$available), interval_available = FALSE,
++    reason = "Constrained profile trace; existing global-fit gates and interval-calibration requirements are unchanged.")
++  out
++}
+--- predecessor/man/dot-msr_factorized_scale_sd_profile.Rd
++++ man/dot-msr_factorized_scale_sd_profile.Rd
+@@ -0,0 +1,66 @@
++% Generated by roxygen2: do not edit by hand
++% Please edit documentation in R/factorized_scale_sd_profile.R
++\name{.msr_factorized_scale_sd_profile}
++\alias{.msr_factorized_scale_sd_profile}
++\title{Trace a Private Gaussian Annual Log-Scale SD Profile}
++\usage{
++.msr_factorized_scale_sd_profile(
++  spec,
++  sd,
++  control = list(),
++  initial_parameters = list()
++)
++}
++\arguments{
++\item{spec}{An unpenalized specification from \code{.msr_marginal_prepare}
++with Gaussian response, one kernel, an intercept-only fixed scale and one
++independent scale random intercept. Response random effects, population
++priors and Gaussian projection blocks are unsupported.}
++
++\item{sd}{Distinct finite nonnegative SDs, including zero, in log kernel-scale
++deviations. Requested order is retained. These are not distance radii.}
++
++\item{control}{List with \code{starts} (default three) and \code{iter.max}
++(default 250). Numerical audit and integration thresholds remain fixed.}
++
++\item{initial_parameters}{Optional additional parameter lists retaining the
++original block names. All starts remain explicit, including duplicates and
++failures; integrated latent coordinates are omitted and the requested SD fixed.}
++}
++\value{
++A private \code{msr_scale_sd_profile} list. \code{curve} records each
++  requested SD, exact-zero flag, availability, objective/log likelihood and
++  objective relative only to the best requested valid point. \code{points}
++  retain all attempts, full/nuisance gradients and curvature, selected parameters,
++  failures and required limiting audits. \code{control}, target, parameter,
++  units, group/covariate and observation/group counts describe the calculation.
++  \code{diagnostics} reports trace completeness. \code{global_fit_eligible}
++  and \code{uncertainty$available} remain false. No interval is returned.
++}
++\description{
++Fix the SD of one independent kernel-scale group, including exact zero, and
++audit the remaining likelihood parameters. This private trace supplies no CI.
++}
++\details{
++Positive annual SD stays fixed in the normalized full marginal
++  likelihood while independent latent scale effects are integrated. Exact zero
++  removes their block, without a floor. Cold integration uses a fresh, stricter
++  partition and ordinary-value audit. The existing alternate integration
++  coordinate is also checked for SDs of eight or more. Population priors and
++  a REML adjustment are absent. Nuisance stationarity/curvature does not imply
++  a global fit; the full fixed-direction score is retained.
++
++  Broad/nearest kernel limits remove annual scale dependence exactly. Their
++  normalized latent density integrates to one at any requested SD, so its
++  coordinate is recorded as structurally omitted rather than reoptimized or
++  given artificial curvature. Both limits retain three starts and cold/ordinary
++  audits. An audited feasible limit can exclude a finite kernel even if its
++  curvature is singular; it is never accepted as a finite fit.
++
++  Groups are independent and exchangeable, without temporal correlation.
++  Annual log-scale SD is distinct from response-group SD and spatial-field
++  amplitude. Every requested point, lower ineligible candidate and competing
++  nuisance optimum remains explicit. A later boundary-aware bootstrap or
++  test-inversion design is required before reporting confidence intervals.
++}
++\keyword{internal}
+--- predecessor/tests/testthat/test-factorized-scale-sd-profile.R
++++ tests/testthat/test-factorized-scale-sd-profile.R
+@@ -0,0 +1,179 @@
++annual_sd_profile_fixture <- function() {
++  f <- bayesian_scale_fixture(n_site = 6L, n_year = 5L, seed = 713403)
++  prepare <- function(data) multiScaleR:::.msr_marginal_prepare(
++    count ~ habitat + temp + offset(log(effort)), f$inputs, data,
++    list(habitat = ~1 + (1 | year)), "gaussian", "key", 200)
++  spec <- prepare(f$data)
++  p <- spec$parameters; p$beta <- c(.5, .25, 2); p$scale_beta[] <- log(.2)
++  p$scale_z[] <- c(-1, -.3, 0, .4, .9); p$log_scale_sd[] <- log(.35)
++  p$log_dispersion[] <- log(.2)
++  eta <- multiScaleR:::.msr_bayes_components(spec, p)$eta
++  n <- nrow(f$data)
++  residual <- qnorm((((seq_len(n) * 7L - 1L) %% n) + .5) / n)
++  f$data$count <- eta + .2 * residual
++  list(spec = prepare(f$data), parameters = p, inputs = f$inputs, data = f$data)
++}
++
++# Independent base-R integration of Gaussian observation densities and the
++# standard-normal group density. Centering changes neither limits nor measure.
++annual_profile_reference <- function(spec, parameters, sd) {
++  index <- spec$scales[[1L]]$random[[1L]]$index
++  if (sd == 0) {
++    p <- parameters; p$scale_z <- rep(0, length(unique(index))); p$log_scale_sd <- 0
++    eta <- multiScaleR:::.msr_bayes_components(spec, p)$eta
++    return(-sum(dnorm(spec$y, eta, exp(p$log_dispersion), log = TRUE)))
++  }
++  sum(vapply(seq_along(unique(index)), function(group) {
++    g <- multiScaleR:::.msr_factorized_group(spec, group)
++    log_density <- function(z) {
++      p <- parameters; p$log_scale_sd <- log(sd); p$scale_z <- z
++      eta <- multiScaleR:::.msr_bayes_components(g, p)$eta
++      sum(dnorm(g$y, eta, exp(p$log_dispersion), log = TRUE)) + dnorm(z, log = TRUE)
++    }
++    shift <- -optimize(function(z) -log_density(z), c(-12, 12))$objective
++    bound <- -length(g$y) * (parameters$log_dispersion + .5 * log(2 * pi))
++    # Skip only values whose Gaussian density upper bound already rounds to
++    # zero. This avoids 0*Inf kernel arithmetic without imposing a tail cutoff.
++    value <- integrate(function(z) vapply(z, function(x) {
++      if (exp(bound + dnorm(x, log = TRUE) - shift) == 0) return(0)
++      exp(log_density(x) - shift)
++    }, 0),
++      -Inf, Inf, rel.tol = 1e-9, subdivisions = 1000L)$value
++    -shift - log(value)
++  }, 0))
++}
++
++test_that("annual SD traces preserve normalized fixed targets and exact limits", {
++  skip_if_not_installed("RTMB")
++  f <- annual_sd_profile_fixture()
++  before <- serialize(f$spec, NULL); rng <- .Random.seed
++  trace <- multiScaleR:::.msr_factorized_scale_sd_profile(f$spec, c(0, .2, .5),
++    initial_parameters = list(f$parameters))
++  observer <- getOption("multiScaleR.annual_profile_test_observer")
++  if (is.function(observer)) observer(trace)
++  expect_s3_class(trace, "msr_scale_sd_profile")
++  expect_identical(serialize(f$spec, NULL), before)
++  expect_identical(.Random.seed, rng)
++  expect_identical(trace$curve$sd, c(0, .2, .5))
++  expect_length(trace$points, 3L)
++  expect_false(trace$global_fit_eligible)
++  expect_false(trace$uncertainty$available)
++  expect_false(trace$diagnostics$interval_available)
++  expect_identical(trace$scale_group, "year")
++  expect_identical(trace$units, "log kernel scale deviations")
++  audited <- list()
++  for (point in trace$points) {
++    expect_length(point$attempts, 4L)
++    expect_false(point$global_fit_eligible)
++    for (a in point$attempts) {
++      expect_false(a$global_fit_eligible)
++      expect_equal(a$initial$log_scale_sd, if (point$sd == 0) numeric() else log(point$sd))
++      if (isTRUE(a$audited_value)) {
++        expect_equal(a$parameters$log_scale_sd, if (point$sd == 0) numeric() else log(point$sd))
++        expect_lt(a$cold_error, 1e-6)
++        expect_lt(a$reference_error, 1e-6)
++        expect_true(all(is.finite(a$full_gradient)))
++        expect_true(all(is.finite(a$full_hessian)))
++        audited[[length(audited) + 1L]] <- list(sd = point$sd, attempt = a)
++      }
++    }
++    if (!is.null(point$limits)) {
++      expect_true(point$limits$completed)
++      expect_equal(point$limits$fixed_sd, point$sd)
++      for (limit in point$limits$references) {
++        expect_length(limit$attempts, 3L)
++        expect_identical(limit$sd_coordinate, "structurally_omitted_kernel_limit")
++        for (a in limit$attempts) {
++          expect_false(a$global_fit_eligible)
++          expect_length(a$initial$log_scale_sd, 0L)
++          expect_identical(a$sd_coordinate, "structurally_omitted_kernel_limit")
++          if (!is.null(a$parameters)) expect_length(a$parameters$log_scale_sd, 0L)
++        }
++      }
++    }
++  }
++  expect_gt(length(audited), 0)
++  for (point in trace$points) {
++    accepted <- Filter(function(a) isTRUE(a$audited_value), point$attempts)
++    if (length(accepted)) expect_equal(accepted[[1L]]$objective,
++      annual_profile_reference(f$spec, accepted[[1L]]$parameters, point$sd), tolerance = 1e-7)
++  }
++  # Finite-difference all nuisance directions at a retained positive-SD vector.
++  positive <- Filter(function(x) x$sd > 0, audited)
++  expect_gt(length(positive), 0)
++  if (length(positive)) {
++    a <- positive[[1L]]$attempt; sd <- positive[[1L]]$sd
++    problem <- multiScaleR:::.msr_fixed_sd_profile_problem(f$spec, sd, a$parameters, "scale")
++    reference <- function(x) annual_profile_reference(f$spec, problem$parameters(x), sd)
++    h <- 1e-5
++    score <- vapply(seq_along(a$par), function(j) {
++      hi <- lo <- a$par; hi[j] <- hi[j] + h; lo[j] <- lo[j] - h
++      (reference(hi) - reference(lo)) / (2 * h)
++    }, 0)
++    expect_lt(max(abs(score - a$full_gradient[a$free_indices])), 1e-4)
++    expect_gt(abs(a$full_gradient[a$fixed_indices]), 1e-4)
++  }
++  zero <- multiScaleR:::.msr_fixed_sd_profile_problem(f$spec, 0, f$parameters, "scale")
++  p0 <- zero$parameters(zero$par)
++  expect_length(p0$scale_z, 0L); expect_length(p0$log_scale_sd, 0L)
++  expect_equal(zero$fn(zero$par), annual_profile_reference(f$spec, p0, 0), tolerance = 1e-9)
++  expect_equal(annual_profile_reference(f$spec, p0, 1e-8),
++    annual_profile_reference(f$spec, p0, 0), tolerance = 1e-7)
++  for (kernel in c("broad", "nearest")) {
++    limit <- multiScaleR:::.msr_factorized_limit_spec(f$spec, kernel)
++    values <- vapply(c(0, .2, .5), function(sd) {
++      p <- f$parameters; p$scale_beta <- numeric()
++      problem <- multiScaleR:::.msr_fixed_sd_profile_problem(limit, sd, p, "scale", allow_irrelevant = TRUE)
++      expect_length(problem$fixed, 0L)
++      expect_length(problem$parameters(problem$par)$log_scale_sd, 0L)
++      problem$fn(problem$par)
++    }, 0)
++    expect_equal(values, rep(values[1], 3), tolerance = 0)
++  }
++})
++
++test_that("annual profiles reject unsupported scopes before fitting", {
++  f <- annual_sd_profile_fixture(); profile <- multiScaleR:::.msr_factorized_scale_sd_profile
++  for (grid in list(numeric(), .2, c(0, 0), c(0, -1), c(0, NA), matrix(0)))
++    expect_error(profile(f$spec, grid), "sd")
++  expect_error(profile(f$spec, c(0, .2), list(cutoff = 3.84)), "control")
++  expect_error(profile(f$spec, c(0, .2), initial_parameters = list(list(beta = 1))), "blocks")
++  posterior <- f$spec; posterior$priors <- list(beta_sd = 2)
++  expect_error(profile(posterior, c(0, .2)), "unpenalized")
++  counts <- f$spec; counts$family <- "nbinom2"
++  expect_error(profile(counts, c(0, .2)), "Gaussian")
++  response <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp + (1 | year),
++    f$inputs, f$data, list(habitat = ~1 + (1 | year)), "gaussian", "key", 200)
++  expect_error(profile(response, c(0, .2)), "no response group")
++  expect_error(multiScaleR:::.msr_fixed_sd_profile_problem(f$spec, .2, f$parameters, "scale",
++    allow_irrelevant = TRUE), "exact kernel limit")
++})
++
++test_that("annual conditional selection retains lower and competing candidates", {
++  f <- annual_sd_profile_fixture(); calls <- 0L
++  local_mocked_bindings(.msr_fixed_sd_profile_attempt = function(spec, sd, initial, iter.max, ...) {
++    calls <<- calls + 1L; i <- (calls - 1L) %% 3L + 1L
++    list(eligible_nuisance = i != 2L, audited_value = TRUE, objective = c(0, -1, .5)[i],
++      par = c(0, 0), nuisance_hessian = diag(2), parameters = initial, global_fit_eligible = FALSE)
++  }, .msr_scale_profile_limits = function(...) list(completed = TRUE, witnesses = character()), .package = "multiScaleR")
++  result <- multiScaleR:::.msr_factorized_scale_sd_profile(f$spec, c(0, .2))
++  expect_false(any(result$curve$available))
++  expect_true(all(vapply(result$points, function(p) p$better_ineligible_candidate, TRUE)))
++  calls <- 0L
++  local_mocked_bindings(.msr_fixed_sd_profile_attempt = function(spec, sd, initial, iter.max, ...) {
++    calls <<- calls + 1L; i <- (calls - 1L) %% 3L + 1L
++    list(eligible_nuisance = TRUE, audited_value = TRUE, objective = c(0, 1, .5)[i],
++      par = c(if (i == 2L) 2 else 0, 0), nuisance_hessian = diag(2), parameters = initial, global_fit_eligible = FALSE)
++  }, .package = "multiScaleR")
++  result <- multiScaleR:::.msr_factorized_scale_sd_profile(f$spec, c(0, .2))
++  expect_false(any(result$curve$available))
++  expect_true(all(vapply(result$points, function(p) p$competing_nuisance_optima, TRUE)))
++  local_mocked_bindings(.msr_fixed_sd_profile_attempt = function(spec, sd, initial, iter.max, ...)
++    list(eligible_nuisance = TRUE, objective = 0, par = c(0, 0), nuisance_hessian = diag(2), parameters = initial),
++    .msr_scale_profile_limits = function(...) list(completed = FALSE, witnesses = character()), .package = "multiScaleR")
++  result <- multiScaleR:::.msr_factorized_scale_sd_profile(f$spec, c(0, .2))
++  expect_false(any(result$curve$available)); expect_match(result$curve$reason[1], "audit failed")
++  local_mocked_bindings(.msr_scale_profile_limits = function(...) list(completed = TRUE, witnesses = "broad"), .package = "multiScaleR")
++  result <- multiScaleR:::.msr_factorized_scale_sd_profile(f$spec, c(0, .2))
++  expect_false(any(result$curve$available)); expect_match(result$curve$reason[1], "witnesses")
++})

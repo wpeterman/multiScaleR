@@ -1,0 +1,9 @@
+{
+  "sidecar_sha256": "E4DCA96B2B9827BE2885773949D8240F3041AC087B4D3BD552CE6AC2C28BCD3F",
+  "tests": 9,
+  "exit_code": 0,
+  "passed": true,
+  "test_sha256": "01F3B826B4411DFBC534D785F616986FBFB3366736A0DC88789ECD2308C14039",
+  "time": "2026-10-29T00:30:46.5295579-04:00",
+  "scope": "Separately labeled compact-summary interpretation; original results, flags and raw/derived gates remain intact."
+}

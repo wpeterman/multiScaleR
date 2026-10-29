@@ -1,0 +1,17 @@
+{
+  "controller": {
+    "ProcessId": 79324,
+    "ParentProcessId": 12180,
+    "CreationDate": "2026-10-28T23:09:22.42138-04:00",
+    "ExecutablePath": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+    "CommandLine": "\"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -NoProfile -Command \"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\n$taskStudy=Join-Path (Get-Location).Path 'tools/benchmarks/tmb_marginal_likelihood/spatial_reference_20261028'; . (Join-Path $taskStudy 'resource-controller-v2.ps1'); Assert-TaskAdmission; $taskTokens=$null; $taskErrors=$null; [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $taskStudy 'run-pending-v3.ps1'),[ref]$taskTokens,[ref]$taskErrors); if($taskErrors.Count){$taskErrors;throw 'Continuation syntax invalid'}; $taskA=Join-Path $taskStudy 'unique-checkpoint-test-a.json'; $taskB=Join-Path $taskStudy 'unique-checkpoint-test-b.json'; if((Test-Path -LiteralPath $taskA) -or (Test-Path -LiteralPath $taskB)){throw 'Retain existing probe'}; Write-TaskJson @{transition=1} $taskA; Write-TaskJson @{transition=2} $taskB; $taskPassed=((Get-Content -LiteralPath $taskA -Raw | ConvertFrom-Json).transition -eq 1) -and ((Get-Content -LiteralPath $taskB -Raw | ConvertFrom-Json).transition -eq 2); Write-TaskJson @{passed=$taskPassed;no_replacement=$true;time=(Get-Date -Format o)} (Join-Path $taskStudy 'unique-checkpoints-test01.json'); if(-not $taskPassed){throw 'Unique checkpoint test failed'}; & 'C:/Users/peterman.73/AppData/Local/Programs/Python/Python312/python.exe' (Join-Path $taskStudy 'continuation.py') --freeze; if($LASTEXITCODE -ne 0){throw 'Continuation freeze failed'}; & (Join-Path $taskStudy 'run-pending-v3.ps1')\""
+  },
+  "only_pending": [
+    "null-b",
+    "smooth-a",
+    "smooth-b"
+  ],
+  "worker_limit": 1,
+  "started_at": "2026-10-28T23:09:38.8792728-04:00",
+  "planned_total": 4
+}

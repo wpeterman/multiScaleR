@@ -403,6 +403,80 @@
 #'   optimization. When \code{NULL} (default), \code{stats::update()} (or the
 #'   unmarked equivalent) is used. Provide this only when the default refit
 #'   path is insufficient. See Details.
+#' @param backend \code{"refit"} (default) preserves the existing model-refit
+#'   optimizer. \code{"profile_glm"} opts into the analytic-profile backend for
+#'   independent Gaussian, Poisson, binomial, and NB2 observations. See the
+#'   formula, data, and uncertainty contracts in Details. \code{"joint_nb2"}
+#'   jointly estimates kernel parameters, coefficients, and NB2 dispersion,
+#'   including the exact Poisson boundary. It requires an NB2 log-link model.
+#'   \code{"joint_mixed"} opts into joint Poisson/NB2 random-intercept fitting
+#'   with optional zero inflation; see its restricted contracts in Details.
+#'   \code{"conditional_logit"} jointly estimates smooth kernel scales and
+#'   conditional-logistic coefficients for one used step per matched choice set.
+#'   It accepts retained survival models or amt wrappers; see Details.
+#' @param profile_control Named list used by the analytic backends:
+#'   For \code{conditional_logit}, accepted entries are \code{n_starts} (6),
+#'   \code{starts}, \code{iter.max} (500), \code{gradient_tolerance} (0.001),
+#'   and \code{kernel_engine} (\code{"reference"} or \code{"stream"}).
+#'   For \code{joint_mixed}, only \code{n_starts} (default 6) and
+#'   \code{starts} are accepted. Each row of \code{starts} contains positive
+#'   kernel scales in internal distance units (map distance divided by
+#'   \code{unit_conv}), in model predictor order. All starts are retained.
+#'   For the analytic GLM backends, available controls are
+#'   \code{n_starts} (6), \code{starts} (optional positive numeric matrix),
+#'   \code{theta_bounds} (\code{c(1e-4, 1e5)}), \code{theta_start} (optional),
+#'   \code{gradient_tolerance} (0.001), \code{iter.max} (500), and
+#'   \code{eval.max} (1000). Set \code{kernel_engine = "stream"} to opt into
+#'   contiguous matrix traversal for shared kernel values and derivatives,
+#'   reduced copying of prepared matrices, and cached response-only NB2 terms;
+#'   \code{"reference"} is the default. This retains the same starts,
+#'   likelihood, and uncertainty checks. The stream
+#'   engine uses additional temporary vectors proportional to the number of
+#'   observations and can reduce traversal cost for larger binned matrices.
+#'   For smooth weighted SQ predictors in \code{conditional_logit}, it also
+#'   computes values and scale derivatives in compiled code, reusing work
+#'   buffers across sites. Temporary storage is proportional to the largest
+#'   retained site buffer. The reference engine and default remain unchanged.
+#'   For NB2 models in either analytic backend, set
+#'   \code{coefficient_start = "warm"} to reuse
+#'   conditional regression coefficients within each search. The default is
+#'   \code{"cold"}. Warm continuation resets at every independent start and
+#'   falls back to cold initialization if its score or rank checks fail. Final
+#'   likelihood checks always use independently initialized coefficients.
+#'   Counts and fallback reasons are stored in
+#'   \code{profile_fit$coefficient_audit}. All independent starts are retained.
+#'   For \code{joint_nb2} only, \code{worker_pool} accepts a reusable PSOCK
+#'   cluster created with \code{parallel::makePSOCKcluster()}. Its default,
+#'   \code{NULL}, keeps fitting serial. Keep \code{n_cores = 1}; the pool size
+#'   determines the number of workers for independent starts. Workers must
+#'   load the same installed package code as the controller. Each start keeps
+#'   its cold terminal audit, and results retain their original start order.
+#'   You own the pool: reuse it across calls and close it with
+#'   \code{parallel::stopCluster()} when finished, including after errors.
+#'   Pool connections are not stored in the fitted object. Worker coefficient
+#'   audits are stored in \code{profile_fit$worker_coefficient_audits};
+#'   \code{coefficient_audit} then covers controller-side final evaluation.
+#'   Subsequent profile and bootstrap inference remains serial. Separate
+#'   processes duplicate data and package memory; inspect
+#'   \code{estimate_multiscale_ram()} before creating a pool. Pool startup
+#'   also checks the binned payload against 75 percent of physical RAM, allowing
+#'   four payload copies and 1 GiB per process for the controller and workers.
+#'   This planning estimate is not a guarantee of peak memory or available RAM.
+#'   Startup
+#'   can outweigh fitting gains for short jobs. Set math-library thread limits
+#'   before creating workers to avoid nested parallel computation.
+#'   Each row of \code{starts} contains kernel scales
+#'   divided by \code{unit_conv}, followed by shapes for \code{"expow"}, in
+#'   model predictor order. Explicit starts replace the deterministic scale
+#'   starts; \code{par}, if supplied, is prepended. NB2 dispersion starts cycle
+#'   through the initial theta, 0.3, 2, and 20 within the specified bounds.
+#'   Theta bounds must be positive, increasing, and at most 1e6.
+#'   For \code{"joint_nb2"}, the default theta bounds are \code{c(1e-4, Inf)};
+#'   the upper bound must remain infinite, and the lower bound must be at least
+#'   \code{1e-8}. Each kernel start is tried at the exact Poisson boundary and
+#'   at an interior dispersion, giving 12 fits with the default six kernel
+#'   starts. \code{iter.max} limits each L-BFGS-B search; \code{eval.max} applies
+#'   to subsequent profile/inference refits, which use conditional fitting.
 #'
 #' @return A list of class \code{"multiScaleR"} containing:
 #' \describe{
@@ -453,11 +527,181 @@
 #'   \item{\code{warn_message}}{Integer vector of triggered warning codes:
 #'     1 = max-distance, 2 = sigma precision, 3 = shape precision.}
 #'   \item{\code{call}}{The matched call.}
+#'   \item{\code{profile_fit}, \code{uncertainty}, \code{dispersion_est}}{Present
+#'     for both analytic GLM backends. These retain transformed parameter estimates,
+#'     starts and convergence scores, the profile and joint information
+#'     matrices, identifiability diagnostics, and NB2 theta. The ordinary
+#'     \code{opt_mod} and its coefficient summary condition on optimized kernel
+#'     parameters. Use \code{\link{vcov.multiScaleR}} and
+#'     \code{\link{predict.multiScaleR}} for joint uncertainty.}
+#'   \item{\code{mixed_fit}}{For \code{joint_mixed}, retained kernel engine,
+#'     log-scale estimates and bounds in internal distance units, independent
+#'     starts, every start outcome and warning, selected-start index, and
+#'     required prediction variables. \code{uncertainty$available} is
+#'     \code{FALSE}; \code{next_run} and \code{opt_context} are \code{NULL}.}
 #' }
 #' @details
+#' \strong{Opt-in analytic GLM contracts}
+#'
+#' The opt-in \code{backend = "conditional_logit"} uses the exact finite-choice-set
+#' likelihood with one used and at least one available step per set. Use a
+#' retained \code{survival::clogit} model (\code{model = TRUE}) or an amt
+#' \code{fit_clogit} wrapper, Gaussian or exponential binned inputs, and one
+#' bare \code{strata(choice_id)} term. IDs must identify sets uniquely across
+#' animals and bursts. Row names must match prepared point IDs. Explicitly
+#' prepare complete sets before fitting; omitted missing rows, subsets, weights,
+#' robust clustering and special Cox terms are rejected. Kernel predictors must
+#' be bare additive terms. Fixed covariates can include factors, transformations
+#' and formula offsets when their original inputs are recoverable. Optimized
+#' kernel-weighted surface SQ predictors are also supported when the matching
+#' raw buffers are retained. These use the weighted root-mean-square deviation,
+#' not hard-radius sample SD. Their scales remain independent, and prediction
+#' requires the same source and metric specifications and training normalization.
+#' Fixed-radius metrics can be supplied as fixed predictors; their values must
+#' be provided explicitly for new predictions. Optimization of hard-radius
+#' landscape/surface metrics and interactions involving optimized spatial
+#' predictors are not supported by this backend; use the default refit backend.
+#'
+#' Conditional-logistic fitting uses serial independent L-BFGS-B starts, with
+#' cold coefficient initialization and a cold native survival refit at every
+#' terminal point. Eligibility requires convergence, a small projected score,
+#' agreement in likelihood and coefficients, well-conditioned coefficient
+#' information and agreement with native covariance. Failed attempts and warnings
+#' remain explicit. After the original joint point passes the native agreement
+#' audits, cold native coefficients may refine its terminal score if the objective
+#' does not increase and the score improves. Both scores and the refinement flag
+#' are retained; the eligibility threshold is unchanged. Failed attempts
+#' remain in \code{profile_fit$start_results}; if all fail, the error condition
+#' contains \code{start_results}. \code{profile_fit$starts} stores log-scale
+#' starting values and \code{winner} identifies the selected record. Final
+#' \code{opt_mod} retains the native conditional fit and amt metadata when
+#' supplied. Its internal prediction contract omits duplicate fitting data to
+#' reduce serialized size; the original model remains in
+#' \code{fitted_mod_original}. Updating the conditional fit requires explicit data with already
+#' standardized kernel covariates; otherwise rerun the original multiscale fit.
+#' Scale SEs and joint prediction uncertainty are withheld. Native
+#' coefficient covariance conditions on the selected scales and does not correct
+#' temporal dependence. Movement terms must match the available-step proposal;
+#' the backend does not add them, validate a sampling interval, or calibrate
+#' population inference. Keep available steps fixed throughout optimization.
+#'
+#' The opt-in \code{backend = "joint_mixed"} requires optional packages RTMB,
+#' TMB, and glmmTMB. It jointly estimates kernel scales and model parameters,
+#' integrating random intercepts by the Laplace approximation. It supports
+#' log-link Poisson and NB2 glmmTMB fits with one conditional random intercept,
+#' constant dispersion, and optional fixed-effects zero inflation. Use binned
+#' Gaussian or negative exponential kernels, direct additive numeric spatial
+#' terms, retained model row names matching prepared point IDs, and
+#' \code{n_cores = 1}. Random slopes, multiple grouping terms, spatial terms in
+#' zero-inflation or dispersion formulas, non-unit weights, priors, parameter
+#' maps, and REML are unsupported. Raw formula variables must be recoverable
+#' from the fitted model; use formula \code{offset()} terms. Each start uses a
+#' fresh native fit, a joint Hessian check, and an independent native terminal
+#' refit with likelihood agreement within \code{1e-5}. Failed starts remain in
+#' \code{mixed_fit$start_results}; if all fail, the error condition contains
+#' \code{start_results}. No Hessian checks are bypassed.
+#'
+#' For \code{joint_mixed}, \code{opt_mod} is the final native glmmTMB fit.
+#' \code{mixed_fit} records log scales, bounds, starts, all outcomes, and the
+#' selected start. \code{diagnostics$joint_mixed} reports eligibility and scale
+#' boundary flags. Scale uncertainty has not been calibrated: scale SEs and
+#' legacy scale Hessians are \code{NA}, and joint intervals are unavailable.
+#' Native coefficient and prediction covariance condition on the selected
+#' scales. Use \code{predict(fit, se.fit = TRUE, uncertainty = "conditional")}
+#' or \code{predict(fit$opt_mod, ...)}. This backend does not extend the
+#' single-kernel NB2 contract of \code{scale_inference()}.
+#'
+#' The two analytic GLM backends require \code{bin = TRUE}, a smooth kernel,
+#' and a \code{glm} or \code{MASS::glm.nb} object retaining its model frame.
+#' For \code{"profile_glm"}, supported links are Gaussian identity, Poisson log, binomial logit, and
+#' NB2 log. NB2 has variance \eqn{\mu + \mu^2/\theta}; theta is estimated
+#' alongside kernel parameters, even when the initial GLM used a fixed theta.
+#' This backend is experimental. Development simulations found scale-interval
+#' undercoverage even among fits passing curvature checks. For single-kernel
+#' NB2 models, \code{\link{scale_inference}} examines the full likelihood range
+#' and optionally supplies bootstrap calibration; neither method guarantees
+#' reliable inference under weak identification.
+#' For \code{"profile_glm"}, regression coefficients are solved by IRLS at each candidate. A full-rank
+#' NB2 fit whose iterations fail receives a coefficient-likelihood refinement
+#' using the analytic score and observed information. Gaussian residual
+#' standard deviation is profiled at its maximum likelihood estimate.
+#'
+#' \code{"joint_nb2"} uses L-BFGS-B to estimate kernel parameters, coefficients,
+#' and \eqn{\rho = \log(1 + \alpha)} jointly, where \eqn{\alpha = 1/\theta}.
+#' At \code{rho = 0}, the likelihood is exactly Poisson. Each candidate must
+#' also agree with an independently optimized conditional coefficient fit
+#' within \code{1e-5} negative log-likelihood units. Start records retain
+#' failures, projected gradients, conditional likelihood gaps, and warnings.
+#' \code{dispersion_est} adds \code{alpha} and \code{exact_poisson}; a boundary
+#' estimate has \code{theta = Inf}. This is still an NB2 model, so the fitted
+#' model's likelihood parameter count includes dispersion at the boundary.
+#' Its conditional coefficient summary uses the Poisson GLM summary at that
+#' boundary; inspect \code{dispersion_est} for the NB2 boundary metadata.
+#' The \code{profile_fit} parameter vector uses log kernel parameters followed
+#' by \code{rho}; \code{joint_par} also includes regression coefficients.
+#' Its marginal covariance and Hessian are missing when joint uncertainty is
+#' unavailable. Interior joint covariance returned by \code{vcov()} retains
+#' log(theta) coordinates, as for \code{"profile_glm"}.
+#'
+#' Kernel predictors must be bare additive numeric terms. Fixed covariates may
+#' include factors, transforms, and interactions, using the fitted design's
+#' terms and contrasts. Interactions or transformations involving kernel
+#' predictors, kernel-dependent offsets, hard-radius metrics, random effects,
+#' and zero inflation are unsupported. Put offsets in the formula with
+#' \code{offset()}, rather than in the separate model argument.
+#'
+#' The retained model-frame rows define the fitting sample. Their row names
+#' must match unique prepared point IDs; preserve these through subsetting.
+#' Kernel means and standard deviations use only these rows. No observations
+#' are dropped during optimization. Binomial responses must be binary or
+#' \code{cbind(successes, failures)} with positive trial totals. Positive integer
+#' frequency weights are supported for count and binomial models; Gaussian
+#' weights must all equal one. Proportion responses and precision weights are
+#' unsupported.
+#'
+#' These backends default to serial full multi-start fits; use \code{n_cores = 1},
+#' \code{start_strategy = "single"}, and \code{profile_control}. It does not
+#' accept \code{refit_fn} or \code{join_by}. Every winning start must pass both
+#' optimizer convergence and projected-gradient checks.
+#' The optional \code{profile_control$worker_pool} distributes independent
+#' \code{joint_nb2} starts across a caller-owned PSOCK pool. It does not reduce
+#' the number of starts or change uncertainty criteria. For repeated fitting,
+#' create a pool once, pass \code{profile_control = list(worker_pool = pool)}
+#' to each call, and close the pool afterward. Use \code{on.exit()} inside
+#' your calling function to ensure cleanup if a fit fails.
+#'
+#' Joint observed information includes kernel, coefficient, and dispersion
+#' cross derivatives. Default scale limits are normal approximations on the
+#' log scale. Wald uncertainty is withheld at bounds, with nonpositive
+#' information or scaled-information condition number at least 1e8, log-kernel
+#' standard errors exceeding one, or competing starts more than 0.5 log units
+#' apart within a 95 percent likelihood threshold. These are diagnostic
+#' screening rules, not a proof of identifiability. A separate near-Poisson
+#' diagnostic flags \code{max(mu/theta) < 0.01}. A finite upper theta bound
+#' does not establish a finite dispersion maximum.
+#' Joint Wald results are also withheld when a Poisson fit at the selected
+#' scales is within the same likelihood threshold of the NB2 fit. This
+#' conservative dispersion diagnostic does not constitute a formal model test;
+#' reoptimizing Poisson scales could reveal additional compatibility.
+#' An exact Poisson boundary fit never receives joint Wald uncertainty.
+#' Explicit \code{uncertainty = "conditional"} predictions at that boundary
+#' condition on both the fitted kernel parameters and the Poisson dispersion
+#' boundary. They do not quantify uncertainty about the boundary or scales.
+#' The conditional \code{opt_mod} retains standard GLM methods, but
+#' \code{update(opt_mod)} is disabled because its original call references
+#' pre-optimization kernel values. Refit through \code{multiScale_optim()}.
+#'
+#' \code{summary(x, profile = TRUE)} reoptimizes other kernel parameters and
+#' NB2 dispersion while profiling each sigma. It reports the connected
+#' likelihood region around the selected solution; limits that reach a search
+#' bound are labeled \code{"profile-bound-limited"}, not interpreted as fully
+#' resolved confidence limits. \code{profile_sigma()} instead holds other
+#' kernel parameters fixed, while reestimating coefficients and NB2 dispersion.
+#' Neither operation guarantees discovery of unvisited likelihood modes.
+#'
 #' \strong{Optimization approach}
 #'
-#' The optimizer uses the L-BFGS-B algorithm (bounded quasi-Newton) to
+#' The default refit optimizer uses the L-BFGS-B algorithm (bounded quasi-Newton) to
 #' maximize the log-likelihood over sigma (and shape for \code{"expow"}) while
 #' holding all regression coefficients at their fitted values for each candidate
 #' scale. Standard errors are Hessian-based approximations from the outer
@@ -538,6 +782,24 @@
 #' With PSOCK clusters, \code{refit_fn} must serialize cleanly. Prefer
 #' namespace-qualified calls (e.g., \code{stats::update()}) and avoid
 #' closures over large local objects.
+#'
+#' The callback receives \code{context$return_model = FALSE} for scalar
+#' objective evaluations and \code{TRUE} when a fitted model is requested,
+#' including the final selected-model refit. For supported unmarked models,
+#' you can omit intermediate Hessian calculations while retaining the original
+#' model's uncertainty settings whenever a fitted model is returned:
+#' \preformatted{
+#' refit_unmarked <- function(model, data, context) \{
+#'   if (identical(context$return_model, FALSE))
+#'     unmarked::update(model, data = data, se = FALSE)
+#'   else
+#'     unmarked::update(model, data = data)
+#' \}
+#' }
+#' Supply this function as \code{refit_fn} to opt in. This changes neither
+#' coefficient starts nor the model's likelihood. It does not add uncertainty
+#' for kernel scales or override an original \code{se = FALSE} setting.
+#' Verify this contract for your model class before using a custom refitter.
 #'
 #' \strong{Wrapper model objects}
 #'
@@ -646,6 +908,26 @@
 #' opt_custom <- multiScale_optim(fitted_mod = mod,
 #'                                kernel_inputs = kernel_inputs,
 #'                                refit_fn = refit_glm)
+#'
+#' ## Opt-in NB2 fit: theta and kernel scales are estimated together.
+#' if (requireNamespace("MASS", quietly = TRUE)) {
+#'   ki_nb <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+#'                        kernel = "gaussian", bin = TRUE)
+#'   nb_data <- data.frame(ki_nb$kernel_dat)
+#'   nb_data$y <- rnbinom(nrow(nb_data),
+#'                       mu = exp(0.5 + 0.8 * nb_data$hab), size = 2)
+#'   nb_initial <- glm(y ~ hab, data = nb_data,
+#'                      family = MASS::negative.binomial(2))
+#'   nb_fit <- multiScale_optim(nb_initial, ki_nb, backend = "profile_glm",
+#'                              n_cores = 1,
+#'                              profile_control = list(n_starts = 6))
+#'   diagnostics(nb_fit)$profile_glm
+#'   predict(nb_fit)  # Expected counts for the retained fitting rows.
+#'   if (nb_fit$uncertainty$available) {
+#'     predict(nb_fit, interval = "confidence")
+#'     vcov(nb_fit)  # Includes kernel/coefficient/dispersion covariance.
+#'   }
+#' }
 #'}
 #' @rdname multiScale_optim
 #' @export
@@ -666,7 +948,10 @@ multiScale_optim <- function(fitted_mod,
                              n_cores = NULL,
                              PSOCK = FALSE,
                              verbose = TRUE,
-                             refit_fn = NULL){
+                             refit_fn = NULL,
+                             backend = c("refit", "profile_glm", "joint_nb2", "joint_mixed", "conditional_logit"),
+                             profile_control = list()){
+  backend <- match.arg(backend)
   if(is.null(fitted_mod)){
     stop("`fitted_mod` must be a fitted model object.")
   }
@@ -733,6 +1018,21 @@ multiScale_optim <- function(fitted_mod,
   validate_scalar_numeric(kernel_inputs$max_D, "kernel_inputs$max_D", positive = TRUE)
   validate_scalar_numeric(kernel_inputs$unit_conv, "kernel_inputs$unit_conv", positive = TRUE)
   kernel_inputs$kernel <- match.arg(kernel_inputs$kernel, c("gaussian", "exp", "expow", "fixed"))
+  if (backend == "conditional_logit") {
+    return(.msr_fit_clogit_backend(fitted_mod, kernel_inputs, join_by, par,
+      start_strategy, n_cores, refit_fn, profile_control, verbose, match.call()))
+  }
+  if (backend == "joint_mixed") {
+    return(.msr_fit_mixed_backend(fitted_mod, kernel_inputs, join_by, par,
+      start_strategy, n_cores, refit_fn, profile_control, verbose, match.call()))
+  }
+  if (backend %in% c("profile_glm", "joint_nb2")) {
+    return(.msr_fit_profile_backend(
+      fitted_mod, kernel_inputs, join_by, par, start_strategy, n_cores,
+      refit_fn, profile_control, verbose, match.call(), backend))
+  }
+  if (length(profile_control))
+    stop("`profile_control` requires backend = 'profile_glm' or 'joint_nb2'.", call. = FALSE)
   analysis_mod <- .analysis_model(fitted_mod)
 
   # Extract variables from fitted model
@@ -850,7 +1150,8 @@ multiScale_optim <- function(fitted_mod,
                                    unit_conv = kernel_inputs$unit_conv,
                                    resolution = kernel_inputs$resolution,
                                    n_cols = kernel_inputs$n_cols,
-                                   binned = kernel_inputs$binned)
+                                   binned = kernel_inputs$binned,
+                                   d_list = kernel_inputs$d_list)
 
   if(kernel_inputs$kernel == 'expow'){
     lwr <- c(lwr, rep(0.75, n_covs))

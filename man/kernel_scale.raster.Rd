@@ -19,6 +19,8 @@ kernel_scale.raster(
   na.rm = TRUE,
   verbose = TRUE,
   offset_values = NULL,
+  include_fixed = FALSE,
+  match_buffer = FALSE,
   ...
 )
 }
@@ -95,6 +97,28 @@ offsets. When omitted, a log offset uses 1 (zero on the log scale) and
 a direct offset uses 0. Set this argument for a meaningful projection
 scenario.}
 
+\item{include_fixed}{Logical. For a fitted unmarked, GLM, or coxph model,
+set \code{TRUE}
+with \code{scale_center = TRUE} to standardize modeled fixed-radius metrics
+using their verified original training preparation. The default
+\code{FALSE} uses only the supplied object's scaling parameters. The opt-in
+requires retained training buffers, matching fixed metric definitions and
+raster resolution, and unchanged native training predictor values. GLM and
+coxph models require \code{model = TRUE}, numeric fixed inputs retained
+under their original names, and model row IDs matching retained prepared
+sites. See
+\code{\link{prepare_unmarked_data}} for the verification contract.}
+
+\item{match_buffer}{Logical. The default \code{FALSE} retains the historical
+\code{pct_wt} projection window. Set \code{TRUE} to use the retained
+preparation's \code{max_D} polygon-intersection support and finite-cell
+normalization, including partially intersecting boundary cells.
+Requires a fitted or prepared \code{multiScaleR} object, matching projected
+square-cell resolution, \code{fft = TRUE}, and \code{na.rm = TRUE}.
+Metric radii larger than the prepared buffer raise an error. Central source
+NA cells remain masked. Binning, rasterization, and cell-center differences
+remain separate approximations.}
+
 \item{...}{Reserved for deprecated arguments. Currently only \code{scale_opt}
 (deprecated alias for \code{multiScaleR}) is handled.}
 }
@@ -147,10 +171,52 @@ covariates. These dummy layers are required for \code{terra::predict} to
 work but do not represent real spatial variation. Replace them manually for
 non-zero projection scenarios. Categorical predictors are skipped with a
 warning.
+Native unmarked models require explicit nonspatial prediction scenarios.
+When every native predictor is represented by a spatial layer, no dummy
+layers are needed. Supply remaining variables through native prediction data
+or \code{terra::predict(..., const = scenario)}.
 Offset terms use their underlying input variables as layer names. For
 \code{offset(log(n_weeks))}, the default layer is \code{n_weeks = 1},
 representing one week of effort. Set \code{offset_values = c(n_weeks = 4)}
 to predict for four weeks. Direct offsets default to zero.
+
+\strong{Verified fixed-radius metrics in native projection}
+
+Set \code{include_fixed = TRUE} with \code{scale_center = TRUE} when the
+fitted model contains declared fixed-radius metrics whose scaling parameters
+are retained only in its original preparation. The original fixed transforms
+and training normalization must reproduce the native model covariates
+exactly. Changed definitions or training inputs raise an error. This opt-in
+does not alter the caller's fitted object, metric definitions, or native
+uncertainty interpretation. Point-buffer preparation and raster smoothing
+retain their respective truncation and approximation rules.
+GLM and coxph projection require the retained native model frame and matching
+original prepared row IDs for this verification. Transformations that do not
+retain the fixed predictor under its original name are not reconstructed.
+For conditional-logistic step selection, native \code{type = "risk"} with
+\code{reference = "zero"} gives a relative selection score. Supply required
+stratum variables explicitly through \code{const}. These scores are not
+choice probabilities or occurrence probabilities; choice probabilities require
+normalization within explicit sets of alternatives.
+
+\strong{Matching the prepared neighborhood}
+
+\code{match_buffer = TRUE} uses the same projected \code{sf::st_buffer()}
+and polygon-intersection cell selection as point preparation. Partial boundary
+cells receive their usual full-cell kernel weights, matching the fitting
+convention rather than adding coverage-fraction weights. Finite cells within
+mapped support are renormalized at raster edges; central source NA cells remain
+masked. Constant weighted SQ support has zero population spread in this mode.
+The historical \code{pct_wt} window and its numerical behavior remain unchanged
+when \code{match_buffer = FALSE}.
+
+This option aligns the extraction footprint at raster cell centers. It does
+not undo distance binning, reconstruct raster contents or original CRS metadata,
+replace missing source coverage, or remove differences between an arbitrary
+sampled point and a raster cell center. Use the same intended sources and map
+units. A larger prepared buffer can increase projection memory and runtime.
+Hard-neighborhood metric radii above \code{max_D} are refused because their
+truncated cell-intersection footprint is not equivalent to a smaller radius.
 }
 \examples{
 ## Not Run

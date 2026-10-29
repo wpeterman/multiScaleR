@@ -1,0 +1,140 @@
+coverage-expansion: .............................
+
+Optimization complete
+...................................................................
+internals-and-helpers: ..................................................................
+joint-nb2-pool: ..........................
+optimization-workflow: .......................
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+..............
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+..
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+....................
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=11.9 to ensure accurate estimation of scale.
+
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+...............
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+...............
+
+Optimization complete
+
+ WARNING!!!
+ The estimated scale of effect approaches or exceeds the current search extent.
+ Consider increasing max_D in `kernel_prep` to >=400 to ensure accurate estimation of scale.
+
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+ WARNING!!!
+ The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.
+ Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.
+
+...........
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+.....
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+
+ WARNING!!!
+ The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.
+ Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.
+
+........
+
+*** Standard optimization failed ***
+Error message:
+mock standard failure
+.
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+..
+
+*** Parallel optimization failed ***
+Error message:
+mock parallel failure
+Parallel optimization aborted.
+Try running with `n_cores = 1` to use standard optimization.
+
+.
+
+Optimization complete
+
+ WARNING!!!
+ The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
+ Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
+
+.......
+
+Optimization complete
+
+
+Optimization complete
+...
+
+Optimization complete
+
+
+Optimization complete
+..
+
+Optimization complete
+
+
+Optimization complete
+...
+
+══ DONE ════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,45 @@
+{
+  "frozen_at_UTC": "2026-10-29T02:42:05.395361+00:00",
+  "dry_repair_gate_passed": true,
+  "prior_sampling_calls_completed": 0,
+  "producer_sha256": {
+    "OPS_REPAIR_PROTOCOL.md": "d844276e7c4096f7fe284f95b1b2f027d09320ff98fecca5d51c92ffb69f8bd7",
+    "run-fit-v2.R": "5e71e3849a6bde024cd041444d247e35d8b2f41b9e14b9f700c4111c90637e41",
+    "resource-controller-v2.ps1": "39898fdb87a5951178da338aa21c21067234fc994187746e35b302863a33b085",
+    "run-panel-v2.ps1": "770f6e15986bf62401321f8960f90ff39a20a00a95b5ebb74f14f7c3757fca0e",
+    "probe-repair.R": "17f97993c9dfcf3133e9af184e18ae1fdb0d9513905181815e259e0c516ec696",
+    "verify-repair.py": "211907561b0978dfb79ecd3a53c23f653e3ab9f7b212962317d30a5c47946e9c",
+    "freeze-repair.py": "a7faee6c63da53b5cb1a2c6808cf4eb2ca618e7edddd5790ae306dfa1a7de3e6"
+  },
+  "retained_failure_sha256": {
+    "BASELINE.json": "b0456275e12e685a66a5e88e8bca30f4a584908b9e70c1c41c94cbee3becf79c",
+    "null-a.json": "893ceff253d5467b7fc26ce6fae6ddd39f09545be4bf7b07be532fbfd18e1406",
+    "null-a-started.json": "5da080af48804d42dfc3905f6fbee3b450ba5945f11829853bfd171ee20d09cf",
+    "null-a-exit.json": "3959a27c380c57bbe5818ee003b36b713d502d66a37a240362ad140bf5e141d0",
+    "null-a-process.json": "0ff7db6eb11368bf0a1a5ea902cb8fbce6758534aad7d8270d61e4385be0893b",
+    "null-a.log": "d6ffd85da55cd8415a7b6907c04834a51dc97d2734caecae3a9f425d16114e51",
+    "null-a.err": "38f38676bf26f1a5c57f16fbfffdd7724fc1d02eb836f5af86104a136122f9e0",
+    "null-a-resources.jsonl": "d117c4f718583e4767dd85760a23f71f81cf00a8e144e5931e2ce00eafcdbe81",
+    "panel-started.json": "3c625b84e735723653ce64ce6f8dc862c62863a9720930ecdf8d497b53a64886",
+    "checkpoint-running.json": "94f2e2bbc5509d3ba86ac9a8baf62bd8b17edcea3b69815d45cb283873ad3724",
+    "checkpoint-running.json.tmp": "312ad30fe94e55cdc4d62144d28686f3b6083832017b73feae86e312de482c24",
+    "unit01.json": "0391284824076656d3d45a6fca12efa2599af406bb7dfe0ca1dfd196220872ed",
+    "unit01.log": "b0bbe45c535e77e13925bd354f4833dd4c76831378fb35ce8f4814d90aa4b074",
+    "unit02.json": "43914261c5d339134aa6886cc9ada56824170e429e8f13a4f45d4a896ca53453",
+    "unit02.log": "2a654f4a4fad6e53e96d96cce16dc389d240d97a9f0196b26d7f1b2e2806cbc8",
+    "atomic-writer-probe01-failure.json": "0fb4b9524ddbe01fb60ed99954c78fcadeb9d4b35b02be9dd9ab33d83cc4ba63",
+    "atomic-writer-validation.json": "297dd9694b9a983dc24fbcc9ddc07075385240baefb0cefd4edc21b0200f79ee",
+    "atomic-writer-validation.json.tmp": "2d5da8b0c15246d9e38084b8326a859911f0488551da0ade30526990962ab221",
+    "pre-repair-probe/resource-controller-v2.ps1": "aab0757aef290fb688a6c52d522ced6cc00bd44aab7241cbc9f6adb45b329057",
+    "repair-unit01.json": "b09bc82e1afbe64483cb51bd801c25057692c176cba73103646ed6bd384f4643",
+    "atomic-writer-validation02.json": "49e4ff49e7b09b6105664cb685ca2f04964d00af3841e3def33dbf4ab096144c"
+  },
+  "prior_failed_wall_seconds": 21.2220588,
+  "planned_scientific_slots": [
+    "null-a",
+    "null-b",
+    "smooth-a",
+    "smooth-b"
+  ],
+  "scope": "Pre-sampling operational repair; target, priors, numeric starts, seeds, controls and statistical gates unchanged."
+}

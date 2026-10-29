@@ -1,0 +1,20 @@
+spatial-source-report: ..................................1
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Error ('test-spatial-source-report.R:62:18'): source reports reject unveri
+Error in `st_crs.character(terra::crs(raster))`: invalid crs: 
+Backtrace:
+     ▆
+  1. ├─testthat::expect_error(call_report(raster = no_crs), "same defined projected CRS") at test-spatial-source-report.R:74:3
+  2. │ └─testthat:::expect_condition_matching_(...)
+  3. │   └─testthat:::quasi_capture(...)
+  4. │     ├─testthat (local) .capture(...)
+  5. │     │ └─base::withCallingHandlers(...)
+  6. │     └─rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+  7. └─call_report(raster = no_crs)
+  8.   └─multiScaleR:::.msr_spatial_source_report(...) at test-spatial-source-report.R:62:18
+  9.     ├─base::isTRUE(crs == sf::st_crs(terra::crs(raster))) at multiScaleR/R/spatial_source_report.R:74:3
+ 10.     ├─sf::st_crs(terra::crs(raster)) at multiScaleR/R/spatial_source_report.R:74:3
+ 11.     └─sf:::st_crs.character(terra::crs(raster))
+
+══ DONE ════════════════════════════════════════════════════════════════════════

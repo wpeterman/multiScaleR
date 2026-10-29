@@ -1,0 +1,645 @@
+---
+title: "Bayesian Scales Across Years"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Bayesian Scales Across Years}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5,
+  fig.height = 4.25)
+```
+
+This development interface estimates landscape scales and response effects
+together in a Bayesian model. It accepts stacked observations, such as the same
+sites surveyed over several years. Annual scales can borrow information from a
+common distribution, an approach called partial pooling.
+
+Start with `vignette("quickstart", package = "multiScaleR")` for kernel preparation
+and `vignette("year-specific-rasters", package = "multiScaleR")` for annual maps.
+The worked example below shows actual NUTS fits, annual scale estimates and
+predictive checks. Compact posterior draws are bundled with the package so
+you can read the fitted results without installing sampling software. The
+long fitting calls are shown but are not rerun during a package build. Full
+sampling is the primary workflow; approximation methods follow later.
+
+## Check your setup
+
+Preparation and the stored example need no optional Bayesian packages. Before
+fitting your own model, check the packages required by your chosen method:
+
+```{r setup-check}
+check_bayes_setup(method = "prepare")
+```
+
+For full sampling, install RTMB, tmbstan, rstan and posterior, then run the
+dependency check in your R session:
+
+```{r install-sampler, eval=FALSE}
+install.packages(c("RTMB", "tmbstan", "rstan", "posterior"))
+check_bayes_setup(method = "sample")
+```
+
+`ready = TRUE` means the required packages load and meet their minimum
+versions. It does not test compilation, available memory or a model's
+sampling behavior. Source installation can require a C++ compiler. On Windows,
+follow the [Rtools instructions](https://cran.r-project.org/bin/windows/Rtools/)
+for your R release. The [RStan setup guide](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started)
+and [RTMB installation page](https://github.com/kaskr/RTMB) explain their
+platform requirements. This interface uses tmbstan and RStan; installing
+CmdStan alone does not supply those R packages.
+
+You can validate your observations, maps and formulas with `method = "prepare"`
+before installing the sampler. Run a small fit next and inspect its
+diagnostics. More iterations can improve simulation precision, but they
+cannot repair an inappropriate likelihood or an uninformative landscape.
+
+## Response year effects and scale year effects
+
+These formulas describe different parts of the model:
+
+```{r formulas}
+response <- count ~ habitat + factor(year) + (1 | site)
+scales <- list(habitat = ~1 + (1 | year))
+```
+
+In the response formula, `factor(year)` lets baseline expected counts differ
+among years. The site random intercept accounts for repeated observations at
+the same site. The habitat coefficient describes its association with the
+response after surrounding habitat has been weighted by distance.
+
+The scale formula gives each year its own log landscape scale. Those annual
+values share an estimated mean and between-year standard deviation. A year with
+little scale information can borrow information from the other years. This is
+the hierarchy $\log D_y = \alpha + \tau z_y$, with $z_y \sim N(0,1)$.
+Here $D_y$ is the year's kernel scale in map units, $\alpha$ is the population
+log-distance location and $\tau$ describes variation among annual log scales.
+The priors on $\alpha$ and $\tau$ are specified separately from response effects.
+The annual effects are exchangeable: this hierarchy does not impose temporal
+autocorrelation.
+
+Use `~1` for one shared scale, `~year` for fixed factor-year scale effects, or
+`~1 + (1 | year)` for partial pooling. Treat calendar year as a factor when
+you want separate annual effects. A numeric year specifies a linear trend in
+log scale; center it to give the intercept a useful meaning.
+
+For a comparison without estimated pooling, use `~0 + year`. Each factor level
+then has its own log-scale coefficient with a normal prior centered at the same
+log median distance and SD `scale_intercept_sd`. This avoids making the first
+year a privileged prior reference. The priors still regularize the separate
+annual estimates; this is not an unpenalized likelihood fit.
+
+## Model flexibility and current limits
+
+Scale formulas describe log distance, so they can include measured covariates
+as well as group effects. For example, a centered numeric year can describe a
+trend while an annual random intercept allows departures from it:
+
+```{r scale-formula-options}
+trend_and_year <- list(habitat = ~1 + year_centered + (1 | year))
+two_predictors <- list(
+  habitat = ~1 + (1 | year),
+  forest = ~1 + (1 | year)
+)
+crossed_groups <- list(habitat = ~1 + (1 | year) + (1 | region))
+```
+
+The corresponding columns must exist in the data, and both kernel predictors
+must be prepared for the two-predictor example. Separate predictors have
+separate scale parameters and independent prior group effects. Using the same
+group name does not introduce an estimated correlation between their scales.
+
+Full NUTS can fit multiple scale-group SDs. The marginal approximation currently
+integrates exactly one scale-group SD and rejects models with more than one.
+Additional response random intercepts are distinct from this limit. Broad
+simulation evidence is strongest for one landscape predictor with annual
+pooling and Gaussian kernels; a valid formula is not itself evidence of good
+identification or interval calibration for a more complex model.
+
+The response can be Gaussian, Poisson, binomial or negative binomial, with the
+documented links. Binomial data can use successes and failures. Gaussian and
+exponential kernel means are supported. The response formula allows offsets,
+ordinary fixed covariates and additive random intercepts. Preparation checks
+the complete model before optional sampling software is needed.
+
+The landscape coefficient currently stays common across years even when its
+scale varies. Kernel-by-year interactions and response random slopes are not
+supported. The interface also lacks correlated random effects, temporal
+autoregression, spatial random fields, zero inflation, custom families and
+joint detection or multispecies likelihoods. These would require explicit
+likelihood, design and validation work. Bayesian inference alone does not add
+them to the package. Existing likelihood wrappers support some models outside
+this Bayesian interface, so it is not a replacement for every existing backend.
+
+Use posterior summaries and predictive checks for the fitted observations.
+For new observations and unobserved years, see
+`vignette("bayesian-prediction", package = "multiScaleR")`. It shows separate
+policies for new scale and response effects, future landscape scenarios and
+joint predictive totals. A fixed response year factor cannot predict an
+unseen year's coefficient; the forecasting example uses annual response
+random effects instead.
+Hierarchical scale models are new capabilities of this development interface;
+they are not exclusive to Bayesian inference in statistical theory.
+
+## Prepare annual maps and stacked observations
+
+The artificial example has five annual habitat maps and repeated surveys at
+25 possible sites. Two years have fewer surveys. Counts were generated with
+NB2 overdispersion, a habitat response effect, annual baseline differences and
+site random intercepts. The generating kernel scales vary among years.
+Projected distances are meters in this example.
+
+```{r prepare-data}
+example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
+  package = "multiScaleR"))
+dat <- example$data
+inputs <- example$inputs
+knitr::kable(example$truth, digits = 0,
+  caption = "Generating kernel scales and surveyed observations by year.")
+```
+
+The stored inputs are numeric bin summaries, not live raster pointers or a
+sampling object. To reproduce the maps and data, use the bundled source:
+
+```{r regenerate-data, eval=FALSE}
+source(system.file("examples", "bayesian-annual-data.R", package = "multiScaleR"))
+fresh <- make_bayesian_annual_data()
+dat <- fresh$data
+inputs <- fresh$inputs
+```
+
+That script prepares the site-year observations with
+`kernel_prep_by_group(points, maps, group = as.character(dat$year),
+max_D = 1200, sigma = 250, nbins = 48, store_cell_data = FALSE)`.
+It computes the generating response from the same finite-cell bins used for
+inference. `sigma = 250` is the preparation reference, while the table above
+contains the distinct generating annual scales. See the annual-map vignette
+for a walk-through of preparing your own maps.
+
+The key `site_year` identifies a prepared observation and its annual landscape.
+The `site` column identifies repeated surveys at the same location. When one
+static landscape is reused over time, a repeated site ID can instead map several
+observation rows to the same prepared row. Do not reuse static bins when the
+intended annual landscape changed.
+
+```{r prepare-model}
+prepared <- multiScale_bayes(
+  response, inputs, dat, scales = scales, row_id = "site_year",
+  family = "nbinom2", priors = list(scale_median = 250),
+  method = "prepare"
+)
+prepared
+```
+
+Preparation fixes observation order, checks formulas and missing values, and
+defines priors. It does not estimate parameters or produce posterior draws.
+Kernel columns are rebuilt from the bins at each sampled scale.
+
+### Check what the priors imply before fitting
+
+Simulate complete datasets from the prepared prior model. This needs no
+optional Bayesian software and does not condition on the observed counts.
+
+```{r prior-predictive}
+prior <- simulate_bayes_prior(prepared, nsim = 100, seed = 63)
+prior_checks <- data.frame(
+  statistic = c("Fraction of zeros", "Largest count"),
+  observed = c(mean(dat$count == 0), max(dat$count)),
+  prior_lower = c(quantile(vapply(prior$responses, function(y) mean(y == 0),
+    numeric(1)), .025), quantile(vapply(prior$responses, max, numeric(1)), .025)),
+  prior_upper = c(quantile(vapply(prior$responses, function(y) mean(y == 0),
+    numeric(1)), .975), quantile(vapply(prior$responses, max, numeric(1)), .975))
+)
+knitr::kable(prior_checks, digits = 2, row.names = FALSE)
+```
+
+The bounds describe variation among simulated dataset statistics, including
+parameter and observation variation. They are not confidence intervals around
+the observed statistic. Broad count ranges can arise from the joint priors on
+response coefficients, site variation and dispersion. Decide whether those
+ranges are scientifically plausible for your survey design before fitting;
+the table does not select a prior or establish model fit. The simulation keeps
+the prepared maps, offsets, trial totals and predictor standardization fixed.
+`prior$means` excludes observation variation. `prior$log_scales` stores log
+distance by group and replicate for inspecting scale quantiles separately.
+
+In these 100 replicates, the central zero-fraction range is
+`r format(round(prior_checks$prior_lower[1], 2), nsmall = 2)` to
+`r format(round(prior_checks$prior_upper[1], 2), nsmall = 2)`, compared with
+`r format(prior_checks$observed[1], nsmall = 2)` observed. The largest-count
+range reaches about
+`r format(round(prior_checks$prior_upper[2]), big.mark = ",", scientific = FALSE, trim = TRUE)`,
+compared with an observed maximum of `r prior_checks$observed[2]`.
+These priors often generate count patterns quite different from the observed
+data. Review their implications using biological knowledge and the survey
+design. The stored fits retain their original priors so that the comparisons
+continue to describe the same posterior.
+
+## Sample and inspect the posterior
+
+This call fits the annual hierarchy. The example uses more iterations than
+the function's default to obtain stable displayed results. Chains run serially.
+
+```{r sample, eval=FALSE}
+fit <- multiScale_bayes(
+  response, inputs, dat, scales = scales, row_id = "site_year",
+  family = "nbinom2",
+  priors = list(scale_median = 250, scale_group_sd = 0.5),
+  chains = 4, iter = 6000, warmup = 3000, seed = 5211,
+  control = list(adapt_delta = 0.95, max_treedepth = 12)
+)
+fit
+summary(fit)$diagnostics
+```
+
+Sampling includes response coefficients, annual scales, site effects,
+between-group SDs, and NB2 dispersion. Laplace approximation is disabled.
+Chains run serially.
+
+Diagnostics report rank-normalized R-hat, bulk and tail effective sample sizes,
+divergences, tree-depth hits, and energy behavior. The passed flag requires at
+least two chains, R-hat no greater than 1.01, bulk and tail effective sample
+sizes of at least 100 per chain, no divergences or maximum-depth hits, and
+E-BFMI of at least 0.3. Inspect individual parameters when a flag fails.
+Good mixing does not rule out missed modes or establish model adequacy.
+
+Check the fitted annual distances as well as the raw coefficients. Annual
+log distance combines the population location, group SD and annual deviation;
+those combinations can mix differently from their individual components.
+
+```{r derived-diagnostics, eval=FALSE}
+precision <- diagnose_bayes_scales(fit)
+precision$parameters  # Rhat and effective information for annual log distances and SDs
+precision$quantiles   # endpoints and medians with Monte Carlo standard errors
+precision$passed      # requires the original sampler checks AND the derived checks
+```
+
+The derived screen uses the same Rhat and effective-sample-size cutoffs.
+`mcse` estimates simulation error in each quantile, in the stated units.
+For annual log distances, an MCSE of 0.01 is on the log axis. It is not the
+posterior uncertainty about that year's distance. Compare computational
+precision with the decision you need to make: passing the screen does not
+guarantee a stable lower endpoint. Inspect independent runs when tails matter.
+The function leaves the original sampler flag unchanged.
+
+The stored fits were run with the calls described here. Diagnostics were
+computed before retaining 2000 joint posterior draws per fitted model. Keeping
+complete parameter vectors preserves dependence among annual scales,
+coefficients, site effects and SDs. The original samplers are not bundled.
+
+Consequently, `diagnose_bayes_scales()` cannot compute new chain diagnostics
+from these compact fits. It reports `available = FALSE` and explains why;
+the original diagnostic evidence remains in the example. Approximate draws
+also cannot supply MCMC chain diagnostics. Inspect their stored numerical
+checks instead.
+
+```{r stored-fit}
+fit <- example$fits$pooled
+knitr::kable(example$fit_info[c("model", "iterations", "original_draws", "stored_draws", "seconds")],
+  digits = 1, col.names = c("Model", "Iterations/chain", "Full draws", "Stored draws", "Seconds"),
+  caption = "Actual fitting effort and compact stored draws.")
+knitr::kable(example$fit_info[c("model", "max_rhat", "min_bulk_ess", "min_tail_ess",
+  "divergences", "depth_hits", "min_ebfmi", "passed")], digits = 3,
+  col.names = c("Model", "Rhat", "Bulk ESS", "Tail ESS", "Div.", "Depth", "E-BFMI", "Pass"),
+  caption = "Diagnostics from all unthinned chains and derived scale quantities.")
+```
+
+**How to read the diagnostics:** each model must pass the original sampler
+checks and separate checks on derived scale quantities. `max_rhat` should be
+at most 1.01, `min_bulk_ess` and `min_tail_ess` at least 400 for four chains,
+and divergences and depth hits zero. `min_ebfmi` should be at least 0.3.
+These checks use all retained chain iterations, rather than treating the
+smaller bundled draw count as additional evidence. If a longer retry was
+needed, its actual iteration count appears in the table and the original
+failed attempt remains in the development study.
+
+## Read annual estimates and population variation
+
+```{r annual-results}
+annual <- posterior_scales(fit)
+knitr::kable(annual[c("group", "median", "lower", "upper",
+  "p_below_min_D", "p_above_max_D")], digits = 3)
+summary(fit)$group_sd$log_scale_group_sd
+coefficients <- summary(fit)$coefficients
+knitr::kable(coefficients[c("coefficient", "median", "lower", "upper")], digits = 3)
+```
+
+**How to read the output:** `median`, `lower` and `upper` describe each year's
+kernel scale in meters. The interval is a central 95% credible interval,
+conditional on the model, priors and prepared landscapes. The population SD
+describes variation among years on the log-distance axis. It is distinct from
+uncertainty in one year's distance. The two support columns report posterior
+mass outside the input reference range; large distances still use only the
+neighborhoods that were extracted. These are separate marginal intervals,
+not a simultaneous 95% band for all annual scales.
+
+Response coefficients use the log expected-count scale. Exponentiating a
+coefficient gives an expected-count ratio, holding the other predictors and
+effects fixed. The habitat coefficient is shared across years and refers to
+one SD of the landscape predictor under the fixed reference transformation.
+Annual baseline coefficients change expected counts; annual scale effects
+change distance weighting. They describe different ecological relationships.
+
+For this NB2 example, the main output locations are:
+
+| Quantity | Where to read it | Interpretation |
+|---|---|---|
+| Response coefficients | `summary(fit)$coefficients` | Log expected-count effects; exponentiate for count ratios |
+| Annual distances | `posterior_scales(fit)` | Fitted kernel parameters in meters, with marginal credible intervals |
+| Population scale coefficients | `summary(fit)$scale_coefficients$habitat` | Log-distance intercept and any log-distance contrasts |
+| Between-year SD | `summary(fit)$group_sd$log_scale_group_sd` | Population variation among annual log distances |
+| Between-site response SD | `summary(fit)$group_sd$response_group_sd` | Site variation on the log expected-count axis |
+| NB2 size | `summary(fit)$dispersion` | Theta in `variance = mu + mu^2 / theta`; larger theta means less overdispersion |
+
+A between-year SD of 0.5 corresponds to a multiplicative distance factor
+`exp(0.5)`, about 1.65, per population SD. It is not an annual distance's
+posterior standard error. In a Gaussian response model, response coefficients
+and response SDs instead use response units; binomial coefficients use log odds.
+
+```{r annual-plot}
+truth_points <- data.frame(
+  group = annual$group, covariate = annual$covariate,
+  truth = example$truth$scale[match(as.character(dat$year[annual$row]), example$truth$year)]
+)
+plot(fit) + ggplot2::geom_point(data = truth_points,
+  ggplot2::aes(x = group, y = truth), inherit.aes = FALSE, shape = 4,
+  color = "firebrick", size = 3)
+plot(fit, type = "group_sd")
+```
+
+**How to read these plots:** points and vertical intervals summarize the
+posterior. Red crosses show known generating scales, which would be unknown
+in an empirical study. The SD plot separates annual scale variation from site
+response variation because their units differ. A plot can display a fit whose
+diagnostics failed, but its subtitle flags that failure. Plotting does not
+establish convergence or calibration. Its subtitle uses stored numerical
+flags; it does not recompute the derived annual-scale diagnostics.
+
+The continuous half-normal prior on a group SD assigns no point mass to
+exactly zero. A positive lower credible limit therefore does not establish
+year-to-year variation. Assess the probability of variation large enough to
+matter ecologically, and compare the shared-scale control. The SD's posterior
+spread still describes uncertainty about the amount of pooling.
+
+## Compare shared, independent and partially pooled scales
+
+Keep the response model and coefficient priors the same while changing only
+the scale model. The shared model uses one distance for all years. Independent
+annual cells have separate coefficients with equal distance priors. The
+hierarchy learns a population location and SD while estimating annual effects.
+
+```{r comparison-fits, eval=FALSE}
+shared <- multiScale_bayes(response, inputs, dat, row_id = "site_year",
+  scales = list(habitat = ~1), priors = list(scale_median = 250),
+  chains = 4, iter = 6000, warmup = 3000, seed = 5212,
+  control = list(adapt_delta = 0.95, max_treedepth = 12))
+independent <- multiScale_bayes(response, inputs, dat, row_id = "site_year",
+  scales = list(habitat = ~0 + year), priors = list(scale_median = 250),
+  chains = 4, iter = 6000, warmup = 3000, seed = 5213,
+  control = list(adapt_delta = 0.95, max_treedepth = 12))
+```
+
+```{r pooling-comparison}
+comparison <- example$comparison
+ggplot2::ggplot(comparison, ggplot2::aes(x = year, y = median,
+  ymin = lower, ymax = upper, color = model, shape = model)) +
+  ggplot2::geom_pointrange(position = ggplot2::position_dodge(width = 0.6)) +
+  ggplot2::geom_point(data = example$truth,
+    ggplot2::aes(x = year, y = scale), inherit.aes = FALSE, shape = 4, size = 3) +
+  ggplot2::scale_color_brewer(palette = "Dark2") +
+  ggplot2::labs(x = "Year", y = "Kernel scale (m)", color = "Scale model",
+    shape = "Scale model") +
+  ggplot2::theme_bw()
+knitr::kable(example$recovery, digits = 3,
+  caption = "Log-scale error in this one artificial dataset.")
+```
+
+Black crosses mark the generating annual scales. Partial pooling can stabilize
+weakly informed years, but it can also shrink an
+unusual year too far toward the others. Compare the intervals with the sample
+sizes and generating scales. Here, hierarchical log-scale RMSE is about 0.484,
+compared with 0.586 for independent years. The shared model does better than
+either, with RMSE about 0.359, despite the distinct generating annual scales.
+This dataset has too little scale information to reward all the added annual
+flexibility. The hierarchy's intervals contain all five generating scales,
+compared with four for independent years and five for the shared model.
+These are five related interval checks, not an estimate of 95% calibration.
+
+The example illustrates the consequences of the scale model. One dataset
+cannot establish comparative recovery or interval coverage. Do not choose an
+empirical prior by minimizing an error against generating values that are
+available only in a simulation.
+
+## Check predicted counts and prior sensitivity
+
+`predict()` describes expected responses at the fitted observations.
+`simulate()` also includes observation sampling variation. Here are three
+simple checks on the count distribution:
+
+```{r fitted-means}
+expected_counts <- predict(fit)
+rows <- match(example$truth$year, as.character(dat$year))
+expected_preview <- cbind(
+  data.frame(year = dat$year[rows], observed = dat$count[rows]),
+  expected_counts[rows, c("median", "lower", "upper")]
+)
+knitr::kable(expected_preview, digits = 3, row.names = FALSE,
+  caption = "Expected counts for one fitted observation per year.")
+```
+
+**How to read the predictions:** `median`, `lower` and `upper` describe each
+observation's expected count, including its fitted site effect. An observed
+count need not lie in this interval because observation variation is absent.
+The intervals are marginal for individual observations, not a simultaneous
+band. `predict(fit, re.form = NA)` sets response site effects to zero while
+retaining fitted annual scales; it does not average over a new site's effect.
+For grouped-binomial models, expected-response predictions are success
+probabilities, while simulations return success counts out of the trial totals.
+
+For example, the displayed 2023 observation is zero although its interval for
+the expected count is positive. A zero can still arise from the NB2 observation
+distribution; it does not need to lie in an interval for the mean.
+
+```{r predictive-checks}
+replicate_counts <- simulate(fit, nsim = 200, seed = 94)
+statistics <- function(y) c(mean = mean(y), zero_fraction = mean(y == 0), maximum = max(y))
+replicated <- vapply(replicate_counts, statistics, numeric(3))
+predictive <- data.frame(statistic = names(statistics(dat$count)),
+  observed = statistics(dat$count),
+  replicated_median = apply(replicated, 1, median),
+  replicated_lower = apply(replicated, 1, quantile, 0.025),
+  replicated_upper = apply(replicated, 1, quantile, 0.975))
+knitr::kable(predictive, digits = 3, row.names = FALSE)
+```
+
+The observed mean of `r round(predictive$observed[1], 2)` and maximum of
+`r predictive$observed[3]` lie within their displayed replicate ranges.
+The observed zero fraction of `r predictive$observed[2]` is nearer the upper
+end, so inspect where zeros occur by year and site.
+
+These are posterior predictive intervals for data summaries, not credible
+intervals for a scale. A discrepancy can indicate that the response model
+misses a feature of the counts. Agreement on three summaries is not a complete
+model check. Also examine patterns by year, site and fitted mean for your data.
+
+With five years, the prior on between-year variation can matter. The stored
+example repeats the hierarchical fit using half-normal prior scales 0.25,
+0.5 and 0.75 for the between-year log-scale SD. The median distance reference
+remains 250 m, so predictor standardization is held fixed.
+
+```{r prior-sensitivity}
+knitr::kable(example$sensitivity, digits = 3,
+  caption = "Population SD summaries under three explicitly specified priors.")
+```
+
+To reproduce the two alternatives, repeat the pooled fitting call with
+`priors = list(scale_median = 250, scale_group_sd = 0.25), seed = 5214`
+and with `scale_group_sd = 0.75, seed = 5215`. These are deliberate sensitivity
+models, not changes to the function's defaults. Assess whether scientifically
+important annual conclusions depend on a defensible prior choice. Stable
+sampling alone does not establish that the data identify the pooling SD.
+Here its posterior median rises from about 0.150 to 0.235 to 0.276 as the
+half-normal prior scale rises from 0.25 to 0.5 to 0.75. The broad upper
+interval limits also increase. With only five weakly informed years, the data
+leave considerable uncertainty about the amount of annual variation.
+
+## Choose a computation method
+
+Full NUTS sampling is the main workflow in this guide. Alternatives change
+the computation, not the likelihood or priors:
+
+| Method | What it computes | Main limitation |
+|---|---|---|
+| `method = "sample"` | Joint posterior sampling by NUTS | Requires full-chain checks and adequate simulation precision |
+| `method = "laplace"` | One local Gaussian approximation | Can miss skewness and dependence on a weakly identified SD |
+| `method = "marginal"` | Numerical integration of one scale-group SD with conditional Gaussian approximations | Grid convergence does not establish accurate annual intervals |
+| Marginal with `correction = "importance"` | Full-target weighting of proposed parameter vectors | Poor proposal coverage can make estimates unstable despite a large candidate count |
+
+For formulas, controls, actual comparison outputs and interpretation of each
+numerical flag, read `vignette("bayesian-computation", package = "multiScaleR")`.
+The marginal approximation integrates exactly one scale-group SD in total.
+Use full sampling for models with more scale-group SDs. A returned fit or a
+passed numerical flag does not by itself establish adequate calibration.
+
+## Distinguish distance uncertainty from population variation
+
+### Prefer quantiles when distance tails are broad
+
+Medians and credible intervals remain useful under broad distance uncertainty.
+Arithmetic means and SDs need more care. The annual log-scale model includes
+the product of a normal year effect and an uncertain between-year SD. With a
+half-normal SD prior of scale `s`, the prior moment `E(exp(r * tau * z))` is
+finite only when $r s < 1$. The default `s = 0.5` is already at the boundary
+for the second distance moment. The prior-sensitivity choice `s = 1` is at the
+boundary for the arithmetic distance mean.
+
+The binned likelihood can retain these tails: as distance grows, kernel weights
+approach uniform weights within the extracted neighborhood. A finite trace can
+therefore return a sample mean or SD even when the corresponding posterior
+moment is not finite. More draws cannot turn an infinite moment into a stable
+estimate. This does not invalidate posterior medians or interval quantiles.
+
+```{r log-scale-summary, eval=FALSE}
+posterior_scales(fit)                 # distance medians and credible intervals
+posterior_scales(fit, scale = "log")  # means and SDs on the log-distance axis
+```
+
+The log-distance SD measures uncertainty in one fitted year's distance. It is
+different from the population SD describing variation among years. Exponentiate
+log-distance medians or interval limits to return to map units. Exponentiating
+a log mean gives a geometric summary, rather than an arithmetic distance mean.
+The comparison studies use log-distance errors and distance quantiles, so their
+primary recovery and calibration statistics do not require a finite distance
+variance. These clarifications leave the fitted priors unchanged.
+
+### Separate posterior uncertainty from Monte Carlo uncertainty
+
+A credible interval describes posterior uncertainty about a scale. Monte Carlo
+uncertainty describes how accurately a finite computation estimates that
+interval or median. A flat posterior CDF near a quantile can turn a small
+probability error into a substantial distance change. Inspect the quantile
+MCSE from `diagnose_bayes_scales()` for an original NUTS fit and compare it
+with the precision your scientific decision needs.
+
+The original sampler flag checks raw parameters and sampler behavior. It does
+not certify annual-median precision. Compare independent runs when tails
+matter. Weighted importance summaries and their separate precision limits
+are explained in `vignette("bayesian-computation", package = "multiScaleR")`.
+
+## Prior and landscape support checks
+
+Scale intercepts have normal priors on log distance, centered at the specified
+median scale. Between-year log-scale SDs have half-normal priors. With few
+years, the prior on between-year variation can substantially affect results.
+Repeat the fit with defensible alternative median scales and group-SD priors,
+then compare annual summaries and predictions.
+
+Centering and SD for each kernel predictor are calculated once across fitting
+observations at the prior median scale. They are held fixed during sampling,
+giving response coefficient priors a fixed reference meaning. This differs from
+scale-dependent standardization in existing optimization backends. Changing
+the reference median changes that transformation too; inspect it when comparing
+prior specifications.
+
+`p_below_min_D` and `p_above_max_D` report posterior mass outside the input
+reference range. Scales have no hard bounds. Each kernel still uses only cells
+extracted within `max_D`; a large sampled scale cannot recover missing distant
+habitat. Missing raster cells are excluded and finite weights renormalized.
+
+Weak landscape effects may provide little information about scale. Partial
+pooling and priors can stabilize estimation, but narrow intervals can reflect
+the prior. General scale-recovery, calibration, and runtime studies remain
+development gates.
+
+## Quick reference
+
+```{r quick-reference, eval=FALSE}
+# 1. Validate explicit observation-to-map alignment.
+prepared <- multiScale_bayes(
+  count ~ habitat + factor(year) + (1 | site), inputs, dat,
+  scales = list(habitat = ~1 + (1 | year)),
+  row_id = "site_year", priors = list(scale_median = 250), method = "prepare"
+)
+# 2. Sample shared and annual parameters jointly.
+fit <- multiScale_bayes(
+  count ~ habitat + factor(year) + (1 | site), inputs, dat,
+  scales = list(habitat = ~1 + (1 | year)),
+  row_id = "site_year", priors = list(scale_median = 250),
+  chains = 4, iter = 6000, warmup = 3000, seed = 521,
+  control = list(adapt_delta = 0.95, max_treedepth = 12)
+)
+# 3. Inspect diagnostics before interpreting scales.
+summary(fit)$diagnostics
+precision <- diagnose_bayes_scales(fit)  # full NUTS sampler required
+precision$parameters
+precision$quantiles                    # simulation error of annual log endpoints
+posterior_scales(fit)
+predict(fit)                        # uncertainty in expected counts
+simulate(fit, nsim = 100, seed = 1)  # replicated observation counts
+```
+
+| Function | Purpose |
+|---|---|
+| `check_bayes_setup()` | Check optional package availability before fitting |
+| `kernel_prep_by_group()` | Match stacked observations to annual maps |
+| `multiScale_bayes()` | Prepare, sample, or approximate the hierarchical scale model |
+| `simulate_bayes_prior()` | Check prior implications before fitting, using the prepared design |
+| `posterior_scales()` | Summarize shared and annual scales in map units |
+| `predict_scales()` | Predict scales at new covariates and years, including new-group variation |
+| `diagnose_bayes_scales()` | Check annual log-scale mixing and quantile simulation error |
+| `plot()` | Display fitted scale intervals or between-group SDs |
+| `predict()` | Propagate posterior uncertainty into fitted or new-observation means |
+| `simulate()` | Generate posterior predictive responses |
+
+See also `vignette("bayesian-computation", package = "multiScaleR")` for
+approximation choices and numerical precision,
+`vignette("bayesian-prediction", package = "multiScaleR")` for new sites and years,
+`vignette("year-specific-rasters", package = "multiScaleR")` and
+`vignette("quickstart", package = "multiScaleR")`.

@@ -60,6 +60,11 @@ With advanced coding skills, Bayesian analytical frameworks can be used to estim
 - Model selection tables (AIC, BIC) account for the additional parameters estimated during scale optimization.
 - Functions to simulate rasters and response data facilitate power analysis and methods testing.
 
+For stacked observations and partially pooled annual landscape scales, see
+`vignette("bayesian-scales", package = "multiScaleR")`. That experimental
+workflow estimates scale and response parameters jointly and includes a fitted
+example, optional-software setup checks, posterior plots and prior sensitivity.
+
 `multiScaleR` supports models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and many `unmarkedFit` classes. For `unmarked`, a raster covariate being optimized must be a static site covariate, and the fitted class must support refitting with updated data. Other model classes may work when they provide a suitable `update` method and are supported by [insight](https://CRAN.R-project.org/package=insight). Let me know if you encounter issues or would like to see support for other model classes.
 
 **References**
@@ -260,10 +265,7 @@ plot(pts, add = T, pch = 19)
 
 `kernel_prep()` is the first step of every `multiScaleR` analysis. It does two things:
 
-For observations collected against different annual maps, use
-`kernel_prep_by_group()` in its place. That function extracts each observation
-from its assigned map, then creates shared distance bins and pooled scaling
-parameters. See `vignette("year-specific-rasters", package = "multiScaleR")`.
+For observations collected against different annual maps, use `kernel_prep_by_group()` in its place. That function extracts each observation from its assigned map, then creates shared distance bins and pooled scaling parameters. See `vignette("year-specific-rasters", package = "multiScaleR")`.
 
 1.  For each sample point, it extracts raster values at every cell within `max_D` (the maximum search radius) and computes their distances. These are stored compactly (as a dense or sparse matrix per point, whichever is smaller).
 2.  It computes an initial set of distance-weighted covariate values at each sample point using a starting σ (by default, `max_D / 2`). These initial values are used to fit the starting regression model.
@@ -391,12 +393,7 @@ However, the log-likelihood surface for σ is often asymmetric, especially when 
 
 To request profile-likelihood CIs, pass `profile = TRUE` to `summary()`:
 
-For landscape metrics and unweighted surface metrics whose radius changes in
-discrete cell steps, the Hessian standard error is not a useful measure of
-uncertainty. Their default summary displays `NA` for the standard error and
-Wald interval. Use the profile-likelihood interval and report the parameter
-as a radius in map units. Candidate scales that make a covariate undefined
-at modeled observations are rejected so likelihoods retain the same sample.
+For landscape metrics and unweighted surface metrics whose radius changes in discrete cell steps, the Hessian standard error is not a useful measure of uncertainty. Their default summary displays `NA` for the standard error and Wald interval. Use the profile-likelihood interval and report the parameter as a radius in map units. Candidate scales that make a covariate undefined at modeled observations are rejected so likelihoods retain the same sample.
 
 ```{r eval=FALSE}
 summary(opt1, profile = TRUE)
@@ -482,12 +479,7 @@ plot_marginal_effects(opt2)
 
 **Profiling the likelihood surface.** `profile_sigma()` provides a diagnostic view of how the model fit changes as σ varies across its search range for each covariate, while all other σ values are held at their optimized values. Rather than reporting a single point estimate with an interval, it shows the full shape of the AICc (or log-likelihood) surface across the parameter space.
 
-Profiling must be able to refit the stored model. If a model was created inside
-a temporary function or loop, keep its formula and data available to the
-model call. Write the formula directly in the fitting call when possible, or
-provide a `refit_fn` to `multiScale_optim()`. If all refits fail,
-`profile_sigma()` stops with an error instead of displaying optimizer
-penalties as a likelihood profile.
+Profiling must be able to refit the stored model. If a model was created inside a temporary function or loop, keep its formula and data available to the model call. Write the formula directly in the fitting call when possible, or provide a `refit_fn` to `multiScale_optim()`. If all refits fail, `profile_sigma()` stops with an error instead of displaying optimizer penalties as a likelihood profile.
 
 `profile_sigma()` can evaluate covariate profiles in parallel via `n_cores`. Because each scaled surface (spatial covariate) is profiled independently, setting `n_cores` to the number of scaled surfaces is often the most efficient choice when your computer has enough available resources.
 
@@ -512,11 +504,7 @@ We can also apply the optimized kernel to the full raster surfaces. This is a ke
 
 `kernel_scale.raster()` smooths each raster layer using the estimated σ from the optimization. When `scale_center = TRUE`, the smoothed values are standardized using the mean and SD from the sample points, matching the scaling used during model fitting. This ensures that `terra::predict()` receives covariate values in the same space as the training data.
 
-For a model containing `offset(log(n_weeks))`, the projected raster stack
-contains a layer named `n_weeks` with value 1 by default. Set
-`offset_values = c(n_weeks = 4)` to predict for four weeks of exposure.
-Direct offsets default to zero. Choose values that match the quantity you
-want to predict.
+For a model containing `offset(log(n_weeks))`, the projected raster stack contains a layer named `n_weeks` with value 1 by default. Set `offset_values = c(n_weeks = 4)` to predict for four weeks of exposure. Direct offsets default to zero. Choose values that match the quantity you want to predict.
 
 ```{r kernel_raster}
 rast_opt <- terra::unwrap(vignette_cache$guide$rast_opt)
@@ -748,21 +736,9 @@ plogis(opt_umf.p$opt_mod@estimates@estimates$det@estimates[[1]])
 
 Assess kernel and effects plots
 
-For `unmarked` models, marginal-effect panels use the variables in the selected
-state or abundance formula. Factor contrasts such as `Year2` are coefficient
-labels, not separate data columns. Version 0.7.4 handles the factor itself and
-selects numeric columns by name, including when `join_by` links repeated
-site-year rows. Unused site keys and detection-only variables do not receive
-state-effect panels.
+For `unmarked` models, marginal-effect panels use the variables in the selected state or abundance formula. Factor contrasts such as `Year2` are coefficient labels, not separate data columns. Version 0.7.4 handles the factor itself and selects numeric columns by name, including when `join_by` links repeated site-year rows. Unused site keys and detection-only variables do not receive state-effect panels.
 
-In each panel, other numeric predictors are held at their observed means and
-other factors at their first observed values. Site random effects, when
-present, are set to zero (`re.form = NA`). These are conditional predictions,
-not predictions averaged over sites, years, or their random effects. To show a
-landscape curve separately for each year, condition an explicit prediction grid
-on the desired year and retain the fitted factor coding. Confidence intervals
-from these curves condition on the selected
-landscape scale. See `?plot_marginal_effects` for explicit-contrast handling.
+In each panel, other numeric predictors are held at their observed means and other factors at their first observed values. Site random effects, when present, are set to zero (`re.form = NA`). These are conditional predictions, not predictions averaged over sites, years, or their random effects. To show a landscape curve separately for each year, condition an explicit prediction grid on the desired year and retain the fitted factor coding. Confidence intervals from these curves condition on the selected landscape scale. See `?plot_marginal_effects` for explicit-contrast handling.
 
 ```{r}
 plot(opt_umf.p)
@@ -784,12 +760,159 @@ rast_scale.center <- kernel_scale.raster(raster_stack = rs,
 plot(rast_scale.center)
 
 
+# Dispatch to unmarked's native S4 method explicitly. This also works when
+# unmarked is installed but not attached to the R search path.
+native_unmarked <- function(model, data, type, ...) {
+  unmarked::predict(model, type = type, newdata = data, ...)
+}
 ab.mod_pred <- terra::predict(rast_scale.center,
                              opt_umf.p$opt_mod,
-                             type = 'state')
+                             fun = native_unmarked,
+                             type = 'state', na.rm = TRUE)
 
 plot(ab.mod_pred)
 ```
+
+The output layers retain the native `Predicted`, `SE`, `lower`, and `upper`
+columns. The native `Predicted` column describes expected latent abundance for
+this N-mixture model, whereas the `state` component of an occupancy model gives
+the probability that the species occupies the cell.
+Detection predictions require `type = "det"` and explicit survey conditions.
+These intervals condition on the selected scales. They exclude uncertainty in
+scale estimation, and a map of abundance is not a map of expected detections.
+
+Supply any nonspatial factor, grouping, or offset inputs for the scenario you
+intend to map. A constant zero layer does not define a meaningful scenario for
+every covariate. You can supply fixed inputs through `terra::predict(...,
+const = scenario)` using a one-row data frame with the fitted factor levels,
+or use corresponding raster layers when values vary spatially. For dynamic
+occupancy, native `psi` is initial occupancy and `col`/`ext` describe transitions.
+They are not projected occupancy trajectories. See
+`vignette("spatial_projection_clamping", package = "multiScaleR")` for the
+projection window and extrapolation limits.
+
+### Predict at explicitly keyed sites
+
+For predictions at points, `prepare_unmarked_data()` calculates optimized
+spatial predictors at the fitted scales and applies the original training means
+and standard deviations. It leaves your scenario rows in their supplied order.
+Repeated keys repeat a site's predictors, which is useful for comparing years
+or survey conditions. You still supply the row layout and nonspatial variables
+that native unmarked prediction requires for the selected component.
+
+```{r unmarked-keyed-prediction}
+# Reuse three locations from the existing example. Keys follow point order.
+prediction_sites <- s_dat$pts[1:3, ]
+site_keys <- data.frame(site_id = 1:3)
+prediction_inputs <- kernel_prep(
+  pts = prediction_sites, raster_stack = rs,
+  max_D = opt_umf.p$max_D,
+  kernel = opt_umf.p$kernel_inputs$kernel,
+  scale_vars = opt_umf.p$kernel_inputs$scale_vars,
+  bin = !is.null(opt_umf.p$kernel_inputs$binned), verbose = FALSE)
+
+# Native prediction rows can repeat sites without recalculating their buffers.
+scenarios <- data.frame(site_id = c(3, 1, 1, 2))
+nd <- prepare_unmarked_data(opt_umf.p, scenarios, prediction_inputs,
+                            join_by = site_keys)
+unmarked::predict(opt_umf.p$opt_mod, type = "state", newdata = nd)
+
+# Retain a compact native output snapshot for these same rows and controls.
+prepared <- prepare_prediction(opt_umf.p, scenarios, prediction_inputs,
+                               component = "state", join_by = site_keys)
+predict(prepared)
+```
+
+The two tables describe the same four prediction rows. The two copies of site
+1 have identical spatial predictors. Values inserted into `nd` are already on
+the fitted standardized scale. Do not scale them again or use the prediction
+sample's mean and SD. Prepare a new snapshot after changing locations, scenarios,
+or native prediction controls. Fixed-radius covariates remain explicit by default.
+To calculate them at prediction sites too, set `include_fixed = TRUE` in
+`prepare_unmarked_data()` or in the spatial `prepare_prediction()` call. This
+opt-in verifies the stored training normalization against both prepared values
+and the fitted static site covariates before applying it to new sites. It rejects
+changed radii, manually rescaled fixed predictors, ambiguous training keys, and
+missing training buffers. Keep the original inputs if you need this verification.
+Smooth weighted SQ retains its weighted definition; a hard-radius SQ predictor
+still uses the original sample standard deviation within its fixed radius.
+
+```{r unmarked-fixed-prediction-contract, eval=FALSE}
+# For a model containing declared fixed-radius landscape or surface metrics.
+prepared_fixed <- prepare_prediction(fit, scenarios, prediction_inputs,
+  component = "state", join_by = site_keys, include_fixed = TRUE)
+predict(prepared_fixed)
+
+# Project the same declared metrics, with verified training standardization.
+layers_fixed <- kernel_scale.raster(habitat, multiScaleR = fit,
+  scale_center = TRUE, include_fixed = TRUE)
+terra::predict(layers_fixed, fit$opt_mod, fun = native_unmarked, type = "state")
+```
+
+The raster opt-in also preserves modeled fixed-metric layers when discovering
+native unmarked predictors. It does not fill missing training information or
+substitute a different metric. Keep `include_fixed = FALSE` if you are supplying
+fixed inputs and scaling parameters explicitly. Clamping uses the spatial
+covariates themselves, so unrelated character site IDs or factor columns do not
+coerce their numeric ranges.
+
+The raster opt-in also supports retained native GLM and coxph model frames.
+These require numeric fixed predictors under their original names and original
+row IDs that match the retained preparation. It rejects missing or manually
+transformed inputs. For conditional-logistic step selection, map a relative
+selection score using native survival prediction controls:
+
+```{r fixed-step-selection-projection, eval=FALSE}
+layers_ssf <- kernel_scale.raster(habitat, multiScaleR = ssf_fit,
+  scale_center = TRUE, include_fixed = TRUE)
+# For an amt fit_clogit wrapper, its native Cox model is in opt_mod$model.
+native_ssf <- if (inherits(ssf_fit$opt_mod, "fit_clogit"))
+  ssf_fit$opt_mod$model else ssf_fit$opt_mod
+selection_score <- terra::predict(layers_ssf, native_ssf,
+  type = "risk", reference = "zero",
+  const = data.frame(step_id_ = observed_step_id), na.rm = TRUE)
+```
+
+Use an observed stratum ID for `observed_step_id` and the actual stratum variable
+name from the fitted formula. The constant supplies native formula structure;
+`reference = "zero"` avoids arbitrary stratum centering. The resulting score is
+relative selection intensity, not occurrence probability, a utilization
+distribution, or probability of choosing a step. Choice probabilities require
+explicit alternatives and normalization within each choice set. Keep fixed
+covariates, offsets, and movement variables explicit when defining a projection
+scenario.
+
+### Match the prepared buffer when projecting
+
+Point preparation and the historical raster window need not include the same
+cells. `kernel_prep()` extracts cells intersecting each `max_D` buffer polygon,
+including partial boundary cells, while the default raster window is sized by
+the one-dimensional `pct_wt` cutoff. The default remains unchanged.
+
+For projected rasters at the preparation's square-cell resolution, opt in to
+matching that extraction footprint:
+
+```{r matched-projection-window, eval=FALSE}
+matched_layers <- kernel_scale.raster(habitat, multiScaleR = fit,
+  scale_center = TRUE, include_fixed = TRUE, match_buffer = TRUE)
+```
+
+This uses the same buffer construction and polygon-intersection cell selection
+at raster cell centers. Boundary cells receive their usual full-cell kernel
+weights, rather than new coverage-fraction weights. Finite mapped neighbors are
+renormalized at raster edges. Central source NA cells stay masked, so matching
+does not fill unmapped locations. Weighted SQ remains weighted population
+spread, including zero for constant support; hard-radius SQ remains sample SD.
+
+Matching requires `fft = TRUE`, `na.rm = TRUE`, and a valid projected CRS at the
+prepared resolution. Use the intended source layers and matching map units.
+This option does not reconstruct missing original CRS metadata, undo distance
+binning, or turn an arbitrary sampled point into a raster cell center. A metric
+radius larger than the fitting buffer is refused because its truncated
+cell-intersection footprint cannot be reproduced simply by capping the radius.
+Reprepare with an adequate buffer before fitting such a model. A large `max_D`
+can also increase projection memory and runtime, so validate the cost on your
+analysis before making large maps.
 
 ## Binomial Occurrence Model
 

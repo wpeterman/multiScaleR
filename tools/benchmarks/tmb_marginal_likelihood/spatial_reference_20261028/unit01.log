@@ -1,0 +1,68 @@
+adapter: W12345678...................
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+1. spatial reference inputs match both exact frozen pilots ('test-adapter.R:4:5') - cannot open file 'tools/benchmarks/tmb_marginal_likelihood/latent_gaussian_20261028/pilot-null.json': No such file or directory
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Error ('test-adapter.R:4:5'): spatial reference inputs match both exact fr
+Error in `open.connection(con, "rb")`: cannot open the connection
+Backtrace:
+    ▆
+ 1. └─jsonlite::read_json(...) at test-adapter.R:4:5
+ 2.   └─jsonlite::parse_json(...)
+ 3.     └─jsonlite:::parse_and_simplify(...)
+ 4.       └─jsonlite:::parseJSON(txt, bigint_as_char)
+ 5.         └─jsonlite:::parse_con(txt, bigint_as_char)
+ 6.           ├─base::open(con, "rb")
+ 7.           └─base::open.connection(con, "rb")
+
+── 2. Failure ('test-adapter.R:32:5'): private projection reconstruction matches
+Expected `unname(derived[iteration, chain, 1:72])` to equal `expected`.
+Differences:
+`names(actual)` is absent
+`names(expected)` is a character vector ('1', '2', '3', '4', '5', ...)
+
+
+── 3. Failure ('test-adapter.R:32:5'): private projection reconstruction matches
+Expected `unname(derived[iteration, chain, 1:72])` to equal `expected`.
+Differences:
+`names(actual)` is absent
+`names(expected)` is a character vector ('1', '2', '3', '4', '5', ...)
+
+
+── 4. Failure ('test-adapter.R:32:5'): private projection reconstruction matches
+Expected `unname(derived[iteration, chain, 1:72])` to equal `expected`.
+Differences:
+`names(actual)` is absent
+`names(expected)` is a character vector ('1', '2', '3', '4', '5', ...)
+
+
+── 5. Failure ('test-adapter.R:32:5'): private projection reconstruction matches
+Expected `unname(derived[iteration, chain, 1:72])` to equal `expected`.
+Differences:
+`names(actual)` is absent
+`names(expected)` is a character vector ('1', '2', '3', '4', '5', ...)
+
+
+── 6. Failure ('test-adapter.R:32:5'): private projection reconstruction matches
+Expected `unname(derived[iteration, chain, 1:72])` to equal `expected`.
+Differences:
+`names(actual)` is absent
+`names(expected)` is a character vector ('1', '2', '3', '4', '5', ...)
+
+
+── 7. Failure ('test-adapter.R:32:5'): private projection reconstruction matches
+Expected `unname(derived[iteration, chain, 1:72])` to equal `expected`.
+Differences:
+`names(actual)` is absent
+`names(expected)` is a character vector ('1', '2', '3', '4', '5', ...)
+
+
+── 8. Failure ('test-adapter.R:43:3'): private projection reconstruction matches
+Expected `unname(correlated[1L, 2L, 1:72])` to equal `expected`.
+Differences:
+`names(actual)` is absent
+`names(expected)` is a character vector ('1', '2', '3', '4', '5', ...)
+
+
+══ DONE ════════════════════════════════════════════════════════════════════════

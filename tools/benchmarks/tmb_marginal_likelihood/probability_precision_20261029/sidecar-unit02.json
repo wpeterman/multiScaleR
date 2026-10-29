@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "scope": "Mean-precision sidecar, finite event/unique target coverage and unchanged raw/derived/paired gates; original outcomes retained.",
+  "sidecar_sha256": "3698D8E26D7256B9EF1655DFE41D8906A44FC92B385285316FB1CC91272EECCC",
+  "tests": 9,
+  "test_sha256": "362EAF9A00003EBBEC79E3CEE7F6148DFD7A906511EAF64DD99AA9D77C7BA91B",
+  "passed": true,
+  "time": "2026-10-29T00:32:29.2641351-04:00"
+}

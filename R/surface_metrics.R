@@ -307,6 +307,72 @@
 }
 
 
+# Prepare invariant neighbor contributions once per optimization context. A
+# contribution enters a radius exactly when all of its cells enter. Keep the
+# original matrix column order so mean/sum use the same arithmetic order; do
+# not round radii or accumulate approximate prefix moments.
+.msr_prepare_surface_neighbors_base <- function(d_list, cov_df, specs, resolution, n_cols) {
+  if (is.null(d_list) || is.null(cov_df) || is.null(specs) ||
+      length(d_list) != length(cov_df) || !nrow(specs)) return(NULL)
+  specs <- specs[specs$type == "surface" & specs$metric %in% c("sdq", "sdr"), , drop = FALSE]
+  if (!nrow(specs) || length(resolution) != 1L || !is.finite(resolution) ||
+      resolution <= 0 || length(n_cols) != 1L || !is.finite(n_cols) ||
+      n_cols < 1 || n_cols != trunc(n_cols)) return(NULL)
+  lapply(seq_along(d_list), function(i) {
+    d <- d_list[[i]]
+    cells <- .msr_extract_cells(cov_df[[i]])
+    if (!length(d) || length(cells) != length(d) || anyNA(cells) ||
+        any(!is.finite(cells) | cells < 1 | cells != trunc(cells)) ||
+        anyDuplicated(cells) || !any(is.finite(d))) return(NULL)
+    # Column-major order matches the reconstructed local matrix, including
+    # shuffled input cells. Prevent right neighbors from wrapping raster rows.
+    cols <- (cells - 1) %% n_cols
+    base <- order(cols, cells)
+    base <- base[cols[base] < n_cols - 1]
+    right <- match(cells[base] + 1, cells)
+    down <- match(cells[base] + n_cols, cells)
+    diagonal <- match(cells[base] + n_cols + 1, cells)
+    distances <- d
+    distances[!is.finite(distances)] <- Inf
+    out <- list()
+    for (source in unique(specs$source)) {
+      z <- cov_df[[i]][, source]
+      if (length(z) != length(d) || !is.numeric(z)) next
+      # Match the reference double matrix arithmetic, including integer inputs.
+      z <- as.double(z)
+      needed <- specs[specs$source == source, , drop = FALSE]
+      for (metric in unique(needed$metric)) {
+        if (metric == "sdq") {
+          value <- ((z[base] - z[right])^2 + (z[base] - z[down])^2) / resolution^2
+          threshold <- pmax(distances[base], distances[right], distances[down])
+        } else {
+          value <- .surface_akl(z[base], z[right], z[down], z[diagonal], resolution, resolution)
+          threshold <- pmax(distances[base], distances[right], distances[down], distances[diagonal])
+        }
+        keep <- is.finite(value) & is.finite(threshold)
+        prepared <- list(value = value[keep], threshold = threshold[keep],
+                         min_distance = min(d[is.finite(d)]), metric = metric,
+                         resolution = resolution)
+        for (name in needed$covariate[needed$metric == metric]) out[[name]] <- prepared
+      }
+    }
+    out
+  })
+}
+
+.msr_eval_surface_neighbors <- function(prepared, radius) {
+  validate_scalar_numeric(radius, "radius", positive = TRUE)
+  if (identical(prepared$metric, "sq")) {
+    index <- findInterval(radius, prepared$threshold)
+    return(if (index == 0L) NA_real_ else prepared$value[[index]])
+  }
+  value <- prepared$value[prepared$threshold <= radius]
+  if (!length(value)) return(NA_real_)
+  if (prepared$metric == "sdq") sqrt(mean(value)) else
+    (sum(value) / (length(value) * prepared$resolution^2) - 1) * 100
+}
+
+
 # Raster-projection path for `sq`.
 #
 # Sq is the sample standard deviation within each circular neighborhood, which
@@ -630,6 +696,15 @@
     )
   }
 
+  # Centered two-pass SQ with one weight buffer shared across columns.
+  # Keep the R implementation below as the reference for other moments.
+  if (identical(metric, "sq") &&
+      (!identical(kernel, "expow") || (length(shape) == 1L && is.finite(shape)))) {
+    out <- msr_surface_weighted_sq_cpp(d, values, sigma,
+      if (identical(kernel, "expow")) shape else 1, kernel)
+    return(stats::setNames(out, colnames(values)))
+  }
+
   weights <- .msr_kernel_shape_weight(
     d = d,
     sigma = sigma,
@@ -647,11 +722,105 @@
 }
 
 
+# Reuse centered moments only within one buffer, from the very same source
+# column and exact scale/shape. Thus the distances and valid-cell mask are
+# identical by construction; nothing is cached across points or evaluations.
+.msr_shared_weighted_metrics <- function(d, cov_df, specs, covariates,
+                                         sigma, shape, kernel, param_covariates,
+                                         validate) {
+  if (length(covariates) < 2L ||
+      sum(specs$type == "surface" & specs$weighted, na.rm = TRUE) < 2L)
+    return(numeric(0))
+  selected <- specs[match(covariates, specs$covariate), , drop = FALSE]
+  pending <- which(selected$type == "surface" & selected$weighted &
+                     selected$metric %in% c("sa", "sq", "ssk", "sku"))
+  out <- numeric(0)
+  if (length(pending) < 2L) return(out)
+  parameter <- match(selected$covariate, param_covariates)
+  if (!anyDuplicated(unname(sigma[parameter[pending]]))) return(out)
+  while (length(pending)) {
+    i <- pending[1L]
+    same <- pending[vapply(pending, function(j)
+      identical(selected$source[i], selected$source[j]) &&
+        identical(unname(sigma[[parameter[i]]]), unname(sigma[[parameter[j]]])) &&
+        (is.null(shape) || identical(unname(shape[[parameter[i]]]),
+                                     unname(shape[[parameter[j]]]))), TRUE)]
+    pending <- setdiff(pending, same)
+    if (length(same) < 2L) next
+    values <- cov_df[, selected$source[i], drop = FALSE]
+    sig <- sigma[[parameter[i]]]
+    shp <- if (is.null(shape)) NULL else shape[[parameter[i]]]
+    metrics <- selected$metric[same]
+    if (length(unique(metrics)) == 1L) {
+      answer <- rep(.surface_weighted_by_buffer(d, values, kernel, sig, shp,
+                                                metrics[1L], validate)[[1L]], length(same))
+    } else {
+      validate_scalar_numeric(sig, "sigma", positive = TRUE)
+      if (!length(d)) stop("`d` must contain at least one distance.", call. = FALSE)
+      values <- as.numeric(values[, 1L])
+      if (length(values) != length(d))
+        stop("`r_stack.df` must have one row for each distance in `d`.", call. = FALSE)
+      if (isTRUE(validate)) .surface_validate_continuous_values(values, metrics[1L])
+      weights <- .msr_kernel_shape_weight(d, sig,
+        if (identical(kernel, "expow")) shp else NULL, kernel)
+      valid <- is.finite(values) & is.finite(weights) & weights > 0
+      v <- values[valid]; w <- weights[valid]; s0 <- sum(w)
+      answer <- rep(NA_real_, length(same))
+      if (length(v) && is.finite(s0) && s0 > 0) {
+        dev <- v - sum(w * v) / s0
+        m2 <- sum(w * dev^2) / s0
+        # Compute each requested statistic once; retain the scalar reference's
+        # arithmetic order and centered powers rather than raw-moment subtraction.
+        unique_metrics <- unique(metrics)
+        result <- vapply(unique_metrics, function(metric) switch(metric,
+          sa = sum(w * abs(dev)) / s0,
+          sq = if (m2 <= 0) 0 else sqrt(m2),
+          ssk = if (m2 <= 0) NA_real_ else (sum(w * dev^3) / s0) / m2^1.5,
+          sku = if (m2 <= 0) NA_real_ else (sum(w * dev^4) / s0) / m2^2 - 3), 0)
+        answer <- unname(result[match(metrics, unique_metrics)])
+      }
+    }
+    out <- c(out, stats::setNames(answer, selected$covariate[same]))
+  }
+  out
+}
+
 # Build the kernel weight matrix used to project a weighted surface metric. This
 # mirrors the focal-window construction in `.msr_kernel_raster_one()`: a window
 # sized using the historical one-dimensional `pct_wt` cutoff, filled with the
 # distance-decay weights for the given kernel, sigma, and shape.
-.surface_kernel_weight_matrix <- function(raster, sigma, shape, kernel, pct_wt) {
+.surface_kernel_weight_matrix <- function(raster, sigma, shape, kernel, pct_wt,
+                                          buffer_radius = NULL) {
+  if (!is.null(buffer_radius)) {
+    validate_scalar_numeric(buffer_radius, "buffer_radius", positive = TRUE)
+    resolution <- terra::res(raster)
+    if (!isTRUE(all.equal(resolution[1L], resolution[2L])))
+      stop("Prepared-buffer projection requires square raster cells.", call. = FALSE)
+    offsets <- seq.int(-ceiling(buffer_radius / resolution[1L]),
+                       ceiling(buffer_radius / resolution[1L])) * resolution[1L]
+    distance <- sqrt(outer(offsets^2, offsets^2, "+"))
+    weights <- matrix(.msr_kernel_shape_weight(as.vector(distance), sigma, shape, kernel),
+                       nrow(distance), ncol(distance))
+    # kernel_prep() keeps every cell returned by polygon intersection, including
+    # partial boundary cells. Reproduce its GEOS buffer and extraction footprint;
+    # a center-distance circle would silently omit those weighted cells.
+    half <- resolution[1L] / 2
+    template <- terra::rast(nrows = length(offsets), ncols = length(offsets),
+      xmin = min(offsets) - half, xmax = max(offsets) + half,
+      ymin = min(offsets) - half, ymax = max(offsets) + half,
+      crs = terra::crs(raster))
+    terra::values(template) <- 0
+    center <- sf::st_sf(geometry = sf::st_sfc(sf::st_point(c(0, 0)),
+      crs = sf::st_crs(terra::crs(raster))))
+    polygon <- sf::st_buffer(center, dist = buffer_radius)
+    cells <- exactextractr::exact_extract(template, polygon,
+      include_cell = TRUE, progress = FALSE)[[1L]]$cell
+    support <- rep(FALSE, length(weights))
+    support[cells] <- TRUE
+    support <- matrix(support, nrow(weights), ncol(weights), byrow = TRUE)
+    weights[!support] <- 0
+    return(weights)
+  }
   mx <- kernel_dist(kernel = kernel, sigma = sigma, beta = shape, prob = pct_wt,
                     dimension = "1d")
   r_res <- terra::res(raster)[1]
@@ -685,7 +854,8 @@
                                          shape,
                                          metric,
                                          pct_wt = 0.975,
-                                         na.rm = TRUE) {
+                                         na.rm = TRUE,
+                                         buffer_radius = NULL) {
   metric <- match.arg(metric, c("sa", "sq", "ssk", "sku"))
   .landscape_validate_single_layer_raster(raster, "Surface")
   values <- terra::as.matrix(raster, wide = TRUE)
@@ -700,13 +870,15 @@
     sigma = sigma,
     shape = shape,
     kernel = kernel,
-    pct_wt = pct_wt
+    pct_wt = pct_wt,
+    buffer_radius = buffer_radius
   )
 
   out <- terra::rast(raster)
 
   if (metric == "sa") {
     result <- surface_sa_focal_cpp(values, wt_mat)
+    if (!is.null(buffer_radius)) result[is.na(values)] <- NA_real_
     terra::values(out) <- as.vector(t(result))
     names(out) <- paste0(names(raster), "_sa")
     return(out)
@@ -744,8 +916,13 @@
     result <- m4 / m2^2 - 3
   }
 
-  result[!is.finite(s0) | s0 <= 0 | m2 <= 0] <- NA_real_
+  if (!is.null(buffer_radius) && metric == "sq") {
+    # Weighted population spread is zero on constant support, unlike the
+    # standardized higher moments. Preserve the legacy branch by default.
+    result[!is.finite(s0) | s0 <= 0] <- NA_real_
+  } else result[!is.finite(s0) | s0 <= 0 | m2 <= 0] <- NA_real_
   result[!is.finite(result)] <- NA_real_
+  if (!is.null(buffer_radius)) result[t(is.na(values))] <- NA_real_
 
   terra::values(out) <- as.vector(result)
   names(out) <- paste0(names(raster), "_", metric)

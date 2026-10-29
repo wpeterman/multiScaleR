@@ -124,9 +124,13 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
     cat("for profile-likelihood limits.\n")
   }
   scale_ci_method <- attr(x$opt_scale, "interval_method")
-  if (!is.null(scale_ci_method) && any(scale_ci_method != "wald")) {
+  if (!is.null(scale_ci_method) && any(grepl("^profile", scale_ci_method))) {
     cat("\nProfile-likelihood confidence limits were used for `sigma` where available;\n")
     cat("reported standard errors remain Hessian-based approximations.\n")
+    if (any(scale_ci_method == "profile-bound-limited"))
+      cat("Some profile limits reach search bounds; those limits are not fully resolved.\n")
+  } else if (!is.null(scale_ci_method) && any(scale_ci_method == "log_wald")) {
+    cat("\nScale confidence limits use joint observed information on the log scale.\n")
   }
   cat("\n\n  ==================================== ")
 
@@ -145,6 +149,15 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 
 
   cat('\n\n *****     Fitted Model Summary     *****\n\n')
+  if (identical(x$backend, "conditional_logit"))
+    cat("Coefficient uncertainty conditions on fitted kernel scales; scale uncertainty is unavailable.\n")
+  if (.msr_analytic_backend(x)) {
+    cat("Coefficient summary below is conditional on fitted kernel parameters.\n")
+    cat("Use vcov(fit) and predict(fit, se.fit = TRUE) for joint uncertainty.\n")
+    if (length(x$diagnostics$profile_glm$reasons))
+      cat("Joint Wald uncertainty unavailable: ",
+          paste(x$diagnostics$profile_glm$reasons, collapse = "; "), ".\n", sep = "")
+  }
   if(any(grepl("^unmarked", class(x$fitted_mod)))) {
     print(x$fitted_mod)
   } else {
@@ -194,8 +207,8 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #' @param object An object of class \code{multiScaleR}.
 #' @param profile Logical. If \code{TRUE}, use profile-likelihood confidence
 #'   limits for `sigma` when feasible. Defaults to \code{FALSE} so summaries
-#'   remain fast; profile results are cached for repeated calls on the same
-#'   fitted object during the current R session.
+#'   remain fast. The default refit backend caches profile results during the
+#'   current R session; the analytic-profile backend recomputes them.
 #' @param dimension Character. \code{"2d"} (default) reports the radius
 #'   containing \code{prob} of ideal planar kernel weight as the selected
 #'   distance. \code{"1d"} restores the original distance along a line.
@@ -221,6 +234,11 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #'   \code{NA}; use \code{profile = TRUE} for profile-likelihood limits.
 #'   Profiling errors are reported instead of silently returning invalid limits.
 #' @details
+#' For \code{backend = "profile_glm"} or \code{"joint_nb2"}, default scale limits use joint information
+#' on log scales and are omitted when identifiability checks fail. The printed
+#' coefficient summary remains conditional on optimized kernels; use
+#' \code{\link{vcov.multiScaleR}} for joint covariance.
+#'
 #' Set \code{dimension = "1d"} to preserve the original \code{opt_dist} and
 #' \code{opt_distance} values in existing scripts. For a dimension-independent
 #' extraction, use \code{opt_dist_1d} or \code{opt_dist_2d}. Neither selection
@@ -249,6 +267,8 @@ summary.multiScaleR <- function(object, profile = FALSE,
   if (!is.logical(profile) || length(profile) != 1L || is.na(profile)) {
     stop("`profile` must be TRUE or FALSE.")
   }
+  if (identical(object$backend, "conditional_logit"))
+    object$opt_mod <- .analysis_model(object$opt_mod)
 
   if(any(class(object$opt_mod) == 'gls')){
     df <- object$opt_mod$dims$N - object$opt_mod$dims$p
@@ -301,6 +321,8 @@ summary.multiScaleR <- function(object, profile = FALSE,
                          df = df,
                          min_D = NULL,
                          names = row.names(object$shape_est))
+    if (.msr_analytic_backend(object))
+      tab_shape <- .msr_profile_wald_table(object, shape = TRUE)
 
     out <- list(opt_scale = tab_scale,
                 opt_shape = tab_shape,
@@ -336,6 +358,7 @@ summary.multiScaleR <- function(object, profile = FALSE,
   }
 
 
+  out$backend <- object$backend
   class(out) <- c('summary_multiScaleR')
   if (sys.nframe() == 1L) print(out)
   out
@@ -390,6 +413,12 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
 
   cat("\n  ==================================== ")
   cat("\n\n ***** Fitted Model *****\n")
+  if (.msr_analytic_backend(x)) {
+    cat("Conditional GLM at the optimized kernel parameters.\n")
+    if (length(x$uncertainty$reasons))
+      cat("Joint Wald uncertainty unavailable: ",
+          paste(x$uncertainty$reasons, collapse = "; "), ".\n", sep = "")
+  }
   print(x$opt_mod)
 
 

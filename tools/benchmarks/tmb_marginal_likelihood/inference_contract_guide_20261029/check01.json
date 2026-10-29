@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "source_stable": true,
+  "archive_SHA256": "81787612CB9E445390BBE3A05467744CDA6A26617C157742402F31489511D8D6",
+  "check_status_OK": true,
+  "retained_complete_test_evidence": "spatial_source_contract_20261029/final-source-evidence.json",
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-inference-guide-mf816ads",
+  "completed_at": "2026-10-29T02:27:48.0179529-04:00",
+  "installed_tests_rerun": false
+}

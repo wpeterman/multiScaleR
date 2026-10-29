@@ -11,8 +11,8 @@
 
 \item{profile}{Logical. If \code{TRUE}, use profile-likelihood confidence
 limits for `sigma` when feasible. Defaults to \code{FALSE} so summaries
-remain fast; profile results are cached for repeated calls on the same
-fitted object during the current R session.}
+remain fast. The default refit backend caches profile results during the
+current R session; the analytic-profile backend recomputes them.}
 
 \item{dimension}{Character. \code{"2d"} (default) reports the radius
 containing \code{prob} of ideal planar kernel weight as the selected
@@ -45,6 +45,11 @@ An object of class \code{summary_multiScaleR}. Kernel-scale limits
 Summarizes output from \code{multiScale_optim}.
 }
 \details{
+For \code{backend = "profile_glm"} or \code{"joint_nb2"}, default scale limits use joint information
+on log scales and are omitted when identifiability checks fail. The printed
+coefficient summary remains conditional on optimized kernels; use
+\code{\link{vcov.multiScaleR}} for joint covariance.
+
 Set \code{dimension = "1d"} to preserve the original \code{opt_dist} and
 \code{opt_distance} values in existing scripts. For a dimension-independent
 extraction, use \code{opt_dist_1d} or \code{opt_dist_2d}. Neither selection

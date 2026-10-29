@@ -1,0 +1,30 @@
+bayesian-probabilities: ...................................1..............................................................................2.3.45.......................
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-bayesian-probabilities.R:40:3'): probability diagnostics va
+Expected `diagnose_bayes_probabilities(fit, list(habitat = 100), mcse_target = target)` to throw a error.
+
+── 2. Failure ('test-bayesian-probabilities.R:131:3'): constant, nonfinite and u
+Expected `d$probabilities$reason` to match regexp "two chains".
+Actual text:
+x | Constant indicator; probability precision is nonestimable.
+
+── 3. Failure ('test-bayesian-probabilities.R:135:3'): constant, nonfinite and u
+Expected `d$probabilities$reason` to match regexp "four iterations".
+Actual text:
+x | Constant indicator; probability precision is nonestimable.
+
+── 4. Failure ('test-bayesian-probabilities.R:141:3'): constant, nonfinite and u
+Expected `d$probabilities$precision_available` to be TRUE.
+Differences:
+`actual`:   FALSE
+`expected`: TRUE 
+
+
+── 5. Failure ('test-bayesian-probabilities.R:145:3'): constant, nonfinite and u
+Expected `d$probabilities$rhat` > 1.01.
+Actual comparison: 1.0037 <= 1.0100
+Difference: -0.0063 <= 0
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+I believe in you!

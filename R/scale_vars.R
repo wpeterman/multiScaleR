@@ -41,6 +41,9 @@
 #'   distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
 #'   not the slope metric (\code{"sdq"}), and the scale is always optimized, so
 #'   \code{radius} must be \code{NULL}.
+#'   Within a buffer evaluation, weighted metrics reuse weights and centered
+#'   moments only when the source, scale, shape and valid-cell mask match exactly.
+#'   This does not tie their fitted scales or reuse results across evaluations.
 #' @param base Positive numeric (not equal to 1). Logarithm base used by every
 #'   entropy-based metric: the diversity metrics (\code{"shdi"}, \code{"shei"},
 #'   \code{"msidi"}, \code{"msiei"}) and the information-theory metrics
@@ -172,8 +175,9 @@
 #'     complexity that remains once composition is accounted for: the uncertainty
 #'     about a neighbor's class given the focal cell's class.}
 #'   \item{\code{"mutinf"}}{Mutual information, I(y, x). How much knowing a cell's
-#'     class tells you about its neighbor; it rises as like classes cluster
-#'     together. This is the configuration signal separated from composition.}
+#'     class tells you about its neighbor. Both clumping and regular alternation
+#'     can make neighboring classes predictable. Its magnitude also depends on
+#'     marginal entropy, so it is not a composition-independent aggregation index.}
 #'   \item{\code{"relmutinf"}}{Relative mutual information, I(y, x) / H(x). Mutual
 #'     information rescaled by marginal entropy to the range 0 to 1, so that
 #'     configuration can be compared across landscapes of differing composition.
@@ -202,6 +206,14 @@
 #' built from the full class-pair matrix (\code{"contag"}, \code{"iji"}, and the
 #' information-theory family), whose cost scales with the square of the class
 #' count.
+#'
+#' During model optimization, categorical adjacency metrics reuse sorted cell
+#' and neighbor-pair entry distances instead of rescanning every buffered cell
+#' at each radius. Metrics on the same source and radius share their counts.
+#' This can reduce repeated fitting time, at the cost of additional retained
+#' cache memory, which is included in the package's worker-memory estimates.
+#' Radius boundaries and metric definitions are unchanged. This optimization
+#' does not make hard-radius metrics smooth or remove local-optimum concerns.
 #'
 #' Before optimizing the scale of \code{"iji"}, \code{"siei"}, or \code{"msiei"},
 #' inspect a pilot \code{kernel_prep()} result or a few fixed radii. These
@@ -674,7 +686,9 @@ print.multiScaleR_vars <- function(x, ...) {
 
   used_covariates <- tryCatch(
     intersect(scale_vars$covariate,
-              .model_predictors(.analysis_model(multiScaleR$opt_mod))),
+      if (methods::is(multiScaleR$opt_mod, "unmarkedFit"))
+        .unmarked_model_predictors(multiScaleR$opt_mod) else
+        .model_predictors(.analysis_model(multiScaleR$opt_mod))),
     error = function(e) character(0)
   )
 
@@ -730,12 +744,25 @@ print.multiScaleR_vars <- function(x, ...) {
                                  resolution,
                                  n_cols,
                                  covariates = scale_vars$covariate,
-                                 validate = TRUE) {
+                                 validate = TRUE,
+                                 prepared_neighbors = NULL,
+                                 prepared_adjacency = NULL,
+                                 prepared_edges = NULL) {
   out <- numeric(length(covariates))
   names(out) <- covariates
 
   opt_vars <- .msr_optimized_scale_vars(scale_vars)
   param_covariates <- covariates[covariates %in% opt_vars$covariate]
+
+  weighted_values <- .msr_shared_weighted_metrics(d, cov_df, scale_vars,
+    covariates, sigma, shape, kernel, param_covariates, validate)
+
+  adjacency_values <- if (isTRUE(validate)) numeric(0) else
+    .msr_eval_prepared_adjacency(prepared_adjacency, scale_vars, covariates,
+                               sigma, param_covariates, unit_conv)
+  edge_values <- if (isTRUE(validate)) numeric(0) else
+    .msr_eval_edge_neighbors(prepared_edges, scale_vars, covariates,
+                             sigma, param_covariates, unit_conv)
 
   for (j in seq_along(covariates)) {
     covariate <- covariates[[j]]
@@ -745,6 +772,29 @@ print.multiScaleR_vars <- function(x, ...) {
            call. = FALSE)
     }
 
+    if (covariate %in% names(weighted_values)) {
+      out[[j]] <- weighted_values[[covariate]]
+      next
+    }
+
+    if (covariate %in% names(edge_values)) {
+      out[[j]] <- edge_values[[covariate]]
+      next
+    }
+    if (covariate %in% names(adjacency_values)) {
+      out[[j]] <- adjacency_values[[covariate]]
+      next
+    }
+    prepared <- prepared_neighbors[[covariate]]
+    if (!isTRUE(validate) && !is.null(prepared)) {
+      radius <- if (isTRUE(spec$optimize))
+        sigma[[match(covariate, param_covariates)]] else spec$radius / unit_conv
+      # Preserve the legacy empty-neighborhood error path.
+      if (is.finite(radius) && radius >= prepared$min_distance) {
+        out[[j]] <- .msr_eval_surface_neighbors(prepared, radius)
+        next
+      }
+    }
     values <- cov_df[, spec$source, drop = FALSE]
 
     if (identical(spec$type, "kernel")) {
@@ -865,7 +915,8 @@ print.multiScaleR_vars <- function(x, ...) {
                                    pct_wt,
                                    fft,
                                    na.rm,
-                                   verbose) {
+                                   verbose,
+                                   buffer_radius = NULL) {
   opt_vars <- .msr_optimized_scale_vars(scale_vars)
   out <- vector("list", nrow(scale_vars))
   names(out) <- scale_vars$covariate
@@ -890,7 +941,8 @@ print.multiScaleR_vars <- function(x, ...) {
         kernel = kernel,
         pct_wt = pct_wt,
         fft = fft,
-        na.rm = na.rm
+        na.rm = na.rm,
+        buffer_radius = buffer_radius
       )
       names(out[[i]]) <- spec$covariate
       next
@@ -901,6 +953,8 @@ print.multiScaleR_vars <- function(x, ...) {
     } else {
       spec$radius
     }
+    if (!is.null(buffer_radius) && !isTRUE(spec$weighted) && radius > buffer_radius)
+      stop("A metric radius exceeds the prepared buffer; its truncated footprint cannot be projected by this matching mode.", call. = FALSE)
 
     if (isFALSE(fft)) {
       stop("Landscape and surface metric raster projection currently requires `fft = TRUE`.",
@@ -937,7 +991,8 @@ print.multiScaleR_vars <- function(x, ...) {
           shape = if (is.null(shape)) NULL else shape[[param_idx]],
           metric = spec$metric,
           pct_wt = pct_wt,
-          na.rm = na.rm
+          na.rm = na.rm,
+          buffer_radius = buffer_radius
         )
       } else {
         out[[i]] <- .surface_metric_raster_fft(
@@ -987,7 +1042,29 @@ print.multiScaleR_vars <- function(x, ...) {
                                    kernel,
                                    pct_wt,
                                    fft,
-                                   na.rm) {
+                                   na.rm,
+                                   buffer_radius = NULL) {
+  if (!is.null(buffer_radius)) {
+    if (!isTRUE(fft) || !isTRUE(na.rm))
+      stop("Prepared-buffer projection requires FFT and finite-cell normalization.", call. = FALSE)
+    weights <- .surface_kernel_weight_matrix(raster, sigma, shape, kernel,
+                                              pct_wt, buffer_radius)
+    values <- terra::as.matrix(raster, wide = TRUE)
+    valid <- is.finite(values)
+    zeroed <- values
+    zeroed[!valid] <- 0
+    # Sum convolutions normalize against actual mapped finite support, including
+    # raster edges. Keep the original central-cell mask as the projection domain.
+    s0 <- fft_convolution(matrix(as.numeric(valid), nrow(values), ncol(values)),
+                           weights, fun = "sum", na.rm = TRUE)
+    s1 <- fft_convolution(zeroed, weights, fun = "sum", na.rm = TRUE)
+    result <- s1 / s0
+    result[!is.finite(s0) | s0 <= 0] <- NA_real_
+    result[t(!valid)] <- NA_real_
+    out <- terra::rast(raster)
+    terra::values(out) <- as.vector(result)
+    return(out)
+  }
   mx <- kernel_dist(kernel = kernel,
                     dimension = "1d",
                     sigma = sigma,

@@ -1,0 +1,12 @@
+{
+  "new_numerical_launches_planned": false,
+  "disk_bytes": 49697968128,
+  "head": "87bf8779fe571921f2fd5d3e45c0f9e478530022",
+  "R_process_count": 0,
+  "index_empty": true,
+  "time": "2026-10-29T03:31:55.7188499-04:00",
+  "RAM_bytes": 16975478784,
+  "branch": "codex/inference-dev",
+  "automation_deletion_pending": true,
+  "source_frozen": true
+}

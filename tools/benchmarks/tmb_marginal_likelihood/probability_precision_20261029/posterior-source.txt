@@ -1,0 +1,40 @@
+# posterior:::rhat
+function (x, ...) 
+UseMethod("rhat")
+
+# posterior:::rhat.default
+function (x, ...) 
+{
+    rhat_bulk <- .rhat(z_scale(.split_chains(x)))
+    rhat_tail <- .rhat(z_scale(.split_chains(fold_draws(x))))
+    max(rhat_bulk, rhat_tail)
+}
+
+# posterior:::.rhat
+function (x) 
+{
+    x <- as.matrix(x)
+    if (should_return_NA(x)) {
+        return(NA_real_)
+    }
+    nchains <- NCOL(x)
+    niterations <- NROW(x)
+    chain_mean <- matrixStats::colMeans2(x)
+    chain_var <- matrixStats::colVars(x, center = chain_mean)
+    var_between <- niterations * var(chain_mean)
+    var_within <- mean(chain_var)
+    sqrt((var_between/var_within + niterations - 1)/niterations)
+}
+
+# posterior:::.split_chains
+function (x) 
+{
+    x <- as.matrix(x)
+    niter <- NROW(x)
+    if (niter == 1L) {
+        return(x)
+    }
+    half <- niter/2
+    cbind(x[1:floor(half), ], x[ceiling(half + 1):niter, ])
+}
+

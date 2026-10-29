@@ -1,0 +1,107 @@
+tmbstan 1.2.1 rstan 2.32.7 
+function (obj, ..., lower = numeric(0), upper = numeric(0), laplace = FALSE, 
+    silent = TRUE, debug = FALSE) 
+{
+    restore.on.exit <- c("last.par.best", "random.start", "value.best", 
+        "last.par", "inner.control", "tracemgc")
+    oldvars <- sapply(restore.on.exit, get, envir = obj$env, 
+        simplify = FALSE)
+    restore.oldvars <- function() {
+        for (var in names(oldvars)) assign(var, oldvars[[var]], 
+            envir = obj$env)
+    }
+    on.exit(restore.oldvars())
+    if (silent) 
+        obj$env$beSilent()
+    stopifnot(length(lower) == length(upper))
+    if (laplace) {
+        par <- obj$env$last.par.best[-obj$env$random]
+        fn <- obj$fn
+        gr <- obj$gr
+        obj$env$random.start <- expression({
+            cand <- list(last.par.best[random], last.par[random])
+            cand[[which.min(sapply(cand, f0))]]
+        })
+    }
+    else {
+        par <- obj$env$last.par.best
+        fn <- obj$env$f
+        gr <- function(x) obj$env$f(x, order = 1)
+        if (length(lower) == length(obj$par) && !is.null(obj$env$random)) {
+            lower. <- lower
+            upper. <- upper
+            lower <- par * 0 - Inf
+            upper <- par * 0 + Inf
+            lower[-obj$env$random] <- lower.
+            upper[-obj$env$random] <- upper.
+        }
+    }
+    mod <- tmbstan_model(par, fn, gr, lower, upper)
+    if ((!laplace) && (!debug)) {
+        mod@ptr <- obj$env$ADFun$ptr
+        mod@DLL <- obj$env$DLL
+    }
+    args <- list(object = mod, ...)
+    chains <- args$chains
+    if (is.null(chains)) 
+        chains <- 4
+    shortParNames <- unique(names(par))
+    shortParLengths <- table(factor(names(par), levels = shortParNames))
+    specialChars <- c("par", "last.par", "last.par.best")
+    initSanitizer <- function(x) {
+        if (is.list(x)) {
+            x <- x[shortParNames]
+            names(x) <- shortParNames
+            spl <- sapply(x, length)
+            if (!identical(as.vector(spl), as.vector(shortParLengths))) {
+                cat("Expected parameter lengths:\n")
+                print(shortParLengths)
+                cat("Got:\n")
+                print(spl)
+                stop("Wrong length of list component")
+            }
+            x <- unlist(x)
+            initSanitizer(x)
+        }
+        else if (is.numeric(x)) {
+            if (length(x) != length(par)) 
+                stop("Detected initial parameter of the wrong length.")
+            init <- list()
+            init[[names(par)[1]]] <- numeric()
+            init$y <- x
+            init
+        }
+        else if (is.character(x) && (x %in% specialChars)) {
+            x <- get(x, envir = obj$env)
+            initSanitizer(x)
+        }
+        else x
+    }
+    if (is.null(args$init)) {
+        args$init <- "random"
+    }
+    else {
+        init <- args$init
+        if (is.numeric(init) && length(init == 1)) 
+            init <- as.character(init)
+        if (is.function(init)) {
+            if ("chain_id" %in% names(formals(init))) 
+                init <- lapply(1:chains, FUN = init)
+            else init <- lapply(1:chains, function(id) init())
+        }
+        if (is.numeric(init)) 
+            init <- list(init)
+        if (is.character(init) && any(init %in% specialChars)) 
+            init <- as.list(init)
+        if (is.list(init)) 
+            init <- lapply(init, initSanitizer)
+        if (is.list(init) && (length(init) != chains)) {
+            warning("Re-cycling inits to match number of chains")
+            init <- rep(init, length.out = chains)
+        }
+        args$init <- init
+    }
+    ans <- do.call("sampling", args)
+    ans@model_name <- obj$env$DLL
+    ans
+} 

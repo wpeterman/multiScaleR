@@ -1,0 +1,7 @@
+{
+  "ProcessId": 74120,
+  "ParentProcessId": 50796,
+  "CreationDate": "2026-10-29T10:02:11.465714-04:00",
+  "ExecutablePath": "C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rcmd.exe",
+  "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rcmd.exe\" build multiScaleR"
+}

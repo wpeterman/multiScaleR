@@ -1,0 +1,10 @@
+{
+  "analysis_sha256": "C2448F855FAB3A577335742B419ACF71BDE06DB0DEC779316B604CE9728CEE7B",
+  "protocol_sha256": "994CB102062B95519D878021BCF13429991216B8E43C2627B34D25D4E0443A2E",
+  "test_sha256": "12E70D797B2AD5C892DAF0D33CAFBCC6ED1F12CED6507FA8E2B7C759A5A6DA49",
+  "scope": "Deterministic compact-summary consumer tests; no sampler or package mutation.",
+  "tests": 9,
+  "passed": true,
+  "exit_code": 0,
+  "time": "2026-10-28T22:51:26.0581145-04:00"
+}

@@ -1,0 +1,7 @@
+{
+  "ProcessId": 76012,
+  "ParentProcessId": 55844,
+  "CreationDate": "2026-10-28T21:39:46.906896-04:00",
+  "ExecutablePath": "C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rterm.exe",
+  "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rterm.exe\" --vanilla --no-echo --no-save --no-restore -f supplement-driver.R"
+}

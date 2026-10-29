@@ -66,6 +66,14 @@ distances, or with manually supplied kernel parameters to explore kernel
 behavior.
 }
 \details{
+For \code{backend = "profile_glm"} or \code{"joint_nb2"} with an estimated exponential-power
+shape, distance intervals use joint log-scale delta-method uncertainty for
+both sigma and shape. They remain Wald intervals even when sigma intervals
+are profiled in \code{summary()}. They are unavailable when the fit fails
+the joint identifiability checks. Point distances remain available.
+For \code{conditional_logit}, point distances remain available but scale
+uncertainty has not been calibrated, so distance confidence limits are missing.
+
 \strong{Default change.} Version 0.7.4 and later use
 \code{dimension = "2d"} for distances, summaries, and kernel plots. Earlier
 versions used \code{"1d"}. Set \code{dimension = "1d"} explicitly to

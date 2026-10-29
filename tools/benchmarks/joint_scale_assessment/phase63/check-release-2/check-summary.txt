@@ -1,0 +1,4 @@
+-- R CMD check results ---------------------------------- multiScaleR 0.7.4 ----
+Duration: 16m 31.3s
+
+0 errors v | 0 warnings v | 0 notes v

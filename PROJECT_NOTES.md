@@ -123,3 +123,11 @@ extractions at three scales and checks the final pooled model refit.
 
 The manual bin-row replacement below remains specific to compatible,
 previously prepared objects; use the public function for new analyses.
+
+## October 23 development follow-up: metric optimization efficiency
+
+The 15-minute overnight monitor is paused. The next landscape/surface performance assessment should distinguish the existing, substantial FFT raster-projection gains from repeated metric evaluation inside model optimization, where end-to-end speed and memory evidence remains limited. Prioritize prepared cell/neighbor indices, shared metric statistics, exact neighborhood-event caching, and removal of duplicate mixed kernel/metric evaluation before broader optimizer work.
+
+Detailed evidence, proposed priorities, and preservation requirements: [phase39 development note](tools/benchmarks/joint_scale_assessment/phase39/DEVELOPMENT-NOTE.md). Today's bounded public NB2 and mixed/zero-inflated benchmark records and final handoff are in the same phase39 directory. Preserve Bayesian changes, independent starts, failures, uncertainty safeguards, and defaults. No commits authorized.
+
+October 23 evening follow-up: phase40 completed the remaining public mixed-model cost comparisons. Cold native repeats isolate the earlier prediction mismatch to different fitted scale endpoints; public predictions match native predictions. Strict cross-endpoint gates remain failed. Observed mixed NB2/ZIP speed ratios are 10.68x/19.31x, with 93.48%/96.71% lower cumulative R allocation, but larger retained audit objects. See phase40/RESULTS.md under tools/benchmarks/joint_scale_assessment. The next implementation is narrowly specified in phase40/METRIC-NEXT.md: remove duplicate exact kernel evaluation in mixed binned-kernel/metric inputs, then validate full-analysis gains. No default or safeguard changes; no commits.

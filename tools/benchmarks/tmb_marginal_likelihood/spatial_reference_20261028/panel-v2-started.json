@@ -1,0 +1,13 @@
+{
+  "protocol_sha256": "33cf7df6fac389501b4b4be44be8545d7b78538553d873f11f5a9ef3972cd713",
+  "controller": {
+    "ProcessId": 69708,
+    "ParentProcessId": 12180,
+    "CreationDate": "2026-10-28T22:42:03.411125-04:00",
+    "ExecutablePath": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+    "CommandLine": "\"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -NoProfile -Command \"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\n$taskStudy=Join-Path (Get-Location).Path 'tools/benchmarks/tmb_marginal_likelihood/spatial_reference_20261028'; $taskTokens=$null; $taskErrors=$null; [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $taskStudy 'run-panel-v2.ps1'),[ref]$taskTokens,[ref]$taskErrors); if($taskErrors.Count){$taskErrors;throw 'Panel syntax failed'}; Get-Content -LiteralPath (Join-Path $taskStudy 'run-panel-v2.ps1') | Select-Object -Last 28; & 'C:/Users/peterman.73/AppData/Local/Programs/Python/Python312/python.exe' (Join-Path $taskStudy 'freeze-repair.py'); if($LASTEXITCODE -ne 0){throw 'Repair freeze failed'}; & 'C:/Users/peterman.73/AppData/Local/Programs/Python/Python312/python.exe' (Join-Path $taskStudy 'verify-repair.py'); if($LASTEXITCODE -ne 0){throw 'Repair identity gate failed'}; & (Join-Path $taskStudy 'run-panel-v2.ps1')\""
+  },
+  "planned_runs": 4,
+  "started_at": "2026-10-28T22:42:14.7950975-04:00",
+  "worker_limit": 1
+}

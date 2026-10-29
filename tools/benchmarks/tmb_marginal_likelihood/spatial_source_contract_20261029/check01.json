@@ -1,0 +1,12 @@
+{
+  "archive_SHA256": "118A69E2A54465CD56EE833A85F80C0B3A379BA0D7AA25084190CC3B40A3FC8A",
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-spatial-source-lc238368",
+  "tests_complete": true,
+  "completed_at": "2026-10-29T02:04:44.8601003-04:00",
+  "check_status_OK": true,
+  "source_stable": true,
+  "tests_run_separately": true,
+  "passed": true,
+  "NOT_CRAN": true,
+  "installed_test_directory": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-spatial-source-lc238368\\exact-archive-tests"
+}

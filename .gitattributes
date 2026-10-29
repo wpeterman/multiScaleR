@@ -1,0 +1,2 @@
+# Frozen benchmark evidence uses byte hashes; preserve those exact bytes.
+tools/benchmarks/** -text

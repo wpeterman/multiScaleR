@@ -1,0 +1,18 @@
+test_that('duplicate keys distinguish repair eligibility without removing valid reuse', {
+  root <- normalizePath(file.path('..', '..'), winslash = '/', mustWork = FALSE)
+  path <- file.path(root, 'tools/benchmarks/joint_scale_assessment/phase15/revision2/bounds.R')
+  skip_if_not(file.exists(path), 'Development benchmark helper is not packaged')
+  e <- new.env(parent = globalenv())
+  # Source the pure helpers without changing the working directory for package tests.
+  sys.source(file.path(root, 'tools/benchmarks/joint_scale_assessment/phase15/bounds.R'), e)
+  expr <- parse(path); eval(expr[-1L], e)
+  x <- c(-1 - .Machine$double.eps, 0)
+  checks <- lapply(c(TRUE, FALSE), function(g) e$check_generated_start(x, c(-1, -1), c(1, 1), g))
+  keys <- e$roundoff_start_keys(rbind(x, x), checks)
+  expect_false(identical(keys[1], keys[2]))
+  expect_true(checks[[1]]$valid); expect_false(checks[[2]]$valid)
+  x <- c(0, 0)
+  checks <- lapply(c(TRUE, FALSE), function(g) e$check_generated_start(x, c(-1, -1), c(1, 1), g))
+  keys <- e$roundoff_start_keys(rbind(x, x), checks)
+  expect_identical(keys[1], keys[2])
+})

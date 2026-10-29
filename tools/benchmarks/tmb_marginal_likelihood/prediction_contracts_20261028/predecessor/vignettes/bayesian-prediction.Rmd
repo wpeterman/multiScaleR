@@ -1,0 +1,419 @@
+---
+title: "Bayesian Prediction for New Observations and Years"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Bayesian Prediction for New Observations and Years}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5,
+  fig.height = 4.25)
+```
+
+A prediction for a surveyed site reuses information about that site's effects.
+A prediction for an unsurveyed site must also allow its unknown effects to vary.
+The same distinction applies to years. This guide shows how to make those
+choices explicitly, retain dependence among observations in the same year,
+and distinguish expected responses from future observations.
+
+Start with `vignette("bayesian-scales", package = "multiScaleR")` for fitting
+and interpreting annual-scale models. The examples here use actual stored
+NUTS fits to artificial data. Reading them requires no optional sampling
+software. Long fitting calls are shown but do not run during a package build.
+
+## Choose the prediction you need
+
+| Question | Function | Variation included |
+|:---------|:---------|:-------------------|
+| What is the scale for these covariates or years? | `predict_scales()` | Joint scale-parameter uncertainty; new-year variation when requested |
+| What is the expected response? | `predict()` | Joint parameter uncertainty and requested group effects |
+| What observations might I record? | `simulate()` | The above plus observation sampling variation |
+
+For binomial models, `predict(type = "response")` returns success probabilities.
+For Poisson and negative-binomial models it returns expected counts, and for
+Gaussian models it returns expected responses. `type = "link"` returns logits
+for binomial models, log means for count models, and means for Gaussian models.
+An interval for an expected response does not include observation sampling
+variation. Use `simulate()` when that variation belongs in your question.
+Each prediction draw is an expected response conditional on that draw's
+parameters and included group effects. Its posterior median need not equal
+the median of future observations. The `mean` and `sd` columns are finite
+Monte Carlo summaries, not proof that the corresponding theoretical moments
+exist. Prefer medians and quantiles for heavy-tailed new-group predictions.
+
+## Predict another survey at known sites and years
+
+```{r known-surveys}
+annual <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
+  package = "multiScaleR"))
+known_fit <- annual$fits$pooled
+surveys <- annual$data[1:3, ]
+surveys$count <- NULL  # Future responses are not inputs to prediction.
+
+known <- predict(known_fit, surveys, kernel_inputs = annual$inputs,
+  row_id = "site_year", draws = 400)
+knitr::kable(known[c("point_id", "median", "lower", "upper",
+  "new_scale_level", "new_response_level")], digits = 2,
+  col.names = c("Point ID", "Median", "Lower", "Upper", "New scale", "New response"))
+```
+
+**How to read the output:** Each row is an expected count for another survey
+under the supplied landscape and covariates. The central 95% intervals summarize
+posterior uncertainty in those means. Both flags are `FALSE` because these
+years and sites have fitted effects. They are not intervals for new counts.
+The `draws` limit makes the teaching example quick; use all retained draws for
+final summaries and assess Monte Carlo precision.
+
+`kernel_inputs` supplies prepared bins for the prediction locations and maps.
+Each unique prepared location has a unique `binned$point_ids` entry. The
+`row_id` column matches observations to those entries. Observation rows can be
+reordered or repeated, including repeated visits to one location. `row_id`
+defaults to the fitted ID-column name when the fit retained it; supplying it
+explicitly also works with older saved fits.
+
+For your own maps, use `kernel_prep()` or `kernel_prep_by_group()` as described
+in `vignette("year-specific-rasters", package = "multiScaleR")`. Keep the fitted
+kernel, predictor definitions, and projected map units. New inputs may use a
+different numerical distance normalizer, but must express the same physical
+units. Prediction retains the training center, spread, contrasts, and formula
+bases. Do not standardize the new rows independently.
+
+## Predict the scale distribution in an unobserved year
+
+The annual-scale model uses a population log scale and annual deviations:
+
+\[
+\log D_y = a + \tau z_y, \qquad z_y \sim N(0,1).
+\]
+
+Here, $D_y$ is a distance in map units and $\tau$ is the between-year SD of
+log distances. For the Gaussian kernel, $D$ is sigma; for the exponential
+kernel, it is the decay distance. It is not the finite preparation cutoff or
+a radius containing a specified fraction of kernel weight.
+Both $a$ and $\tau$ remain uncertain. For an unobserved year,
+`new_levels = "sample"` samples its deviation using each complete posterior
+parameter vector. It includes uncertainty in $\tau$ rather than plugging in
+one estimate.
+
+```{r future-scales}
+future_years <- data.frame(year = c("2026", "2027"))
+future_scale <- predict_scales(known_fit, future_years,
+  new_levels = "sample", seed = 801)
+knitr::kable(future_scale[c("group", "distribution", "median", "lower", "upper",
+  "p_below_min_D", "p_above_max_D")], digits = 3,
+  col.names = c("Year", "Distribution", "Median", "Lower", "Upper", "Below range", "Above range"))
+```
+
+**How to read the output:** `new_group_predictive` identifies a distribution
+for an unobserved year's scale. Its interval includes variation among years
+and uncertainty about the population parameters. It does not estimate that
+future year's realized scale as if its responses had been observed. The
+exchangeable model gives 2026 and 2027 the same distribution before observing
+either year. Small differences between their printed summaries are Monte
+Carlo variation, not an estimated trend.
+When future responses become available, refit with those observations to
+estimate that year's realized effects. Prediction alone does not update the
+posterior with new responses.
+
+The two support columns report probability below and above the *fitted*
+reference range. They do not assess coverage of an unspecified future map.
+Bayesian distance priors have unbounded support; these probabilities are
+important when substantial mass falls outside the distances your maps resolve.
+Use medians and quantiles for strongly skewed distance distributions. A finite
+Monte Carlo arithmetic mean does not establish that its theoretical mean exists.
+Use `scale = "log"` to summarize natural log distances for extreme tails.
+
+### Understand the zero-deviation reference
+
+```{r zero-scale-reference}
+reference_scale <- predict_scales(known_fit, future_years,
+  new_levels = "zero")
+knitr::kable(reference_scale[c("group", "distribution", "median", "lower", "upper")],
+  digits = 2)
+```
+
+This sets the new year's $z_y$ to zero. The reference retains uncertainty in
+$a$ but omits future-year variation. It is not the average distance over years:
+even conditional on fixed $a$ and $\tau$, the mean of $D_y$ is
+$\exp(a + \tau^2/2)$, whereas the zero-deviation distance is $\exp(a)$.
+The fitted posterior dependence between $a$ and $\tau$ matters when averaging
+over their uncertainty.
+
+```{r scale-prediction-plot, fig.cap="New-year scale prediction and the zero-deviation reference. Bars are central 95% intervals in meters; points are medians. These are separate targets, not competing estimates of the same interval."}
+local({
+  x <- rbind(future_scale[1, ], reference_scale[1, ])
+  op <- par(mar = c(4.5, 9, 1, 1)); on.exit(par(op))
+  plot(x$median, 2:1, xlim = range(c(x$lower, x$upper)), ylim = c(.5, 2.5),
+    yaxt = "n", ylab = "", xlab = "Landscape scale D (meters)", pch = 19)
+  segments(x$lower, 2:1, x$upper, 2:1)
+  axis(2, 2:1, c("Unobserved year", "Zero deviation"), las = 1)
+})
+```
+
+**How to read the plot:** The future-year interval includes an additional
+source of variation. The reference answers a conditional question. Its tighter
+interval is not evidence that zeroing annual effects produces a more precise
+forecast of a realized year.
+
+## Use a model that can predict future responses
+
+The original worked fit contains a fixed `factor(year)` response effect.
+It cannot supply a coefficient for an unseen year. Predicting a future scale
+does not solve that separate response-design limitation.
+
+The next stored fit uses annual response random intercepts as well as annual
+scale random intercepts. These are separate model components:
+
+```{r forecasting-model, eval=FALSE}
+forecast_fit <- multiScale_bayes(
+  count ~ habitat + (1 | site) + (1 | year),
+  annual$inputs, annual$data, row_id = "site_year", family = "nbinom2",
+  scales = list(habitat = ~1 + (1 | year)),
+  priors = known_fit$specification$priors,
+  method = "sample", chains = 4, iter = 8000, warmup = 4000,
+  seed = 630127, control = list(adapt_delta = .99, max_treedepth = 12))
+```
+
+| Component | Role in a future-year prediction |
+|:----------|:---------------------------------|
+| `habitat = ~1 + (1 | year)` | Allows the future landscape scale to differ from the population log scale |
+| Response `(1 | year)` | Allows the future response baseline to differ from the population intercept |
+| Response `(1 | site)` | Reuses a fitted site effect or samples an unsurveyed site's effect |
+| NB2 observation model | Adds count variation around the expected count when simulating observations |
+
+Annual response and scale effects are independent conditional on their
+population parameters in this model. Sharing a grouping label does not fit
+a correlation between those effects. These effects are exchangeable across
+years, without temporal autocorrelation or a directional forecast. You can
+include a numeric year trend when scientifically justified, but prediction
+then extrapolates that fitted trend. Random slopes, correlated response/scale
+effects, and temporal dependence are not implemented by this interface.
+
+```{r load-forecast-fit}
+example <- readRDS(system.file("extdata", "bayesian-prediction-example.rds",
+  package = "multiScaleR"))
+forecast_fit <- example$fit
+knitr::kable(example$fit_info[c("seed", "passed", "derived_max_rhat",
+  "minimum_bulk_ess", "minimum_tail_ess", "divergences")], digits = 3,
+  col.names = c("Seed", "Passed", "Max Rhat", "Min bulk ESS", "Min tail ESS", "Divergences"))
+```
+
+**How to read the fit information:** The recorded diagnostics describe the
+original full chains before storing a compact set of complete joint parameter
+vectors. The designated teaching fit, seed 630127, passed the unchanged raw
+and derived-scale gates. The independent repeat, seed 630128, had two
+divergences and remains rejected even though its Rhat and effective sample
+sizes looked satisfactory. No sampler settings or thresholds were changed to
+remove that rejection. Inspect every diagnostic, not Rhat alone.
+This is a worked dataset, not a calibration study. The compact fit has
+no full sampler for trace plots or a new chain-level convergence audit.
+For your own fit, inspect `summary(forecast_fit)$diagnostics` and
+`diagnose_bayes_scales(forecast_fit)` before interpreting predictions.
+
+## Supply future landscape scenarios and group policies
+
+```{r future-observations}
+new_surveys <- example$newdata
+future_inputs <- example$kernel_inputs
+new_surveys
+
+future_mean <- predict(forecast_fit, new_surveys,
+  kernel_inputs = future_inputs, row_id = "site_year",
+  new_scale_levels = "sample", new_response_levels = "sample",
+  draws = 1000, seed = 802)
+knitr::kable(future_mean[c("point_id", "median", "lower", "upper",
+  "new_scale_level", "new_response_level")], digits = 2,
+  col.names = c("Point ID", "Median", "Lower", "Upper", "New scale", "New response"))
+knitr::kable(attr(future_mean, "new_groups"))
+```
+
+The supplied small bin matrices describe artificial future landscape scenarios
+derived from the example's maps. They are not observed 2026/2027 rasters or a
+forecast of landscape change. Predictions are conditional on these supplied
+landscapes. They do not propagate map measurement or future-landscape uncertainty.
+Prepare and compare scientifically plausible landscape scenarios for an actual
+forecast.
+Two scenario positions reuse example landscape profiles with new site IDs
+solely to illustrate unseen-site effects; they are not newly observed locations.
+
+The deterministic scenario builder is supplied at
+`system.file("examples", "bayesian-prediction-data.R", package = "multiScaleR")`.
+Sourcing it defines `make_bayesian_prediction_scenario()`, which recreates
+these eight rows and bin matrices without fitting, sampling or writing files.
+
+Use comparable predictor definitions, bin resolution and preparation coverage.
+A smaller future buffer renormalizes a more truncated kernel. Raster edges and
+missing cells can matter even when buffers have the same nominal extent.
+Prediction does not certify that coverage. You can inspect the scale
+distribution against the future inputs' reference range and convert each
+scale to an ideal planar kernel radius:
+
+```{r future-coverage}
+log_D <- predict_scales(forecast_fit, future_years, new_levels = "sample",
+  scale = "log", summary = FALSE, seed = 806)$habitat
+radius_per_D <- kernel_dist(prob = .95, dimension = "2d",
+  sigma = 1, kernel = forecast_fit$specification$kernel)
+knitr::kable(data.frame(year = future_years$year,
+  p_D_above_max_D = colMeans(log_D > log(future_inputs$max_D)),
+  p_radius95_above_max_D = colMeans(log_D + log(radius_per_D) >
+    log(future_inputs$max_D))), digits = 3)
+```
+
+**How to read this check:** The first probability concerns the scale parameter
+itself. The second concerns the radius containing 95% of weight under the
+ideal, untruncated planar kernel, which extends beyond one scale parameter.
+Both retain posterior and new-year uncertainty. They do not measure actual
+cell coverage near raster edges or gaps. Inspect those separately. If larger
+neighborhoods are scientifically needed, rebuild comparable fitting and
+prediction inputs and refit rather than silently changing the predictor's
+finite support only at prediction time.
+
+**How to read these outputs:** All rows have a new annual scale. A response
+row is also flagged if it includes a new response year or site. Known sites
+retain their fitted site effects even in future years. The `new_groups`
+attribute lists the component, predictor, grouping variable, new level and
+chosen action. It distinguishes a new annual response effect from a new annual
+scale effect, although both use `year`.
+
+| Choice | Scale component | Response component | Meaning |
+|:-------|:----------------|:-------------------|:--------|
+| Require an explicit decision | `new_scale_levels = "error"` | `new_response_levels = "error"` | Default; an unseen included group stops prediction |
+| Predict a new group | `new_scale_levels = "sample"` | `new_response_levels = "sample"` | Sample one new effect per group and complete posterior vector |
+| Zero only unseen effects | `new_scale_levels = "zero"` | `new_response_levels = "zero"` | Keep known effects, set new deviations to zero |
+| Omit all group effects in a component | `scale_re.form = NA` | `re.form = NA` | Set known and new deviations in that component to zero |
+
+Zero-deviation predictions retain uncertainty in fixed parameters. They do not
+integrate over group variation, particularly after nonlinear link functions
+or kernels. An omitted grouping column is unnecessary only when all effects
+that require it are omitted and no fixed term also uses it. An unseen
+fixed-factor level remains an error under every policy.
+
+## Simulate observations and joint totals
+
+```{r future-counts}
+replicated <- simulate(forecast_fit, nsim = 1000, seed = 803,
+  newdata = new_surveys, kernel_inputs = future_inputs, row_id = "site_year",
+  new_scale_levels = "sample", new_response_levels = "sample")
+count_intervals <- t(apply(replicated, 1, quantile, c(.025, .5, .975)))
+knitr::kable(data.frame(point_id = new_surveys$site_year, count_intervals,
+  check.names = FALSE), col.names = c("Point ID", "2.5%", "Median", "97.5%"))
+
+# Each column is one coherent predictive dataset. Sum within that column.
+total_counts <- colSums(replicated)
+quantile(total_counts, c(.025, .5, .975))
+```
+
+**How to read the output:** Count intervals include uncertainty in expected
+counts and NB2 observation variation. They can be much wider than intervals
+for expected counts. The final interval concerns the sum over all supplied
+surveys. It retains shared effects, including the same new year at different
+sites and the same new site across years. Summing separate interval endpoints
+would not calculate an interval for that total.
+
+Within one call, observations in the same new group share its sampled effect
+for a complete predictive dataset. Different new groups are independent
+conditional on their population parameters, whose joint posterior dependence
+is preserved. Separate calls do not define a shared realization across
+components or batches. Supply all rows together when their joint prediction
+matters. Reusing a seed across `predict_scales()`, `predict()` and `simulate()`
+does not promise matching latent effects across those different algorithms.
+
+`simulate()` returns rows by replicates. `predict(summary = FALSE)` instead
+returns posterior vectors by rows, and `predict_scales(summary = FALSE)`
+returns a named list of such matrices, one per landscape predictor. These
+orientations matter when computing joint contrasts or totals.
+
+### Binary and grouped-binomial observations
+
+For a binary fit, new observations default to one trial. For a
+`cbind(successes, failures)` fit, supply new trial totals explicitly:
+
+```{r grouped-binomial, eval=FALSE}
+# binomial_fit is an existing fit to grouped successes/failures.
+probability <- predict(binomial_fit, newdata = new_surveys,
+  kernel_inputs = future_inputs, row_id = "site_year",
+  new_scale_levels = "sample", new_response_levels = "sample", seed = 804)
+successes <- simulate(binomial_fit, nsim = 1000, seed = 805,
+  newdata = new_surveys, kernel_inputs = future_inputs, row_id = "site_year",
+  trials = rep(10L, nrow(new_surveys)),
+  new_scale_levels = "sample", new_response_levels = "sample")
+```
+
+`probability` summarizes success probabilities, regardless of the number of
+trials. `successes` contains integer counts out of ten. Use the actual future
+trial totals; future response columns are ignored and never determine them.
+
+## Check predictions before using them
+
+Prediction propagates the fitted posterior; it does not repair failed
+sampling, inaccurate approximation, or a misspecified observation model.
+All supported inference methods use their retained complete joint vectors.
+Importance-corrected fits use their stored joint resamples here, so prediction
+has the finite precision of those resamples rather than a fresh weighted
+integration. More predictive replicates reduce simulation noise conditional
+on the retained posterior but do not add posterior effective sample size.
+
+Scale summaries compute each distinct active covariate/group combination
+once. A large stack sharing two annual scales therefore needs only two scale
+columns internally when `summary = TRUE`. Full scale draws and response
+predictions still allocate posterior vectors by observation rows. For
+individual rowwise intervals you can process smaller batches and retain only
+their summaries. Independently simulated batches do not define a coherent
+joint forecast for shared groups or totals. Use one batch for those targets.
+
+Check held-out responses at the level you intend to predict. Holding out a
+visit at a known site and year is easier than holding out an entire year or
+site. Evaluate interval coverage, predictive scores and scientifically
+relevant summaries within those separate tasks. Repeated sites or years are
+not independent validation replicates. Good computational diagnostics and one
+successful teaching example do not establish predictive calibration.
+
+Prediction fails on unmatched IDs, new fixed-factor levels, unavailable
+formula transforms, incompatible kernel inputs, and nonfinite results. It
+does not silently clip scales to input limits or replace problematic draws.
+Use deterministic formula transforms. Standard base/stats transforms and namespace-qualified transforms
+must remain available; custom functions saved only in a fitting workspace
+are not serialized with the model. `scale()` and `poly()` retain their fitting
+definitions for prediction. An expression such as `I(x - mean(x))` instead
+computes its mean on the supplied new batch by ordinary R formula rules.
+Use precomputed training constants when you need to retain that center.
+
+## Quick reference
+
+```{r quick-reference, eval=FALSE}
+# 1. Forecast annual scales, allowing a new year's deviation to vary.
+predict_scales(forecast_fit, data.frame(year = "2026"),
+  new_levels = "sample", seed = 801)
+
+# 2. Predict means conditional on the supplied future landscape scenario.
+predict(forecast_fit, new_surveys, kernel_inputs = future_inputs,
+  row_id = "site_year", new_scale_levels = "sample",
+  new_response_levels = "sample", seed = 802)
+
+# 3. Generate coherent datasets, then summarize totals or contrasts within each.
+y <- simulate(forecast_fit, nsim = 2000, seed = 803,
+  newdata = new_surveys, kernel_inputs = future_inputs, row_id = "site_year",
+  new_scale_levels = "sample", new_response_levels = "sample")
+quantile(colSums(y), c(.025, .5, .975))
+```
+
+| Function | Purpose |
+|:---------|:--------|
+| `predict_scales()` | Predict conditional, new-group or zero-reference scale distributions |
+| `predict()` | Predict expected responses or link values at fitted or new observations |
+| `simulate()` | Add observation variation while retaining within-dataset group dependence |
+| `diagnose_bayes_scales()` | Audit derived-scale chain diagnostics when full chains remain available |
+
+See also:
+
+- `vignette("bayesian-scales", package = "multiScaleR")` for model fitting, pooling and prior checks.
+- `vignette("bayesian-computation", package = "multiScaleR")` for approximation choices and limitations.
+- `vignette("year-specific-rasters", package = "multiScaleR")` for preparing annual landscape inputs.
+- `vignette("quickstart", package = "multiScaleR")` for the core kernel workflow.

@@ -1,0 +1,4 @@
+{
+  "passed": false,
+  "reason": "Explicit Git add stopped on one ignored pinned installed-tests.log; partial explicit staging retained. Retry permits only the existing planned index subset and explicitly forces the reviewed evidence paths. No source or frozen evidence changed."
+}

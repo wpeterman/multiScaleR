@@ -1,0 +1,12 @@
+{
+  "installed_test_directory": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-probability-availability-kn_zo515\\exact-archive-tests",
+  "archive_SHA256": "3ED47F85D4267A93713DB2BD501DD88525C4C1914A613A9C95B92FC2E9EA6B8D",
+  "tests_complete": true,
+  "passed": true,
+  "check_status_OK": true,
+  "completed_at": "2026-10-29T00:39:03.1265573-04:00",
+  "tests_run_separately": true,
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-probability-availability-kn_zo515",
+  "NOT_CRAN": true,
+  "source_stable": true
+}

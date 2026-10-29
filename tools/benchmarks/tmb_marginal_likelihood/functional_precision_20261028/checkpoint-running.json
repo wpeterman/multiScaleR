@@ -1,0 +1,21 @@
+{
+  "time": "2026-10-28T22:05:04.1065916-04:00",
+  "state": "full_validation_running",
+  "phase": "build01",
+  "owned_root_identity_matches": false,
+  "owned_root": {
+    "ProcessId": 43200,
+    "ParentProcessId": 79548,
+    "CreationDate": "2026-10-28T22:02:36.448231-04:00",
+    "ExecutablePath": "C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rcmd.exe",
+    "CommandLine": "\"C:\\Program Files\\R\\R-4.6.1\\bin\\x64\\Rcmd.exe\" build multiScaleR"
+  },
+  "source_files": 311,
+  "unit02_assertions": 145,
+  "compatibility01_assertions": 290,
+  "documentation01_passed": true,
+  "full_gate_passed": false,
+  "branch": "codex/inference-dev",
+  "no_stage_commit_version_merge_push": true,
+  "resume": "Read live identities and phase logs; do not launch a duplicate. Only a complete check01.json and passing verify-candidate.py close this batch."
+}

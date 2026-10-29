@@ -1,0 +1,51 @@
+==================================================================
+HUMANIZER AUDIT
+==================================================================
+Paragraphs: 5   Sentences: 27   Words: 450
+
+-- BURSTINESS (sentence length variation) -----------------------
+  mean 16.7  sd 10.7  cv 0.64  range 3-54
+  coefficient of variation: GOOD
+     target cv >= 0.5; human expert prose is bursty
+  mix: short (<=12 words) 12 (44%), medium (13-30) 13 (48%), long (>30) 2 (7%)
+     target: mostly medium, with short sentences for emphasis and an occasional long integrating sentence
+  ! 1 run(s) of >=3 same-length sentences:
+      sentences 20-25: lengths [9, 8, 5, 9, 11, 12]
+
+-- SENTENCE OPENERS ---------------------------------------------
+  no >2 identical openers in a row
+  most common openers: read(2), native(2), this(2), posterior(2), shared(1)
+  non-subject openers (purpose-, concession-, phrase-first): 1/27 (4%)
+
+-- PUNCTUATION RESTRAINT ----------------------------------------
+  prose words (parentheticals excluded): 447
+  semicolons: 1  (2.2 per 1,000 words)  moderate; restructure the sentences that carry them
+  colons:     0  (0.0 per 1,000 words)  sparse (the user's range)
+     the user uses both sparingly; rhythm comes from sentence length and shape, not punctuation
+  em-dashes (U+2014, forbidden): 0
+  spaced hyphens used as dashes ( - ): 0
+
+-- AI VOCABULARY ------------------------------------------------
+  banned words: none
+
+-- AI PHRASES & THROAT-CLEARING ---------------------------------
+  banned phrases: none
+
+-- OVERUSED CONNECTIVES -----------------------------------------
+  none
+
+-- MACHINE CONSTRUCTIONS ----------------------------------------
+  none detected
+
+-- VOICE-STYLE MECHANICS ----------------------------------------
+  curly quotes (use straight ASCII): 0
+  british spelling: none
+
+-- PARAGRAPH LENGTH VARIATION -----------------------------------
+  mean 90 words  cv 1.19
+
+==================================================================
+Diagnostic only. Fix by rewriting for meaning + voice, then re-run.
+A true technical term that scores as low-probability is not a defect.
+Thresholds are heuristics; the user's prose sits well inside them.
+==================================================================

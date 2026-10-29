@@ -1,0 +1,21 @@
+{
+  "completed": [
+    {
+      "elapsed_seconds": 796.8090446,
+      "qualified": false,
+      "id": "null-a",
+      "completed": true
+    },
+    {
+      "elapsed_seconds": 659.7325186,
+      "qualified": false,
+      "id": "null-b",
+      "completed": true
+    }
+  ],
+  "cumulative_seconds": 1477.763622,
+  "state": "running",
+  "planned_runs": 4,
+  "active_run": "smooth-a",
+  "time": "2026-10-28T23:20:50.3207418-04:00"
+}

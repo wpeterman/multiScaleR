@@ -1,0 +1,28 @@
+$expected
+$expected$estimate
+[1] 0.5
+
+$expected$mcse
+[1] 0.01237194
+
+$expected$ess_mean
+[1] 1634.317
+
+$expected$rhat
+[1] NA
+
+
+$actual
+  covariate  group row threshold threshold_scale estimate       mcse ess_mean
+1   habitat shared   1         0             log      0.5 0.01237194 1634.317
+  rhat constant precision_available precision_target_met
+1   NA    FALSE               FALSE                   NA
+                                                                   reason
+1 Indicator precision diagnostics are nonestimable; inspect chain mixing.
+
+$regression_reproduced
+[1] TRUE
+
+$posterior_version
+[1] "1.7.0"
+

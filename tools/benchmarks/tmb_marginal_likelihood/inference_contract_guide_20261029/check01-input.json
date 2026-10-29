@@ -1,0 +1,9 @@
+{
+  "installed_tests_rerun": false,
+  "R_BATCH_forwarder_SHA256": "496E6685D38BA01E89AA4C2DDED69F3AC33F4B1A85E7D9EEED83AAE8AF02BDD8",
+  "Rscript_forwarder_SHA256": "D829BCF7E9FA1D7E3E828C565C3CDBB1ED416F551F4FA6FD4DFCDF231E33E5E8",
+  "workspace": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-inference-guide-mf816ads",
+  "NOT_CRAN": true,
+  "source_files": 318,
+  "started_at": "2026-10-29T02:18:20.4637812-04:00"
+}

@@ -1,0 +1,171 @@
+--- predecessor/NEWS
++++ NEWS
+@@ -1,5 +1,9 @@
+ Bayesian development (unreleased)
+ ---------
++* Probability MCSE availability is separate from indicator Rhat availability.
++  Balanced binary events can retain finite mean MCSE and ESS when indicator
++  Rhat is undefined; the report keeps that Rhat unavailable with an explicit
++  reason. Original sampling and derived-scale diagnostic gates are unchanged.
+ * `diagnose_bayes_probabilities()` reports chain-based probabilities and Monte
+   Carlo precision at requested fitted-scale thresholds. Constant indicators,
+   unavailable chains and failed diagnostics remain explicit; fit gates and
+--- predecessor/R/bayes_scale_probabilities.R
++++ R/bayes_scale_probabilities.R
+@@ -30,6 +30,9 @@
+ #'       \code{threshold_scale}; estimated event probability \code{estimate};
+ #'       indicator \code{mcse}, \code{ess_mean}, and \code{rhat}; \code{constant},
+ #'       \code{precision_available}, \code{precision_target_met}, and \code{reason}.
++#'       Mean precision requires finite positive MCSE and mean ESS. Separate
++#'       \code{rhat_available} and \code{rhat_reason} fields describe indicator
++#'       Rhat availability without changing the fit's original diagnostic gates.
+ #'       The event includes equality: kernel scale is less than or equal to the
+ #'       threshold. Probability estimates and MCSE use the probability axis.
+ #'       Undefined diagnostics and unrequested target decisions remain \code{NA}.}
+@@ -50,6 +53,12 @@
+ #'   precision diagnostics. Constant indicators have nonestimable precision,
+ #'   even when their empirical probability is zero or one. Nonfinite derived
+ #'   log scales remain explicit failures; iterations are never dropped.
++#'
++#'   Indicator Rhat can be undefined for balanced binary events even when mean
++#'   ESS and MCSE are finite. Its reported value remains \code{NA}, with an
++#'   explicit availability flag and reason. This alone does not make mean
++#'   precision unavailable. Inspect the original and derived-scale mixing
++#'   diagnostics before interpreting a probability's MCSE.
+ #'
+ #'   MCSE describes computational uncertainty in a probability estimate, not
+ #'   posterior uncertainty about the scale or observation sampling variation.
+@@ -96,7 +105,8 @@
+   out <- list(available = FALSE, reason = "", raw_diagnostics = object$diagnostics,
+     probabilities = cbind(identifiers, estimate = numeric(), mcse = numeric(), ess_mean = numeric(),
+       rhat = numeric(), constant = logical(), precision_available = logical(),
+-      precision_target_met = logical(), reason = character()),
++      precision_target_met = logical(), reason = character(),
++      rhat_available = logical(), rhat_reason = character()),
+     chain_probabilities = cbind(identifiers, chain = integer(), estimate = numeric(), constant = logical()),
+     chains = NA_integer_, iterations = NA_integer_, mcse_target = mcse_target,
+     event = "kernel_scale <= threshold", metadata_establishes_eligibility = FALSE,
+@@ -163,7 +173,8 @@
+                 metrics <- tryCatch(c(mcse = posterior::mcse_mean(indicator),
+                   ess_mean = posterior::ess_mean(indicator), rhat = posterior::rhat(indicator)),
+                   error = function(e) { reason <<- conditionMessage(e); metrics })
+-                if (any(!is.finite(metrics)) || metrics[["mcse"]] <= 0 || metrics[["ess_mean"]] <= 0)
++                if (any(!is.finite(metrics[c("mcse", "ess_mean")])) ||
++                    metrics[["mcse"]] <= 0 || metrics[["ess_mean"]] <= 0)
+                   if (!nzchar(reason)) reason <- "Indicator precision diagnostics are nonestimable; inspect chain mixing."
+               }
+         usable <- !nzchar(reason)
+@@ -172,7 +183,11 @@
+           mcse = unname(metrics[["mcse"]]), ess_mean = unname(metrics[["ess_mean"]]),
+           rhat = unname(metrics[["rhat"]]), constant = constant,
+           precision_available = usable, precision_target_met = if (usable && !is.null(mcse_target))
+-            metrics[["mcse"]] <= mcse_target else NA, reason = reason)
++            metrics[["mcse"]] <= mcse_target else NA, reason = reason,
++          rhat_available = is.finite(metrics[["rhat"]]),
++          rhat_reason = if (is.finite(metrics[["rhat"]])) "" else if (nzchar(reason)) reason else
++            if (is.na(metrics[["rhat"]])) "Indicator Rhat is undefined; mean precision is reported separately." else
++              "Indicator Rhat is nonfinite; mean precision is reported separately.")
+         chains[[length(chains) + 1L]] <- cbind(id[rep(1L, out$chains), , drop = FALSE],
+           chain = seq_len(out$chains), estimate = if (finite) colMeans(indicator) else rep(NA_real_, out$chains),
+           constant = if (finite) apply(indicator, 2L, function(x) length(unique(x)) == 1L) else
+--- predecessor/man/diagnose_bayes_probabilities.Rd
++++ man/diagnose_bayes_probabilities.Rd
+@@ -44,6 +44,9 @@
+       \code{threshold_scale}; estimated event probability \code{estimate};
+       indicator \code{mcse}, \code{ess_mean}, and \code{rhat}; \code{constant},
+       \code{precision_available}, \code{precision_target_met}, and \code{reason}.
++      Mean precision requires finite positive MCSE and mean ESS. Separate
++      \code{rhat_available} and \code{rhat_reason} fields describe indicator
++      Rhat availability without changing the fit's original diagnostic gates.
+       The event includes equality: kernel scale is less than or equal to the
+       threshold. Probability estimates and MCSE use the probability axis.
+       Undefined diagnostics and unrequested target decisions remain \code{NA}.}
+@@ -71,6 +74,12 @@
+   even when their empirical probability is zero or one. Nonfinite derived
+   log scales remain explicit failures; iterations are never dropped.
+ 
++  Indicator Rhat can be undefined for balanced binary events even when mean
++  ESS and MCSE are finite. Its reported value remains \code{NA}, with an
++  explicit availability flag and reason. This alone does not make mean
++  precision unavailable. Inspect the original and derived-scale mixing
++  diagnostics before interpreting a probability's MCSE.
++
+   MCSE describes computational uncertainty in a probability estimate, not
+   posterior uncertainty about the scale or observation sampling variation.
+   \code{precision_target_met} only compares that MCSE with the requested
+--- predecessor/tests/testthat/test-bayesian-probabilities.R
++++ tests/testthat/test-bayesian-probabilities.R
+@@ -198,3 +198,58 @@
+     dimnames = list(NULL, NULL, c(dimnames(original)[[3L]], "scale_beta[1]")))
+   expect_error(diagnose_bayes_probabilities(fit, list(habitat = 100)), "ambiguous original parameter layout")
+ })
++
++test_that("balanced binary events separate mean precision from indicator Rhat", {
++  skip_if_not_installed("posterior")
++  f <- bayesian_scale_fixture(n_site = 3L, n_year = 2L)
++  fit <- multiScale_bayes(count ~ habitat, f$inputs, f$data, row_id = "key", method = "prepare")
++  fit$specification$unit_conv <- 1
++  fit$sampler <- "deterministic chain fixture"
++  fit$diagnostics <- list(passed = FALSE, marker = "raw failure retained")
++  a <- probability_chain_fixture(fit, iterations = 400L)
++  set.seed(917613)
++  a[, , "scale_beta"] <- sample(rep(c(-1, 1), each = 800L))
++  indicator <- 1 * (a[, , "scale_beta"] <= 0)
++  expected_mcse <- posterior::mcse_mean(indicator)
++  expected_ess <- posterior::ess_mean(indicator)
++  expected_rhat <- posterior::rhat(indicator)
++  local_mocked_bindings(.msr_bayes_sampler_array = function(sampler) a, .package = "multiScaleR")
++  before <- serialize(fit, NULL); rng <- .Random.seed
++  d <- diagnose_bayes_probabilities(fit, list(habitat = 0), scale = "log", mcse_target = .1)
++  p <- d$probabilities
++  expect_identical(p$estimate, .5)
++  expect_equal(p$mcse, expected_mcse)
++  expect_equal(p$ess_mean, expected_ess)
++  expect_equal(p$rhat, expected_rhat)
++  expect_true(p$precision_available)
++  expect_identical(p$precision_target_met, expected_mcse <= .1)
++  expect_identical(p$rhat_available, is.finite(expected_rhat))
++  if (is.finite(expected_rhat)) expect_identical(p$rhat_reason, "") else
++    expect_match(p$rhat_reason, "undefined")
++  expect_identical(p$reason, "")
++  expect_identical(d$raw_diagnostics, fit$diagnostics)
++  expect_false(d$metadata_establishes_eligibility)
++  expect_false("passed" %in% names(d))
++  expect_identical(serialize(fit, NULL), before)
++  expect_identical(.Random.seed, rng)
++  unrequested <- diagnose_bayes_probabilities(fit, list(habitat = 0), scale = "log")
++  expect_true(unrequested$probabilities$precision_available)
++  expect_true(is.na(unrequested$probabilities$precision_target_met))
++  constants <- diagnose_bayes_probabilities(fit, list(habitat = c(-2, 2)), scale = "log", mcse_target = .1)
++  expect_true(all(constants$probabilities$constant))
++  expect_false(any(constants$probabilities$precision_available))
++  expect_false(any(constants$probabilities$rhat_available))
++  expect_true(all(is.na(constants$probabilities$mcse)))
++  expect_true(all(is.na(constants$probabilities$rhat)))
++  expect_true(all(is.na(constants$probabilities$precision_target_met)))
++  # Preserve a nonfinite auxiliary Rhat as reported; never manufacture a finite
++  # replacement or erase the independently computed mean precision.
++  local_mocked_bindings(rhat = function(x, ...) Inf, .package = "posterior")
++  nonfinite <- diagnose_bayes_probabilities(fit, list(habitat = 0), scale = "log", mcse_target = .1)
++  expect_identical(nonfinite$probabilities$rhat, Inf)
++  expect_false(nonfinite$probabilities$rhat_available)
++  expect_match(nonfinite$probabilities$rhat_reason, "nonfinite")
++  expect_true(nonfinite$probabilities$precision_available)
++  expect_equal(nonfinite$probabilities$mcse, expected_mcse)
++  expect_true(nonfinite$probabilities$precision_target_met)
++})
+--- predecessor/vignettes/bayesian-computation.Rmd
++++ vignettes/bayesian-computation.Rmd
+@@ -409,6 +409,12 @@
+ their checks. Thresholds refer to the kernel scale parameter, rather than an
+ automatically transformed radius containing a chosen share of kernel weight.
+ 
++Indicator Rhat can be undefined for a balanced binary event even when its mean
++ESS and MCSE are finite. The report keeps that Rhat as `NA`; `rhat_available`
++and `rhat_reason` describe its availability. `precision_available` concerns
++mean precision. A computable probability MCSE still requires the original
++sampling and derived-scale checks before interpretation.
++
+ ## Decision checklist
+ 
+ 1. Keep likelihoods, priors, data alignment and predictor standardization fixed

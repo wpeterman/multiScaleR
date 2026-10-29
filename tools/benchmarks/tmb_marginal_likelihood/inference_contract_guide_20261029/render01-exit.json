@@ -1,0 +1,7 @@
+{
+  "phase_limit_seconds": 600,
+  "exit_code": 1,
+  "elapsed_seconds": 21.8159559,
+  "completed_at": "2026-10-29T02:15:32.7834346-04:00",
+  "operational_passed": true
+}

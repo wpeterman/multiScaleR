@@ -8,7 +8,7 @@
 #' @param object An object to inspect. Must be of class \code{multiScaleR}.
 #' @param ... Additional arguments passed to methods.
 #'
-#' @return A named list with four elements:
+#' @return A named list with the following elements:
 #' \describe{
 #'   \item{\code{max_distance}}{A list describing whether the estimated scale of
 #'     effect approaches or exceeds \code{max_D}. Fields include:
@@ -36,6 +36,14 @@
 #'     \code{triggered} is \code{TRUE}
 #'     when the fitted model uses fewer observations. Candidate scales that
 #'     change the initial model's sample are rejected during optimization.}
+#'   \item{\code{profile_glm}}{Present for both opt-in analytic GLM backends.
+#'     Includes \code{uncertainty_available}, explanatory \code{reasons},
+#'     \code{weak_identifiability}, \code{boundary}, \code{condition_number},
+#'     log-kernel standard errors, competing-mode flags, and attempted/eligible
+#'     start counts. \code{poisson_limit} marks negligible fitted NB2 extra
+#'     variance; \code{poisson_compatible} and \code{poisson_deviance} compare
+#'     the NB2 fit with a Poisson fit at the selected kernel scales. See
+#'     \code{\link{multiScale_optim}} for thresholds and limitations.}
 #' }
 #'
 #' @details

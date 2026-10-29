@@ -1,0 +1,58 @@
+bayesian-prediction: .................................................................................................................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+prepared-prediction: .............
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+prepared-unmarked: ...................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+unmarked-fixed-prediction: .....................................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+unmarked-spatial-prediction: ...............................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+factorized-posterior: ............................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+bayesian-weighted-summaries: ....................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+bayesian-log-summaries: .............
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+scale-inference-metadata: ...................................................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+joint-mixed: W........................................................................................
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+1. joint mixed models retain native predictions and independent starts ('test-joint-mixed.R:4:3') - package version mismatch: 
+glmmTMB was built with TMB package version 1.9.21
+Current TMB package version is 1.9.25
+Please re-install glmmTMB from source or restore original 'TMB' package (see '?reinstalling' for more information)
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+conditional-logit: .....................................................12
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Error ('test-conditional-logit.R:149:3'): failed native audits remain expl
+Error in `value[[3L]](cond)`: attempt to apply non-function
+Backtrace:
+    ▆
+ 1. └─base::tryCatch(...) at test-conditional-logit.R:149:3
+ 2.   └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 3.     └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+
+── 2. Error ('test-conditional-logit.R:166:3'): terminal refinement cannot conce
+Error in `value[[3L]](cond)`: attempt to apply non-function
+Backtrace:
+    ▆
+ 1. └─base::tryCatch(...) at test-conditional-logit.R:166:3
+ 2.   └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 3.     └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+Error: passed is not TRUE
+Execution halted

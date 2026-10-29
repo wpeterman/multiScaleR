@@ -1,0 +1,20 @@
+{
+  "completed": [
+    {
+      "elapsed_seconds": 796.8090446,
+      "qualified": false,
+      "id": "null-a",
+      "completed": true
+    },
+    {
+      "elapsed_seconds": 659.7325186,
+      "qualified": false,
+      "id": "null-b",
+      "completed": true
+    }
+  ],
+  "cumulative_seconds": 1477.763622,
+  "planned_runs": 4,
+  "time": "2026-10-28T23:20:48.3892826-04:00",
+  "state": "phase_completed"
+}
