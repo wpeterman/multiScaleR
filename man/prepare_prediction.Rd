@@ -62,7 +62,10 @@ General refits additionally support \code{reference} and nlme
 also supports \code{exclude}, \code{terms}, \code{unconditional},
 \code{iterms.type}, and \code{block.size}. The controls and native
 warnings are bound to the snapshot. Unconditional GAM SEs request native
-smoothing-parameter covariance; they do not add kernel-scale uncertainty.}
+smoothing-parameter covariance; they do not add kernel-scale uncertainty.
+GAM rows retain all formula-input requirements, including excluded-term
+inputs. The unchecked \code{newdata.guaranteed} shortcut is unsupported.
+Selected lme4 effects and GAM terms are recorded in prediction contracts.}
 
 \item{join_by}{For native-refit spatial predictions, explicit site keys with
 one row per prepared prediction site, in spatial input order. Requires

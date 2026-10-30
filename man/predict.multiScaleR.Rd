@@ -62,7 +62,10 @@ models. For refit points, also accepts \code{join_by} and
 such as \code{native_args = list(level = 0)} for nlme population predictions.
 Zero-effect predictions may omit random-only grouping or slope inputs,
 while all fixed predictors and offsets remain required. Setting effects
-to zero does not integrate over their distribution.
+to zero does not integrate over their distribution. For lme4 partial
+\code{re.form} formulas, supply the fixed predictors and the grouping/slope
+variables in the selected effects. Native validation still checks that the
+selected effects belong to the fitted model.
 Raster controls go in a named \code{raster_args} list; see Details.}
 }
 \value{

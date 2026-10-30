@@ -1,3 +1,9 @@
+multiScaleR 0.7.9 (development)
+---------
+* Partial lme4 predictions require only fixed inputs and selected random-effect
+  inputs. Shared contracts retain selected effects and GAM term controls while
+  preserving native validation and uncertainty distinctions.
+
 multiScaleR 0.7.8 (development)
 ---------
 * Native zero-random-effect predictions recognize formula syntax independently

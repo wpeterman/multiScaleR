@@ -156,7 +156,9 @@ NULL
 .msr_native_prediction_contract <- function(object, kind, type, native_args) {
   model <- .analysis_model(object$opt_mod)
   zero <- .msr_native_zero_random_effects(model, native_args, kind)
+  selected <- .msr_native_selected_random_effects(model, native_args, kind)
   re_policy <- if (zero) "zero_deviation_reference" else
+    if (selected) "selected_conditional_effects" else
     if ("re.form" %in% names(native_args) && is.null(native_args$re.form)) "native_conditional_effects" else
       if (kind == "glmmTMB" && !"re.form" %in% names(native_args)) "native_conditional_effects" else
         "native_re_form_or_default"
@@ -176,8 +178,12 @@ NULL
     intervals = if (kind == "unmarked") "native_conditional_confidence" else "conditional_standard_errors_only",
     omitted = c("kernel_parameter_uncertainty", "observation_noise"),
     fixed_inputs = TRUE, component = type)
-  if (inherits(model, "gam"))
+  if (selected) out$effects$selection <- paste(deparse(native_args$re.form), collapse = " ")
+  if (inherits(model, "gam") || identical(kind, "gam")) {
     out$uncertainty$smoothing_parameters <- if (isTRUE(native_args$unconditional))
       "native_unconditional_requested" else "native_default_conditional"
+    out$term_selection <- list(terms = native_args$terms, exclude = native_args$exclude,
+      iterms.type = native_args$iterms.type)
+  }
   out
 }

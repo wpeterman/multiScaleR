@@ -16,6 +16,14 @@
       !is.na(value[[2L]]) && value[[2L]] == 0)
 }
 
+# Partial selection is documented for lme4. Other providers validate their own
+# controls without borrowing lme4's row requirements.
+.msr_native_selected_random_effects <- function(model, controls, kind = NULL) {
+  (inherits(model, "merMod") || isTRUE(kind %in% c("merMod", "lmerMod", "glmerMod"))) &&
+    inherits(controls$re.form, "formula") &&
+    !.msr_native_zero_random_effects(model, controls, kind)
+}
+
 # Shared native-refit transformation. Keep physical scales, source definitions,
 # fitted parameter order, and training normalization identical across models.
 .msr_refit_spatial_values <- function(object, inputs, covs) {
@@ -191,10 +199,12 @@
       formula <- stats::formula(model)
       required <- union(.model_predictors(model),
         .msr_marginal_variables(formula[[length(formula)]], offsets = TRUE))
-      if (.msr_native_zero_random_effects(model, dots)) {
+      selected <- .msr_native_selected_random_effects(model, dots)
+      if (.msr_native_zero_random_effects(model, dots) || selected) {
         # Inspect fixed syntax directly. Formula environments do not decide
         # whether grouping columns or random-only slopes are needed.
         required <- .msr_marginal_variables(formula[[length(formula)]], offsets = TRUE)
+        if (selected) required <- union(required, all.vars(dots$re.form))
         if (inherits(model, "glmmTMB")) for (f in
             model$modelInfo$allForm[c("ziformula", "dispformula")])
           if (!is.null(f)) required <- union(required,
