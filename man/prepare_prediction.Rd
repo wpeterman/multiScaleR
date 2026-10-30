@@ -58,7 +58,11 @@ preparation. For \code{joint_mixed}, supports \code{re.form},
 \code{backTransform}, \code{na.rm}, \code{appendData}, \code{level}, and
 \code{re.form}. Defaults to an empty list, preserving native defaults.
 General refits additionally support \code{reference} and nlme
-\code{level}, when accepted by the native method.}
+\code{level}, when accepted by the native method. For mgcv GAMs,
+also supports \code{exclude}, \code{terms}, \code{unconditional},
+\code{iterms.type}, and \code{block.size}. The controls and native
+warnings are bound to the snapshot. Unconditional GAM SEs request native
+smoothing-parameter covariance; they do not add kernel-scale uncertainty.}
 
 \item{join_by}{For native-refit spatial predictions, explicit site keys with
 one row per prepared prediction site, in spatial input order. Requires
@@ -124,7 +128,9 @@ for the fixed controls, rather than retaining a native model or rebuilding
 its prediction machinery. Native warnings are recorded and repeated when
 the corresponding cached output is requested. Native errors abort preparation.
 Mixed standard errors remain conditional on selected scales. Changing
-random-effect settings requires a new snapshot. Native glmmTMB \code{re.form = NA}
+random-effect settings requires a new snapshot. Zero random-effect controls
+use formula syntax, independently of its environment; grouping columns may
+be omitted when the native provider permits zero-effect predictions. Native glmmTMB \code{re.form = NA}
 sets random effects to zero and does not integrate over their distribution.
 
 For unmarked without \code{kernel_inputs}, \code{newdata} is passed unchanged

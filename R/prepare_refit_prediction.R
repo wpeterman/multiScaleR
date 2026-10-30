@@ -2,7 +2,10 @@
 # recorded separately, so preparing point predictions never manufactures it.
 .msr_prepare_refit_prediction <- function(object, newdata, kernel_inputs,
     max_bytes, component, native_args, join_by, include_fixed) {
+  model <- .analysis_model(object$opt_mod)
   allowed <- c("re.form", "allow.new.levels", "na.action", "reference", "level")
+  if (inherits(model, "gam")) allowed <- c(allowed,
+    "exclude", "terms", "unconditional", "iterms.type", "block.size")
   if (!is.list(native_args) || (length(native_args) &&
       (is.null(names(native_args)) || anyNA(names(native_args)) ||
        any(!names(native_args) %in% allowed) || anyDuplicated(names(native_args)))))

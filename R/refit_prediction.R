@@ -1,3 +1,21 @@
+# Recognize documented zero-effect controls without comparing formula environments.
+# This describes conditioning at zero, never integration over random effects.
+.msr_native_zero_random_effects <- function(model, controls, kind = NULL) {
+  if (inherits(model, "lme") || identical(kind, "lme")) {
+    level <- controls$level
+    return(is.numeric(level) && length(level) == 1L && !is.na(level) && level == 0)
+  }
+  if (!inherits(model, c("merMod", "glmmTMB")) &&
+      !methods::is(model, "unmarkedFit") &&
+      !isTRUE(kind %in% c("glmmTMB", "unmarked", "merMod", "lmerMod", "glmerMod")))
+    return(FALSE)
+  value <- controls$re.form
+  (is.atomic(value) && length(value) == 1L && is.na(value)) ||
+    (inherits(value, "formula") && length(value) == 2L &&
+      is.numeric(value[[2L]]) && length(value[[2L]]) == 1L &&
+      !is.na(value[[2L]]) && value[[2L]] == 0)
+}
+
 # Shared native-refit transformation. Keep physical scales, source definitions,
 # fitted parameter order, and training normalization identical across models.
 .msr_refit_spatial_values <- function(object, inputs, covs) {
@@ -142,16 +160,7 @@
   if (!is.null(newdata)) {
     newdata <- .msr_refit_prediction_data(object, newdata, kernel_inputs,
                                           join_by, include_fixed)
-    if (!methods::is(model, "unmarkedFit")) {
-      required <- union(all.vars(stats::delete.response(stats::terms(model))),
-                         .model_predictors(model))
-      formula <- stats::formula(model)
-      required <- union(required, all.vars(formula[[length(formula)]]))
-      absent <- setdiff(required, names(newdata))
-      if (length(absent))
-        stop("newdata must explicitly contain formula variables: ",
-             paste(absent, collapse = ", "), call. = FALSE)
-    }
+
   }
   .msr_native_prediction_rows(object, newdata, type, se.fit, dots)
 }
@@ -182,10 +191,15 @@
       formula <- stats::formula(model)
       required <- union(.model_predictors(model),
         .msr_marginal_variables(formula[[length(formula)]], offsets = TRUE))
-      zero <- ("re.form" %in% names(dots) &&
-        (identical(dots$re.form, NA) || identical(dots$re.form, ~0))) ||
-        (inherits(model, "lme") && identical(dots$level, 0))
-      if (!zero) required <- union(required, all.vars(formula[[length(formula)]]))
+      if (.msr_native_zero_random_effects(model, dots)) {
+        # Inspect fixed syntax directly. Formula environments do not decide
+        # whether grouping columns or random-only slopes are needed.
+        required <- .msr_marginal_variables(formula[[length(formula)]], offsets = TRUE)
+        if (inherits(model, "glmmTMB")) for (f in
+            model$modelInfo$allForm[c("ziformula", "dispformula")])
+          if (!is.null(f)) required <- union(required,
+            .msr_marginal_variables(f[[length(f)]], offsets = TRUE))
+      } else required <- union(required, all.vars(formula[[length(formula)]]))
       if (inherits(model, "coxph") && type %in% c("expected", "survival"))
         required <- union(required, all.vars(formula[[2L]]))
     }

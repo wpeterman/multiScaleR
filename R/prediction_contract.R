@@ -154,16 +154,13 @@ NULL
 # Native tables/vectors retain their exact attributes and component meaning.
 # Store this description on the snapshot, never on the cached native values.
 .msr_native_prediction_contract <- function(object, kind, type, native_args) {
-  zero <- if (!"re.form" %in% names(native_args)) FALSE else {
-    value <- native_args$re.form
-    (length(value) == 1L && is.atomic(value) && is.na(value)) ||
-      (inherits(value, "formula") && identical(as.character(value), c("~", "0")))
-  }
+  model <- .analysis_model(object$opt_mod)
+  zero <- .msr_native_zero_random_effects(model, native_args, kind)
   re_policy <- if (zero) "zero_deviation_reference" else
     if ("re.form" %in% names(native_args) && is.null(native_args$re.form)) "native_conditional_effects" else
       if (kind == "glmmTMB" && !"re.form" %in% names(native_args)) "native_conditional_effects" else
         "native_re_form_or_default"
-  .msr_prediction_contract("native", kind, if (kind == "unmarked" ||
+  out <- .msr_prediction_contract("native", kind, if (kind == "unmarked" ||
       !type %in% c("response", "link")) "native_component" else
       if (type == "link") "linear_predictor" else "expected_response",
     output_scale = if (kind == "unmarked")
@@ -179,4 +176,8 @@ NULL
     intervals = if (kind == "unmarked") "native_conditional_confidence" else "conditional_standard_errors_only",
     omitted = c("kernel_parameter_uncertainty", "observation_noise"),
     fixed_inputs = TRUE, component = type)
+  if (inherits(model, "gam"))
+    out$uncertainty$smoothing_parameters <- if (isTRUE(native_args$unconditional))
+      "native_unconditional_requested" else "native_default_conditional"
+  out
 }

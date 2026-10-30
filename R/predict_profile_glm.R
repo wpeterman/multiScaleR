@@ -121,6 +121,9 @@
 #'   \code{include_fixed} for verified spatial preparation. Use a named
 #'   \code{native_args} list for controls that share a wrapper argument name,
 #'   such as \code{native_args = list(level = 0)} for nlme population predictions.
+#'   Zero-effect predictions may omit random-only grouping or slope inputs,
+#'   while all fixed predictors and offsets remain required. Setting effects
+#'   to zero does not integrate over their distribution.
 #'   Raster controls go in a named \code{raster_args} list; see Details.
 #' @details
 #' For \code{conditional_logit}, \code{type = "response"} returns probabilities
