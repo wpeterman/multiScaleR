@@ -471,14 +471,19 @@ distance or when the metric is expensive to recompute. Use optimized landscape
 metric radii when the scale itself is a central question and computation time is
 acceptable.
 
-At present, optimized landscape metrics are not supported with
-`kernel = "expow"` because the exponential-power shape parameter does not apply
-cleanly to fixed-buffer landscape metrics.
+The native-refit backend can combine optimized landscape radii with
+`kernel = "expow"`. A hard radius ignores kernel shape. Its shape and shape SE
+are reported as `NA`, and its ignored shape position does not count toward K.
+The likelihood remains stepped in the radius, so this support does not create
+a smooth-curvature radius SE. Both FFT and direct focal raster calculation
+support the categorical metric families under the same support rules.
 
 ---
 
 # See also
 
+- `vignette("feature-compatibility", package = "multiScaleR")` for method
+  restrictions, checked raster scenarios, and model-comparison requirements.
 - `vignette("surface_metric_covariates", package = "multiScaleR")` for the
   continuous-surface analogue of these metrics (roughness, gradient, and texture
   of a continuous raster).

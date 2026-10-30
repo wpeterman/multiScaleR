@@ -24,6 +24,7 @@
     types <- component
   } else {
     model <- object$opt_mod
+    newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
     nd <- .msr_mixed_prediction_data(object, newdata, kernel_inputs)
     types <- if (is.null(component)) c("response", "link") else component
   }
@@ -88,9 +89,11 @@
     if (!is.logical(se.fit) || length(se.fit) != 1L || is.na(se.fit))
       stop("se.fit must be one logical value.", call. = FALSE)
     if (interval != "none" || (se.fit && uncertainty != "conditional"))
-      stop("joint_mixed supports conditional prediction SEs only; use uncertainty = 'conditional' and interval = 'none'.", call. = FALSE)
+      stop(paste0(if (object$native_kind == "refit") "Refit" else "joint_mixed",
+        " supports conditional prediction SEs only; use uncertainty = 'conditional' and interval = 'none'."), call. = FALSE)
     item <- object$results[[type]][[if (se.fit) "se" else "point"]]
   }
   for (message in item$warnings) warning(message, call. = FALSE)
+  if (!is.null(item$error)) stop(item$error, call. = FALSE)
   item$value
 }

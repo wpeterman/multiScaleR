@@ -98,104 +98,29 @@ prepare_unmarked_data <- function(object, newdata, kernel_inputs, join_by,
     stop("newdata must be a nonempty data frame with unique column names.", call. = FALSE)
   if (missing(join_by) || is.null(join_by))
     stop("Supply explicit join_by keys in prepared spatial site order.", call. = FALSE)
-  train <- object$kernel_inputs
-  inputs <- kernel_inputs
-  covs <- names(object$scl_params$mean)
-  if (is.null(train) || !length(covs) || anyDuplicated(covs) ||
-      !all(covs %in% .unmarked_model_predictors(object$opt_mod)))
-    stop("The fit must retain spatial inputs and named training standardization.", call. = FALSE)
-  if (!inherits(inputs, "multiScaleR_data") || !identical(inputs$kernel, train$kernel))
-    stop("Supply kernel_prep() inputs with the fitted kernel.", call. = FALSE)
-  validate_scalar_numeric(inputs$unit_conv, "kernel_inputs$unit_conv", positive = TRUE)
-  if (!isTRUE(all.equal(inputs$max_D, object$max_D)) ||
-      !isTRUE(all.equal(inputs$min_D, object$min_D)))
-    stop("Prediction buffer extent must match the fitted min_D and max_D.", call. = FALSE)
-  if (!isTRUE(all.equal(inputs$resolution, train$resolution)))
-    stop("Prediction raster resolution must match the fit.", call. = FALSE)
-  specs <- train$scale_vars
-  actual <- inputs$scale_vars
-  if (is.null(specs) != is.null(actual))
-    stop("Spatial source and metric definitions must match the fit.", call. = FALSE)
-  if (!is.null(specs)) {
-    specs <- specs[match(covs, specs$covariate), , drop = FALSE]
-    actual <- actual[match(covs, actual$covariate), , drop = FALSE]
-    if (anyNA(specs$covariate) || anyNA(actual$covariate) ||
-        any(!specs$optimize) ||
-        !isTRUE(all.equal(as.data.frame(specs), as.data.frame(actual),
-                          check.attributes = FALSE)))
-      stop("Spatial source and metric definitions must match the fit.", call. = FALSE)
-  }
-  center <- object$scl_params$mean[covs]
-  spread <- object$scl_params$sd[covs]
-  if (any(!is.finite(center)) || length(spread) != length(covs) ||
-      any(!is.finite(spread) | spread <= 0))
-    stop("Training means and positive standard deviations must be finite.", call. = FALSE)
-  n <- if (!is.null(inputs$d_list)) length(inputs$d_list) else inputs$binned$n_points
-  if (length(n) != 1L || !is.finite(n) || n < 1L)
-    stop("Prediction inputs must contain prepared spatial sites.", call. = FALSE)
+  covs <- intersect(rownames(object$scale_est), .unmarked_model_predictors(object$opt_mod))
+  spatial <- .msr_refit_spatial_values(object, kernel_inputs, covs)
   if (any(covs %in% names(join_by)))
     stop("join_by key columns cannot be spatial predictors.", call. = FALSE)
-  rows <- .unmarked_site_map(newdata, join_by, n)
-  # Keep the fit's parameter order; fixed-radius metrics have no parameter.
-  optimized <- if (is.null(specs)) covs else specs$covariate[specs$optimize]
-  sigma <- object$scale_est[optimized, "Mean"] / inputs$unit_conv
-  if (length(sigma) != length(optimized) || any(!is.finite(sigma) | sigma <= 0))
-    stop("Finite positive fitted spatial scales are required.", call. = FALSE)
-  par <- sigma
-  if (inputs$kernel == "expow") {
-    shape <- object$shape_est[optimized, "Mean"]
-    if (length(shape) != length(optimized) || any(!is.finite(shape) | shape <= 0))
-      stop("Finite positive fitted kernel shapes are required.", call. = FALSE)
-    par <- c(par, shape)
-  }
-  stored <- object$optim_results$par
-  if (!is.null(stored)) {
-    # Reuse the actual fitted parameters without a report-unit round trip.
-    # Reported scales must still agree exactly with that retained parameter set.
-    validate_scalar_numeric(train$unit_conv, "fitted unit_conv", positive = TRUE)
-    parameter_names <- rownames(object$scale_est)
-    p <- length(parameter_names)
-    expected_length <- p * if (inputs$kernel == "expow") 2L else 1L
-    if (length(stored) != expected_length || any(!is.finite(stored)) ||
-        !isTRUE(all.equal(unname(stored[seq_len(p)] * train$unit_conv),
-          unname(object$scale_est$Mean), tolerance = 0, check.attributes = FALSE)))
-      stop("Stored fitted parameters disagree with reported spatial scales.", call. = FALSE)
-    idx <- match(optimized, parameter_names)
-    par <- stored[idx] * (train$unit_conv / inputs$unit_conv)
-    if (inputs$kernel == "expow") {
-      shape <- stored[p + idx]
-      if (!isTRUE(all.equal(unname(shape), unname(object$shape_est[optimized, "Mean"]),
-                            tolerance = 0, check.attributes = FALSE)))
-        stop("Stored fitted parameters disagree with reported kernel shapes.", call. = FALSE)
-      par <- c(par, shape)
-    }
-  }
-  binned_covs <- function(x) intersect(covs, x$binned$covariates)
-  if (!setequal(binned_covs(inputs), binned_covs(train)))
-    stop("Prediction binned versus exact kernel evaluation must match the fit.", call. = FALSE)
-  # Use the same transform evaluator as refitting, with no model-row filtering.
-  # Each site is evaluated once before repeated native scenario rows are joined.
-  context <- list(covs = covs, n_covs = length(optimized), scale_vars = specs,
-    unit_conv = inputs$unit_conv, resolution = inputs$resolution,
-    n_cols = inputs$n_cols, binned = inputs$binned)
-  raw <- .msr_kernel_cov_w(par, inputs$d_list, inputs$raw_cov, inputs$kernel, context)
-  if (any(is.infinite(raw))) stop("Spatial prediction values cannot be infinite.", call. = FALSE)
-  scaled <- sweep(sweep(raw, 2L, center), 2L, spread, "/")
-  newdata[covs] <- as.data.frame(scaled[rows, , drop = FALSE])
+  rows <- .unmarked_site_map(newdata, join_by, spatial$n_sites)
+  newdata[covs] <- as.data.frame(spatial$value[rows, , drop = FALSE])
   if (include_fixed)
-    newdata <- .msr_unmarked_fixed_prediction_data(object, newdata, inputs,
-                                                  rows, context, par, join_by)
+    newdata <- .msr_fixed_prediction_data(object, newdata, kernel_inputs,
+      rows, spatial$context, spatial$par, join_by)
   newdata
 }
 
 # Fixed predictors are not refitted by the scale optimizer. Their original
 # preparation normalization is reusable only when it reproduces native inputs.
-.msr_unmarked_fixed_prediction_data <- function(object, newdata, inputs,
+.msr_fixed_prediction_data <- function(object, newdata, inputs,
                                                rows, context, par, join_by) {
   train <- object$kernel_inputs
   specs <- train$scale_vars
-  fixed <- specs$covariate[!specs$optimize &
-    specs$covariate %in% .unmarked_model_predictors(object$opt_mod)]
+  if (is.null(specs)) return(newdata)
+  model <- .analysis_model(object$opt_mod)
+  variables <- if (methods::is(model, "unmarkedFit"))
+    .unmarked_model_predictors(model) else .model_predictors(model)
+  fixed <- specs$covariate[!specs$optimize & specs$covariate %in% variables]
   if (!length(fixed)) return(newdata)
   if (any(fixed %in% names(join_by)))
     stop("join_by key columns cannot be spatial predictors.", call. = FALSE)
@@ -222,6 +147,10 @@ prepare_unmarked_data <- function(object, newdata, kernel_inputs, join_by,
 .msr_fixed_training_contract <- function(object) {
   train <- object$kernel_inputs
   specs <- train$scale_vars
+  if (is.null(specs)) return(list(covariates = character(),
+                                  center = numeric(), spread = numeric()))
+  # Native wrappers retain bounds outside kernel_inputs to avoid duplication.
+  if (is.null(train$max_D)) train$max_D <- object$max_D
   model <- .analysis_model(object$opt_mod)
   unmarked <- methods::is(model, "unmarkedFit")
   variables <- if (unmarked) .unmarked_model_predictors(model) else
@@ -231,18 +160,21 @@ prepare_unmarked_data <- function(object, newdata, kernel_inputs, join_by,
   if (!length(fixed)) return(list(covariates = character(),
                                   center = numeric(), spread = numeric()))
   if (unmarked) site_covs <- model@data@siteCovs else {
-    if (!inherits(model, c("glm", "coxph")) || !is.data.frame(model$model))
+    site_covs <- if (inherits(model, "merMod")) model@frame else if (is.list(model)) {
+      if (is.data.frame(model$model)) model$model else if (is.data.frame(model$frame))
+        model$frame else if (inherits(model, "lme") && is.data.frame(model$data)) {
+          # nlme retains original data separately; restrict it to fitted rows.
+          used <- rownames(model$fitted)
+          rows <- match(used, rownames(model$data))
+          if (length(used) && !anyNA(rows)) model$data[rows, , drop = FALSE] else NULL
+        } else NULL
+    } else NULL
+    if (!is.data.frame(site_covs))
       stop("Automatic fixed predictors require a supported native model with a retained model frame.", call. = FALSE)
-    site_covs <- model$model
   }
   if (!all(fixed %in% names(site_covs)) ||
       !all(fixed %in% names(train$kernel_dat)))
     stop("Automatic fixed predictors require retained prepared and native numeric covariates.", call. = FALSE)
-  center <- train$scl_params$mean[fixed]
-  spread <- train$scl_params$sd[fixed]
-  if (length(center) != length(fixed) || any(!is.finite(center)) ||
-      length(spread) != length(fixed) || any(!is.finite(spread) | spread <= 0))
-    stop("Fixed predictors require finite retained training means and positive standard deviations.", call. = FALSE)
   if (unmarked) {
     training_rows <- .unmarked_site_map(site_covs, object$join_by,
       nrow(train$kernel_dat), rownames(train$kernel_dat))
@@ -252,24 +184,5 @@ prepare_unmarked_data <- function(object, newdata, kernel_inputs, join_by,
     if (is.null(ids) || anyDuplicated(ids) || anyNA(training_rows))
       stop("Native model row IDs must match retained prepared training sites.", call. = FALSE)
   }
-  training_context <- list(covs = character(), n_covs = 0L,
-    scale_vars = specs, unit_conv = train$unit_conv,
-    resolution = train$resolution, n_cols = train$n_cols, binned = train$binned)
-  # These transforms have fixed radii and need no optimization parameters.
-  training_raw <- .msr_kernel_cov_w(numeric(), train$d_list, train$raw_cov,
-    train$kernel, training_context, covariates = fixed)
-  training_scaled <- sweep(sweep(training_raw, 2L, center), 2L, spread, "/")
-  for (nm in fixed) {
-    if (!is.numeric(site_covs[[nm]]) || !is.numeric(train$kernel_dat[[nm]]) ||
-        !isTRUE(all.equal(as.numeric(site_covs[[nm]]),
-          as.numeric(train$kernel_dat[[nm]][training_rows]),
-          tolerance = 0, check.attributes = FALSE)) ||
-        !isTRUE(all.equal(as.numeric(train$kernel_dat[[nm]]),
-          as.numeric(training_scaled[, nm]), tolerance = 0,
-          check.attributes = FALSE)))
-      stop("Fixed predictor '", nm,
-           "' does not match its retained training preparation; supply it explicitly.",
-           call. = FALSE)
-  }
-  list(covariates = fixed, center = center, spread = spread)
+  .msr_fixed_reference_contract(train, site_covs, training_rows, fixed)
 }

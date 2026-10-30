@@ -18,9 +18,14 @@
           par$scale_z[term$z_index], par$log_scale_sd[term$sd_index])
     scales[[nm]] <- exp(log_s) * spec$unit_conv
     power <- if (spec$kernel == "gaussian") 2 else 1
-    w <- exp(-spec$delta[[nm]] * exp(-power * log_s) /
-               if (power == 2) 2 else 1)
-    x <- sum_rows(w * spec$V[[nm]]) / sum_rows(w * spec$C[[nm]])
+    if (nm %in% names(spec$surface$buffers)) {
+      x <- .msr_scale_surface_raw(spec$surface$buffers[[nm]], log_s,
+        spec$kernel, inherits(par$beta, "advector"))
+    } else {
+      w <- exp(-spec$delta[[nm]] * exp(-power * log_s) /
+                 if (power == 2) 2 else 1)
+      x <- sum_rows(w * spec$V[[nm]]) / sum_rows(w * spec$C[[nm]])
+    }
     kernel[[nm]] <- (x - spec$center[[nm]]) / spec$spread[[nm]]
     eta <- eta + kernel[[nm]] * par$beta[ncol(spec$X_fixed) + j]
   }
@@ -34,6 +39,7 @@
 }
 
 .msr_bayes_objective <- function(spec, ad = FALSE) {
+  if (ad) .msr_scale_surface_ram(spec)
   density <- if (ad) getExportedValue("RTMB", "dnorm") else stats::dnorm
   function(par) {
     p <- spec$priors

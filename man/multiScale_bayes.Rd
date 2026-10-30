@@ -34,20 +34,27 @@ multiScale_bayes(
 
 \item{x}{A \code{multiScaleR_bayes} object to print.}
 
-\item{formula}{Two-sided response formula. Kernel predictors must be bare
+\item{formula}{Two-sided response formula. Spatial predictors must be bare
 additive terms. Fixed covariates, factors, formula offsets, and additive
 random intercepts such as \code{(1 | site)} are supported.}
 
-\item{inputs}{Binned inputs from \code{\link{kernel_prep}} or
+\item{inputs}{Prepared inputs from \code{\link{kernel_prep}} or
 \code{\link{kernel_prep_by_group}}. Gaussian and exponential kernel means
-are supported. Distances use the projected map units of these inputs.}
+and optimized weighted surface SQ are supported, alone or together.
+Declared fixed-radius surface and landscape metrics are ordinary numeric
+covariates, using their original preparation normalization. Their original
+prepared columns must be retained in \code{data}; no bandwidth is estimated
+for them. Undefined or constant prepared metrics remain errors.
+Kernel means require bins; SQ requires retained raw cell buffers and
+source specifications. Distances use the projected map units of these inputs.}
 
 \item{data}{Data frame with one row per observation, including the response,
-fixed covariates, and grouping variables. Kernel columns are reconstructed
-from the bins; you do not need to supply them in \code{data}. Missing
+fixed covariates, and grouping variables. Spatial columns are reconstructed
+from prepared spatial inputs when their scales are estimated. These optimized
+columns need not be supplied in \code{data}. Missing
 response or model covariate values cause an error rather than row deletion.}
 
-\item{scales}{Named list of one-sided formulas, one per modeled kernel
+\item{scales}{Named list of one-sided formulas, one per modeled spatial
 predictor. \code{list(habitat = ~1 + (1 | year))} estimates partially pooled
 year-specific scales. \code{~year} gives fixed year effects on log scale.
 \code{~0 + year} gives independent annual log-scale coefficients with
@@ -62,7 +69,8 @@ scale per predictor, equivalent to \code{~1} for every predictor.}
 \eqn{\mu + \mu^2/\theta}.}
 
 \item{row_id}{Optional name of a column in \code{data} containing prepared
-\code{binned$point_ids}. The default matches observation row names.
+\code{binned$point_ids}, or \code{kernel_dat} row names for surface-only
+inputs. The default matches observation row names.
 Repeated IDs can reuse a static landscape for repeated observations.
 For annual rasters, use distinct prepared site-year IDs to match each
 observation to its assigned annual map.}
@@ -297,10 +305,25 @@ renormalized. Centering and SD are calculated once across fitting rows,
 using the prior median scales, and then held fixed. This differs from
 the scale-dependent standardization in the existing optimization backends:
 response coefficient priors therefore have a fixed reference meaning.
+Weighted surface SQ uses the square root of the kernel-weighted centered
+variance, dividing by the sum of weights. Each source uses its finite cells.
+The pooled reference transformation is fixed at preparation, including when
+a site has repeated observations or scales vary across years and draws.
+It is never estimated again from prediction rows.
+
+SQ preparation records \code{specification$surface$memory}: the number of
+observation-cell evaluations, retained buffer bytes, and a planning estimate
+of differentiation memory. Repeated observations count separately. Before
+recording an SQ differentiation tape, a conservative RAM check must succeed.
+This estimate is not a memory quota or guarantee; retain operational headroom.
+SQ proposals evaluate bounded candidate batches without a three-dimensional
+candidate-by-observation-by-cell array. Other optimized surface metrics and
+exponential-power SQ are unsupported. Private marginal-likelihood limiting
+routines remain separate and do not accept SQ.
 
 Priors act on log scales, with no hard bounds at \code{min_D} or
 \code{max_D}. Summaries report posterior mass outside this reference range.
-All kernel means still use the neighborhoods actually extracted. Scales
+All spatial predictors still use the neighborhoods actually extracted. Scales
 beyond \code{max_D} describe increasingly uniform weighting within those
 neighborhoods, not information from unobserved distant cells.
 

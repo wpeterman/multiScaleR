@@ -104,7 +104,8 @@
 }
 
 .msr_bayes_prediction_prepare <- function(object, newdata, kernel_inputs, row_id,
-    scale_policy, response_policy, include_scale, include_response) {
+    scale_policy, response_policy, include_scale, include_response, include_fixed = FALSE) {
+  validate_scalar_logical(include_fixed, "include_fixed")
   spec <- object$specification
   if (.msr_has_gaussian_blocks(spec))
     stop("Gaussian projection blocks require the dedicated private spatial prediction adapter.", call. = FALSE)
@@ -119,7 +120,8 @@
   }
   if (!is.data.frame(newdata) || nrow(newdata) < 1L || anyDuplicated(names(newdata)))
     stop("newdata must be a nonempty data frame with distinct column names.", call. = FALSE)
-  if (is.null(kernel_inputs) || is.null(kernel_inputs$binned))
+  has_surface <- length(spec$surface$buffers) > 0L
+  if (is.null(kernel_inputs) || (is.null(kernel_inputs$binned) && !has_surface))
     stop("Supply matching binned kernel_inputs for newdata.", call. = FALSE)
   if (!identical(kernel_inputs$kernel, spec$kernel))
     stop("Prediction kernel_inputs must use the fitted kernel.", call. = FALSE)
@@ -134,33 +136,58 @@
       stop("row_id must name a prepared point-ID column in newdata.", call. = FALSE)
     newdata[[row_id]]
   }
-  points <- kernel_inputs$binned$point_ids
-  if (!all(spec$covariates %in% names(kernel_inputs$binned$vsum)))
+  points <- .msr_scale_point_ids(kernel_inputs)
+  surface_names <- names(spec$surface$buffers)
+  mean_names <- setdiff(spec$covariates, surface_names)
+  if (!all(mean_names %in% names(kernel_inputs$binned$vsum)))
     stop("Prediction bins must contain every fitted landscape predictor.", call. = FALSE)
   variables <- kernel_inputs$scale_vars
   if (!is.null(variables)) {
     used <- variables[variables$covariate %in% spec$covariates, , drop = FALSE]
-    if (any(used$type != "kernel"))
+    if (any(used$type != "kernel" & !used$covariate %in% surface_names))
       stop("Prediction inputs must supply kernel means for the fitted landscape predictors.", call. = FALSE)
   }
-  if (is.null(points) || anyNA(points) || anyDuplicated(as.character(points)) ||
-      any(!nzchar(as.character(points))) ||
-      length(points) != nrow(kernel_inputs$binned$vsum[[spec$covariates[1L]]]))
-    stop("Prediction binned point_ids must be unique and nonmissing.", call. = FALSE)
+  if (has_surface) {
+    expected <- spec$surface$specs
+    if (is.null(variables)) stop("Prediction surface specifications are required.", call. = FALSE)
+    actual <- variables[match(expected$covariate, variables$covariate), , drop = FALSE]
+    fields <- c("covariate", "source", "type", "metric", "weighted", "optimize")
+    if (!isTRUE(all.equal(actual[, fields], expected[, fields], check.attributes = FALSE)))
+      stop("Prediction surface source and metric specifications must match the fitted model.", call. = FALSE)
+  }
   if (!is.atomic(keys) || !is.null(dim(keys)) || length(keys) != nrow(newdata) ||
       anyNA(keys) || any(!nzchar(as.character(keys))))
     stop("Each new observation needs a nonmissing prepared point ID.", call. = FALSE)
   rows <- match(as.character(keys), as.character(points))
   if (anyNA(rows)) stop("New observation IDs do not match prediction binned point_ids; supply row_id explicitly.", call. = FALSE)
-  engine <- .msr_prepare_kernel_engine(kernel_inputs$binned, spec$covariates,
-    rows, spec$kernel, standardize = FALSE)
-  distance <- engine$distance * kernel_inputs$unit_conv / spec$unit_conv
+  if (include_fixed && length(spec$fixed_reference$covariates)) {
+    reference <- spec$fixed_reference
+    # Earlier fixed-feature specifications already retained this fitted bound.
+    if (is.null(reference$max_D)) reference$max_D <- spec$support[["max_D"]]
+    newdata[spec$fixed_reference$covariates] <- as.data.frame(
+      .msr_fixed_reference_values(reference, kernel_inputs, rows))
+  }
+  if (has_surface) {
+    prepared <- kernel_inputs
+    ratio <- prepared$unit_conv / spec$unit_conv
+    if (!is.null(prepared$binned)) prepared$binned$bin_rep <- prepared$binned$bin_rep * ratio
+    prepared$d_list <- lapply(prepared$d_list, function(d) d * ratio)
+    engine <- .msr_prepare_surface_engine(prepared, spec$covariates, rows, standardize = FALSE)
+    spec$surface$buffers <- engine$buffers
+    spec$surface$memory <- .msr_scale_surface_size(spec$surface)
+    engine <- engine$means
+    distance <- engine$distance
+  } else {
+    engine <- .msr_prepare_kernel_engine(kernel_inputs$binned, spec$covariates,
+      rows, spec$kernel, standardize = FALSE)
+    distance <- engine$distance * kernel_inputs$unit_conv / spec$unit_conv
+  }
   spec$V <- engine$V; spec$C <- engine$C
-  spec$delta <- lapply(spec$covariates, function(nm) {
+  spec$delta <- lapply(mean_names, function(nm) {
     d <- matrix(rep(distance, each = nrow(spec$C[[nm]])), nrow(spec$C[[nm]]))
     nearest <- apply(replace(d, spec$C[[nm]] <= 0, Inf), 1L, min)
     pmax(if (spec$kernel == "gaussian") d^2 - nearest^2 else d - nearest, 0)
-  }); names(spec$delta) <- spec$covariates
+  }); names(spec$delta) <- mean_names
   model_data <- newdata
   for (nm in spec$covariates) model_data[[nm]] <- 0
   fixed <- .msr_bayes_prediction_matrix(spec$response, model_data, spec$X_fixed, TRUE)

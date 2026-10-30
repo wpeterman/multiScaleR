@@ -56,6 +56,34 @@ not expose those private prototypes as likelihood fits or confidence procedures.
 See `?multiScale_bayes` for each public method's supported model structures and
 diagnostic requirements.
 
+The analytic optimization backends share preparation and prediction machinery
+for Gaussian or exponential kernel means and weighted surface SQ. This does not
+make their model classes or uncertainty interchangeable:
+
+| Backend | Supported model | Scale and prediction uncertainty |
+|:--------|:----------------|:---------------------------------|
+| `profile_glm` | Supported Gaussian, Poisson, binomial and NB2 GLMs | Joint covariance requires the existing curvature gates. |
+| `joint_nb2` | Boundary-aware NB2 GLMs, including the Poisson limit | Existing boundary and covariance gates apply; one spatial predictor can use `scale_inference()`. |
+| `conditional_logit` | Supported one-case choice sets | Prediction SEs condition on scales; joint scale uncertainty is unavailable. |
+| `joint_mixed` | Supported Poisson/NB2 random-intercept models | Native prediction SEs condition on scales; joint scale uncertainty is unavailable. |
+
+SQ needs retained raw buffers and explicit row alignment; kernel means need
+binned summaries. Estimating other surface metrics' radii uses the refit backend.
+Declared fixed-radius metrics enter analytic and Bayesian models as verified
+numeric columns, without additional bandwidth parameters. The Bayesian
+adapter also accepts weighted SQ, retaining its fixed pooled reference
+normalization and proper priors. Optimization's scale-dependent standardization
+is not substituted into the Bayesian target. SQ preparation, sampling, Laplace
+and marginal approximation retain their existing uncertainty and diagnostic rules.
+Connecting SQ to likelihood profiles does not establish coverage for SQ intervals.
+
+The native-refit path also shares spatial point preparation and fixed-row
+snapshots across supported model classes. Raster predictions require a retained
+preparation descriptor and use conditional coefficient uncertainty. Analytic
+GLM/NB2 maps use the same retained information as their point predictions.
+See `vignette("feature-compatibility", package = "multiScaleR")` for the
+complete feature/method matrix, explicit scenarios, and smoothing contracts.
+
 ## Read the prepared target before fitting
 
 Preparation checks rows, bins, formulas and priors and freezes the reference

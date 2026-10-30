@@ -1,16 +1,19 @@
 #' Plot Marginal Effects from a Fitted Model
 #'
-#' Generates marginal effect plots with 95\% confidence intervals for each
+#' Generates marginal effect plots with 95\% intervals for each
 #' covariate in the optimized model stored within a \code{multiScaleR} object.
 #' Each panel sweeps one covariate across its observed range while holding all
-#' other numeric predictors at their sample mean. For \code{unmarked} models,
+#' other numeric predictors at their sample mean. For categorical predictors,
+#' the grid uses observed levels and other categorical inputs use an observed
+#' reference level. For \code{unmarked} models,
 #' other categorical predictors are held at their first observed level.
 #'
 #' @param x A fitted \code{multiScaleR} object returned by
 #'   \code{\link{multiScale_optim}}. Must contain \code{opt_mod} (the optimized
 #'   fitted model) and \code{scl_params} (a list with \code{mean} and \code{sd}
 #'   elements for each covariate, used to back-transform scaled covariates to
-#'   their original units for the x-axis).
+#'   their original units for the x-axis). Also accepts \code{multiScaleR_bayes}
+#'   fits for hypothetical fixed-reference covariate curves; see Details.
 #' @param ylab Character scalar. Y-axis label for all marginal effect panels.
 #'   Default: \code{"Estimated response"}.
 #' @param length.out Positive integer. Number of equally spaced points at which
@@ -23,6 +26,10 @@
 #'   response scale). For \code{glm} objects this is applied automatically.
 #'   Set to \code{TRUE} manually if predicted values appear to be on the link
 #'   scale. Default: \code{FALSE}.
+#' @param draws For Bayesian fits, a positive number of stored draws to select
+#'   evenly across the retained sample, or explicit draw indices. The default
+#'   \code{NULL} uses at most 1000 evenly spaced draws. Ignored for frequentist
+#'   fits. Bayesian curves use the response scale regardless of \code{link}.
 #'
 #' @return A named list of \code{ggplot2} objects, one per covariate. Plots are
 #'   printed as a side effect and the list is returned invisibly. Each plot
@@ -33,6 +40,9 @@
 #'       to the original (unscaled) units when applicable.
 #'     \item A shaded ribbon or categorical error bars for the 95\% confidence
 #'       interval (when available from the model's \code{predict} method).
+#'       Bayesian curves show posterior medians and central 95\% credible
+#'       intervals, with the retained draw indices and prediction contract
+#'       attached to the returned list.
 #'     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
 #'       terms that involve the covariate.
 #'   }
@@ -82,6 +92,25 @@
 #' \code{plot_marginal_effects()} uses the nested analysis model for predictor
 #' discovery, data recovery, and prediction when possible.
 #'
+#' Mixed-model curves set response random effects to zero. glmmTMB curves use
+#' native response predictions, including zero inflation or truncated-family
+#' means, with native response-scale Wald limits when available. This is a
+#' prediction at zero random effects, not an average over their distribution.
+#' Frequentist limits condition on the selected spatial scales. Cox panels
+#' default to log relative risk; exponentiation gives a relative risk score,
+#' not an occurrence or survival probability.
+#'
+#' Bayesian panels use the stored marginal response-coefficient draws and the
+#' original pooled reference normalization. They hold each landscape covariate
+#' at a hypothetical grid of values while keeping the remaining covariates at
+#' their reference values. Coefficient draws retain their fitted posterior
+#' variation, but the landscape is not reevaluated at each draw's kernel scales.
+#' Response random effects are zero and observation noise is excluded. Use
+#' \code{\link{predict.multiScaleR_bayes}} with matched spatial inputs for
+#' location-specific posterior expectations. A plotted credible interval does
+#' not establish convergence or calibration; existing fit diagnostics remain
+#' relevant and their stored status is shown in the caption.
+#'
 #' @examples
 #' \donttest{
 #' data('pts')
@@ -117,13 +146,16 @@ plot_marginal_effects <- function(x,
                                   ylab = "Estimated response",
                                   length.out = 100,
                                   type = "state",
-                                  link = FALSE) {
+                                  link = FALSE, draws = NULL) {
+  validate_scalar_logical(link, "link")
+  if (inherits(x, "multiScaleR_bayes"))
+    return(.msr_bayes_marginal_effects(x, ylab, length.out, draws))
+  if (!is.null(draws)) stop("draws applies only to Bayesian effect curves.", call. = FALSE)
   if(!inherits(x, "multiScaleR")){
     stop("`x` must be a fitted `multiScaleR` object.")
   }
   validate_character_scalar(ylab, "ylab")
   validate_scalar_numeric(length.out, "length.out", integerish = TRUE, positive = TRUE)
-  validate_scalar_logical(link, "link")
 
   if(is.null(x$opt_mod)){
     stop("`x` must contain an `opt_mod` fitted model.")
@@ -137,6 +169,9 @@ plot_marginal_effects <- function(x,
   analysis_mod <- .analysis_model(mod)
   scl <- x$scl_params
   namespace(analysis_mod)
+  native_mixed_response <- inherits(analysis_mod, c("glmmTMB", "merMod"))
+  if (missing(ylab) && inherits(analysis_mod, "coxph"))
+    ylab <- if (link) "Relative risk" else "Log relative risk"
 
   if(inherits(analysis_mod, "glm")){
     link <- TRUE
@@ -306,13 +341,20 @@ plot_marginal_effects <- function(x,
     }
 
     plot_list <- lapply(c_vars, function(v) {
-      if(!v %in% names(scl$mean)){
-        x_unscaled <- x_seq <- seq(min(dat_all[[v]], na.rm = TRUE),
-                                  max(dat_all[[v]], na.rm = TRUE),
-                                  length.out = length.out)
+      values <- dat_all[[v]]
+      if (all(is.na(values)))
+        stop("Covariate '", v, "' has no observed values.", call. = FALSE)
+      if (is.numeric(values)) {
+        x_seq <- seq(min(values, na.rm = TRUE), max(values, na.rm = TRUE),
+                     length.out = length.out)
+      } else if (is.factor(values)) {
+        # Preserve fitted levels, ordering, and contrasts in native prediction.
+        x_seq <- values[match(levels(droplevels(values)), as.character(values))]
       } else {
-        x_seq <- seq(min(dat_all[[v]], na.rm = TRUE),
-                     max(dat_all[[v]], na.rm = TRUE), length.out = length.out)
+        x_seq <- unique(values[!is.na(values)])
+      }
+      x_unscaled <- x_seq
+      if (v %in% names(scl$mean)) {
         x_unscaled <- (x_seq * scl$sd[v]) + scl$mean[v]
       }
 
@@ -320,7 +362,7 @@ plot_marginal_effects <- function(x,
       # R's predict() evaluates I(x^2), log(x), etc. from the base column, so
       # newdata only needs to contain the base variable names.
       newdata <- as.data.frame(
-        lapply(pred_defaults, function(value) rep(value, length.out)),
+        lapply(pred_defaults, function(value) rep(value, length(x_seq))),
         stringsAsFactors = FALSE
       )
       newdata[[v]] <- x_seq
@@ -347,6 +389,19 @@ plot_marginal_effects <- function(x,
             )
           }
         )
+      } else if (native_mixed_response) {
+        # Native response prediction also handles zero-inflation and truncated
+        # families. Transforming only the conditional count link would not.
+        preds <- tryCatch(
+          predict(analysis_mod, newdata = newdata, type = "response",
+                  re.form = NA, se.fit = TRUE),
+          error = function(e) stop(sprintf(
+            "Failed to compute marginal effects for covariate '%s': %s", v,
+            e$message), call. = FALSE)
+        )
+      } else if (inherits(analysis_mod, "coxph")) {
+        preds <- predict(analysis_mod, newdata = newdata, type = "lp",
+                         reference = "zero", se.fit = TRUE)
       } else {
         preds <- tryCatch(
           predict(analysis_mod, newdata = newdata, se.fit = TRUE),
@@ -365,7 +420,7 @@ plot_marginal_effects <- function(x,
         upr  <- preds$CI_high
         if(is.null(lwr) && is.null(upr)) lwr <- upr <- NA
 
-      } else if(!is.null(link_inverse(analysis_mod)) && link){
+      } else if(!native_mixed_response && !is.null(link_inverse(analysis_mod)) && link){
         if(!inherits(preds, 'list') || (is.list(preds) && length(preds) == 1)){
           fit_ <- link_inverse(analysis_mod)(as.data.frame(preds)[, 1])
           lwr  <- upr <- NA
@@ -426,6 +481,12 @@ plot_marginal_effects <- function(x,
       xlab(df$variable[1]) +
       ylab(ylab) +
       theme_cowplot()
+    if (native_mixed_response)
+      p <- p + labs(caption = paste(
+        "Random effects are set to zero, not integrated.",
+        "Intervals use native response-scale standard errors and condition on spatial scales."))
+    else if (!all(is.na(df$lwr)))
+      p <- p + labs(caption = "Confidence limits condition on the selected spatial scales.")
 
     discrete <- !is.numeric(df$x)
     if (discrete) {

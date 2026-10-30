@@ -22,7 +22,8 @@
 #' @param metric Character scalar. The metric to compute within the circular
 #'   buffer. For \code{landscape_var()} this is a landscape ecology metric
 #'   computed on a categorical raster; for \code{surface_var()} this is a
-#'   continuous surface texture metric (\code{"sa"} or \code{"sq"}) computed on
+#'   continuous surface texture metric (including \code{"sa"}, \code{"sq"},
+#'   \code{"ssk"}, \code{"sku"}, \code{"sdq"}, and \code{"sdr"}) computed on
 #'   a continuous raster. Must be one of the supported metrics (see Details).
 #'   Matched case-insensitively.
 #' @param radius Optional positive numeric. Fixed buffer radius in the same
@@ -36,13 +37,28 @@
 #'   When \code{TRUE}, each cell is weighted by the model's distance kernel
 #'   (the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
 #'   parameter is the kernel scale (sigma), exactly as for a kernel-weighted
-#'   mean. The weighted form estimates the scale of effect of heterogeneity with
-#'   a likelihood that is smooth in sigma. It is available only for the
+#'   mean. Kernel weights vary continuously with sigma. SQ is smooth away from
+#'   zero variance; absolute deviations and standardized higher moments have
+#'   additional nonsmooth or undefined cases. Weighting is available only for the
 #'   distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
 #'   not the slope metric (\code{"sdq"}), and the scale is always optimized, so
 #'   \code{radius} must be \code{NULL}.
 #'   Within a buffer evaluation, weighted metrics reuse weights and centered
 #'   moments only when the source, scale, shape and valid-cell mask match exactly.
+#'
+#' @details
+#' The native-refit backend can combine exponential-power kernel predictors with
+#' optimized hard-radius surface or landscape metrics. A hard radius does not
+#' use kernel shape. Its reported shape and shape SE are NA, and its inactive
+#' shape position is excluded from model-selection parameter counts. Fixed-radius
+#' metrics likewise have no estimated scale or shape parameter.
+#'
+#' Analytic profile GLM, joint NB2, conditional-logistic, joint mixed-model, and
+#' Bayesian adapters accept weighted SQ with Gaussian or exponential kernels,
+#' subject to their model-specific contracts. Other surface and landscape
+#' metrics remain native-refit predictors. See
+#' \code{vignette("feature-compatibility", package = "multiScaleR")} for the
+#' feature and inference-method matrix.
 #'   This does not tie their fitted scales or reuse results across evaluations.
 #' @param base Positive numeric (not equal to 1). Logarithm base used by every
 #'   entropy-based metric: the diversity metrics (\code{"shdi"}, \code{"shei"},
@@ -113,7 +129,7 @@
 #' By default a surface metric uses a hard-edged neighborhood. Setting
 #' \code{weighted = TRUE} instead weights each cell by the model's distance
 #' kernel and optimizes the kernel scale (sigma), which estimates the scale of
-#' effect of heterogeneity with a smooth likelihood (see the \code{weighted}
+#' effect of heterogeneity using continuous kernel weights (see the \code{weighted}
 #' argument). This applies to the distribution metrics (\code{"sa"},
 #' \code{"sq"}, \code{"ssk"}, \code{"sku"}).
 #'
@@ -650,19 +666,8 @@ print.multiScaleR_vars <- function(x, ...) {
     stop("`scale_vars` covariate names must be unique.", call. = FALSE)
   }
 
-  # Optimized hard-neighborhood metrics (landscape metrics and unweighted
-  # surface metrics) have no kernel, so the exponential-power shape parameter is
-  # undefined for them. Weighted surface metrics do use the kernel (including
-  # its shape), so they are permitted with `kernel = "expow"`.
-  if (identical(kernel, "expow") &&
-      any((scale_vars$type == "landscape" |
-             (scale_vars$type == "surface" & !scale_vars$weighted)) &
-            scale_vars$optimize)) {
-    stop(
-      "Optimized `landscape_var()` and unweighted `surface_var()` specifications are not currently supported with `kernel = 'expow'`.",
-      call. = FALSE
-    )
-  }
+  # Hard-neighborhood metrics use their radius alone. An expow mixture may
+  # retain legacy shape slots, but those slots never enter these transforms.
 
   class(scale_vars) <- c("multiScaleR_vars", "data.frame")
   scale_vars
@@ -906,6 +911,16 @@ print.multiScaleR_vars <- function(x, ...) {
   out
 }
 
+# Full-length computational shape vector for the legacy expow parameter layout.
+# A hard-radius transform ignores this placeholder; its reported shape is NA.
+.msr_shape_values <- function(object) {
+  if (is.null(object$shape_est)) return(NULL)
+  value <- stats::setNames(object$shape_est$Mean, rownames(object$shape_est))
+  hard <- intersect(names(value), .msr_hard_radius_covariates(object$kernel_inputs$scale_vars))
+  value[hard] <- 1
+  value
+}
+
 
 .msr_scale_vars_raster <- function(raster_stack,
                                    scale_vars,
@@ -920,6 +935,7 @@ print.multiScaleR_vars <- function(x, ...) {
   opt_vars <- .msr_optimized_scale_vars(scale_vars)
   out <- vector("list", nrow(scale_vars))
   names(out) <- scale_vars$covariate
+  convolve <- if (isTRUE(fft)) fft_convolution else .msr_focal_convolution
 
   for (i in seq_len(nrow(scale_vars))) {
     spec <- scale_vars[i, , drop = FALSE]
@@ -956,10 +972,6 @@ print.multiScaleR_vars <- function(x, ...) {
     if (!is.null(buffer_radius) && !isTRUE(spec$weighted) && radius > buffer_radius)
       stop("A metric radius exceeds the prepared buffer; its truncated footprint cannot be projected by this matching mode.", call. = FALSE)
 
-    if (isFALSE(fft)) {
-      stop("Landscape and surface metric raster projection currently requires `fft = TRUE`.",
-           call. = FALSE)
-    }
     if (isTRUE(verbose)) {
       if (identical(spec$type, "surface") && isTRUE(spec$weighted)) {
         cat(paste0(
@@ -992,14 +1004,14 @@ print.multiScaleR_vars <- function(x, ...) {
           metric = spec$metric,
           pct_wt = pct_wt,
           na.rm = na.rm,
-          buffer_radius = buffer_radius
+          buffer_radius = buffer_radius, convolve = convolve
         )
       } else {
         out[[i]] <- .surface_metric_raster_fft(
           raster = source_raster,
           radius = radius,
           metric = spec$metric,
-          na.rm = na.rm
+          na.rm = na.rm, convolve = convolve
         )
       }
     } else if (spec$metric %in% c(.msr_composition_metrics(), "pland", "ca")) {
@@ -1010,14 +1022,14 @@ print.multiScaleR_vars <- function(x, ...) {
         base = spec$base,
         classes_max = if (is.na(spec$classes_max)) NULL else spec$classes_max,
         focal_class = if (is.na(spec$class)) NULL else spec$class,
-        na.rm = na.rm
+        na.rm = na.rm, convolve = convolve
       )
     } else if (spec$metric %in% .msr_edge_metrics()) {
       out[[i]] <- .landscape_edge_raster_fft(
         raster = source_raster,
         radius = radius,
         metric = spec$metric,
-        na.rm = na.rm
+        na.rm = na.rm, convolve = convolve
       )
     } else {
       out[[i]] <- .landscape_adjacency_raster_fft(
@@ -1026,8 +1038,20 @@ print.multiScaleR_vars <- function(x, ...) {
         metric = spec$metric,
         base = spec$base,
         focal_class = if (is.na(spec$class)) NULL else spec$class,
-        na.rm = na.rm
+        na.rm = na.rm, convolve = convolve
       )
+    }
+    if (!isTRUE(na.rm)) {
+      support <- if (identical(spec$type, "surface") && isTRUE(spec$weighted))
+        .surface_kernel_weight_matrix(source_raster, radius,
+          if (is.null(shape)) NULL else shape[[param_idx]], kernel, pct_wt) != 0 else
+        .landscape_circle_kernel(radius, terra::res(source_raster)[1L]) != 0
+      finite <- !is.na(terra::as.matrix(source_raster, wide = TRUE))
+      count <- convolve(matrix(as.numeric(finite), nrow(finite), ncol(finite)),
+        support * 1, fun = "sum", na.rm = TRUE)
+      value <- terra::values(out[[i]])
+      value[as.vector(round(count) != sum(support)), 1L] <- NA_real_
+      terra::values(out[[i]]) <- value
     }
     names(out[[i]]) <- spec$covariate
   }
@@ -1045,8 +1069,9 @@ print.multiScaleR_vars <- function(x, ...) {
                                    na.rm,
                                    buffer_radius = NULL) {
   if (!is.null(buffer_radius)) {
-    if (!isTRUE(fft) || !isTRUE(na.rm))
-      stop("Prepared-buffer projection requires FFT and finite-cell normalization.", call. = FALSE)
+    if (!isTRUE(na.rm))
+      stop("Prepared-buffer projection requires finite-cell normalization.", call. = FALSE)
+    convolve <- if (isTRUE(fft)) fft_convolution else .msr_focal_convolution
     weights <- .surface_kernel_weight_matrix(raster, sigma, shape, kernel,
                                               pct_wt, buffer_radius)
     values <- terra::as.matrix(raster, wide = TRUE)
@@ -1055,9 +1080,9 @@ print.multiScaleR_vars <- function(x, ...) {
     zeroed[!valid] <- 0
     # Sum convolutions normalize against actual mapped finite support, including
     # raster edges. Keep the original central-cell mask as the projection domain.
-    s0 <- fft_convolution(matrix(as.numeric(valid), nrow(values), ncol(values)),
+    s0 <- convolve(matrix(as.numeric(valid), nrow(values), ncol(values)),
                            weights, fun = "sum", na.rm = TRUE)
-    s1 <- fft_convolution(zeroed, weights, fun = "sum", na.rm = TRUE)
+    s1 <- convolve(zeroed, weights, fun = "sum", na.rm = TRUE)
     result <- s1 / s0
     result[!is.finite(s0) | s0 <= 0] <- NA_real_
     result[t(!valid)] <- NA_real_
@@ -1077,7 +1102,7 @@ print.multiScaleR_vars <- function(x, ...) {
     focal_d <- focal_d + 1
   }
 
-  mat <- matrix(stats::rnorm(focal_d^2), focal_d, focal_d)
+  mat <- matrix(0, focal_d, focal_d)
   r_wt <- terra::rast(mat)
   terra::crs(r_wt) <- terra::crs(raster)
   cntr_crd <- terra::xyFromCell(r_wt, ceiling(length(mat) / 2))
@@ -1104,6 +1129,7 @@ print.multiScaleR_vars <- function(x, ...) {
                  w = wt_mat,
                  fun = "mean",
                  na.rm = na.rm,
+                 na.policy = "omit",
                  expand = FALSE)
   }
 }

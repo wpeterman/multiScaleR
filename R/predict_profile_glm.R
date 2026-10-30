@@ -16,13 +16,14 @@
     return(list(X = cbind(obj$X_fixed, kd$value), offset = obj$offset,
                 ds = kd$d_scale, dh = kd$d_shape, rows = rownames(contract$frame)))
   }
-  if (is.null(kernel_inputs) || is.null(kernel_inputs$binned) ||
+  if (is.null(kernel_inputs) || (is.null(kernel_inputs$binned) && !inherits(e, "msr_surface_engine")) ||
       !identical(kernel_inputs$kernel, e$kernel))
-    stop("New predictions require matching smooth, binned kernel_inputs.", call. = FALSE)
+    stop("New predictions require matching smooth kernel_inputs.", call. = FALSE)
   validate_scalar_numeric(kernel_inputs$unit_conv, "kernel_inputs$unit_conv", positive = TRUE)
   b <- kernel_inputs$binned
   if (is.null(newdata)) {
-    ids <- b$point_ids
+    ids <- if (is.null(b)) rownames(kernel_inputs$kernel_dat) else b$point_ids
+    if (is.null(ids) && is.null(b)) stop("Surface-only predictions require preparation row IDs.", call. = FALSE)
     if (is.null(ids)) ids <- seq_len(nrow(b$vsum[[1L]]))
     newdata <- data.frame(row.names = as.character(ids))
   }
@@ -32,9 +33,9 @@
   if (length(missing))
     stop("newdata is missing formula variables: ", paste(missing, collapse = ", "),
          ". Supply them explicitly; formula-environment fallback is not used.", call. = FALSE)
-  rows <- .msr_profile_rows(newdata, b)
+  rows <- .msr_profile_input_rows(newdata, kernel_inputs)
   # Convert prepared distance units, not fitted scales or sample normalization.
-  b$bin_rep <- b$bin_rep * kernel_inputs$unit_conv / object$kernel_inputs$unit_conv
+  if (!is.null(b)) b$bin_rep <- b$bin_rep * kernel_inputs$unit_conv / object$kernel_inputs$unit_conv
   if (inherits(e, "msr_surface_engine")) {
     specs <- kernel_inputs$scale_vars
     expected <- e$surface_specs
@@ -88,18 +89,25 @@
 #' @param object A \code{multiScaleR} fit using \code{backend = "profile_glm"}
 #'   or \code{backend = "joint_nb2"}, or an experimental
 #'   \code{backend = "joint_mixed"} fit.
-#'   Also accepts \code{backend = "conditional_logit"} fits.
+#'   Also accepts \code{backend = "conditional_logit"} and native-refit fits.
 #' @param newdata A data frame containing fixed covariates and formula offset
 #'   variables. Row names must match point IDs in \code{kernel_inputs}. Kernel
 #'   columns are computed from the prepared data, replacing any supplied values.
-#' @param kernel_inputs Binned inputs from \code{\link{kernel_prep}} for new
+#'   Alternatively, supply checked \code{SpatRaster} output from
+#'   \code{\link{kernel_scale.raster}}; see Raster prediction below.
+#' @param kernel_inputs Prepared inputs from \code{\link{kernel_prep}} for new
 #'   locations, with the same kernel and covariate names as the fit. If both
 #'   \code{newdata} and \code{kernel_inputs} are omitted, predict the retained
-#'   fitting rows. If only \code{newdata} is omitted, an empty frame is constructed
+#'   fitting rows. For analytic GLM fits, if only \code{newdata} is omitted,
+#'   an empty frame is constructed
 #'   from prepared point IDs; this works only without additional covariates.
 #'   Conditional-logistic fits with optimized weighted surface SQ also require
 #'   matching raw buffers and source/metric specifications in these inputs.
-#' @param type Predict on the \code{"response"} or \code{"link"} scale.
+#' @param type Predict on the \code{"response"} or \code{"link"} scale for
+#'   analytic fits. Native-refit fits also accept their provider's prediction
+#'   components. Their defaults are response, unmarked state, or Cox linear
+#'   predictor, as appropriate. Unmarked raster prediction requires an explicit
+#'   component. Cox response probabilities are not supplied by this wrapper.
 #' @param se.fit Return standard errors of the estimated mean.
 #' @param uncertainty \code{"joint"} includes estimated kernel scales, shapes,
 #'   and their covariance with coefficients. \code{"conditional"} holds kernel
@@ -108,8 +116,12 @@
 #' @param interval \code{"none"} or \code{"confidence"}. Confidence limits
 #'   describe the expected response, not future observations.
 #' @param level Confidence level strictly between zero and one.
-#' @param ... Passed to native glmmTMB prediction for \code{joint_mixed};
-#'   otherwise reserved for future use.
+#' @param ... Native prediction controls for refit and \code{joint_mixed}
+#'   models. For refit points, also accepts \code{join_by} and
+#'   \code{include_fixed} for verified spatial preparation. Use a named
+#'   \code{native_args} list for controls that share a wrapper argument name,
+#'   such as \code{native_args = list(level = 0)} for nlme population predictions.
+#'   Raster controls go in a named \code{raster_args} list; see Details.
 #' @details
 #' For \code{conditional_logit}, \code{type = "response"} returns probabilities
 #' normalized within each supplied choice set, not occurrence probabilities or
@@ -146,26 +158,91 @@
 #'   and \code{level}. Binomial response predictions are probabilities.
 #'   For \code{joint_mixed}, returns the native glmmTMB prediction vector or,
 #'   with \code{se.fit = TRUE}, its list containing \code{fit} and \code{se.fit}.
+#'   Native-refit results follow the provider's output. Computed-raster inputs
+#'   return a \code{SpatRaster} of predictions, with SE layers when requested
+#'   and available. Unmarked SE output retains the native \code{Predicted},
+#'   \code{SE}, \code{lower}, and \code{upper} columns as layers, with native
+#'   confidence-level semantics. No observation noise is added.
 #' @seealso \code{\link{multiScale_optim}}, \code{\link{vcov.multiScaleR}},
 #'   \code{\link{prepare_prediction}} for repeated summaries of fixed rows.
 #' @details For \code{joint_mixed}, prediction delegates to the final native
 #'   glmmTMB model. Standard errors require \code{uncertainty = "conditional"}
 #'   and exclude scale estimation uncertainty; confidence intervals are not
-#'   provided by this wrapper. Supply both \code{newdata} and matching binned
+#'   provided by this wrapper. Supply both \code{newdata} and matching
 #'   \code{kernel_inputs} for new rows. Include all fixed-effect, offset, and
-#'   grouping variables explicitly. Spatial columns are recomputed using the
+#'   grouping variables. Kernel means need binned summaries; weighted surface
+#'   SQ needs matching source specifications, raw cell buffers, and row IDs.
+#'   Spatial columns are recomputed using the
 #'   training means and standard deviations. Additional arguments, including
 #'   \code{re.form} and \code{allow.new.levels}, follow native glmmTMB behavior.
 #'   The default includes fitted random effects; \code{re.form = NA} sets them
 #'   to zero and does not integrate over their distribution. Use native
 #'   \code{predict(object$opt_mod, ...)} for other glmmTMB prediction types.
+#'
+#' \strong{Fixed-radius point predictors.} For analytic GLM/NB2, conditional
+#' logistic, joint mixed, and native-refit models, \code{include_fixed = TRUE}
+#' recomputes declared fixed-radius predictors from matching spatial inputs.
+#' Their original prepared numeric columns and means/sample SDs must be verified
+#' against the retained native model frame. Source, metric, radius, kernel,
+#' resolution, buffer extent (\code{max_D}), and observation-to-site alignment
+#' must match. The default keeps
+#' these columns explicit. Fixed radii add no scale parameters or uncertainty.
+#'
+#' \strong{Native-refit points.} Spatial means and metrics are recomputed from
+#' matching source definitions, prepared rows, physical distance units, and
+#' selected scales. Unused prepared variables are ignored. Training means and
+#' sample standard deviations are retained. Supply both \code{newdata} and
+#' \code{kernel_inputs}, or omit both for fitting rows. Explicit \code{join_by}
+#' keys support repeated site scenarios. Set \code{include_fixed = TRUE} to
+#' verify and reproduce modeled fixed-radius predictors from the original
+#' preparation. See \code{\link{prepare_unmarked_data}} for the key and fixed
+#' normalization requirements. Standard errors require
+#' \code{uncertainty = "conditional"} and native support. Unsupported native
+#' SE requests raise an error. Wrapper confidence intervals are unavailable.
+#' Random-effect controls retain native meaning; setting effects to zero is
+#' not integration over the random-effect distribution.
+#'
+#' \strong{Raster prediction.} First call \code{kernel_scale.raster()} with
+#' the fitted object, \code{scale_center = TRUE}, and
+#' \code{match_buffer = TRUE}. Modeled fixed metrics additionally require
+#' \code{include_fixed = TRUE}. Supply categorical scenarios through
+#' \code{site_values}; logical predictors are restored to their fitted type
+#' during prediction. The retained descriptor checks scales, source and metric
+#' definitions, normalization, and support against this fit. It does not
+#' reconstruct a lost descriptor or establish that supplied maps have the
+#' correct scientific provenance. Recompute after saving and reloading cells
+#' through file formats that discard R attributes.
+#' Raster outputs retain \code{prediction_contract} and
+#' \code{projection_contract} attributes, including requested clamping,
+#' smoothing, and offset controls. Recompute the preparation after editing cells.
+#'
+#' Raster SEs are conditional on the selected kernel parameters, with
+#' \code{interval = "none"}. Analytic GLM/NB2 maps use the same retained
+#' coefficient information as point predictions. Other maps use native
+#' prediction. Cox maps default to linear predictors; conditional-logistic
+#' maps require \code{type = "link"} or \code{"risk"}, since choice
+#' probabilities need complete point choice sets. Supply native controls in
+#' \code{native_args}. The \code{raster_args} list accepts \code{filename},
+#' \code{overwrite}, \code{wopt}, \code{const}, \code{cores}, and \code{na.rm}.
+#' Internally created worker clusters are stopped on exit. Rasterization,
+#' distance binning, and partial source coverage remain separate approximation
+#' choices. A single selected-scale raster is not a Bayesian posterior map.
 #' @exportS3Method stats::predict
 predict.multiScaleR <- function(object, newdata = NULL, kernel_inputs = NULL,
                                 type = c("response", "link"), se.fit = FALSE,
                                 uncertainty = c("joint", "conditional"),
                                 interval = c("none", "confidence"), level = .95, ...) {
+  if (inherits(newdata, "SpatRaster")) {
+    if (!is.null(kernel_inputs)) stop("Computed raster predictions do not take kernel_inputs.", call. = FALSE)
+    return(.msr_predict_raster(object, newdata, if (missing(type)) NULL else type,
+      se.fit, match.arg(uncertainty), match.arg(interval), ...))
+  }
   if (identical(object$backend, "conditional_logit")) {
-    if (length(list(...))) stop("Additional prediction arguments are unsupported for conditional_logit.", call. = FALSE)
+    dots <- list(...)
+    include_fixed <- if (is.null(dots$include_fixed)) FALSE else dots$include_fixed
+    dots$include_fixed <- NULL
+    if (length(dots)) stop("Additional prediction arguments are unsupported for conditional_logit.", call. = FALSE)
+    newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
     return(.msr_predict_clogit(object, newdata, kernel_inputs, match.arg(type),
       se.fit, match.arg(uncertainty), match.arg(interval)))
   }
@@ -173,9 +250,13 @@ predict.multiScaleR <- function(object, newdata = NULL, kernel_inputs = NULL,
     return(.msr_predict_mixed(object, newdata, kernel_inputs, match.arg(type),
       se.fit, match.arg(uncertainty), match.arg(interval), ...))
   if (!.msr_analytic_backend(object))
-    stop("This method requires backend = 'profile_glm' or 'joint_nb2'; use predict(object$opt_mod) for other backends.",
-         call. = FALSE)
+    return(.msr_predict_refit(object, newdata, kernel_inputs,
+      if (missing(type)) NULL else type, se.fit, match.arg(uncertainty),
+      match.arg(interval), ...))
   type <- match.arg(type)
+  dots <- list(...)
+  include_fixed <- if (is.null(dots$include_fixed)) FALSE else dots$include_fixed
+  newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
   uncertainty <- match.arg(uncertainty)
   interval <- match.arg(interval)
   if (!is.logical(se.fit) || length(se.fit) != 1L || is.na(se.fit) ||

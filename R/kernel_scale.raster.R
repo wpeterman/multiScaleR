@@ -1,7 +1,7 @@
 #' @title Apply kernel smoothing to raster layers
 #'
 #' @description Applies a kernel smoothing function to one or more raster
-#' layers, producing a spatially weighted mean (or landscape metric) at the
+#' layers, producing a spatially weighted mean, surface metric, or landscape metric at the
 #' scale identified by \code{\link{multiScale_optim}}. Primarily used to
 #' generate prediction rasters for spatial model projection.
 #'
@@ -9,7 +9,8 @@
 #'   layer(s) to be smoothed. Layer names must match the covariate names used
 #'   during model fitting (or the \code{source} names in \code{scale_vars}).
 #' @param sigma Numeric vector of kernel scale parameter(s) in the same units
-#'   as the raster projection (e.g., meters). One value per raster layer.
+#'   as the raster projection (e.g., meters). One value per optimized covariate
+#'   in declaration order, including separate derived variables from one source.
 #'   Ignored when \code{multiScaleR} is provided; sigma values are extracted
 #'   from the fitted object automatically.
 #' @param multiScaleR A fitted object of class \code{"multiScaleR"} (from
@@ -17,7 +18,8 @@
 #'   \code{\link{kernel_prep}}). When provided, sigma, shape, kernel, and
 #'   scale_vars are all extracted automatically. Default: \code{NULL}.
 #' @param shape Numeric vector of shape parameters for the exponential power
-#'   kernel (\code{kernel = "expow"}), one per raster layer. Ignored when
+#'   kernel (\code{kernel = "expow"}), one per optimized covariate. A
+#'   hard-radius variable ignores its shape position. Ignored when
 #'   \code{multiScaleR} is provided. Default: \code{NULL}.
 #' @param kernel Character. Kernel function used for smoothing. One of
 #'   \code{"gaussian"} (default), \code{"exp"}, \code{"fixed"}, or
@@ -35,9 +37,10 @@
 #'   Default: \code{0.975}.
 #' @param fft Logical. If \code{TRUE} (default), smoothing is performed via
 #'   Fast Fourier Transform (FFT) convolution, which is substantially faster
-#'   for large rasters and wide kernels. Some edge effects may occur at raster
-#'   boundaries. Set to \code{FALSE} to use \code{terra::focal}, which avoids
-#'   edge effects but is slower.
+#'   for large rasters and wide kernels. Set to \code{FALSE} to use direct
+#'   focal calculations. Both engines support kernel means and the declared
+#'   surface and landscape metrics, with the same available-support and
+#'   missing-value rules. Direct focal calculations can be slower.
 #' @param scale_center Logical. If \code{TRUE}, the smoothed raster values are
 #'   centered and scaled using the mean and standard deviation from the model
 #'   fitting data (extracted from \code{multiScaleR$scl_params}). Required
@@ -63,26 +66,36 @@
 #'   offsets. When omitted, a log offset uses 1 (zero on the log scale) and
 #'   a direct offset uses 0. Set this argument for a meaningful projection
 #'   scenario.
-#' @param include_fixed Logical. For a fitted unmarked, GLM, or coxph model,
+#' @param include_fixed Logical. For a fitted native model with verifiable
+#'   retained numeric predictors and training row IDs,
 #'   set \code{TRUE}
 #'   with \code{scale_center = TRUE} to standardize modeled fixed-radius metrics
 #'   using their verified original training preparation. The default
 #'   \code{FALSE} uses only the supplied object's scaling parameters. The opt-in
 #'   requires retained training buffers, matching fixed metric definitions and
-#'   raster resolution, and unchanged native training predictor values. GLM and
-#'   coxph models require \code{model = TRUE}, numeric fixed inputs retained
-#'   under their original names, and model row IDs matching retained prepared
-#'   sites. See
+#'   raster resolution, and unchanged native training predictor values.
+#'   Retain the native model frame (for GLM and coxph, \code{model = TRUE}) or
+#'   an equivalent recoverable training frame. Fixed inputs must be retained
+#'   under their original names, with row IDs matching prepared sites. See
 #'   \code{\link{prepare_unmarked_data}} for the verification contract.
 #' @param match_buffer Logical. The default \code{FALSE} retains the historical
 #'   \code{pct_wt} projection window. Set \code{TRUE} to use the retained
 #'   preparation's \code{max_D} polygon-intersection support and finite-cell
 #'   normalization, including partially intersecting boundary cells.
 #'   Requires a fitted or prepared \code{multiScaleR} object, matching projected
-#'   square-cell resolution, \code{fft = TRUE}, and \code{na.rm = TRUE}.
+#'   square-cell resolution and \code{na.rm = TRUE}. Both smoothing engines
+#'   support this option.
 #'   Metric radii larger than the prepared buffer raise an error. Central source
 #'   NA cells remain masked. Binning, rasterization, and cell-center differences
 #'   remain separate approximations.
+#' @param site_values Optional named list of scalar nonspatial projection
+#'   values in the native predictor units, for example
+#'   \code{list(season = "spring", effort = 2, surveyed = TRUE)}. Requires a
+#'   fitted object. Factor and character values must be fitted levels.
+#'   Numeric predictors retain their historical zero default when omitted;
+#'   categorical predictors need an explicit value. Unknown names and attempts
+#'   to overwrite computed spatial layers raise an error. Use
+#'   \code{offset_values} for variables occurring only inside offsets.
 #' @param ... Reserved for deprecated arguments. Currently only \code{scale_opt}
 #'   (deprecated alias for \code{multiScaleR}) is handled.
 #'
@@ -94,7 +107,10 @@
 #' ("dummy") raster layers filled with zeros are appended to make the output
 #' compatible with \code{terra::predict}.
 #' Offset variables are appended under their input names so transformed offset
-#' expressions can be evaluated by \code{terra::predict}.
+#' expressions can be evaluated by prediction. With a fitted object, the
+#' returned R object also retains a preparation descriptor for checked
+#' \code{\link{predict.multiScaleR}} raster prediction. Ordinary raster file
+#' formats need not retain this descriptor.
 #'
 #' @details
 #' \strong{Typical usage} after running \code{\link{multiScale_optim}}:
@@ -105,17 +121,20 @@
 #' ## Scale and center for prediction
 #' opt_hab_sc <- kernel_scale.raster(raster_stack = hab,
 #'                                   multiScaleR = opt,
-#'                                   scale_center = TRUE)
-#' preds <- terra::predict(opt_hab_sc, opt$opt_mod, type = "response")
+#'                                   scale_center = TRUE,
+#'                                   match_buffer = TRUE)
+#' preds <- predict(opt, opt_hab_sc, type = "response")
 #' }
 #'
 #' \strong{FFT vs. focal smoothing}
 #'
-#' The FFT convolution (\code{fft = TRUE}) is substantially faster for large
-#' rasters or wide kernels. It produces minor edge artifacts near raster
-#' boundaries, typically within one kernel-width of the edge. For analyses
-#' focused on interior areas this is usually negligible. Use
-#' \code{fft = FALSE} for exact focal smoothing when edge accuracy matters.
+#' FFT and direct focal calculations evaluate the same declared neighborhood
+#' and finite-cell normalization. Weighted means renormalize over available
+#' mapped support, including raster edges. Central source NA cells remain
+#' masked. With \code{na.rm = FALSE}, incomplete footprints, including missing
+#' cells beyond the map extent, return NA. Small floating-point differences
+#' between engines can occur. Constant weighted SQ support returns zero;
+#' standardized higher moments remain undefined when spread is zero.
 #'
 #' \strong{Dummy rasters for site-level covariates}
 #'
@@ -125,9 +144,10 @@
 #' cannot be projected spatially and are therefore assigned constant zero
 #' rasters, which correspond to the reference value for centered and scaled
 #' covariates. These dummy layers are required for \code{terra::predict} to
-#' work but do not represent real spatial variation. Replace them manually for
-#' non-zero projection scenarios. Categorical predictors are skipped with a
-#' warning.
+#' work but do not represent real spatial variation. Set \code{site_values}
+#' for other scenarios. Categorical predictors are skipped with a warning
+#' unless a fitted level is explicitly supplied. Their raster category labels
+#' preserve the fitted levels. Checked prediction also restores logical types.
 #' Native unmarked models require explicit nonspatial prediction scenarios.
 #' When every native predictor is represented by a spatial layer, no dummy
 #' layers are needed. Supply remaining variables through native prediction data
@@ -136,6 +156,9 @@
 #' \code{offset(log(n_weeks))}, the default layer is \code{n_weeks = 1},
 #' representing one week of effort. Set \code{offset_values = c(n_weeks = 4)}
 #' to predict for four weeks. Direct offsets default to zero.
+#' Compound offsets, such as \code{offset(log(effort * duration))}, require
+#' explicit raw values for each underlying input. Literal constant offsets
+#' need no layer. Ambiguous or conflicting default scenarios raise an error.
 #'
 #' \strong{Verified fixed-radius metrics in native projection}
 #'
@@ -147,7 +170,7 @@
 #' does not alter the caller's fitted object, metric definitions, or native
 #' uncertainty interpretation. Point-buffer preparation and raster smoothing
 #' retain their respective truncation and approximation rules.
-#' GLM and coxph projection require the retained native model frame and matching
+#' Native projection requires a recoverable training frame and matching
 #' original prepared row IDs for this verification. Transformations that do not
 #' retain the fixed predictor under its original name are not reconstructed.
 #' For conditional-logistic step selection, native \code{type = "risk"} with
@@ -164,8 +187,9 @@
 #' convention rather than adding coverage-fraction weights. Finite cells within
 #' mapped support are renormalized at raster edges; central source NA cells remain
 #' masked. Constant weighted SQ support has zero population spread in this mode.
-#' The historical \code{pct_wt} window and its numerical behavior remain unchanged
-#' when \code{match_buffer = FALSE}.
+#' The historical \code{pct_wt} window remains the default when
+#' \code{match_buffer = FALSE}; both window choices use the finite-support,
+#' source-mask, and missing-value corrections described above.
 #'
 #' This option aligns the extraction footprint at raster cell centers. It does
 #' not undo distance binning, reconstruct raster contents or original CRS metadata,
@@ -205,6 +229,7 @@ kernel_scale.raster <- function(raster_stack,
                                 offset_values = NULL,
                                 include_fixed = FALSE,
                                 match_buffer = FALSE,
+                                site_values = NULL,
                                 ...){
 
   args <- list(...)
@@ -226,6 +251,9 @@ kernel_scale.raster <- function(raster_stack,
   validate_scalar_logical(verbose, "verbose")
   validate_scalar_logical(include_fixed, "include_fixed")
   validate_scalar_logical(match_buffer, "match_buffer")
+  site_values <- .msr_site_values(site_values)
+  if (length(site_values) && !inherits(multiScaleR, "multiScaleR"))
+    stop("site_values requires a fitted multiScaleR object.", call. = FALSE)
   if (!is.null(offset_values)) {
     if (!is.numeric(offset_values) || is.null(names(offset_values)) ||
         any(!nzchar(names(offset_values))) || anyDuplicated(names(offset_values)) ||
@@ -252,8 +280,8 @@ kernel_scale.raster <- function(raster_stack,
     if (!(inherits(multiScaleR, "multiScaleR") ||
           inherits(multiScaleR, "multiScaleR_data")))
       stop("match_buffer requires a fitted or prepared multiScaleR object.", call. = FALSE)
-    if (!isTRUE(fft) || !isTRUE(na.rm))
-      stop("match_buffer requires fft = TRUE and na.rm = TRUE.", call. = FALSE)
+    if (!isTRUE(na.rm))
+      stop("match_buffer requires na.rm = TRUE.", call. = FALSE)
     prepared <- if (inherits(multiScaleR, "multiScaleR"))
       multiScaleR$kernel_inputs else multiScaleR
     buffer_radius <- multiScaleR$max_D
@@ -265,11 +293,7 @@ kernel_scale.raster <- function(raster_stack,
   }
   fixed_contract <- NULL
   if (include_fixed) {
-    native_model <- if (inherits(multiScaleR, "multiScaleR"))
-      .analysis_model(multiScaleR$opt_mod) else NULL
-    if (!isTRUE(scale_center) || !inherits(multiScaleR, "multiScaleR") ||
-        !(methods::is(native_model, "unmarkedFit") ||
-          inherits(native_model, c("glm", "coxph"))))
+    if (!isTRUE(scale_center) || !inherits(multiScaleR, "multiScaleR"))
       stop("include_fixed requires a supported fitted native model and scale_center = TRUE.", call. = FALSE)
     if (!isTRUE(all.equal(terra::res(raster_stack),
           rep(multiScaleR$kernel_inputs$resolution, 2L))))
@@ -327,7 +351,7 @@ kernel_scale.raster <- function(raster_stack,
     if (!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")) {
       sigma <- multiScaleR$scale_est[opt_vars$covariate, "Mean"]
       shape <- if (!is.null(multiScaleR$shape_est)) {
-        multiScaleR$shape_est[opt_vars$covariate, "Mean"]
+        .msr_shape_values(multiScaleR)[opt_vars$covariate]
       } else {
         NULL
       }
@@ -391,17 +415,20 @@ kernel_scale.raster <- function(raster_stack,
         smooth_stack = smooth_stack,
         multiScaleR = multiScaleR,
         raster_covs = names(smooth_stack),
-        offset_values = offset_values
+        offset_values = offset_values, site_values = site_values
       )
     }
 
-    return(smooth_stack)
+    return(.msr_stamp_projection(smooth_stack, multiScaleR, scale_center,
+      match_buffer, scale_vars, include_fixed, site_values,
+      list(fft = fft, clamp = clamp, pct_mx = pct_mx, na.rm = na.rm,
+           pct_wt = pct_wt, offset_values = offset_values)))
   }
 
   if(!is.null(multiScaleR) && inherits(multiScaleR, "multiScaleR")){
     covs <- rownames(multiScaleR$scale_est)
     sigma <- multiScaleR$scale_est[,1]
-    shape <- multiScaleR$shape_est[,1]
+    shape <- .msr_shape_values(multiScaleR)
     kernel <- multiScaleR$kernel_inputs$kernel
 
     if(!any(covs %in% names(raster_stack))){
@@ -479,7 +506,7 @@ kernel_scale.raster <- function(raster_stack,
     mx <- kernel_dist(kernel = kernel,
                       dimension = "1d",
                       sigma = sigma[i],
-                      shape = shape[i],
+                      beta = shape[i],
                       prob = pct_wt)
 
     r_res <- res(raster_stack)[1]
@@ -489,7 +516,7 @@ kernel_scale.raster <- function(raster_stack,
       focal_d <- focal_d + 1
     }
 
-    mat <- matrix(rnorm(focal_d^2), focal_d, focal_d)
+    mat <- matrix(0, focal_d, focal_d)
     r_wt <- rast(mat)
     crs(r_wt) <- crs(raster_stack)
     cntr_crd <- cellFromRowCol(r_wt, focal_d/2, focal_d/2)
@@ -523,6 +550,7 @@ kernel_scale.raster <- function(raster_stack,
                                 w = wt_mat,
                                 fun = "mean",
                                 na.rm = na.rm,
+                                na.policy = "omit",
                                 expand = F)
     }
 
@@ -544,117 +572,12 @@ kernel_scale.raster <- function(raster_stack,
       smooth_stack = smooth_stack,
       multiScaleR = multiScaleR,
       raster_covs = var,
-      offset_values = offset_values
+      offset_values = offset_values, site_values = site_values
     )
   }
 
-  return(smooth_stack)
-}
-
-
-## Helper function
-# helper: add constant rasters for non-raster covariates used by fitted model
-.add_site_covariate_rasters <- function(smooth_stack, multiScaleR, raster_covs,
-                                        offset_values = NULL) {
-
-  if (is.null(multiScaleR) || !inherits(multiScaleR, "multiScaleR")) {
-    return(smooth_stack)
-  }
-
-  mod <- multiScaleR$opt_mod
-  if (is.null(mod)) {
-    return(smooth_stack)
-  }
-  if (methods::is(mod, "unmarkedFit") &&
-      !length(setdiff(.unmarked_model_predictors(mod), raster_covs)))
-    return(smooth_stack)
-
-  mf <- try(stats::model.frame(mod), silent = TRUE)
-  if (inherits(mf, "try-error")) {
-    warning("Could not inspect fitted model frame; site-level covariates were not added.",
-            call. = FALSE)
-    return(smooth_stack)
-  }
-
-  # response name
-  resp <- names(mf)[1]
-
-  # model.frame names transformed offset columns by expression. Convert those
-  # names to the raw input variables that terra::predict evaluates in newdata.
-  offset_cols <- grep("^offset\\(", names(mf), value = TRUE)
-  offset_vars <- character()
-  offset_defaults <- numeric()
-  for (term in offset_cols) {
-    expr <- tryCatch(parse(text = term)[[1]][[2]], error = function(e) NULL)
-    if (is.null(expr)) next
-    vars <- all.vars(expr)
-    if (length(vars) != 1L) {
-      stop("Offsets used in raster projection must contain exactly one input variable.",
-           call. = FALSE)
-    }
-    is_log <- is.call(expr) && identical(as.character(expr[[1]]), "log") &&
-      length(expr) == 2L && identical(expr[[2]], as.name(vars))
-    is_direct <- is.symbol(expr)
-    if (!is_log && !is_direct && !vars %in% names(offset_values)) {
-      stop(sprintf("Offset expression `%s` needs an explicit raw value in `offset_values`.",
-                   term), call. = FALSE)
-    }
-    offset_vars <- c(offset_vars, vars)
-    offset_defaults <- c(offset_defaults, if (is_log) 1 else 0)
-  }
-  names(offset_defaults) <- offset_vars
-  model_vars <- c(setdiff(names(mf), c(resp, offset_cols)), offset_vars)
-
-  # variables already represented by smoothed rasters
-  site_vars <- setdiff(model_vars, raster_covs)
-
-  if (length(site_vars) == 0) {
-    return(smooth_stack)
-  }
-
-  # template raster
-  tmpl <- smooth_stack[[1]]
-
-  for (v in site_vars) {
-    if (v %in% offset_vars) {
-      value <- if (v %in% names(offset_values)) offset_values[[v]] else
-        offset_defaults[[v]]
-      rr <- tmpl * 0 + value
-      names(rr) <- v
-      smooth_stack <- c(smooth_stack, rr)
-      next
-    }
-    x <- mf[[v]]
-
-    # factor / character / complex terms are not safe to add as dummy rasters
-    if (is.factor(x) || is.character(x)) {
-      warning(
-        paste0(
-          "Site-level covariate '", v, "' is categorical. ",
-          "A dummy raster cannot be added safely without explicitly defining a projection value."
-        ),
-        call. = FALSE
-      )
-      next
-    }
-
-    # only allow atomic numeric/logical/integer covariates
-    if (!(is.numeric(x) || is.integer(x) || is.logical(x))) {
-      warning(
-        paste0(
-          "Site-level covariate '", v, "' is not numeric/integer/logical. ",
-          "Skipping dummy raster creation."
-        ),
-        call. = FALSE
-      )
-      next
-    }
-
-    # create constant zero raster
-    rr <- tmpl * 0
-    names(rr) <- v
-    smooth_stack <- c(smooth_stack, rr)
-  }
-
-  smooth_stack
+  return(.msr_stamp_projection(smooth_stack, multiScaleR, scale_center,
+    match_buffer, scale_vars, include_fixed, site_values,
+    list(fft = fft, clamp = clamp, pct_mx = pct_mx, na.rm = na.rm,
+         pct_wt = pct_wt, offset_values = offset_values)))
 }

@@ -13,11 +13,24 @@
   rows
 }
 
+# Surface-only preparation has no binned means. Its explicit preparation rows
+# supply the same row-ID contract without inventing binned summaries.
+.msr_profile_input_rows <- function(data, inputs) {
+  if (!is.null(inputs$binned)) return(.msr_profile_rows(data, inputs$binned))
+  ids <- rownames(inputs$kernel_dat)
+  if (is.null(ids) || length(ids) != length(inputs$d_list) || anyNA(ids) ||
+      anyDuplicated(ids) || anyDuplicated(rownames(data)))
+    stop("Surface preparation requires matching explicit point IDs and raw buffers.", call. = FALSE)
+  rows <- match(rownames(data), ids)
+  if (anyNA(rows)) stop("Model/data row names must match prepared point IDs.", call. = FALSE)
+  rows
+}
+
 .msr_profile_contract <- function(model, inputs, kernel_engine = "reference") {
   if (!inherits(model, "glm") || !is.data.frame(model$model))
     stop("profile_glm requires a glm or MASS::glm.nb fit with model = TRUE.", call. = FALSE)
-  if (is.null(inputs$binned) || inputs$kernel == "fixed")
-    stop("profile_glm requires smooth kernels and bin = TRUE in kernel_prep().", call. = FALSE)
+  if (inputs$kernel == "fixed")
+    stop("profile_glm requires smooth kernels.", call. = FALSE)
   if (!is.null(model$call$offset))
     stop("Use an offset() term in the formula, not the separate offset argument.", call. = FALSE)
   fam <- model$family
@@ -29,17 +42,22 @@
          call. = FALSE)
   mf <- model$model
   tt <- stats::terms(model)
-  covs <- intersect(all.vars(stats::delete.response(tt)), names(inputs$binned$vsum))
-  if (!length(covs))
-    stop("No binned kernel predictors occur in the model formula.", call. = FALSE)
   specs <- inputs$scale_vars
+  surface_names <- if (is.null(specs)) character() else specs$covariate[
+    specs$type == "surface" & specs$metric == "sq" & specs$weighted & specs$optimize]
+  covs <- intersect(all.vars(stats::delete.response(tt)), c(names(inputs$binned$vsum), surface_names))
+  if (!length(covs))
+    stop("No supported spatial predictors occur in the model formula; kernel means require bin = TRUE.", call. = FALSE)
   if (!is.null(specs)) {
     used <- specs[specs$covariate %in% all.vars(tt), , drop = FALSE]
-    if (any(used$type != "kernel") || any(!used$optimize))
-      stop("profile_glm currently requires optimized kernel-type spatial predictors only.",
+    optimized <- used[used$optimize, , drop = FALSE]
+    if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface_names)))
+      stop("profile_glm supports optimized kernel means and weighted surface SQ only; use refit for other surface metrics or hard-radius predictors.",
            call. = FALSE)
-    if (!all(used$covariate %in% covs))
-      stop("Every modeled spatial predictor must have binned summaries.", call. = FALSE)
+    if (!all(optimized$covariate %in% covs))
+      stop("Every modeled kernel mean must have binned summaries.", call. = FALSE)
+    if (any(!used$optimize)) .msr_fixed_training_contract(list(opt_mod = model,
+      kernel_inputs = inputs))
   }
   # A kernel covariate must correspond to one additive design column. Fixed
   # covariates may have interactions/transforms, using the fitted terms object.
@@ -65,9 +83,11 @@
   if (!all(covs %in% colnames(X)) || any(!is.finite(X)))
     stop("The fitted model must have a finite, recoverable design matrix.", call. = FALSE)
   fixed_columns <- setdiff(colnames(X), covs)
-  rows <- .msr_profile_rows(mf, inputs$binned)
-  e <- .msr_prepare_kernel_engine(inputs$binned, covs, rows, inputs$kernel,
-                                  implementation = kernel_engine)
+  rows <- .msr_profile_input_rows(mf, inputs)
+  e <- if (any(covs %in% surface_names))
+    .msr_prepare_surface_engine(inputs, covs, rows, implementation = kernel_engine) else
+      .msr_prepare_kernel_engine(inputs$binned, covs, rows, inputs$kernel,
+                                implementation = kernel_engine)
   y <- stats::model.response(mf)
   trials <- rep(1, nrow(mf))
   if (family == "binomial") {
@@ -340,6 +360,7 @@ summary.msr_conditional_glm <- function(object, ...) {
            theta_bounds = control$theta_bounds, poisson_limit = info$poisson_limit) else NULL,
     diagnostics = .empty_diagnostics(), next_run = NULL, warn_message = 0, call = call)
   class(out) <- "multiScaleR"
+  out <- .msr_attach_fixed_reference(out)
   if (is.function(obj$coefficient_audit))
     out$profile_fit$coefficient_audit <- obj$coefficient_audit()
   if (!is.null(pool)) {
@@ -370,9 +391,10 @@ summary.msr_conditional_glm <- function(object, ...) {
   out$diagnostics$max_distance <- .max_distance_diagnostic(
     kernel_dist(out, dimension = "1d"), inputs$max_D)
   if (isTRUE(out$diagnostics$max_distance$triggered)) out$warn_message <- 1L
+  prepared_n <- if (is.null(inputs$binned)) length(inputs$d_list) else nrow(inputs$binned$vsum[[1L]])
   out$diagnostics$sample_size <- list(code = "sample_size",
-    triggered = obj$engine$n < nrow(inputs$binned$vsum[[1L]]),
-    fitted_n = obj$engine$n, prepared_n = nrow(inputs$binned$vsum[[1L]]))
+    triggered = obj$engine$n < prepared_n,
+    fitted_n = obj$engine$n, prepared_n = prepared_n)
   out$next_run <- .next_run_recommendation(scale_est, shape_est, inputs$max_D, out$diagnostics)
   if (!info$available)
     warning("Joint Wald uncertainty unavailable: ", paste(info$reasons, collapse = "; "),

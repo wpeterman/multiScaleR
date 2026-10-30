@@ -4,7 +4,7 @@
 #'   once and retain a compact snapshot for repeated summaries of fixed rows.
 #' @param object A fitted \code{multiScaleR} object using \code{profile_glm},
 #'   \code{joint_nb2}, \code{conditional_logit}, or \code{joint_mixed}, or
-#'   containing a native \code{unmarkedFit} in \code{opt_mod}.
+#'   containing a supported native-refit model in \code{opt_mod}.
 #' @param newdata,kernel_inputs Prediction data and matching prepared spatial
 #'   inputs, with the same requirements as \code{\link{predict.multiScaleR}}.
 #'   The default \code{NULL} for both uses the retained fitting rows.
@@ -17,20 +17,31 @@
 #'   optionally select one native glmmTMB prediction type, such as
 #'   \code{"zprob"}; \code{NULL} prepares both response and link predictions.
 #'   Leave \code{NULL} for the analytic GLM and conditional-logistic backends.
+#'   General refit snapshots default to response and link for GLM-like models,
+#'   or linear predictor and risk for Cox models. Other native providers
+#'   require an explicit component.
 #' @param native_args A named list of native prediction controls to bind during
 #'   preparation. For \code{joint_mixed}, supports \code{re.form},
 #'   \code{allow.new.levels}, and \code{na.action}. For unmarked, supports
 #'   \code{backTransform}, \code{na.rm}, \code{appendData}, \code{level}, and
 #'   \code{re.form}. Defaults to an empty list, preserving native defaults.
-#' @param join_by For unmarked spatial predictions, explicit site keys with
+#'   General refits additionally support \code{reference} and nlme
+#'   \code{level}, when accepted by the native method.
+#' @param join_by For native-refit spatial predictions, explicit site keys with
 #'   one row per prepared prediction site, in spatial input order. Requires
 #'   both \code{newdata} and \code{kernel_inputs}. See
-#'   \code{\link{prepare_unmarked_data}}. The default \code{NULL} preserves
-#'   native prediction on already prepared data. Unsupported for other models.
+#'   \code{\link{prepare_unmarked_data}}. The default \code{NULL} uses strict
+#'   row-name alignment for general refits. Unmarked spatial snapshots require
+#'   explicit keys; without spatial inputs their native data pass unchanged.
+#'   Unsupported for analytic and
+#'   joint mixed-model snapshots.
 #' @param include_fixed Logical. The default \code{FALSE} keeps fixed-radius
-#'   predictors explicit. For unmarked spatial snapshots, set \code{TRUE} to
+#'   predictors explicit. For supported spatial snapshots, set \code{TRUE} to
 #'   use the verified fixed-radius preparation in
-#'   \code{\link{prepare_unmarked_data}}. Requires spatial inputs and site keys.
+#'   \code{\link{prepare_unmarked_data}}. Requires spatial inputs and verified
+#'   row alignment, using explicit site keys for repeated sites and unmarked.
+#'   Analytic GLM/NB2, conditional-logistic, and joint mixed snapshots also
+#'   support this verification, with their existing strict row-ID rules.
 #' @details
 #' The snapshot binds coefficients, covariance, spatial scales, training
 #' standardization, row order, and any choice sets to the supplied model and
@@ -61,6 +72,13 @@
 #' columns and applies training standardization without changing native
 #' observation/year ordering or nonspatial factor/offset inputs. Spatial
 #' snapshots retain prediction row names and site keys in their provenance.
+#'
+#' General refit snapshots also cache numerical outputs without retaining the
+#' fitted native model, formula environments, or raw cell buffers. If a native
+#' provider lacks standard errors, point predictions remain available and a
+#' later SE request replays the recorded error. Errors in point predictions
+#' still abort preparation. These snapshots retain native uncertainty
+#' distinctions and do not add scale uncertainty or observation noise.
 #' The returned
 #' table preserves native columns, intervals, missing-value handling, and
 #' component interpretation. Native standard errors and intervals condition on
@@ -106,15 +124,24 @@ prepare_prediction <- function(object, newdata = NULL, kernel_inputs = NULL,
                                include_fixed = FALSE) {
   validate_scalar_numeric(max_bytes, "max_bytes", positive = TRUE)
   validate_scalar_logical(include_fixed, "include_fixed")
-  if (include_fixed && !methods::is(object$opt_mod, "unmarkedFit"))
-    stop("include_fixed applies only to unmarked spatial predictions.", call. = FALSE)
-  if (!is.null(join_by) && !methods::is(object$opt_mod, "unmarkedFit"))
+  refit <- inherits(object, "multiScaleR") &&
+    !.msr_analytic_backend(object) &&
+    !isTRUE(object$backend %in% c("joint_mixed", "conditional_logit"))
+  if (include_fixed && !refit && !methods::is(object$opt_mod, "unmarkedFit") &&
+      !isTRUE(object$backend %in% c("profile_glm", "joint_nb2", "conditional_logit", "joint_mixed")))
+    stop("include_fixed requires a supported spatial prediction model.", call. = FALSE)
+  if (!is.null(join_by) && !refit && !methods::is(object$opt_mod, "unmarkedFit"))
     stop("join_by applies only to unmarked spatial predictions.", call. = FALSE)
+  if (isTRUE(object$backend %in% c("profile_glm", "joint_nb2", "conditional_logit")))
+    newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
   if (inherits(object, "multiScaleR") &&
       (identical(object$backend, "joint_mixed") || methods::is(object$opt_mod, "unmarkedFit")))
     return(.msr_prepare_native_prediction(object, newdata, kernel_inputs,
                                          max_bytes, component, native_args, join_by,
                                          include_fixed))
+  if (refit)
+    return(.msr_prepare_refit_prediction(object, newdata, kernel_inputs,
+      max_bytes, component, native_args, join_by, include_fixed))
   if (!is.null(component) || length(native_args))
     stop("component and native_args apply only to native mixed or unmarked snapshots.", call. = FALSE)
   if (!inherits(object, "multiScaleR") ||
@@ -134,6 +161,7 @@ prepare_prediction <- function(object, newdata = NULL, kernel_inputs = NULL,
       groups = groups, strata_name = contract$strata_name)),
     kernel_inputs = list(kernel = object$kernel_inputs$kernel),
     provenance = list(scale_parameters = object$profile_fit$par,
+      include_fixed = include_fixed,
       distance_unit_conversion = object$kernel_inputs$unit_conv,
       surface_specs = contract$objective$engine$surface_specs))
   if (identical(object$backend, "conditional_logit")) {

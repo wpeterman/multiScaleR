@@ -257,14 +257,17 @@ print.multiScaleR_bayes <- function(x, ...) {
 #' @param level Central posterior interval probability; default 0.95.
 #' @param draws Optional number of evenly spaced posterior draws to use;
 #'   \code{NULL} uses all draws.
-#' @param kernel_inputs Matching binned inputs for \code{newdata}, from
+#' @param kernel_inputs Matching prepared inputs for \code{newdata}, from
 #'   \code{\link{kernel_prep}} or \code{\link{kernel_prep_by_group}}.
 #'   Required for new observations and otherwise \code{NULL}. Use the fitted
 #'   kernel, predictor definitions and physical map units. Numerical
 #'   \code{unit_conv} normalizers may differ and are converted internally;
 #'   this does not convert coordinate systems or physical units.
+#'   Kernel means require bins. Weighted SQ requires matching source/metric
+#'   specifications and raw buffers, with the fitted reference normalization.
 #' @param row_id Name of a \code{newdata} column matching unique prepared
-#'   \code{binned$point_ids}. Observation keys may repeat. \code{NULL} uses
+#'   \code{binned$point_ids}, or \code{kernel_dat} row names for surface-only
+#'   inputs. Observation keys may repeat. \code{NULL} uses
 #'   the fitted row-ID column when retained, or new-data row names otherwise.
 #'   Supply it explicitly for older saved objects. Used only with new data.
 #' @param scale_re.form \code{NULL} (default) includes fitted or explicitly
@@ -279,6 +282,12 @@ print.multiScaleR_bayes <- function(x, ...) {
 #'   their fitted draws. These policies do not create new fixed-factor coefficients.
 #' @param seed Optional positive integer seed for new effects. When supplied,
 #'   the caller's random-number state is restored, including on failure.
+#' @param include_fixed Logical. With new data and matching spatial inputs,
+#'   \code{TRUE} recomputes declared fixed-radius predictors using their original
+#'   preparation means and sample SDs. The default \code{FALSE} requires these
+#'   columns explicitly. Source, metric, radius, kernel, and resolution must
+#'   match the fitted preparation, including its \code{max_D} buffer extent.
+#'   This adds no scale parameters or uncertainty.
 #' @param ... Reserved for future extensions; unused arguments cause an error.
 #' @return With \code{summary = TRUE}, a data frame in the supplied observation
 #'   order containing \code{row}, \code{point_id}, \code{mean}, \code{median},
@@ -359,7 +368,7 @@ predict.multiScaleR_bayes <- function(object, newdata = NULL,
                                       scale_re.form = NULL,
                                       new_scale_levels = c("error", "sample", "zero"),
                                       new_response_levels = c("error", "sample", "zero"),
-                                      seed = NULL, ...) {
+                                      seed = NULL, include_fixed = FALSE, ...) {
   if (length(list(...))) stop("Unused prediction arguments.", call. = FALSE)
   include_response <- .msr_bayes_prediction_re_form(re.form, "re.form")
   include_scale <- .msr_bayes_prediction_re_form(scale_re.form, "scale_re.form")
@@ -370,7 +379,8 @@ predict.multiScaleR_bayes <- function(object, newdata = NULL,
   # as well as new-effect sampling when the caller supplies a seed.
   context <- .msr_bayes_prediction_seed(seed,
     .msr_bayes_prediction_prepare(object, newdata, kernel_inputs, row_id,
-      match.arg(new_scale_levels), match.arg(new_response_levels), include_scale, include_response))
+      match.arg(new_scale_levels), match.arg(new_response_levels), include_scale, include_response,
+      include_fixed))
   spec <- context$spec
   ans <- .msr_bayes_prediction_seed(seed, {
     values <- matrix(NA_real_, length(ids), length(spec$y))

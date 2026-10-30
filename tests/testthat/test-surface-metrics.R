@@ -340,15 +340,12 @@ test_that("optimized surface specs evaluate during model refits", {
 })
 
 
-test_that("optimized surface specs are rejected with the expow kernel", {
+test_that("optimized surface radii can coexist with the expow kernel", {
   elevation <- surface_test_raster(606)
   vars <- msr_vars(
     elev_sq = surface_var("elevation", metric = "sq")
   )
-  expect_error(
-    .msr_validate_scale_vars(vars, elevation, kernel = "expow"),
-    "expow"
-  )
+  expect_silent(.msr_validate_scale_vars(vars, elevation, kernel = "expow"))
 })
 
 
@@ -713,13 +710,12 @@ test_that("weighted surface metrics are allowed with the expow kernel", {
   # Weighted metrics use the kernel (including its shape), so expow is allowed.
   expect_silent(.msr_validate_scale_vars(weighted_vars, elevation,
                                          kernel = "expow"))
-  # Unweighted optimized surface metrics remain unsupported with expow.
+  # Unweighted metrics retain their radius; the shape slot is inapplicable.
   unweighted_vars <- msr_vars(
     elev_sq = surface_var("elevation", metric = "sq")
   )
-  expect_error(.msr_validate_scale_vars(unweighted_vars, elevation,
-                                        kernel = "expow"),
-               "expow")
+  expect_silent(.msr_validate_scale_vars(unweighted_vars, elevation,
+                                         kernel = "expow"))
 })
 
 

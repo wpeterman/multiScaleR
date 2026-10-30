@@ -36,7 +36,8 @@ a layer name in the raster stack provided to \code{\link{kernel_prep}}.}
 \item{metric}{Character scalar. The metric to compute within the circular
 buffer. For \code{landscape_var()} this is a landscape ecology metric
 computed on a categorical raster; for \code{surface_var()} this is a
-continuous surface texture metric (\code{"sa"} or \code{"sq"}) computed on
+continuous surface texture metric (including \code{"sa"}, \code{"sq"},
+\code{"ssk"}, \code{"sku"}, \code{"sdq"}, and \code{"sdr"}) computed on
 a continuous raster. Must be one of the supported metrics (see Details).
 Matched case-insensitively.}
 
@@ -75,14 +76,14 @@ neighborhood and the optimized scale parameter is that neighborhood radius.
 When \code{TRUE}, each cell is weighted by the model's distance kernel
 (the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
 parameter is the kernel scale (sigma), exactly as for a kernel-weighted
-mean. The weighted form estimates the scale of effect of heterogeneity with
-a likelihood that is smooth in sigma. It is available only for the
+mean. Kernel weights vary continuously with sigma. SQ is smooth away from
+zero variance; absolute deviations and standardized higher moments have
+additional nonsmooth or undefined cases. Weighting is available only for the
 distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
 not the slope metric (\code{"sdq"}), and the scale is always optimized, so
 \code{radius} must be \code{NULL}.
 Within a buffer evaluation, weighted metrics reuse weights and centered
-moments only when the source, scale, shape and valid-cell mask match exactly.
-This does not tie their fitted scales or reuse results across evaluations.}
+moments only when the source, scale, shape and valid-cell mask match exactly.}
 }
 \value{
 \describe{
@@ -120,6 +121,20 @@ object that is passed to the \code{scale_vars} argument of
 \code{\link{kernel_prep}} and \code{\link{kernel_scale.raster}}.
 }
 \details{
+The native-refit backend can combine exponential-power kernel predictors with
+optimized hard-radius surface or landscape metrics. A hard radius does not
+use kernel shape. Its reported shape and shape SE are NA, and its inactive
+shape position is excluded from model-selection parameter counts. Fixed-radius
+metrics likewise have no estimated scale or shape parameter.
+
+Analytic profile GLM, joint NB2, conditional-logistic, joint mixed-model, and
+Bayesian adapters accept weighted SQ with Gaussian or exponential kernels,
+subject to their model-specific contracts. Other surface and landscape
+metrics remain native-refit predictors. See
+\code{vignette("feature-compatibility", package = "multiScaleR")} for the
+feature and inference-method matrix.
+  This does not tie their fitted scales or reuse results across evaluations.
+
 \strong{Kernel vs. landscape covariates}
 
 \code{kernel_var(source)} defines a kernel-weighted mean of the continuous
@@ -143,7 +158,7 @@ the ecological scale and the statistical quantity being summarized.
 By default a surface metric uses a hard-edged neighborhood. Setting
 \code{weighted = TRUE} instead weights each cell by the model's distance
 kernel and optimizes the kernel scale (sigma), which estimates the scale of
-effect of heterogeneity with a smooth likelihood (see the \code{weighted}
+effect of heterogeneity using continuous kernel weights (see the \code{weighted}
 argument). This applies to the distribution metrics (\code{"sa"},
 \code{"sq"}, \code{"ssk"}, \code{"sku"}).
 

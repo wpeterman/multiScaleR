@@ -52,7 +52,7 @@ test_that("prediction uses training normalization, offsets, and joint derivative
   converted$unit_conv <- 1
   converted$binned$bin_rep <- converted$binned$bin_rep * 1000
   expect_equal(predict(x, nd, converted), response$fit, tolerance = 1e-9)
-  expect_error(predict(x, nd), "binned kernel_inputs")
+  expect_error(predict(x, nd), "matching smooth kernel_inputs")
   missing_fixed <- f$data
   missing_fixed$z <- NULL
   assign("z", f$data$z, envir = environment(formula(x$opt_mod)))

@@ -368,7 +368,7 @@ test_that("kernel_scale.raster and site-covariate helpers cover validation and f
     weird_out <- multiScaleR:::.add_site_covariate_rasters(
       smooth_stack = base_r,
       multiScaleR = structure(
-        list(opt_mod = structure(list(), class = "fakeListSite")),
+        list(opt_mod = structure(list(formula = ~weird), class = "fakeListSite")),
         class = "multiScaleR"
       ),
       raster_covs = "x"
@@ -446,7 +446,8 @@ test_that("kernel_dist, summary, print, and plotting helpers cover alternate bra
     },
     .package = "multiScaleR"
   )
-  expect_true(is.nan(nan_dist["bin1", "Estimate"]))
+  expect_true(is.finite(nan_dist["bin1", "Estimate"]))
+  expect_true(all(is.na(nan_dist["bin1", -1L])))
 
   gls_summary <- summary(gls_obj, prob = 0.8)
   um_summary <- summary(um_obj, prob = 0.7)

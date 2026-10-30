@@ -18,8 +18,8 @@
   m <- .analysis_model(model)
   if (!inherits(m, "coxph") || !is.data.frame(m$model))
     stop("conditional_logit requires clogit/coxph or amt fit_clogit with model = TRUE.", call. = FALSE)
-  if (is.null(inputs$binned) || !inputs$kernel %in% c("gaussian", "exp"))
-    stop("conditional_logit requires binned Gaussian or exponential kernels.", call. = FALSE)
+  if (!inputs$kernel %in% c("gaussian", "exp"))
+    stop("conditional_logit requires Gaussian or exponential kernels.", call. = FALSE)
   if (!is.null(m$na.action) || !is.null(m$call$subset) || !is.null(m$call$weights) ||
       !is.null(m$weights) || !is.null(m$naive.var) || !is.null(m$call$cluster) ||
       !is.null(m$call$offset))
@@ -86,7 +86,7 @@
   offset <- stats::model.offset(m$model)
   if (is.null(offset)) offset <- rep(0, nrow(X))
   if (any(!is.finite(offset))) stop("Offsets must be finite.", call. = FALSE)
-  rows <- .msr_profile_rows(m$model, inputs$binned)
+  rows <- .msr_profile_input_rows(m$model, inputs)
   engine <- if (any(covs %in% surface_names))
     .msr_prepare_surface_engine(inputs, covs, rows, implementation = implementation) else
     .msr_prepare_kernel_engine(inputs$binned, covs, rows, inputs$kernel,

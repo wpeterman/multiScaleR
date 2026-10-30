@@ -427,13 +427,15 @@ kernel_inputs_opt <- kernel_prep(
 Optimizing a surface texture radius is well defined, but it costs more than
 optimizing a kernel-weighted mean: at each candidate radius the metric is
 recomputed for every sample point, since (unlike a kernel mean) it cannot be
-read off a precomputed distance binning. Surface metrics are continuous in the
-radius, so they tend to optimize smoothly. Start with fixed radii to confirm
+read off a precomputed distance binning. Hard-radius metrics change when cells
+enter or leave the buffer; their objectives need not be smooth. Start with fixed radii to confirm
 the workflow, then optimize once the model structure is settled. Optimized
-*unweighted* surface metrics are not currently supported with
-`kernel = "expow"`, because the exponential-power shape parameter does not apply
-to a hard-edged buffer. The weighted form below does use the kernel, so it is
-supported with every kernel.
+unweighted surface metrics can be combined with `kernel = "expow"` in the
+native-refit backend. Their hard radius has no shape parameter, so the reported
+shape and shape SE are `NA` and no shape is added to the model-selection count.
+The weighted form below uses Gaussian, exponential, or exponential-power
+weights. Analytic and Bayesian weighted-SQ adapters retain their narrower
+Gaussian/exponential kernel contracts.
 
 ---
 
@@ -449,8 +451,9 @@ This changes both the question and the statistics. A weighted `sq` answers "at
 what spatial scale does the *variability* of this surface, measured with a
 smoothly decaying neighborhood, best predict the response?" Because the kernel
 weights change smoothly as sigma changes (cells do not jump in and out of a hard
-edge), the likelihood is smooth in sigma, so `multiScale_optim()` recovers the
-scale with a standard error just as it does for a kernel-weighted mean. This is
+edge), the predictor can support analytic scale derivatives. Scale standard
+errors still require eligible curvature and the selected backend's uncertainty
+checks. Smoothness alone does not establish interval coverage. This is
 the natural way to ask about the scale of effect of heterogeneity, as opposed to
 the scale of effect of the mean.
 
@@ -489,10 +492,35 @@ plot(c(sq_hard, sq_weighted), main = c("sq hard radius 500 m", "sq weighted sigm
 but the weighted version transitions more smoothly because nearby cells
 contribute more than distant ones. In a model, the practical payoff is the
 optimization: the weighted form gives `multiScale_optim()` a smooth objective in
-sigma and returns the scale of heterogeneity with a confidence interval. Use the
+sigma and estimates the scale of heterogeneity under the chosen model. Use the
 weighted form when the scale of heterogeneity is the scientific question; the
 hard-radius form remains convenient when you have a biologically motivated
 buffer or want a metric that matches the `geodiv` definitions exactly.
+
+## Connect weighted SQ to an analytic backend
+
+With Gaussian or exponential kernels, optimized weighted `sq` can use
+`profile_glm`, `joint_nb2`, `conditional_logit`, or `joint_mixed`, subject to each
+backend's model restrictions. A model can contain SQ alone or combine it with
+kernel means. Keep the raw cell buffers returned by `kernel_prep()` for SQ.
+Include `bin = TRUE` when the model also contains kernel means. Surface-only
+inputs can omit bins, but need preparation row names that match the model rows.
+Estimating other surface metrics' radii and hard-radius optimization use
+`backend = "refit"`. Fixed-radius surface and landscape metrics can enter
+analytic and Bayesian designs as ordinary numeric predictors. Keep the original
+prepared columns and their normalization; they add no estimated bandwidth.
+
+Live prediction and `prepare_prediction()` use the fitted normalization and
+verify source specifications and row alignment. For a single-predictor NB2 GLM,
+`scale_inference()` can profile the SQ scale using the existing constrained
+refits. This extends the computation, not the evidence for interval coverage.
+Conditional-logistic and mixed-model prediction standard errors require
+`uncertainty = "conditional"`; their joint scale uncertainty remains unavailable.
+The Bayesian workflow also accepts weighted SQ. It holds pooled reference
+normalization fixed across years, draws and prediction rows, preserving the
+meaning of coefficient priors. Its posterior intervals and diagnostics remain
+different from likelihood intervals and conditional prediction SEs. Keep raw
+buffers for prediction; see `vignette("bayesian-scales", package = "multiScaleR")`.
 
 ---
 
@@ -555,7 +583,7 @@ sq_500 <- kernel_scale.raster(
 
 | Function | Purpose |
 |----------|---------|
-| `surface_var()` | Define a continuous surface texture covariate (`sa` or `sq`). |
+| `surface_var()` | Define continuous-surface distribution, gradient, or area-ratio metrics. |
 | `msr_vars()` | Collect covariate specifications into one object. |
 | `kernel_prep()` | Extract and prepare covariates around each point. |
 | `multiScale_optim()` | Estimate the scale of effect for optimized covariates. |
@@ -563,6 +591,8 @@ sq_500 <- kernel_scale.raster(
 
 ## See also
 
+- `vignette("feature-compatibility", package = "multiScaleR")` for the fitting,
+  focal/FFT smoothing, plotting, point prediction, and raster scenario matrix.
 - `vignette("landscape_metric_covariates", package = "multiScaleR")` for
   categorical landscape metrics and the `msr_vars()` interface.
 - `vignette("multiScaleR_Guide", package = "multiScaleR")` for the full

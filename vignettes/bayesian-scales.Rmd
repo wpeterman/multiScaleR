@@ -127,9 +127,66 @@ identification or interval calibration for a more complex model.
 
 The response can be Gaussian, Poisson, binomial or negative binomial, with the
 documented links. Binomial data can use successes and failures. Gaussian and
-exponential kernel means are supported. The response formula allows offsets,
+exponential kernel means and optimized weighted surface SQ are supported. SQ
+can appear alone or alongside means. Keep its raw buffers and source specifications;
+means also need binned summaries. The response formula allows offsets,
 ordinary fixed covariates and additive random intercepts. Preparation checks
 the complete model before optional sampling software is needed.
+
+Weighted SQ measures the square root of the kernel-weighted centered variance,
+using the sum of weights as its denominator. Its scale can use the same annual
+formulas as a kernel mean. Centering and SD are learned once across the fitting
+observations at the declared prior median scale and stay fixed for every draw
+and prediction. Do not standardize SQ separately within years or at each sampled
+scale. That would change the meaning of the response coefficient and its prior.
+
+SQ uses raw cells, so its differentiation tape can require more memory than a
+binned mean. A prepared object reports observation-cell count, retained bytes,
+and a planning estimate in `specification$surface$memory`. Inspect these before
+fitting. The RAM preflight is conservative, not a guarantee. Prediction checks
+the fitted source and metric, preserves repeated point keys, and converts
+numerical distance normalizers while retaining the same physical map units.
+Save the fitted object with its buffers if you need new-row prediction.
+
+The prepare, sampling, joint Laplace, and marginal Laplace routes use the same
+SQ posterior and existing diagnostics. Numerical derivative and fit checks do
+not establish posterior approximation accuracy or interval calibration. Other
+optimized surface metrics and exponential-power SQ remain unsupported. Fixed-radius
+metrics can enter the response or scale formulas as verified numeric columns,
+retaining their original preparation means and sample SDs. The separate
+private marginal-likelihood limiting routines still reject SQ.
+
+`plot_marginal_effects()` accepts Bayesian fits and displays stored marginal
+response-coefficient draws at hypothetical covariate values under this fixed
+reference normalization. These are credible bands for coefficient curves, with
+response random effects zero and no observation noise. They do not reevaluate
+the landscape under every scale draw. Use spatial `predict()` for
+location-specific posterior expectations. The distinction and the broader
+feature matrix are explained in
+`vignette("feature-compatibility", package = "multiScaleR")`.
+
+For your own projected `points`, continuous `landscape` layers and response
+`observations`, declare SQ explicitly. In this example, `observations$point_key`
+matches the prepared point row names; repeated observations can repeat a key.
+
+```{r weighted-sq-preparation, eval=FALSE}
+sq_vars <- msr_vars(
+  habitat = kernel_var("habitat"),
+  rough = surface_var("elevation", "sq", weighted = TRUE)
+)
+sq_inputs <- kernel_prep(points, landscape, max_D = 1000,
+  kernel = "gaussian", scale_vars = sq_vars, bin = TRUE)
+# The mean is shared; SQ has partially pooled annual scales.
+sq_ready <- multiScale_bayes(count ~ habitat + rough + (1 | site),
+  sq_inputs, observations,
+  scales = list(habitat = ~1, rough = ~1 + (1 | year)),
+  row_id = "point_key", family = "nbinom2",
+  priors = list(scale_median = 250), method = "prepare")
+sq_ready$specification$surface$memory  # Inspect raw-cell workload before fitting.
+```
+
+This prepares a posterior specification without sampling. Choose an inference
+method after reviewing the design, memory requirements and prior assumptions.
 
 The landscape coefficient currently stays common across years even when its
 scale varies. Kernel-by-year interactions and response random slopes are not

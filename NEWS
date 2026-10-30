@@ -1,5 +1,50 @@
-multiScaleR 0.7.5 (development)
+multiScaleR 0.7.6 (development)
 ---------
+* Declared fixed-radius surface and landscape metrics enter analytic and Bayesian
+  numeric designs with verified original normalization. Point prediction,
+  snapshots, and Bayesian simulation can opt into the same fixed preparation.
+  Fixed radii add no estimated bandwidth or scale prior.
+  Automatic fixed reconstruction retains the original buffer extent, and legacy
+  mean-only preparations without scale_vars retain their existing interfaces.
+* Shared R and compiled weighted moments center their inputs before reduction.
+  Weighted SQ values and scale derivatives improve stability at large additive
+  origins without relaxed comparison tolerances. Finite kernel-distance estimates and
+  plots remain available when Wald SEs are unavailable, with missing limits.
+* Native-refit point prediction and compact snapshots share optimized spatial
+  transforms, explicit site alignment, physical units, and training normalization
+  across supported model classes. Verified fixed-radius normalization extends
+  to recoverable native training frames.
+* FFT and direct focal smoothing support the surface and categorical metric
+  families. Raster means now normalize available edge support and preserve
+  source NA masks; strict missing-support handling, constant weighted-SQ zero,
+  stable centered moments, and RNG preservation receive focused coverage.
+* Native exponential-power fits can combine means and hard-radius metrics.
+  Hard radii report inapplicable shapes as NA and omit them from K, retaining
+  the existing parameter layout and numerical diagnostics.
+* Checked raster prediction preserves model types and explicit categorical,
+  logical, and offset scenarios. Analytic GLM/NB2 SE maps use the same retained
+  coefficient information as point predictions. Maps retain preparation controls
+  and conditional uncertainty distinctions; posterior spatial integration is
+  not replaced by a single selected-scale map.
+* Marginal-effect panels preserve factors and native mixed-model response means.
+  Bayesian panels use stored coefficient draws at hypothetical reference-scaled
+  covariates, with explicit credible-band, random-effect, and diagnostic policies.
+* AIC/BIC comparisons check recoverable responses, rows, weights, trials,
+  likelihood measures, ML/REML settings, and Cox strata. Posterior targets are
+  rejected. An educational feature-compatibility guide connects these contracts.
+* Bayesian weighted SQ supports Gaussian/exponential kernels, fixed pooled
+  reference normalization, repeated spatial IDs and matched raw-buffer prediction.
+  Existing priors, posterior methods and diagnostics are preserved. Raw-cell
+  differentiation has a memory preflight; private likelihood limit routines
+  remain gated and no new interval calibration is claimed.
+* Analytic GLM, conditional-logistic and mixed-model backends accept optimized
+  weighted surface SQ with Gaussian or exponential kernels, including kernel-mean
+  combinations and surface-only inputs. Prediction retains training normalization,
+  row IDs and existing covariance gates; single-predictor NB2 scale refits reuse
+  the same objective without claiming new interval calibration.
+* A private Gaussian response-SD likelihood statistic compares fixed-SD
+  profiles with a separately audited unrestricted candidate, retains negative
+  discrepancies and failures, and supplies no confidence calibration.
 * Consolidate likelihood and Bayesian development on one branch, with shared
   prediction contracts, probability precision diagnostics, private SD traces,
   source checks and documentation while retaining target-specific uncertainty.

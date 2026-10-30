@@ -28,7 +28,7 @@
   pf <- object$profile_fit
   obj <- pf$contract$objective
   if (obj$family != "nbinom2" || obj$engine$p != 1L)
-    stop("scale_inference currently supports NB2 with one kernel covariate.", call. = FALSE)
+    stop("scale_inference currently supports NB2 with one spatial covariate.", call. = FALSE)
   # Isolate the likelihood cache as well as the returned fit metadata.
   factory <- if (isTRUE(obj$boundary_nb2)) .msr_joint_nb2_objective else .msr_profile_glm_objective
   obj <- factory(obj$engine, obj$y, obj$family,

@@ -64,6 +64,7 @@
   if (!is.null(shape_est)) {
     start_shape <- shape_est[, "Mean"]
     names(start_shape) <- row.names(shape_est)
+    start_shape[attr(shape_est, "not_applicable")] <- 1
     start_par <- c(start_par_sigma, start_shape)
     names(start_par) <- c(
       paste0(names(start_par_sigma), "_sigma"),
@@ -362,6 +363,9 @@
 #'   (or twice that for \code{kernel = "expow"}, where shape parameters follow
 #'   sigma parameters). Default: \code{NULL}; starting values are chosen
 #'   automatically.
+#'   The expow native-refit interface retains one shape position per optimized
+#'   variable, including hard radii. A hard radius ignores that position;
+#'   provide a finite positive placeholder when supplying \code{par}.
 #' @param start_strategy Character. How to choose starting values when
 #'   \code{par = NULL}: \code{"single"} (default) uses one shared default
 #'   start, while \code{"screen"} performs a low-cost prescreen of sigma
@@ -487,7 +491,9 @@
 #'     whose likelihood changes in steps. Row names are covariate names.}
 #'   \item{\code{shape_est}}{Data frame of the same structure as
 #'     \code{scale_est} for the shape parameter, or \code{NULL} when
-#'     \code{kernel != "expow"}.}
+#'     \code{kernel != "expow"}. Hard-radius variables have NA shape and shape
+#'     SE because shape is inapplicable; their ignored shape positions are
+#'     excluded from likelihood parameter counts.}
 #'   \item{\code{optim_results}}{The raw list returned by \code{stats::optim}
 #'     or \code{optimParallel::optimParallel}, including \code{par},
 #'     \code{value} (negative log-likelihood), \code{hessian}, and convergence
@@ -546,7 +552,7 @@
 #' The opt-in \code{backend = "conditional_logit"} uses the exact finite-choice-set
 #' likelihood with one used and at least one available step per set. Use a
 #' retained \code{survival::clogit} model (\code{model = TRUE}) or an amt
-#' \code{fit_clogit} wrapper, Gaussian or exponential binned inputs, and one
+#' \code{fit_clogit} wrapper, Gaussian or exponential inputs, and one
 #' bare \code{strata(choice_id)} term. IDs must identify sets uniquely across
 #' animals and bursts. Row names must match prepared point IDs. Explicitly
 #' prepare complete sets before fitting; omitted missing rows, subsets, weights,
@@ -557,8 +563,11 @@
 #' raw buffers are retained. These use the weighted root-mean-square deviation,
 #' not hard-radius sample SD. Their scales remain independent, and prediction
 #' requires the same source and metric specifications and training normalization.
-#' Fixed-radius metrics can be supplied as fixed predictors; their values must
-#' be provided explicitly for new predictions. Optimization of hard-radius
+#' Fixed-radius metrics can be supplied as fixed predictors. Their original
+#' prepared numeric columns must be retained in the native model frame.
+#' New predictions require these columns explicitly unless
+#' \code{include_fixed = TRUE} verifies and reuses their original normalization.
+#' Optimization of hard-radius
 #' landscape/surface metrics and interactions involving optimized spatial
 #' predictors are not supported by this backend; use the default refit backend.
 #'
@@ -589,7 +598,7 @@
 #' TMB, and glmmTMB. It jointly estimates kernel scales and model parameters,
 #' integrating random intercepts by the Laplace approximation. It supports
 #' log-link Poisson and NB2 glmmTMB fits with one conditional random intercept,
-#' constant dispersion, and optional fixed-effects zero inflation. Use binned
+#' constant dispersion, and optional fixed-effects zero inflation. Use
 #' Gaussian or negative exponential kernels, direct additive numeric spatial
 #' terms, retained model row names matching prepared point IDs, and
 #' \code{n_cores = 1}. Random slopes, multiple grouping terms, spatial terms in
@@ -609,9 +618,18 @@
 #' Native coefficient and prediction covariance condition on the selected
 #' scales. Use \code{predict(fit, se.fit = TRUE, uncertainty = "conditional")}
 #' or \code{predict(fit$opt_mod, ...)}. This backend does not extend the
-#' single-kernel NB2 contract of \code{scale_inference()}.
+#' single-predictor NB2 GLM contract of \code{scale_inference()}.
 #'
-#' The two analytic GLM backends require \code{bin = TRUE}, a smooth kernel,
+#' The analytic optimization backends support optimized kernel means and kernel-weighted
+#' surface SQ (root mean square deviation), including combinations of these
+#' predictors. Weighted SQ uses retained raw cell buffers with Gaussian or
+#' exponential kernels; estimation of other surface metrics' radii requires
+#' \code{backend = "refit"}. Declared fixed-radius metrics can enter the native
+#' numeric design without adding a scale parameter. Their original prepared
+#' values and normalization must remain recoverable from the native model frame.
+#' Kernel means require \code{bin = TRUE}; surface-only models need explicit
+#' preparation row IDs and raw buffers, without binned summaries.
+#' The two analytic GLM backends require a smooth kernel,
 #' and a \code{glm} or \code{MASS::glm.nb} object retaining its model frame.
 #' For \code{"profile_glm"}, supported links are Gaussian identity, Poisson log, binomial logit, and
 #' NB2 log. NB2 has variance \eqn{\mu + \mu^2/\theta}; theta is estimated
@@ -1331,6 +1349,11 @@ multiScale_optim <- function(fitted_mod,
       shape_est <- data.frame(Mean = opt_results$par_unscale[(n_covs + 1):(n_covs * 2)],
                               SE = res[(n_covs + 1):(n_covs * 2)])
       rownames(shape_est) <- r_vars
+      inactive_shape <- intersect(r_vars, hard_radius)
+      if (length(inactive_shape)) {
+        shape_est[inactive_shape, c("Mean", "SE")] <- NA_real_
+        attr(shape_est, "not_applicable") <- inactive_shape
+      }
 
     } else {
       shape_est <- NULL

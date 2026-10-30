@@ -13,3 +13,14 @@ test_that('compiled weighted SQ preserves the centered reference calculation', {
   expect_error(.surface_weighted_by_buffer(0,matrix(7:8),'gaussian',1,NULL,'sq'), 'one row')
   expect_error(.surface_weighted_by_buffer(d,values,'gaussian',1,NULL,'sq'), 'finite|non-finite')
 })
+
+test_that("compiled surface values and derivatives are invariant to additive origins", {
+  buffer <- list(list(d = c(0, .1, .5, 1), v = c(1, 2, 4, 7)))
+  shifted <- buffer
+  shifted[[1L]]$v <- shifted[[1L]]$v + 1e10
+  for (kernel in c("gaussian", "exp")) for (sigma in c(.01, .5, 100)) {
+    expected <- msr_surface_sq_derivative_cpp(buffer, sigma, kernel)
+    actual <- msr_surface_sq_derivative_cpp(shifted, sigma, kernel)
+    expect_equal(actual, expected, tolerance = 1e-12)
+  }
+})

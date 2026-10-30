@@ -636,7 +636,8 @@
 }
 
 
-.landscape_class_count_rasters <- function(raster, radius, na.rm = TRUE) {
+.landscape_class_count_rasters <- function(raster, radius, na.rm = TRUE,
+                                     convolve = fft_convolution) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_logical(na.rm, "na.rm")
 
@@ -658,7 +659,7 @@
       ncol = ncol(values)
     )
     class_indicator[is.na(class_indicator)] <- 0
-    class_counts[[i]] <- .landscape_clean_count_matrix(fft_convolution(
+    class_counts[[i]] <- .landscape_clean_count_matrix(convolve(
       x = class_indicator,
       kernel = kernel,
       fun = "sum",
@@ -688,7 +689,8 @@
                                               base = exp(1),
                                               classes_max = NULL,
                                               focal_class = NULL,
-                                              na.rm = TRUE) {
+                                              na.rm = TRUE,
+                                              convolve = fft_convolution) {
   metric <- match.arg(
     metric,
     c("shdi", "shei", "sidi", "siei", "msidi", "msiei", "pr",
@@ -709,7 +711,8 @@
   counts <- .landscape_class_count_rasters(
     raster = raster,
     radius = radius,
-    na.rm = na.rm
+    na.rm = na.rm,
+    convolve = convolve
   )
   out <- terra::rast(raster)
 
@@ -784,13 +787,15 @@
 .landscape_shdi_raster_fft <- function(raster,
                                        radius,
                                        base = exp(1),
-                                       na.rm = TRUE) {
+                                       na.rm = TRUE,
+                                       convolve = fft_convolution) {
   .landscape_composition_raster_fft(
     raster = raster,
     radius = radius,
     metric = "shdi",
     base = base,
-    na.rm = na.rm
+    na.rm = na.rm,
+    convolve = convolve
   )
 }
 
@@ -824,7 +829,8 @@
 }
 
 
-.landscape_edge_counts_raster_fft <- function(raster, radius, na.rm = TRUE) {
+.landscape_edge_counts_raster_fft <- function(raster, radius, na.rm = TRUE,
+                                     convolve = fft_convolution) {
   validate_scalar_numeric(radius, "radius", positive = TRUE)
   validate_scalar_logical(na.rm, "na.rm")
   resolution <- .landscape_validate_single_layer_raster(raster, "Edge")
@@ -869,23 +875,23 @@
                                         resolution = resolution,
                                         orientation = "down")
 
-  area_cells <- .landscape_clean_count_matrix(fft_convolution(valid * 1,
+  area_cells <- .landscape_clean_count_matrix(convolve(valid * 1,
                                                               area_kernel,
                                                               fun = "sum",
                                                               na.rm = na.rm))
-  right_count <- .landscape_clean_count_matrix(fft_convolution(right_edges,
+  right_count <- .landscape_clean_count_matrix(convolve(right_edges,
                                                                right_kernel,
                                                                fun = "sum",
                                                                na.rm = na.rm))
-  down_count <- .landscape_clean_count_matrix(fft_convolution(down_edges,
+  down_count <- .landscape_clean_count_matrix(convolve(down_edges,
                                                               down_kernel,
                                                               fun = "sum",
                                                               na.rm = na.rm))
-  right_valid_count <- .landscape_clean_count_matrix(fft_convolution(right_valid_pairs,
+  right_valid_count <- .landscape_clean_count_matrix(convolve(right_valid_pairs,
                                                                      right_kernel,
                                                                      fun = "sum",
                                                                      na.rm = na.rm))
-  down_valid_count <- .landscape_clean_count_matrix(fft_convolution(down_valid_pairs,
+  down_valid_count <- .landscape_clean_count_matrix(convolve(down_valid_pairs,
                                                                     down_kernel,
                                                                     fun = "sum",
                                                                     na.rm = na.rm))
@@ -945,12 +951,14 @@
 .landscape_edge_raster_fft <- function(raster,
                                        radius,
                                        metric,
-                                       na.rm = TRUE) {
+                                       na.rm = TRUE,
+                                       convolve = fft_convolution) {
   metric <- match.arg(metric, c("ed", "te", "lsi"))
   counts <- .landscape_edge_counts_raster_fft(
     raster = raster,
     radius = radius,
-    na.rm = na.rm
+    na.rm = na.rm,
+    convolve = convolve
   )
 
   edge_total <- counts$internal_edge_count * counts$resolution
@@ -976,24 +984,28 @@
 
 .landscape_ed_raster_fft <- function(raster,
                                      radius,
-                                     na.rm = TRUE) {
+                                     na.rm = TRUE,
+                                     convolve = fft_convolution) {
   .landscape_edge_raster_fft(
     raster = raster,
     radius = radius,
     metric = "ed",
-    na.rm = na.rm
+    na.rm = na.rm,
+    convolve = convolve
   )
 }
 
 
 .landscape_te_raster_fft <- function(raster,
                                      radius,
-                                     na.rm = TRUE) {
+                                     na.rm = TRUE,
+                                     convolve = fft_convolution) {
   .landscape_edge_raster_fft(
     raster = raster,
     radius = radius,
     metric = "te",
-    na.rm = na.rm
+    na.rm = na.rm,
+    convolve = convolve
   )
 }
 
@@ -1003,7 +1015,8 @@
                                              to,
                                              right_kernel,
                                              down_kernel,
-                                             na.rm) {
+                                             na.rm,
+                                             convolve = fft_convolution) {
   right_pairs <- matrix(0, nrow = nrow(values), ncol = ncol(values))
   down_pairs <- matrix(0, nrow = nrow(values), ncol = ncol(values))
 
@@ -1023,11 +1036,11 @@
   }
 
   .landscape_clean_count_matrix(
-    fft_convolution(right_pairs,
+    convolve(right_pairs,
                     right_kernel,
                     fun = "sum",
                     na.rm = na.rm) +
-      fft_convolution(down_pairs,
+      convolve(down_pairs,
                       down_kernel,
                       fun = "sum",
                       na.rm = na.rm)
@@ -1040,7 +1053,8 @@
                                             metric,
                                             base = exp(1),
                                             focal_class = NULL,
-                                            na.rm = TRUE) {
+                                            na.rm = TRUE,
+                                            convolve = fft_convolution) {
   metric <- match.arg(
     metric,
     c("ai", "pladj", "contag", "iji", "ent", "condent", "joinent", "mutinf",
@@ -1064,7 +1078,8 @@
   counts <- .landscape_edge_counts_raster_fft(
     raster = raster,
     radius = radius,
-    na.rm = na.rm
+    na.rm = na.rm,
+    convolve = convolve
   )
   values <- counts$values
   .landscape_validate_categorical_values(
@@ -1090,7 +1105,8 @@
       to = to,
       right_kernel = counts$right_kernel,
       down_kernel = counts$down_kernel,
-      na.rm = na.rm
+      na.rm = na.rm,
+      convolve = convolve
     )
   }
 
@@ -1104,7 +1120,8 @@
         to = class,
         right_kernel = counts$right_kernel,
         down_kernel = counts$down_kernel,
-        na.rm = na.rm
+        na.rm = na.rm,
+        convolve = convolve
       )
     }
     result <- like_source / total_source * 100
@@ -1114,7 +1131,8 @@
     class_counts <- .landscape_class_count_rasters(
       raster = raster,
       radius = radius,
-      na.rm = na.rm
+      na.rm = na.rm,
+      convolve = convolve
     )
     result <- matrix(0, nrow = nrow(counts$area_cells),
                      ncol = ncol(counts$area_cells))
@@ -1128,7 +1146,8 @@
         to = class,
         right_kernel = counts$right_kernel,
         down_kernel = counts$down_kernel,
-        na.rm = na.rm
+        na.rm = na.rm,
+        convolve = convolve
       )
       max_adjacencies <- .landscape_max_like_adjacencies_matrix(count)
       class_ai <- like_source / max_adjacencies * 100
@@ -1142,7 +1161,8 @@
     class_counts <- .landscape_class_count_rasters(
       raster = raster,
       radius = radius,
-      na.rm = na.rm
+      na.rm = na.rm,
+      convolve = convolve
     )
     idx <- match(focal_class, class_counts$classes)
     zero_mat <- matrix(0, nrow = nrow(counts$area_cells),
@@ -1170,7 +1190,8 @@
     class_counts <- .landscape_class_count_rasters(
       raster = raster,
       radius = radius,
-      na.rm = na.rm
+      na.rm = na.rm,
+      convolve = convolve
     )
     present <- matrix(0, nrow = nrow(counts$area_cells),
                       ncol = ncol(counts$area_cells))

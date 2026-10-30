@@ -20,6 +20,8 @@ NumericMatrix msr_surface_sq_derivative_cpp(List buffers, double sigma,
     if (d.size() != v.size()) stop("Invalid surface buffer.");
     weights.resize(d.size()); scores.resize(d.size());
     long double sw = 0, sx = 0;
+    double anchor = 0;
+    bool anchored = false;
     for (R_xlen_t j = 0; j < d.size(); ++j) {
       if (!std::isfinite(d[j]) || !std::isfinite(v[j]))
         stop("Surface buffers must contain finite cells.");
@@ -28,7 +30,10 @@ NumericMatrix msr_surface_sq_derivative_cpp(List buffers, double sigma,
       double w = std::exp(kernel == "gaussian" ? -score / 2 : -score);
       weights[j] = std::isfinite(w) && w > 0 ? w : 0;
       scores[j] = score;
-      if (weights[j] > 0) { sw += w; sx += w * v[j]; }
+      if (weights[j] > 0) {
+        if (!anchored) { anchor = v[j]; anchored = true; }
+        sw += w; sx += w * (v[j] - anchor);
+      }
     }
     double total = static_cast<double>(sw);
     if (!std::isfinite(total) || total <= 0)
@@ -36,7 +41,7 @@ NumericMatrix msr_surface_sq_derivative_cpp(List buffers, double sigma,
     double mean = static_cast<double>(sx) / total;
     long double ss = 0;
     for (R_xlen_t j = 0; j < d.size(); ++j) if (weights[j] > 0) {
-      double dev = v[j] - mean;
+      double dev = (v[j] - anchor) - mean;
       ss += weights[j] * (dev * dev);
     }
     double variance = static_cast<double>(ss) / total;
@@ -44,7 +49,7 @@ NumericMatrix msr_surface_sq_derivative_cpp(List buffers, double sigma,
     long double gradient = 0;
     if (variance != 0) {
       for (R_xlen_t j = 0; j < d.size(); ++j) if (weights[j] > 0) {
-        double dev = v[j] - mean;
+        double dev = (v[j] - anchor) - mean;
         gradient += weights[j] * scores[j] * (dev * dev - variance);
       }
     }

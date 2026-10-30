@@ -51,7 +51,7 @@
 simulate.multiScaleR_bayes <- function(object, nsim = 1L, seed = NULL,
     newdata = NULL, kernel_inputs = NULL, row_id = NULL, re.form = NULL,
     scale_re.form = NULL, new_scale_levels = c("error", "sample", "zero"),
-    new_response_levels = c("error", "sample", "zero"), trials = NULL, ...) {
+    new_response_levels = c("error", "sample", "zero"), trials = NULL, include_fixed = FALSE, ...) {
   if (length(list(...))) stop("Unused simulation arguments.", call. = FALSE)
   validate_scalar_numeric(nsim, "nsim", integerish = TRUE, lower = 1)
   ids <- .msr_bayes_draw_ids(object, NULL)
@@ -59,7 +59,8 @@ simulate.multiScaleR_bayes <- function(object, nsim = 1L, seed = NULL,
   context <- .msr_bayes_prediction_seed(seed,
     .msr_bayes_prediction_prepare(object, newdata, kernel_inputs, row_id,
       match.arg(new_scale_levels), match.arg(new_response_levels),
-      .msr_bayes_prediction_re_form(scale_re.form, "scale_re.form"), include_response))
+      .msr_bayes_prediction_re_form(scale_re.form, "scale_re.form"), include_response,
+      include_fixed))
   spec <- context$spec
   if (!is.null(trials)) {
     if (spec$family != "binomial") stop("trials applies only to binomial models.", call. = FALSE)

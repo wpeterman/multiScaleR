@@ -16,6 +16,7 @@
   new_scale_levels = c("error", "sample", "zero"),
   new_response_levels = c("error", "sample", "zero"),
   trials = NULL,
+  include_fixed = FALSE,
   ...
 )
 }
@@ -32,15 +33,18 @@ caller's random-number state is restored after simulation, including on failure.
 a nonempty data frame containing fixed covariates, offsets and included
 grouping variables. Response values are neither needed nor used.}
 
-\item{kernel_inputs}{Matching binned inputs for \code{newdata}, from
+\item{kernel_inputs}{Matching prepared inputs for \code{newdata}, from
 \code{\link{kernel_prep}} or \code{\link{kernel_prep_by_group}}.
 Required for new observations and otherwise \code{NULL}. Use the fitted
 kernel, predictor definitions and physical map units. Numerical
 \code{unit_conv} normalizers may differ and are converted internally;
-this does not convert coordinate systems or physical units.}
+this does not convert coordinate systems or physical units.
+Kernel means require bins. Weighted SQ requires matching source/metric
+specifications and raw buffers, with the fitted reference normalization.}
 
 \item{row_id}{Name of a \code{newdata} column matching unique prepared
-\code{binned$point_ids}. Observation keys may repeat. \code{NULL} uses
+\code{binned$point_ids}, or \code{kernel_dat} row names for surface-only
+inputs. Observation keys may repeat. \code{NULL} uses
 the fitted row-ID column when retained, or new-data row names otherwise.
 Supply it explicitly for older saved objects. Used only with new data.}
 
@@ -65,6 +69,13 @@ observation row. \code{NULL} keeps fitted totals for fitted-row simulation
 and uses one trial for new observations from a binary fit. New observations
 from a grouped-binomial fit require explicit totals. This argument applies
 only to binomial models. New response values never supply the trial totals.}
+
+\item{include_fixed}{Logical. With new data and matching spatial inputs,
+\code{TRUE} recomputes declared fixed-radius predictors using their original
+preparation means and sample SDs. The default \code{FALSE} requires these
+columns explicitly. Source, metric, radius, kernel, and resolution must
+match the fitted preparation, including its \code{max_D} buffer extent.
+This adds no scale parameters or uncertainty.}
 
 \item{...}{Reserved for extensions; unsupported arguments cause an error.}
 }

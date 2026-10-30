@@ -381,6 +381,10 @@ terra::predict(r_scaled, opt$opt_mod, type = "response")
 
 # Learn More
 
+- **Feature compatibility**:
+  `vignette("feature-compatibility", package = "multiScaleR")` connects means,
+  surface and landscape metrics to fitting, plotting, prediction, and model
+  comparison, including checked raster scenarios.
 - **Full user guide**: `vignette("multiScaleR_Guide", package = "multiScaleR")`
   covers kernel selection, model comparison with AIC/BIC, optimization with
   `unmarked`, zero-inflated models, and simulation tools.

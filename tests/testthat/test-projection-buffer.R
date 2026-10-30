@@ -118,8 +118,8 @@ test_that("prepared matching refuses incompatible modes and leaves defaults inta
     kernel = "gaussian", bin = FALSE, verbose = FALSE)
   expect_error(kernel_scale.raster(f$source, sigma = 80, match_buffer = TRUE,
     verbose = FALSE), "requires a fitted or prepared")
-  expect_error(kernel_scale.raster(f$source, multiScaleR = inputs,
-    match_buffer = TRUE, fft = FALSE, verbose = FALSE), "fft = TRUE")
+  expect_s4_class(kernel_scale.raster(f$source, multiScaleR = inputs,
+    match_buffer = TRUE, fft = FALSE, verbose = FALSE), "SpatRaster")
   expect_error(kernel_scale.raster(f$source, multiScaleR = inputs,
     match_buffer = TRUE, na.rm = FALSE, verbose = FALSE), "na.rm = TRUE")
   incompatible <- inputs

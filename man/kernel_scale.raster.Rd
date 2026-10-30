@@ -21,6 +21,7 @@ kernel_scale.raster(
   offset_values = NULL,
   include_fixed = FALSE,
   match_buffer = FALSE,
+  site_values = NULL,
   ...
 )
 }
@@ -30,7 +31,8 @@ layer(s) to be smoothed. Layer names must match the covariate names used
 during model fitting (or the \code{source} names in \code{scale_vars}).}
 
 \item{sigma}{Numeric vector of kernel scale parameter(s) in the same units
-as the raster projection (e.g., meters). One value per raster layer.
+as the raster projection (e.g., meters). One value per optimized covariate
+in declaration order, including separate derived variables from one source.
 Ignored when \code{multiScaleR} is provided; sigma values are extracted
 from the fitted object automatically.}
 
@@ -40,7 +42,8 @@ from the fitted object automatically.}
 scale_vars are all extracted automatically. Default: \code{NULL}.}
 
 \item{shape}{Numeric vector of shape parameters for the exponential power
-kernel (\code{kernel = "expow"}), one per raster layer. Ignored when
+kernel (\code{kernel = "expow"}), one per optimized covariate. A
+hard-radius variable ignores its shape position. Ignored when
 \code{multiScaleR} is provided. Default: \code{NULL}.}
 
 \item{kernel}{Character. Kernel function used for smoothing. One of
@@ -62,9 +65,10 @@ Default: \code{0.975}.}
 
 \item{fft}{Logical. If \code{TRUE} (default), smoothing is performed via
 Fast Fourier Transform (FFT) convolution, which is substantially faster
-for large rasters and wide kernels. Some edge effects may occur at raster
-boundaries. Set to \code{FALSE} to use \code{terra::focal}, which avoids
-edge effects but is slower.}
+for large rasters and wide kernels. Set to \code{FALSE} to use direct
+focal calculations. Both engines support kernel means and the declared
+surface and landscape metrics, with the same available-support and
+missing-value rules. Direct focal calculations can be slower.}
 
 \item{scale_center}{Logical. If \code{TRUE}, the smoothed raster values are
 centered and scaled using the mean and standard deviation from the model
@@ -97,16 +101,17 @@ offsets. When omitted, a log offset uses 1 (zero on the log scale) and
 a direct offset uses 0. Set this argument for a meaningful projection
 scenario.}
 
-\item{include_fixed}{Logical. For a fitted unmarked, GLM, or coxph model,
+\item{include_fixed}{Logical. For a fitted native model with verifiable
+retained numeric predictors and training row IDs,
 set \code{TRUE}
 with \code{scale_center = TRUE} to standardize modeled fixed-radius metrics
 using their verified original training preparation. The default
 \code{FALSE} uses only the supplied object's scaling parameters. The opt-in
 requires retained training buffers, matching fixed metric definitions and
-raster resolution, and unchanged native training predictor values. GLM and
-coxph models require \code{model = TRUE}, numeric fixed inputs retained
-under their original names, and model row IDs matching retained prepared
-sites. See
+raster resolution, and unchanged native training predictor values.
+Retain the native model frame (for GLM and coxph, \code{model = TRUE}) or
+an equivalent recoverable training frame. Fixed inputs must be retained
+under their original names, with row IDs matching prepared sites. See
 \code{\link{prepare_unmarked_data}} for the verification contract.}
 
 \item{match_buffer}{Logical. The default \code{FALSE} retains the historical
@@ -114,10 +119,20 @@ sites. See
 preparation's \code{max_D} polygon-intersection support and finite-cell
 normalization, including partially intersecting boundary cells.
 Requires a fitted or prepared \code{multiScaleR} object, matching projected
-square-cell resolution, \code{fft = TRUE}, and \code{na.rm = TRUE}.
+square-cell resolution and \code{na.rm = TRUE}. Both smoothing engines
+support this option.
 Metric radii larger than the prepared buffer raise an error. Central source
 NA cells remain masked. Binning, rasterization, and cell-center differences
 remain separate approximations.}
+
+\item{site_values}{Optional named list of scalar nonspatial projection
+values in the native predictor units, for example
+\code{list(season = "spring", effort = 2, surveyed = TRUE)}. Requires a
+fitted object. Factor and character values must be fitted levels.
+Numeric predictors retain their historical zero default when omitted;
+categorical predictors need an explicit value. Unknown names and attempts
+to overwrite computed spatial layers raise an error. Use
+\code{offset_values} for variables occurring only inside offsets.}
 
 \item{...}{Reserved for deprecated arguments. Currently only \code{scale_opt}
 (deprecated alias for \code{multiScaleR}) is handled.}
@@ -131,11 +146,14 @@ predictors (i.e., predictors not derived from raster layers), constant
 ("dummy") raster layers filled with zeros are appended to make the output
 compatible with \code{terra::predict}.
 Offset variables are appended under their input names so transformed offset
-expressions can be evaluated by \code{terra::predict}.
+expressions can be evaluated by prediction. With a fitted object, the
+returned R object also retains a preparation descriptor for checked
+\code{\link{predict.multiScaleR}} raster prediction. Ordinary raster file
+formats need not retain this descriptor.
 }
 \description{
 Applies a kernel smoothing function to one or more raster
-layers, producing a spatially weighted mean (or landscape metric) at the
+layers, producing a spatially weighted mean, surface metric, or landscape metric at the
 scale identified by \code{\link{multiScale_optim}}. Primarily used to
 generate prediction rasters for spatial model projection.
 }
@@ -148,17 +166,20 @@ plot(c(hab, opt_hab))
 ## Scale and center for prediction
 opt_hab_sc <- kernel_scale.raster(raster_stack = hab,
                                   multiScaleR = opt,
-                                  scale_center = TRUE)
-preds <- terra::predict(opt_hab_sc, opt$opt_mod, type = "response")
+                                  scale_center = TRUE,
+                                  match_buffer = TRUE)
+preds <- predict(opt, opt_hab_sc, type = "response")
 }
 
 \strong{FFT vs. focal smoothing}
 
-The FFT convolution (\code{fft = TRUE}) is substantially faster for large
-rasters or wide kernels. It produces minor edge artifacts near raster
-boundaries, typically within one kernel-width of the edge. For analyses
-focused on interior areas this is usually negligible. Use
-\code{fft = FALSE} for exact focal smoothing when edge accuracy matters.
+FFT and direct focal calculations evaluate the same declared neighborhood
+and finite-cell normalization. Weighted means renormalize over available
+mapped support, including raster edges. Central source NA cells remain
+masked. With \code{na.rm = FALSE}, incomplete footprints, including missing
+cells beyond the map extent, return NA. Small floating-point differences
+between engines can occur. Constant weighted SQ support returns zero;
+standardized higher moments remain undefined when spread is zero.
 
 \strong{Dummy rasters for site-level covariates}
 
@@ -168,9 +189,10 @@ layers (e.g., survey effort, habitat type measured in the field). These
 cannot be projected spatially and are therefore assigned constant zero
 rasters, which correspond to the reference value for centered and scaled
 covariates. These dummy layers are required for \code{terra::predict} to
-work but do not represent real spatial variation. Replace them manually for
-non-zero projection scenarios. Categorical predictors are skipped with a
-warning.
+work but do not represent real spatial variation. Set \code{site_values}
+for other scenarios. Categorical predictors are skipped with a warning
+unless a fitted level is explicitly supplied. Their raster category labels
+preserve the fitted levels. Checked prediction also restores logical types.
 Native unmarked models require explicit nonspatial prediction scenarios.
 When every native predictor is represented by a spatial layer, no dummy
 layers are needed. Supply remaining variables through native prediction data
@@ -179,6 +201,9 @@ Offset terms use their underlying input variables as layer names. For
 \code{offset(log(n_weeks))}, the default layer is \code{n_weeks = 1},
 representing one week of effort. Set \code{offset_values = c(n_weeks = 4)}
 to predict for four weeks. Direct offsets default to zero.
+Compound offsets, such as \code{offset(log(effort * duration))}, require
+explicit raw values for each underlying input. Literal constant offsets
+need no layer. Ambiguous or conflicting default scenarios raise an error.
 
 \strong{Verified fixed-radius metrics in native projection}
 
@@ -190,7 +215,7 @@ exactly. Changed definitions or training inputs raise an error. This opt-in
 does not alter the caller's fitted object, metric definitions, or native
 uncertainty interpretation. Point-buffer preparation and raster smoothing
 retain their respective truncation and approximation rules.
-GLM and coxph projection require the retained native model frame and matching
+Native projection requires a recoverable training frame and matching
 original prepared row IDs for this verification. Transformations that do not
 retain the fixed predictor under its original name are not reconstructed.
 For conditional-logistic step selection, native \code{type = "risk"} with
@@ -207,8 +232,9 @@ cells receive their usual full-cell kernel weights, matching the fitting
 convention rather than adding coverage-fraction weights. Finite cells within
 mapped support are renormalized at raster edges; central source NA cells remain
 masked. Constant weighted SQ support has zero population spread in this mode.
-The historical \code{pct_wt} window and its numerical behavior remain unchanged
-when \code{match_buffer = FALSE}.
+The historical \code{pct_wt} window remains the default when
+\code{match_buffer = FALSE}; both window choices use the finite-support,
+source-mask, and missing-value corrections described above.
 
 This option aligns the extraction footprint at raster cell centers. It does
 not undo distance binning, reconstruct raster contents or original CRS metadata,

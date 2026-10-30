@@ -62,6 +62,9 @@
 #' the joint identifiability checks. Point distances remain available.
 #' For \code{conditional_logit}, point distances remain available but scale
 #' uncertainty has not been calibrated, so distance confidence limits are missing.
+#' Native-refit point distances remain available when a scale SE is non-finite;
+#' their Wald limits are then missing. A hard-radius metric reports its radius
+#' directly and has no kernel shape, including in an expow mixture.
 #'
 #' \strong{Default change.} Version 0.7.4 and later use
 #' \code{dimension = "2d"} for distances, summaries, and kernel plots. Earlier
@@ -231,10 +234,7 @@ kernel_dist <- function(model,
             scale_mn <- ci_[i, 1]
             scale_l <- ci_[i, 3]
             scale_u <- ci_[i, 4]
-        } else if (is.finite(ci_[i, 2]) ||
-                   ((.msr_analytic_backend(model) || identical(model$backend, "joint_mixed") ||
-                     identical(model$backend, "conditional_logit")) &&
-                    is.finite(ci_[i, 1]))) {
+        } else if (is.finite(ci_[i, 1])) {
             shape_i <- if (!is.null(model$shape_est)) model$shape_est[i,1] else NULL
           # wt_mn <- scale_type_r(d = d,
           #                       kernel = model$kernel_inputs$kernel,
@@ -279,6 +279,10 @@ kernel_dist <- function(model,
                             kernel = model$kernel_inputs$kernel,
                             beta = shape_i,
                             dimension = dimension)
+          interval_method <- attr(ci_, "interval_method")
+          if (!is.finite(ci_[i, 2]) &&
+              (is.null(interval_method) || interval_method[i] == "wald"))
+            scale_l <- scale_u <- NA_real_
           if (.msr_analytic_backend(model) &&
               model$kernel_inputs$kernel == "expow") {
             # Radius depends on both scale and shape. Mapping a scale interval

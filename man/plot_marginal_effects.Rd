@@ -9,7 +9,8 @@ plot_marginal_effects(
   ylab = "Estimated response",
   length.out = 100,
   type = "state",
-  link = FALSE
+  link = FALSE,
+  draws = NULL
 )
 }
 \arguments{
@@ -17,7 +18,8 @@ plot_marginal_effects(
 \code{\link{multiScale_optim}}. Must contain \code{opt_mod} (the optimized
 fitted model) and \code{scl_params} (a list with \code{mean} and \code{sd}
 elements for each covariate, used to back-transform scaled covariates to
-their original units for the x-axis).}
+their original units for the x-axis). Also accepts \code{multiScaleR_bayes}
+fits for hypothetical fixed-reference covariate curves; see Details.}
 
 \item{ylab}{Character scalar. Y-axis label for all marginal effect panels.
 Default: \code{"Estimated response"}.}
@@ -34,6 +36,11 @@ model's inverse link function before plotting (i.e., plotted on the
 response scale). For \code{glm} objects this is applied automatically.
 Set to \code{TRUE} manually if predicted values appear to be on the link
 scale. Default: \code{FALSE}.}
+
+\item{draws}{For Bayesian fits, a positive number of stored draws to select
+evenly across the retained sample, or explicit draw indices. The default
+\code{NULL} uses at most 1000 evenly spaced draws. Ignored for frequentist
+fits. Bayesian curves use the response scale regardless of \code{link}.}
 }
 \value{
 A named list of \code{ggplot2} objects, one per covariate. Plots are
@@ -45,15 +52,20 @@ A named list of \code{ggplot2} objects, one per covariate. Plots are
       to the original (unscaled) units when applicable.
     \item A shaded ribbon or categorical error bars for the 95\% confidence
       interval (when available from the model's \code{predict} method).
+      Bayesian curves show posterior medians and central 95\% credible
+      intervals, with the retained draw indices and prediction contract
+      attached to the returned list.
     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
       terms that involve the covariate.
   }
 }
 \description{
-Generates marginal effect plots with 95\% confidence intervals for each
+Generates marginal effect plots with 95\% intervals for each
 covariate in the optimized model stored within a \code{multiScaleR} object.
 Each panel sweeps one covariate across its observed range while holding all
-other numeric predictors at their sample mean. For \code{unmarked} models,
+other numeric predictors at their sample mean. For categorical predictors,
+the grid uses observed levels and other categorical inputs use an observed
+reference level. For \code{unmarked} models,
 other categorical predictors are held at their first observed level.
 }
 \details{
@@ -100,6 +112,25 @@ class-specific prediction calls.
 When \code{x$opt_mod} is a wrapper object around another fitted model,
 \code{plot_marginal_effects()} uses the nested analysis model for predictor
 discovery, data recovery, and prediction when possible.
+
+Mixed-model curves set response random effects to zero. glmmTMB curves use
+native response predictions, including zero inflation or truncated-family
+means, with native response-scale Wald limits when available. This is a
+prediction at zero random effects, not an average over their distribution.
+Frequentist limits condition on the selected spatial scales. Cox panels
+default to log relative risk; exponentiation gives a relative risk score,
+not an occurrence or survival probability.
+
+Bayesian panels use the stored marginal response-coefficient draws and the
+original pooled reference normalization. They hold each landscape covariate
+at a hypothetical grid of values while keeping the remaining covariates at
+their reference values. Coefficient draws retain their fitted posterior
+variation, but the landscape is not reevaluated at each draw's kernel scales.
+Response random effects are zero and observation noise is excluded. Use
+\code{\link{predict.multiScaleR_bayes}} with matched spatial inputs for
+location-specific posterior expectations. A plotted credible interval does
+not establish convergence or calibration; existing fit diagnostics remain
+relevant and their stored status is shown in the caption.
 }
 \examples{
 \donttest{

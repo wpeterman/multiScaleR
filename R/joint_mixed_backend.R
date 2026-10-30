@@ -4,9 +4,9 @@
   for (pkg in c("RTMB", "TMB", "glmmTMB"))
     if (!requireNamespace(pkg, quietly = TRUE))
       stop("joint_mixed requires the optional package ", pkg, ".", call. = FALSE)
-  if (!inherits(model, "glmmTMB") || is.null(inputs$binned) ||
+  if (!inherits(model, "glmmTMB") ||
       !inputs$kernel %in% c("gaussian", "exp"))
-    stop("joint_mixed requires a glmmTMB model and Gaussian or exponential binned inputs.", call. = FALSE)
+    stop("joint_mixed requires a glmmTMB model and Gaussian or exponential inputs.", call. = FALSE)
   if (!is.null(join_by) || !is.null(refit_fn) || start_strategy != "single" ||
       (!is.null(n_cores) && n_cores != 1L))
     stop("joint_mixed uses retained rows and serial independent starts; join_by and refit_fn are unsupported.", call. = FALSE)
@@ -16,20 +16,27 @@
   if (!is.null(model$call$offset))
     stop("Use a formula offset() rather than the separate offset argument.", call. = FALSE)
   mf <- stats::model.frame(model)
-  covs <- intersect(all.vars(stats::formula(model)), names(inputs$binned$vsum))
-  other_spatial <- intersect(names(inputs$binned$vsum), unique(c(
+  specs <- inputs$scale_vars
+  surface_names <- if (is.null(specs)) character() else specs$covariate[
+    specs$type == "surface" & specs$metric == "sq" & specs$weighted & specs$optimize]
+  spatial_names <- c(names(inputs$binned$vsum), surface_names)
+  covs <- intersect(all.vars(stats::formula(model)), spatial_names)
+  other_spatial <- intersect(spatial_names, unique(c(
     all.vars(model$modelInfo$allForm$ziformula), all.vars(model$modelInfo$allForm$dispformula))))
   if (length(other_spatial))
     stop("Spatial predictors in zero-inflation or dispersion formulas are unsupported.", call. = FALSE)
-  if (!length(covs)) stop("No binned kernel predictors occur in the formula.", call. = FALSE)
-  specs <- inputs$scale_vars
+  if (!length(covs)) stop("No supported spatial predictors occur in the formula.", call. = FALSE)
   if (!is.null(specs)) {
     used <- specs[specs$covariate %in% all.vars(stats::formula(model)), , drop = FALSE]
-    if (any(used$type != "kernel" | !used$optimize) || !all(used$covariate %in% covs))
-      stop("joint_mixed requires optimized kernel-type spatial predictors only.", call. = FALSE)
+    optimized <- used[used$optimize, , drop = FALSE]
+    if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface_names)) || !all(optimized$covariate %in% covs))
+      stop("joint_mixed requires optimized kernel means or weighted surface SQ.", call. = FALSE)
+    if (any(!used$optimize)) .msr_fixed_training_contract(list(opt_mod = model,
+      kernel_inputs = inputs))
   }
-  rows <- .msr_profile_rows(mf, inputs$binned)
-  engine <- .msr_prepare_kernel_engine(inputs$binned, covs, rows, inputs$kernel)
+  rows <- .msr_profile_input_rows(mf, inputs)
+  engine <- if (any(covs %in% surface_names)) .msr_prepare_surface_engine(inputs, covs, rows) else
+    .msr_prepare_kernel_engine(inputs$binned, covs, rows, inputs$kernel)
   # Recover raw formula variables (including offset/transform inputs), then fix
   # the sample to the native fit's retained rows. Never resolve missing data in
   # a formula environment or silently change the sample during optimization.
@@ -83,6 +90,7 @@
     uncertainty = list(available = FALSE, reasons = "Mixed-model scale uncertainty is not calibrated."),
     diagnostics = .empty_diagnostics(), next_run = NULL, warn_message = 0, call = call)
   class(out) <- "multiScaleR"
+  out <- .msr_attach_fixed_reference(out)
   out$diagnostics$joint_mixed <- list(triggered = TRUE, uncertainty_available = FALSE,
     reasons = out$uncertainty$reasons, attempted_starts = length(fits$outcomes),
     eligible_starts = sum(vapply(fits$outcomes, function(x) x$eligible, TRUE)),
@@ -95,11 +103,12 @@
 }
 
 .msr_predict_mixed <- function(object, newdata, kernel_inputs, type, se.fit,
-                                uncertainty, interval, ...) {
+                                uncertainty, interval, include_fixed = FALSE, ...) {
   if (interval != "none" || (se.fit && uncertainty != "conditional"))
     stop("joint_mixed supports conditional prediction SEs only; use uncertainty = 'conditional' and interval = 'none'.", call. = FALSE)
   if (!is.logical(se.fit) || length(se.fit) != 1L || is.na(se.fit))
     stop("se.fit must be one logical value.", call. = FALSE)
+  newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
   newdata <- .msr_mixed_prediction_data(object, newdata, kernel_inputs)
   stats::predict(object$opt_mod, newdata = newdata, type = type, se.fit = se.fit, ...)
 }
@@ -109,16 +118,27 @@
 .msr_mixed_prediction_data <- function(object, newdata, kernel_inputs) {
   if (!is.null(newdata) || !is.null(kernel_inputs)) {
     e <- object$mixed_fit$engine
-    if (!is.data.frame(newdata) || is.null(kernel_inputs$binned) ||
+    if (!is.data.frame(newdata) || (is.null(kernel_inputs$binned) && !inherits(e, "msr_surface_engine")) ||
         !identical(kernel_inputs$kernel, e$kernel))
-      stop("Supply newdata and matching binned kernel_inputs together.", call. = FALSE)
+      stop("Supply newdata and matching kernel_inputs together.", call. = FALSE)
     if (!all(object$mixed_fit$required %in% names(newdata)))
       stop("newdata must explicitly contain all fixed, offset, and grouping variables.", call. = FALSE)
     validate_scalar_numeric(kernel_inputs$unit_conv, "unit_conv", positive = TRUE)
     b <- kernel_inputs$binned
-    rows <- .msr_profile_rows(newdata, b)
-    b$bin_rep <- b$bin_rep * kernel_inputs$unit_conv / object$kernel_inputs$unit_conv
-    en <- .msr_prepare_kernel_engine(b, e$covariates, rows, e$kernel, standardize = FALSE)
+    rows <- .msr_profile_input_rows(newdata, kernel_inputs)
+    ratio <- kernel_inputs$unit_conv / object$kernel_inputs$unit_conv
+    if (!is.null(b)) b$bin_rep <- b$bin_rep * ratio
+    if (inherits(e, "msr_surface_engine")) {
+      expected <- e$surface_specs
+      if (is.null(kernel_inputs$scale_vars)) stop("New surface specifications are required.", call. = FALSE)
+      actual <- kernel_inputs$scale_vars[match(expected$covariate, kernel_inputs$scale_vars$covariate), , drop = FALSE]
+      fields <- c("covariate", "source", "type", "metric", "weighted", "optimize")
+      if (!isTRUE(all.equal(actual[, fields], expected[, fields], check.attributes = FALSE)))
+        stop("New surface source and metric specifications must match the fitted model.", call. = FALSE)
+      prepared <- kernel_inputs; prepared$binned <- b
+      prepared$d_list <- lapply(prepared$d_list, function(d) d * ratio)
+      en <- .msr_prepare_surface_engine(prepared, e$covariates, rows, standardize = FALSE)
+    } else en <- .msr_prepare_kernel_engine(b, e$covariates, rows, e$kernel, standardize = FALSE)
     kd <- .msr_eval_kernel_engine(en, object$mixed_fit$log_scale)
     for (nm in e$covariates) newdata[[nm]] <-
       (kd$raw[, nm] - object$scl_params$mean[nm]) / object$scl_params$sd[nm]

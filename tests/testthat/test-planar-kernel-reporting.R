@@ -126,16 +126,22 @@ test_that("hard-radius plots show buffers without invented weight claims or inte
   }
 })
 
-test_that("fitted plots omit missing weighted scales without leaving empty list entries", {
+test_that("fitted plots retain finite scales without SEs and omit missing estimates", {
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
   fit <- make_core_fixture()$opt
   fit$scale_est <- rbind(missing = data.frame(Mean = 10, SE = NaN), fit$scale_est)
   plots <- plot(fit)
+  expect_length(plots, 2)
+  expect_identical(plots[[1]]$labels$title, "missing")
+  # A missing uncertainty estimate does not invalidate a finite point curve.
+  # A genuinely missing scale is omitted without leaving a NULL list element.
+  fit$scale_est$Mean[1] <- NA_real_
+  plots <- plot(fit)
   expect_length(plots, 1)
   expect_s3_class(plots[[1]], "ggplot")
   expect_identical(plots[[1]]$labels$title, "cont1")
-  fit$scale_est$SE[] <- NaN
+  fit$scale_est$Mean[] <- NA_real_
   expect_identical(plot(fit), list())
 })
 

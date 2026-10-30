@@ -108,7 +108,7 @@ test_that("factorization checks nesting by observed membership rather than group
     family = "custom", row_id = "key", method = "prepare"), "arg")
   f$inputs$kernel <- "expow"
   expect_error(multiScale_bayes(count ~ habitat, f$inputs, f$data,
-    row_id = "key", method = "prepare"), "binned Gaussian or exponential")
+    row_id = "key", method = "prepare"), "Gaussian or exponential")
 })
 
 test_that("private likelihood solvers reject crossed terms before optimization", {

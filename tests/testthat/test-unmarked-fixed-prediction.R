@@ -91,7 +91,7 @@ test_that("fixed-radius preparation refuses unverified normalization and definit
                "include_fixed")
   expect_error(prepare_prediction(object, include_fixed = NA), "include_fixed")
   expect_error(prepare_prediction(structure(list(), class = "multiScaleR"),
-    include_fixed = TRUE), "only to unmarked")
+    include_fixed = TRUE), "retained fitted native model")
 })
 
 test_that("fixed native training rows use their original explicit site keys", {

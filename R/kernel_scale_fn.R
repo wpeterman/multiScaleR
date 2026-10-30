@@ -40,7 +40,7 @@
 
 # unmarked fits differ in whether they retain one formula or a list of
 # component formulas. Only variables in the fitted formulas can be optimized.
-.unmarked_model_predictors <- function(model) {
+.unmarked_model_formulas <- function(model) {
   collect_formulas <- function(x) {
     if (inherits(x, "formula")) return(list(x))
     if (is.list(x)) return(do.call(c, lapply(x, collect_formulas)))
@@ -55,9 +55,12 @@
     stop("Could not recover formulas from this unmarked model class: ",
          class(model)[1], call. = FALSE)
   }
-  unique(unlist(lapply(formulas, all.vars), use.names = FALSE))
+  formulas
 }
 
+.unmarked_model_predictors <- function(model) {
+  unique(unlist(lapply(.unmarked_model_formulas(model), all.vars), use.names = FALSE))
+}
 
 # Resolve every model row to exactly one prepared spatial site. The model may
 # repeat site keys (for example, once per year); prepared keys must be unique.
@@ -538,6 +541,12 @@ kernel_scale_fn <- function(par,
     )
   }
 
+  if (identical(mod_class, "unmarked") &&
+      !identical(mod@sitesRemoved, mod_u@sitesRemoved)) {
+    if (is.null(mod_return)) return(1e6^10)
+    stop("The final unmarked refit changed which sites contribute to the likelihood.",
+         call. = FALSE)
+  }
   starting_n <- tryCatch(.msr_model_nobs(.analysis_model(mod)),
                          error = function(e) NA_integer_)
   candidate_n <- tryCatch(.msr_model_nobs(.analysis_model(mod_u)),
@@ -547,12 +556,6 @@ kernel_scale_fn <- function(par,
       candidate_n != starting_n) {
     if (is.null(mod_return)) return(1e6^10)
     stop("The final refit changed the number of observations relative to the starting model.",
-         call. = FALSE)
-  }
-  if (identical(mod_class, "unmarked") &&
-      !identical(mod@sitesRemoved, mod_u@sitesRemoved)) {
-    if (is.null(mod_return)) return(1e6^10)
-    stop("The final unmarked refit changed which sites contribute to the likelihood.",
          call. = FALSE)
   }
 

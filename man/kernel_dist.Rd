@@ -73,6 +73,9 @@ are profiled in \code{summary()}. They are unavailable when the fit fails
 the joint identifiability checks. Point distances remain available.
 For \code{conditional_logit}, point distances remain available but scale
 uncertainty has not been calibrated, so distance confidence limits are missing.
+Native-refit point distances remain available when a scale SE is non-finite;
+their Wald limits are then missing. A hard-radius metric reports its radius
+directly and has no kernel shape, including in an expow mixture.
 
 \strong{Default change.} Version 0.7.4 and later use
 \code{dimension = "2d"} for distances, summaries, and kernel plots. Earlier

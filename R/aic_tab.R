@@ -1,4 +1,6 @@
 .msr_selection_model <- function(model) {
+  if (inherits(model, "multiScaleR_bayes"))
+    stop("AIC/BIC require maximized likelihoods; Bayesian posterior fits need an appropriate posterior predictive comparison, not a posterior objective substituted for logLik.", call. = FALSE)
   if (inherits(model, "multiScaleR")) {
     return(model$opt_mod)
   }
@@ -20,8 +22,10 @@
   analysis_mod <- .analysis_model(model)
 
   if (any(grepl("^unmarked", class(analysis_mod)))) {
-    return(dim(analysis_mod@data@siteCovs)[1])
+    return(dim(analysis_mod@data@siteCovs)[1] - length(analysis_mod@sitesRemoved))
   }
+
+  if (inherits(analysis_mod, "glm")) return(as.integer(stats::nobs(analysis_mod)))
 
   as.integer(n_obs(analysis_mod)[1])
 }
@@ -158,7 +162,8 @@
     extra_k <- extra_k + nrow(model$scale_est)
   }
   if (!is.null(model$shape_est)) {
-    extra_k <- extra_k + nrow(model$shape_est)
+    hard <- .msr_hard_radius_covariates(model$kernel_inputs$scale_vars)
+    extra_k <- extra_k + sum(!rownames(model$shape_est) %in% hard)
   }
 
   .msr_parameter_count(model$opt_mod) + extra_k
@@ -179,11 +184,21 @@
 
   if (any(grepl("^unmarked", class(analysis_mod)))) {
     dat <- analysis_mod@data@siteCovs
+    if (length(analysis_mod@sitesRemoved))
+      dat <- dat[-analysis_mod@sitesRemoved, , drop = FALSE]
     ids <- row.names(dat)
     if (.msr_valid_observation_ids(ids, mod_n)) {
       return(as.character(ids))
     }
     return(as.character(seq_len(mod_n)))
+  }
+
+  frame <- .msr_selection_frame(analysis_mod)
+  if (!is.null(frame)) {
+    if (inherits(analysis_mod, "glm") && !is.null(analysis_mod$prior.weights))
+      frame <- frame[analysis_mod$prior.weights != 0, , drop = FALSE]
+    ids <- rownames(frame)
+    if (.msr_valid_observation_ids(ids, mod_n)) return(as.character(ids))
   }
 
   dat <- .model_data(analysis_mod, effects = "all")
@@ -193,7 +208,7 @@
 
   if (is.data.frame(dat)) {
     ids <- row.names(dat)
-    if (.msr_valid_observation_ids(ids, nrow(dat))) {
+    if (.msr_valid_observation_ids(ids, mod_n)) {
       return(as.character(ids))
     }
   }
@@ -237,6 +252,7 @@
     }
   }
 
+  .msr_assert_selection_targets(mod_list)
   mod_dims
 }
 
@@ -296,6 +312,24 @@
 #' random effects and the integration limit \code{K} are not counted.
 #' Missing or inconsistent parameter metadata and non-finite log-likelihoods
 #' raise an error instead of guessing from predictor names.
+#' Hard-radius metrics in native expow mixtures contribute their estimated
+#' radius but no inapplicable shape parameter. Fixed-radius metrics contribute
+#' neither an estimated radius nor shape.
+#'
+#' When native metadata can be recovered, comparison also checks used row IDs,
+#' response values, binomial trials, likelihood weights, and the likelihood's
+#' response measure. Binomial counts and proportions with their trial weights
+#' are compared on the same count representation. Zero-weight GLM rows and
+#' removed unmarked sites are excluded from the used-observation count.
+#' ML and REML fits cannot be mixed; REML comparisons require the same
+#' recoverable fixed-effect design. Cox partial-likelihood comparisons require
+#' matching methods and equivalent stratum partitions. These checks cannot
+#' certify metadata unavailable from a native provider, and the user must
+#' still establish scientific comparability of the likelihoods.
+#'
+#' Bayesian posterior fits are rejected. A posterior mode or penalized target
+#' is not a maximized sampling likelihood for AIC or BIC. Posterior predictive
+#' comparison requires a separate workflow with its own target and diagnostics.
 #' AICc tables raise an error if any model has \code{n <= K + 1}; use
 #' \code{AICc = FALSE} for an AIC table in that case.
 #'
@@ -395,7 +429,8 @@ aic_tab <- function(mod_list,
 #'
 #' @param mod_list List containing fitted \code{multiScaleR} objects (from
 #'   \code{\link{multiScale_optim}}) and/or plain fitted model objects. All
-#'   models must have been fit to the same number of observations.
+#'   models must have been fit to the same observations and comparable
+#'   likelihoods, including matching responses, weights, and likelihood measure.
 #' @param mod_names Optional character vector of model names. Length must equal
 #'   \code{length(mod_list)}. By default, names are constructed as
 #'   \code{[kernel]right-hand-side-formula} for \code{multiScaleR} objects.
@@ -425,6 +460,10 @@ aic_tab <- function(mod_list,
 #' Sigma (and shape for \code{"expow"}) is counted in K.
 #' Fitted parameter counts and log-likelihood validation follow
 #' \code{\link{aic_tab}}, including all estimated components of unmarked models.
+#' The same recoverable response, row, weight, ML/REML, and partial-likelihood
+#' checks apply. Inapplicable hard-radius shape positions are excluded.
+#' Bayesian posterior fits are rejected; the name BIC does not make a posterior
+#' target a sampling likelihood.
 #' @export
 #'
 #' @usage

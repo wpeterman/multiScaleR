@@ -1,0 +1,316 @@
+---
+title: "Spatial Features Across Fitting and Prediction"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Spatial Features Across Fitting and Prediction}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+                     fig.width = 6, fig.height = 4.25)
+```
+
+A model covariate can be a kernel-weighted mean, a surface texture, or a
+categorical landscape metric. That definition must survive preparation,
+fitting, prediction, plotting, and model comparison. This guide follows those
+steps and identifies the inference methods that support each feature.
+
+Start with `vignette("quickstart", package = "multiScaleR")` for the basic
+workflow. The artificial landscape below demonstrates software behavior. Its
+counts do not provide evidence of scale recovery, ecological effects, or
+interval coverage. Optimization and posterior fitting examples are not run
+during the vignette build.
+
+## Choose features and a fitting method
+
+`kernel_var()` estimates the distance scale of an environmental mean.
+`surface_var()` describes variation in a continuous surface, while
+`landscape_var()` describes categorical composition or configuration. An
+unweighted metric uses a circular neighborhood with a hard boundary. Its radius
+can be fixed or estimated. A weighted surface metric uses the selected kernel
+and estimates its bandwidth instead.
+
+| Feature | Native refit | Analytic likelihood backends | Bayesian scales |
+|:--------|:-------------|:----------------------------|:----------------|
+| Kernel mean | Gaussian, exponential, exponential-power, or fixed kernel | Supported smooth kernels under the chosen backend's contract | Gaussian or exponential |
+| Weighted surface SQ | Gaussian, exponential, or exponential-power | Gaussian or exponential, including mixtures with means | Gaussian or exponential, alone or with means |
+| Weighted SA, skewness, or kurtosis | Gaussian, exponential, or exponential-power | Not implemented | Not implemented |
+| Estimated hard-radius surface or landscape metric | Supported, including mixtures with exponential-power means | Not implemented for the discontinuous radius | Not implemented |
+| Fixed-radius metric | Prepared once and used as a native predictor | Ordinary numeric predictor with verified original preparation | Ordinary numeric predictor with verified original preparation |
+
+The analytic rows include `profile_glm`, `joint_nb2`, `conditional_logit`, and
+`joint_mixed`, subject to their response and formula restrictions.
+Exponential-power means are supported by the profile GLM/NB2 machinery;
+the conditional-logistic, joint mixed, and Bayesian adapters require Gaussian or exponential
+kernels. Analytic and Bayesian kernel means require distance bins. Weighted SQ
+also needs retained raw cells, matching source definitions, and explicit row IDs.
+
+A fixed-radius metric has no estimated bandwidth. Keep its original prepared
+numeric column in the native model frame or Bayesian `data`. Analytic and
+Bayesian fits use it like any other numeric covariate, including in a Bayesian
+scale formula. It retains the mean and sample SD from the original preparation;
+the prior-median reference for optimized spatial predictors does not replace
+that normalization. Undefined and constant metrics remain preparation errors.
+
+For new points, provide fixed columns explicitly or use `include_fixed = TRUE`
+with matching spatial inputs. Automatic preparation verifies the original
+source, metric, radius, kernel, resolution, buffer extent (`max_D`), and row identities.
+Use the original buffer extent even when the fixed radius itself is smaller;
+a shorter buffer can omit cells needed by the metric. It does not learn
+a new center or SD from the prediction batch. Bayesian prediction and simulation
+share this option, including repeated observations linked by explicit site IDs.
+Fixed radii do not add an AIC parameter, a bandwidth prior, or scale uncertainty.
+
+SQ is the square root of the weighted centered variance, with the sum of
+weights in the denominator. Constant support has SQ zero. Standardized higher
+moments are undefined at zero spread. Weighting removes discrete changes in
+neighborhood membership, but does not make every metric differentiable at every
+parameter value. The derivative-based methods therefore retain explicit
+feature restrictions.
+
+For native exponential-power mixtures, a hard-radius predictor has no shape
+parameter. Its reported shape and shape SE are `NA`, and model selection
+excludes the ignored shape position. The starting parameter vector keeps its
+existing full layout. A fixed-radius metric has neither an estimated radius nor
+an estimated shape. If all features are fixed, fit the native regression
+directly to the prepared columns rather than asking for scale optimization.
+
+## Prepare means, weighted SQ, and a fixed metric together
+
+These two small surfaces share a projected square grid. Multiple covariates
+can come from the same source raster; their aliases identify the model columns.
+
+```{r artificial-surfaces}
+hab <- terra::rast(nrows = 24, ncols = 24, xmin = 0, xmax = 240,
+                   ymin = 0, ymax = 240, crs = "EPSG:3857")
+xy <- terra::xyFromCell(hab, seq_len(terra::ncell(hab)))
+terra::values(hab) <- sin(xy[, 1] / 17) + cos(xy[, 2] / 23) + xy[, 1] / 150
+names(hab) <- "habitat"
+elev <- hab
+terra::values(elev) <- 30 + xy[, 1] / 8 + sin(xy[, 2] / 11) *
+  (1 + xy[, 1] / 30) + cos(xy[, 1] / 13 + xy[, 2] / 19)
+names(elev) <- "elevation"
+landscape <- c(hab, elev)
+locations <- expand.grid(x = seq(45, 195, 30), y = seq(45, 195, 30))
+points <- terra::vect(as.matrix(locations), crs = terra::crs(hab))
+
+features <- msr_vars(
+  mean = kernel_var("habitat"),
+  rough = surface_var("elevation", "sq", weighted = TRUE),
+  fixed = surface_var("elevation", "sa", radius = 25)
+)
+prepared <- kernel_prep(points, landscape, max_D = 40,
+  sigma = c(19, 29), scale_vars = features, bin = FALSE, verbose = FALSE)
+head(prepared$kernel_dat)
+```
+
+**How to read the output.** `mean` and `rough` are different variables with
+starting bandwidths of 19 and 29 map units. `fixed` uses a radius of 25.
+Preparation centers each column and divides by its sample SD. It does not
+estimate a regression or select a scale. Keep the prepared row names when
+joining responses and nonspatial predictors.
+
+A native refit can use all three columns. Here `season` is a nonspatial factor,
+and the counts are deterministic artificial values used only to illustrate the
+calls. Heavy fitting remains explicit:
+
+```{r native-starting-model}
+dat <- prepared$kernel_dat
+dat$season <- factor(rep(c("spring", "fall"), length.out = nrow(dat)))
+dat$y <- (seq_len(nrow(dat)) %% 5L) + as.integer(dat$rough > 0)
+model <- glm(y ~ mean + rough + fixed + season, data = dat, family = poisson())
+```
+
+```{r fit-refit, eval=FALSE}
+fit <- multiScale_optim(model, prepared, backend = "refit", verbose = FALSE)
+summary(fit)
+profile <- profile_sigma(fit, n_pts = 10)
+plot(profile)
+```
+
+**How to read these outputs.** `scale_est` reports the selected bandwidths in
+map units. The fixed metric contributes a regression coefficient but no fitted
+scale. Check convergence, search-bound, precision, and likelihood-profile
+diagnostics before interpreting the selected values. A finite estimate or a
+drawn curve does not establish identification. Hard-radius profiles can be
+stepped and have no smooth-curvature scale SE.
+
+For year-specific maps, use `kernel_prep_by_group()` and retain the map
+assignment for every row. Optimization uses pooled training normalization.
+Bayesian fits instead retain their declared pooled prior-reference
+normalization for every draw. Neither workflow standardizes each projected
+year separately. See `vignette("year-specific-rasters", package = "multiScaleR")`.
+
+## Compare smoothing engines and prepare a map
+
+Both FFT and direct focal calculation support the declared mean, surface, and
+landscape metric families. The following calls use the same prepared circular
+footprint. They perform no fitting:
+
+```{r compare-smoothing}
+map_fft <- kernel_scale.raster(landscape, multiScaleR = prepared,
+  match_buffer = TRUE, fft = TRUE, verbose = FALSE)
+map_focal <- kernel_scale.raster(landscape, multiScaleR = prepared,
+  match_buffer = TRUE, fft = FALSE, verbose = FALSE)
+max(abs(terra::values(map_fft) - terra::values(map_focal)), na.rm = TRUE)
+terra::plot(map_fft[["rough"]], main = "Weighted SQ in source elevation units")
+```
+
+**How to read the output and map.** The printed maximum is the numerical
+difference between engines. SQ describes local variation in elevation, not
+mean elevation. The map retains the source units because this call did not
+request standardization. Available finite cells are renormalized at edges, and
+central source `NA` cells remain masked. With `na.rm = FALSE`, incomplete
+footprints return `NA`; `match_buffer = TRUE` requires `na.rm = TRUE`.
+
+The default `pct_wt` window remains available. For fitted raster prediction,
+`match_buffer = TRUE` matches the retained preparation footprint, including
+partially intersecting cells with their ordinary full-cell weights. Binning,
+rasterization, incomplete source coverage, and the difference between an
+arbitrary sample point and a cell center remain separate approximations.
+
+## Predict points, scenarios, and rasters
+
+For new points, prepare matching source definitions, then supply both their
+data rows and spatial inputs. Selected scales and training normalization are
+reused. Explicit `join_by` keys support repeated scenarios at the same site.
+Verified fixed-radius normalization is opt-in:
+
+```{r point-and-map-prediction, eval=FALSE}
+# These rows and buffers illustrate the interface at the original locations.
+point_prediction <- predict(fit, dat, prepared, include_fixed = TRUE,
+  se.fit = TRUE, uncertainty = "conditional")
+snapshot <- prepare_prediction(fit, dat, prepared, include_fixed = TRUE)
+predict(snapshot)
+
+# Factors need explicit fitted levels. Numeric site variables use their
+# native units, and offset_values contains raw inputs to offset expressions.
+map_inputs <- kernel_scale.raster(landscape, multiScaleR = fit,
+  scale_center = TRUE, include_fixed = TRUE, match_buffer = TRUE,
+  site_values = list(season = "spring"), verbose = FALSE)
+response_map <- predict(fit, map_inputs, se.fit = TRUE,
+  uncertainty = "conditional", raster_args = list(cores = 1))
+terra::plot(response_map)
+```
+
+**How to read the predictions.** Point estimates and maps describe the
+provider's expected response or selected native component. An SE map conditions
+on the selected spatial scales and excludes observation noise. Analytic
+GLM/NB2 maps use the same retained coefficient information as point predictions.
+Other native providers supply their own conditional SEs, when available.
+An unavailable native SE raises an error rather than becoming zero.
+
+Categorical scenarios retain fitted levels. Checked raster prediction restores
+logical columns to their fitted type and preserves a `projection_contract`
+with the preparation controls. Supply compound offset inputs explicitly, for
+example `offset_values = c(effort = 2, duration = 4)` for
+`offset(log(effort * duration))`. A log offset defaults to raw value one, while
+a direct offset defaults to zero. Unknown scenario names are errors.
+
+Random-effect controls keep their native meaning. For glmmTMB or lme4,
+`native_args = list(re.form = NA)` sets response random effects to zero.
+For nlme, use `native_args = list(level = 0)`. These are reference predictions,
+not averages over a random-effect distribution. Cox maps describe linear
+predictors or relative risks. Conditional-logistic response probabilities
+require complete point choice sets; a raster can instead show link or relative
+risk scores. Unmarked components such as state or detection must be selected
+explicitly for raster prediction and retain their native row-layout rules.
+
+A snapshot binds fixed rows, controls, and numerical results. Prepare it again
+after changing any of them. Raster preparation descriptors check retained
+definitions and scaling; they do not verify the scientific provenance of map
+contents. Recompute after editing layers or using file formats that discard R
+attributes.
+
+## Plot effects and compare models with the appropriate target
+
+```{r effects-and-selection, eval=FALSE}
+plot_marginal_effects(fit)
+null_model <- glm(y ~ 1, data = dat, family = poisson())
+aic_tab(list(spatial = fit, null = null_model), AICc = FALSE)
+bic_tab(list(spatial = fit, null = null_model))
+```
+
+**How to read the plots and tables.** Numeric effect panels vary one predictor
+while holding the others at their means. Factor panels use observed levels.
+Frequentist bands condition on selected spatial scales. Mixed-model panels use
+native response means at zero random effects, including the fitted
+zero-inflation or truncated-family mean where applicable. AIC/BIC counts include
+estimated scales and applicable shapes, alongside the native likelihood
+parameters. Fixed radii and inapplicable hard-radius shapes do not add to K.
+
+Comparison requires the same used observations and comparable likelihoods.
+Recoverable responses, row IDs, weights, binomial trials, likelihood measures,
+ML/REML settings, and Cox strata are checked. Missing native metadata still
+requires user judgment. REML comparisons require a common fixed-effect design.
+Bayesian fits are rejected by `aic_tab()` and `bic_tab()` because their posterior
+target includes priors. Posterior predictive comparison needs a separate
+workflow with its own target and diagnostics.
+
+For Bayesian fits, `plot_marginal_effects(bayes_fit)` uses stored
+response-coefficient draws at hypothetical predictor values under the fixed reference
+normalization. Its bands are central credible intervals. It sets response
+random effects to zero and does not reevaluate the landscape at every kernel
+draw. For location-specific posterior expectations, use
+`predict(bayes_fit, ..., kernel_inputs = new_preparation)`; use `simulate()`
+when observation variation is needed. A selected-scale raster cannot replace
+posterior integration over scales. Private unpenalized marginal-likelihood SQ
+limiting routines remain gated pending their separate rank and boundary audits.
+
+| Output | Spatial scales | Included uncertainty |
+|:-------|:---------------|:---------------------|
+| Native-refit point or raster SE | Selected values held fixed | Native coefficient uncertainty, where available |
+| Analytic GLM/NB2 joint point interval | Estimated scales and shapes | Joint coefficient/kernel information, if all gates pass |
+| Bayesian spatial expectation | Recomputed for retained joint draws | Posterior uncertainty under the declared group policies |
+| Bayesian effect panel | Fixed hypothetical reference-normalized covariates | Stored marginal coefficient draws |
+| Bayesian observation simulation | Recomputed for retained joint draws | Posterior uncertainty plus observation variation |
+
+## Quick reference
+
+```{r full-workflow, eval=FALSE}
+# 1. Declare features and preserve point IDs during preparation and joins.
+prepared <- kernel_prep(points, landscape, max_D = 40,
+  scale_vars = features, sigma = c(19, 29), bin = FALSE, verbose = FALSE)
+dat <- data.frame(y = dat$y, season = dat$season, prepared$kernel_dat)
+
+# 2. Fit an appropriate likelihood and inspect its original diagnostics.
+model <- glm(y ~ mean + rough + fixed + season, dat, family = poisson())
+fit <- multiScale_optim(model, prepared, backend = "refit", verbose = FALSE)
+summary(fit)
+
+# 3. Reuse training normalization for points and an explicit map scenario.
+predict(fit, dat, prepared, include_fixed = TRUE)
+map_inputs <- kernel_scale.raster(landscape, multiScaleR = fit,
+  scale_center = TRUE, include_fixed = TRUE, match_buffer = TRUE,
+  site_values = list(season = "spring"), verbose = FALSE)
+response_map <- predict(fit, map_inputs)
+
+# 4. Read effects as conditional curves and compare sampling likelihoods.
+plot_marginal_effects(fit)
+aic_tab(list(fit, glm(y ~ 1, dat, family = poisson())), AICc = FALSE)
+```
+
+| Function | Purpose |
+|:---------|:--------|
+| `msr_vars()` | Name source-specific means and metrics |
+| `kernel_prep()` / `kernel_prep_by_group()` | Prepare matching spatial rows and retain normalization |
+| `multiScale_optim()` / `multiScale_bayes()` | Fit a supported likelihood or posterior target |
+| `kernel_scale.raster()` | Evaluate the same declared features on a raster grid |
+| `predict()` / `prepare_prediction()` | Predict with explicit spatial and uncertainty contracts |
+| `plot_marginal_effects()` | Display conditional or hypothetical reference-covariate effects |
+| `aic_tab()` / `bic_tab()` | Compare appropriate sampling likelihoods |
+
+See also:
+
+- `vignette("quickstart", package = "multiScaleR")` for the core fitting workflow.
+- `vignette("surface_metric_covariates", package = "multiScaleR")` for texture definitions and interpretation.
+- `vignette("landscape_metric_covariates", package = "multiScaleR")` for categorical metrics.
+- `vignette("inference-contracts", package = "multiScaleR")` for likelihood, posterior, and uncertainty distinctions.
+- `vignette("bayesian-prediction", package = "multiScaleR")` for joint-draw spatial expectations and observation simulation.

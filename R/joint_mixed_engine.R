@@ -8,14 +8,27 @@
   engine$n==length(y),length(group)==length(y),all(group>=1L),
   all(group<=length(parameters$b)),all(is.finite(y)),all(y>=0),all(y==floor(y)))
  power<-if(engine$kernel=='gaussian')2 else 1
- distance<-matrix(rep(engine$distance^power,each=engine$n),engine$n)
+ means<-if(inherits(engine,'msr_surface_engine'))engine$means else engine
+ distance<-if(!is.null(means))matrix(rep(means$distance^power,each=engine$n),engine$n) else NULL
  n<-engine$n;p<-engine$p
  # Every builder has its own cold inner optimizer and scale tape.
  fn<-function(par) {
   eta<-drop(X %*% par$beta[seq_len(ncol(X))])+offset+par$b[group]
   for(j in seq_len(p)) {
-   w<-exp(-distance*exp(-power*par$kernel_par[j])/if(power==2)2 else 1)
-   x<-RTMB::rowSums(w*engine$V[[j]])/RTMB::rowSums(w*engine$C[[j]])
+   name<-engine$covariates[j]
+   if(inherits(engine,'msr_surface_engine') && name %in% names(engine$buffers)) {
+    # Center before squaring; RTMB differentiates both the weighted mean and SQ.
+    x<-do.call(c,lapply(engine$buffers[[name]],function(buffer) {
+     if(all(buffer$v==buffer$v[1L]))return(0*par$kernel_par[j])
+     w<-exp(-(buffer$d^power)*exp(-power*par$kernel_par[j])/if(power==2)2 else 1)
+     mu<-sum(w*buffer$v)/sum(w)
+     sqrt(sum(w*(buffer$v-mu)^2)/sum(w))
+    }))
+   } else {
+    k<-match(name,means$covariates)
+    w<-exp(-distance*exp(-power*par$kernel_par[j])/if(power==2)2 else 1)
+    x<-RTMB::rowSums(w*means$V[[k]])/RTMB::rowSums(w*means$C[[k]])
+   }
    centered<-x-sum(x)/n
    x<-centered/sqrt(sum(centered^2)/(n-1))
    eta<-eta+x*par$beta[ncol(X)+j]

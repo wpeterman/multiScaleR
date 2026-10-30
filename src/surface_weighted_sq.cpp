@@ -20,9 +20,14 @@ NumericVector msr_surface_weighted_sq_cpp(NumericVector d, NumericMatrix values,
   }
   for (int j=0; j<values.ncol(); ++j) {
     long double sw=0, sx=0;
+    double anchor=0;
+    bool anchored=false;
     for (R_xlen_t i=0; i<d.size(); ++i) {
       double v=values(i,j), w=weights[i];
-      if (std::isfinite(v) && std::isfinite(w) && w>0) { sw+=w; sx+=w*v; }
+      if (std::isfinite(v) && std::isfinite(w) && w>0) {
+        if (!anchored) { anchor=v; anchored=true; }
+        sw+=w; sx+=w*(v-anchor);
+      }
     }
     double s0=static_cast<double>(sw);
     if (!std::isfinite(s0) || s0<=0) continue;
@@ -31,7 +36,7 @@ NumericVector msr_surface_weighted_sq_cpp(NumericVector d, NumericMatrix values,
     for (R_xlen_t i=0; i<d.size(); ++i) {
       double v=values(i,j), w=weights[i];
       if (std::isfinite(v) && std::isfinite(w) && w>0) {
-        double dev=v-mu;
+        double dev=(v-anchor)-mu;
         ss+=w*(dev*dev);
       }
     }

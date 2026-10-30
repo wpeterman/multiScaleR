@@ -14,6 +14,8 @@
       is.null(inputs$d_list) || is.null(inputs$raw_cov) ||
       length(inputs$d_list) != length(inputs$raw_cov) || any(rows > length(inputs$d_list)))
     stop("Surface derivatives require matching raw buffers and retained rows.", call. = FALSE)
+  if (any(kernel) && is.null(inputs$binned))
+    stop("Kernel means require binned inputs; prepare with bin = TRUE.", call. = FALSE)
   means <- if (any(kernel)) .msr_prepare_kernel_engine(inputs$binned,
     covariates[kernel], rows, inputs$kernel, FALSE, implementation) else NULL
   buffers <- stats::setNames(vector("list", sum(surface)), covariates[surface])
@@ -67,6 +69,7 @@
       total <- sum(w)
       if (!length(v) || !is.finite(total) || total <= 0)
         stop("No effective surface support at this scale.", call. = FALSE)
+      v <- v - v[[1L]]
       dev <- v - sum(w * v) / total
       variance <- sum(w * dev^2) / total
       raw[i, j] <- sqrt(variance)

@@ -83,7 +83,7 @@ test_that("bootstrap refits are reproducible, audit failures, and preserve RNG",
   expect_error(scale_inference(weighted, bootstrap = 19, seed = 1), "unit observation")
   bad <- x
   bad$profile_fit$contract$objective$family <- "poisson"
-  expect_error(scale_inference(bad), "NB2 with one kernel")
+  expect_error(scale_inference(bad), "NB2 with one spatial")
 })
 
 test_that("failed bootstrap pairs remain visible and dispersion cache is exact", {

@@ -84,6 +84,10 @@ AICc uses all free fitted likelihood parameters (including ancillary and
 unmarked detection or variance parameters), plus estimated sigma and shape
 parameters, and the existing model observation count. Parameter counting
 follows \code{\link{aic_tab}}. AICc is \code{NA} when \code{n <= K + 1}.
+Hard-radius metrics can be profiled in native-refit expow mixtures; their
+inactive shape positions do not affect the profile or parameter count.
+Their likelihood changes in steps, so a plotted grid does not justify a
+smooth-curvature SE or establish confidence-interval calibration.
 If all refits return the optimizer penalty, profiling stops with an error
 instead of returning an artificial flat profile. Keep the model formula and
 data available to the stored model call, or provide a working

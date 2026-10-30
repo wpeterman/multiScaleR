@@ -436,6 +436,9 @@ quantile(colSums(y), c(.025, .5, .975))
 
 See also:
 
+- `vignette("feature-compatibility", package = "multiScaleR")` for weighted-SQ
+  compatibility and the distinction between hypothetical effect curves and
+  posterior spatial prediction.
 - `vignette("bayesian-scales", package = "multiScaleR")` for model fitting, pooling and prior checks.
 - `vignette("bayesian-computation", package = "multiScaleR")` for approximation choices and limitations.
 - `vignette("year-specific-rasters", package = "multiScaleR")` for preparing annual landscape inputs.

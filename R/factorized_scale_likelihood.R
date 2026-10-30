@@ -10,6 +10,8 @@
   for (nm in c("X_fixed", "y", "offset", "trials"))
     spec[[nm]] <- if (is.matrix(spec[[nm]])) spec[[nm]][rows, , drop = FALSE] else spec[[nm]][rows]
   for (nm in c("V", "C", "delta")) spec[[nm]] <- lapply(spec[[nm]], function(x) x[rows, , drop = FALSE])
+  if (length(spec$surface$buffers))
+    spec$surface$buffers <- lapply(spec$surface$buffers, function(x) x[rows])
   spec$scales[[1L]]$X <- spec$scales[[1L]]$X[rows, , drop = FALSE]
   term$index <- rep(1L, length(rows)); term$z_index <- 1L
   term$levels <- term$levels[group]
@@ -50,6 +52,15 @@
 # The nearest supported bin always has weight one. Saturation below the
 # floating-point weight range avoids overflow in first and second derivatives.
 .msr_factorized_response_nll <- function(spec, parameters, ad = FALSE) {
+  if (length(spec$surface$buffers)) {
+    eta <- .msr_bayes_components(spec, parameters, include_response = FALSE)$eta
+    if (length(spec$response$random)) {
+      if (spec$family != "gaussian") stop("Gaussian response integration required.", call. = FALSE)
+      return(.msr_factorized_gaussian_response_nll(spec, eta, parameters, ad))
+    }
+    return(-.msr_scale_response_loglik(spec$family, spec$y, eta,
+      parameters$log_dispersion, spec$trials, ad))
+  }
   sm <- spec$scales[[1L]]
   log_s <- drop(sm$X %*% parameters$scale_beta[sm$beta_index])
   for (term in sm$random)

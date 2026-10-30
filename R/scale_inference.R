@@ -1,13 +1,15 @@
 #' Profile and Bootstrap Inference for an NB2 Scale
 #'
-#' Examine the full allowed scale range of a single-kernel NB2 fit, retain
+#' Examine the full allowed scale range of an NB2 fit with one spatial predictor, retain
 #' separate likelihood regions, and optionally calibrate likelihood-ratio
 #' tests by parametric bootstrap. This experimental diagnostic does not change
 #' the fitted object or the default optimizer and uncertainty methods.
 #'
 #' @param object A \code{multiScaleR} fit from \code{backend = "profile_glm"}
 #'   or \code{backend = "joint_nb2"},
-#'   with NB2 errors and exactly one kernel covariate.
+#'   with NB2 errors and exactly one optimized kernel mean or weighted surface
+#'   SQ covariate. Weighted SQ requires retained raw buffers and a Gaussian or
+#'   exponential kernel.
 #' @param sigma_values Optional positive scale values in map units to examine.
 #'   The search bounds and the refined optimum are always included.
 #' @param level Confidence level between zero and one; default \code{0.95}.
@@ -61,6 +63,8 @@
 #' }
 #' @details
 #' Coefficients and NB2 theta are reestimated at every constrained scale.
+#' Weighted SQ uses the same refit and audit machinery. Existing kernel-mean
+#' coverage studies do not establish interval coverage for surface SQ.
 #' Exponential-power shape is also reestimated. A stronger unrestricted refit
 #' and a full-range grid can reveal an optimum missed by the original fit;
 #' the returned reference records this without modifying \code{object}.

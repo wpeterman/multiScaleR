@@ -1,3 +1,19 @@
+# Current validated continuation: multiScaleR 0.7.6
+
+Use **inference-dev**. Read `fixed_metric_integration_20261030/DEVELOPMENT.md` and its adjacent `validation.json`
+for the current shared prediction, weighted-SQ, fixed-metric, and legacy-input
+contracts. The Windows check completed with zero errors/warnings and one elapsed-example
+timing NOTE under concurrent work; exact-archive tests passed
+6799 assertions, zero failures, 12 existing warnings,
+and 10 development-only benchmark skips. Priors, diagnostics, starts/cold/limiting
+gates, and uncertainty distinctions remain intact. No master merge is implied.
+
+The earlier consolidation below is historical source/branch context; its byte
+manifest must not be substituted for current-source coverage or used to reset
+later work. Detailed local study records and unrelated edits remain preserved.
+
+## Historical consolidation
+
 # Inference development: current morning work
 
 Current integration snapshot: inference-dev, version0.7.5. The October29 morning

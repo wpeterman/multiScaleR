@@ -67,6 +67,24 @@ TMB free-parameter metadata are checked for agreement when present. Latent
 random effects and the integration limit \code{K} are not counted.
 Missing or inconsistent parameter metadata and non-finite log-likelihoods
 raise an error instead of guessing from predictor names.
+Hard-radius metrics in native expow mixtures contribute their estimated
+radius but no inapplicable shape parameter. Fixed-radius metrics contribute
+neither an estimated radius nor shape.
+
+When native metadata can be recovered, comparison also checks used row IDs,
+response values, binomial trials, likelihood weights, and the likelihood's
+response measure. Binomial counts and proportions with their trial weights
+are compared on the same count representation. Zero-weight GLM rows and
+removed unmarked sites are excluded from the used-observation count.
+ML and REML fits cannot be mixed; REML comparisons require the same
+recoverable fixed-effect design. Cox partial-likelihood comparisons require
+matching methods and equivalent stratum partitions. These checks cannot
+certify metadata unavailable from a native provider, and the user must
+still establish scientific comparability of the likelihoods.
+
+Bayesian posterior fits are rejected. A posterior mode or penalized target
+is not a maximized sampling likelihood for AIC or BIC. Posterior predictive
+comparison requires a separate workflow with its own target and diagnostics.
 AICc tables raise an error if any model has \code{n <= K + 1}; use
 \code{AICc = FALSE} for an AIC table in that case.
 }

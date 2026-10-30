@@ -393,7 +393,7 @@ However, the log-likelihood surface for σ is often asymmetric, especially when 
 
 To request profile-likelihood CIs, pass `profile = TRUE` to `summary()`:
 
-For landscape metrics and unweighted surface metrics whose radius changes in discrete cell steps, the Hessian standard error is not a useful measure of uncertainty. Their default summary displays `NA` for the standard error and Wald interval. Use the profile-likelihood interval and report the parameter as a radius in map units. Candidate scales that make a covariate undefined at modeled observations are rejected so likelihoods retain the same sample.
+For landscape metrics and unweighted surface metrics whose radius changes in discrete cell steps, the Hessian standard error is not a useful measure of uncertainty. Their default summary displays `NA` for the standard error and Wald interval. Inspect the likelihood profile and report the parameter as a radius in map units. An interval drawn from a profile cutoff does not by itself establish coverage for a stepped likelihood. Candidate scales that make a covariate undefined at modeled observations are rejected so likelihoods retain the same sample.
 
 ```{r eval=FALSE}
 summary(opt1, profile = TRUE)
@@ -435,7 +435,7 @@ No warnings! Let's look at our results.
 summary(opt2)
 ```
 
-The default `summary()` uses delta-method confidence intervals. Because this model is well-behaved (no boundary warnings, reasonable sample size), the delta-method CIs should be reliable here. For a more conservative check, you can compare them to profile-likelihood CIs:
+The default `summary()` uses delta-method confidence intervals. This example has no boundary warnings, but the absence of warnings does not establish interval coverage. Compare the local curvature summary with the likelihood profile to assess sensitivity to the interval construction:
 
 ```{r eval=FALSE}
 summary(opt2, profile = TRUE)

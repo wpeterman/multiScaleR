@@ -7,17 +7,13 @@
   if (!is.data.frame(data) || nrow(data) < 2L || anyDuplicated(names(data)))
     stop("data must be a data frame with at least two observations and distinct columns.",
          call. = FALSE)
-  if (is.null(inputs$binned) || !inputs$kernel %in% c("gaussian", "exp"))
-    stop("Bayesian scales require binned Gaussian or exponential kernel means.", call. = FALSE)
+  if (!inputs$kernel %in% c("gaussian", "exp"))
+    stop("Bayesian scales require Gaussian or exponential kernel means or weighted SQ.", call. = FALSE)
   for (nm in c("unit_conv", "min_D", "max_D"))
     validate_scalar_numeric(inputs[[nm]], nm, positive = TRUE)
   if (inputs$min_D >= inputs$max_D)
     stop("min_D must be smaller than max_D.", call. = FALSE)
-  ids <- inputs$binned$point_ids
-  nr <- nrow(inputs$binned$vsum[[1L]])
-  if (is.null(ids) || length(ids) != nr || anyNA(ids) ||
-      anyDuplicated(ids) || any(!nzchar(as.character(ids))))
-    stop("Binned point_ids must uniquely identify prepared rows.", call. = FALSE)
+  ids <- .msr_scale_point_ids(inputs)
   keys <- if (is.null(row_id)) rownames(data) else {
     if (!is.character(row_id) || length(row_id) != 1L || !row_id %in% names(data))
       stop("row_id must name a column of prepared point IDs in data.", call. = FALSE)
@@ -29,7 +25,8 @@
   if (anyNA(rows))
     stop("Observation IDs do not match binned point_ids; supply row_id explicitly.",
          call. = FALSE)
-  covs <- intersect(all.vars(formula[[3L]]), names(inputs$binned$vsum))
+  surface <- .msr_scale_surface_names(inputs)
+  covs <- intersect(all.vars(formula[[3L]]), c(names(inputs$binned$vsum), surface))
   if (!length(covs))
     stop("The response formula must include at least one binned kernel predictor.", call. = FALSE)
   if (length(setdiff(all.vars(formula), c(names(data), covs))))
@@ -38,8 +35,9 @@
   specs <- inputs$scale_vars
   if (!is.null(specs)) {
     used <- specs[specs$covariate %in% all.vars(formula), , drop = FALSE]
-    if (any(used$type != "kernel") || any(!used$covariate %in% covs))
-      stop("Only kernel means can be spatial predictors in the Bayesian response formula.",
+    optimized <- used[used$optimize, , drop = FALSE]
+    if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface)) || any(!optimized$covariate %in% covs))
+      stop("Only kernel means and optimized weighted SQ can be spatial predictors in the Bayesian response formula.",
            call. = FALSE)
   }
   list(rows = rows, keys = keys, covariates = covs)
@@ -61,11 +59,20 @@
   if (is.null(prepared)) prepared <- .msr_scale_prepare_inputs(formula, inputs, data, row_id)
   rows <- prepared$rows; keys <- prepared$keys; covs <- prepared$covariates
   reference_scale <- .msr_scale_reference(reference_scale, covs)
-  engine <- .msr_prepare_kernel_engine(inputs$binned, covs, rows,
-                                       inputs$kernel, standardize = FALSE)
+  engine <- if (any(covs %in% .msr_scale_surface_names(inputs)))
+    .msr_prepare_surface_engine(inputs, covs, rows, standardize = FALSE) else
+      .msr_prepare_kernel_engine(inputs$binned, covs, rows, inputs$kernel, standardize = FALSE)
+  means <- if (inherits(engine, "msr_surface_engine")) engine$means else engine
   # Keep the same pooled reference transformation for every inference target.
   # Do not restandardize separately within years or at each fitted scale.
-  raw <- .msr_eval_kernel_engine(engine,
+  if (inherits(engine, "msr_surface_engine")) {
+    raw <- matrix(0, length(rows), length(covs), dimnames = list(NULL, covs))
+    if (!is.null(means)) raw[, means$covariates] <- .msr_eval_kernel_engine(means,
+      unname(log(reference_scale[means$covariates] / inputs$unit_conv)))$raw
+    for (nm in names(engine$buffers)) raw[, nm] <- .msr_scale_surface_raw(
+      engine$buffers[[nm]], rep(log(reference_scale[[nm]] / inputs$unit_conv), length(rows)),
+      inputs$kernel)
+  } else raw <- .msr_eval_kernel_engine(engine,
     unname(log(reference_scale / inputs$unit_conv)))$raw
   center <- colMeans(raw)
   spread <- apply(raw, 2L, stats::sd)
@@ -173,14 +180,15 @@
   }
   # Shift exponents by each row's nearest supported bin. The constant cancels
   # from the ratio and prevents all weights underflowing at small scales.
-  delta <- lapply(covs, function(nm) {
-    C <- engine$C[[nm]]
-    d <- matrix(rep(engine$distance, each = nrow(C)), nrow(C))
+  mean_names <- if (is.null(means)) character() else means$covariates
+  delta <- lapply(mean_names, function(nm) {
+    C <- means$C[[nm]]
+    d <- matrix(rep(means$distance, each = nrow(C)), nrow(C))
     nearest <- apply(replace(d, C <= 0, Inf), 1L, min)
     ans <- if (inputs$kernel == "gaussian") d^2 - nearest^2 else d - nearest
     pmax(ans, 0)
   })
-  names(delta) <- covs
+  names(delta) <- mean_names
   # All evaluated designs are already numeric. Keeping a caller's formula
   # environment could otherwise serialize unrelated rasters or an entire fit.
   freeze_formula <- function(x) {
@@ -192,10 +200,10 @@
   }
   rf <- freeze_formula(rf)
   scale_models <- lapply(scale_models, freeze_formula)
-  list(data = data, rows = rows, observation_ids = as.character(keys), row_id = row_id,
+  out <- list(data = data, rows = rows, observation_ids = as.character(keys), row_id = row_id,
        covariates = covs, kernel = inputs$kernel, unit_conv = inputs$unit_conv,
        support = c(min_D = inputs$min_D, max_D = inputs$max_D),
-       V = engine$V, C = engine$C, delta = delta, center = center, spread = spread,
+       V = means$V, C = means$C, delta = delta, center = center, spread = spread,
        response = rf, X_fixed = Xfixed, beta_names = c(fixed_columns, covs),
        scales = scale_models, family = family, y = as.numeric(y), trials = as.numeric(trials),
        offset = offset,
@@ -204,4 +212,13 @@
          response_z = response_z, log_response_sd = log_response_sd,
          log_dispersion = if (family %in% c("gaussian", "nbinom2"))
            0 else numeric()))
+  if (inherits(engine, "msr_surface_engine")) {
+    out$surface <- list(buffers = engine$buffers, specs = engine$surface_specs)
+    out$surface$memory <- .msr_scale_surface_size(out$surface)
+  }
+  fixed_variables <- unique(c(all.vars(formula[[3L]]),
+    unlist(lapply(scales, all.vars), use.names = FALSE)))
+  fixed_reference <- .msr_fixed_reference_contract(inputs, data, rows, fixed_variables)
+  if (length(fixed_reference$covariates)) out$fixed_reference <- fixed_reference
+  out
 }

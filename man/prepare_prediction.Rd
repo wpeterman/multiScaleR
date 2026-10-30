@@ -32,7 +32,7 @@ prepare_prediction(
 \arguments{
 \item{object}{A fitted \code{multiScaleR} object using \code{profile_glm},
 \code{joint_nb2}, \code{conditional_logit}, or \code{joint_mixed}, or
-containing a native \code{unmarkedFit} in \code{opt_mod}.}
+containing a supported native-refit model in \code{opt_mod}.}
 
 \item{newdata, kernel_inputs}{Prediction data and matching prepared spatial
 inputs, with the same requirements as \code{\link{predict.multiScaleR}}.
@@ -47,24 +47,35 @@ applies to retained size, not temporary memory used during preparation.}
 \code{"ext"}, as supported by the fitted model. For \code{joint_mixed},
 optionally select one native glmmTMB prediction type, such as
 \code{"zprob"}; \code{NULL} prepares both response and link predictions.
-Leave \code{NULL} for the analytic GLM and conditional-logistic backends.}
+Leave \code{NULL} for the analytic GLM and conditional-logistic backends.
+General refit snapshots default to response and link for GLM-like models,
+or linear predictor and risk for Cox models. Other native providers
+require an explicit component.}
 
 \item{native_args}{A named list of native prediction controls to bind during
 preparation. For \code{joint_mixed}, supports \code{re.form},
 \code{allow.new.levels}, and \code{na.action}. For unmarked, supports
 \code{backTransform}, \code{na.rm}, \code{appendData}, \code{level}, and
-\code{re.form}. Defaults to an empty list, preserving native defaults.}
+\code{re.form}. Defaults to an empty list, preserving native defaults.
+General refits additionally support \code{reference} and nlme
+\code{level}, when accepted by the native method.}
 
-\item{join_by}{For unmarked spatial predictions, explicit site keys with
+\item{join_by}{For native-refit spatial predictions, explicit site keys with
 one row per prepared prediction site, in spatial input order. Requires
 both \code{newdata} and \code{kernel_inputs}. See
-\code{\link{prepare_unmarked_data}}. The default \code{NULL} preserves
-native prediction on already prepared data. Unsupported for other models.}
+\code{\link{prepare_unmarked_data}}. The default \code{NULL} uses strict
+row-name alignment for general refits. Unmarked spatial snapshots require
+explicit keys; without spatial inputs their native data pass unchanged.
+Unsupported for analytic and
+joint mixed-model snapshots.}
 
 \item{include_fixed}{Logical. The default \code{FALSE} keeps fixed-radius
-predictors explicit. For unmarked spatial snapshots, set \code{TRUE} to
+predictors explicit. For supported spatial snapshots, set \code{TRUE} to
 use the verified fixed-radius preparation in
-\code{\link{prepare_unmarked_data}}. Requires spatial inputs and site keys.}
+\code{\link{prepare_unmarked_data}}. Requires spatial inputs and verified
+row alignment, using explicit site keys for repeated sites and unmarked.
+Analytic GLM/NB2, conditional-logistic, and joint mixed snapshots also
+support this verification, with their existing strict row-ID rules.}
 
 \item{type, se.fit, uncertainty, interval, level}{Output and uncertainty controls
 passed to \code{\link{predict.multiScaleR}}, with the same defaults and
@@ -123,6 +134,13 @@ native prediction rows. \code{\link{prepare_unmarked_data}} computes spatial
 columns and applies training standardization without changing native
 observation/year ordering or nonspatial factor/offset inputs. Spatial
 snapshots retain prediction row names and site keys in their provenance.
+
+General refit snapshots also cache numerical outputs without retaining the
+fitted native model, formula environments, or raw cell buffers. If a native
+provider lacks standard errors, point predictions remain available and a
+later SE request replays the recorded error. Errors in point predictions
+still abort preparation. These snapshots retain native uncertainty
+distinctions and do not add scale uncertainty or observation noise.
 The returned
 table preserves native columns, intervals, missing-value handling, and
 component interpretation. Native standard errors and intervals condition on

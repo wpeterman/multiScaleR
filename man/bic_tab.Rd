@@ -12,7 +12,8 @@ bic_tab(mod_list,
 \arguments{
 \item{mod_list}{List containing fitted \code{multiScaleR} objects (from
 \code{\link{multiScale_optim}}) and/or plain fitted model objects. All
-models must have been fit to the same number of observations.}
+models must have been fit to the same observations and comparable
+likelihoods, including matching responses, weights, and likelihood measure.}
 
 \item{mod_names}{Optional character vector of model names. Length must equal
 \code{length(mod_list)}. By default, names are constructed as
@@ -51,6 +52,10 @@ identifying the single best-supported model rather than model averaging.
 Sigma (and shape for \code{"expow"}) is counted in K.
 Fitted parameter counts and log-likelihood validation follow
 \code{\link{aic_tab}}, including all estimated components of unmarked models.
+The same recoverable response, row, weight, ML/REML, and partial-likelihood
+checks apply. Inapplicable hard-radius shape positions are excluded.
+Bayesian posterior fits are rejected; the name BIC does not make a posterior
+target a sampling likelihood.
 }
 \examples{
 ## Simulate data
