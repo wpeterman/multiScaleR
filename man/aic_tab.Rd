@@ -23,7 +23,7 @@ recommended when the ratio of observations to parameters is small
 
 \item{mod_names}{Optional character vector of model names. Length must equal
 \code{length(mod_list)}. By default, names are constructed as
-\code{[kernel]right-hand-side-formula} for \code{multiScaleR} objects.}
+\code{[kernel=...; family=...]right-hand-side-formula} for \code{multiScaleR} objects.}
 
 \item{verbose}{Logical. If \code{TRUE}, the table is also printed to the
 console. Default: \code{FALSE}.}
@@ -36,7 +36,8 @@ package) sorted by ascending AIC(c), containing:
 \describe{
   \item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
   \item{\code{K}}{Number of fitted likelihood parameters, including
-    ancillary parameters such as negative-binomial dispersion, plus optimized
+    ancillary parameters such as negative-binomial dispersion (or native
+    effective degrees of freedom for GAMs), plus optimized
     scale and shape parameters for \code{multiScaleR} models.}
   \item{\code{AICc} or \code{AIC}}{Information criterion value.}
   \item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}

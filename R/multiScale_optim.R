@@ -401,7 +401,7 @@
 #' @param PSOCK Logical. On Windows, a PSOCK cluster is always used. On Unix,
 #'   a FORK cluster is used by default (faster). Set \code{TRUE} to force a
 #'   PSOCK cluster on Unix. Default: \code{FALSE}.
-#' @param verbose Logical. Print optimization status and warnings to the
+#' @param verbose Logical. Print optimization status and diagnostic blocks to the
 #'   console. Default: \code{TRUE}.
 #' @param refit_fn Optional function for refitting \code{fitted_mod} during
 #'   optimization. When \code{NULL} (default), \code{stats::update()} (or the
@@ -723,7 +723,9 @@
 #' maximize the log-likelihood over sigma (and shape for \code{"expow"}) while
 #' holding all regression coefficients at their fitted values for each candidate
 #' scale. Standard errors are Hessian-based approximations from the outer
-#' optimization. Summary methods report profile-likelihood confidence intervals
+#' optimization. Nonfinite, singular, or non-positive-definite active Hessians
+#' produce missing SEs and a retained diagnostic; the raw Hessian is preserved.
+#' Summary methods report profile-likelihood confidence intervals
 #' for sigma when \code{\link{profile_sigma}} has been run on the object;
 #' otherwise they fall back to Hessian-based intervals.
 #' Candidate scales that make a covariate undefined at a modeled observation
@@ -1318,7 +1320,7 @@ multiScale_optim <- function(fitted_mod,
     return(opt_results)
   } else {
 
-    cat('\n\nOptimization complete\n')
+    if (isTRUE(verbose)) cat('\n\nOptimization complete\n')
 
     opt_results$par_unscale <- c(opt_results$par[1:n_covs] * kernel_inputs$unit_conv,
                                  opt_results$par[(n_covs + 1):(n_covs * 2)])
@@ -1327,17 +1329,13 @@ multiScale_optim <- function(fitted_mod,
     #                              opt_results$par[(n_covs + 1):(n_covs * 2)]^2)
     # opt_results$hessian_unscale <- opt_results$hessian #* kernel_inputs$unit_conv
 
-    i_hess <- try(solve(opt_results$hessian_unscale), silent = TRUE)
-
-    if(!inherits(i_hess, "try-error")){
-      res <- c(sqrt(diag(i_hess)[1:n_covs]) * kernel_inputs$unit_conv,
-               sqrt(diag(i_hess)[(n_covs + 1):(n_covs * 2)]))
-
-    } else {
-      n_se <- if (kernel_inputs$kernel == "expow") n_covs * 2 else n_covs
-      res <- rep(Inf, n_se)
-
-    }
+    hard_radius <- .msr_hard_radius_covariates(kernel_inputs$scale_vars)
+    n_se <- n_covs * if (kernel_inputs$kernel == "expow") 2L else 1L
+    active <- rep(!r_vars %in% hard_radius, length.out = n_se)
+    uncertainty <- .msr_refit_hessian_se(opt_results$hessian_unscale, active,
+      c(rep(kernel_inputs$unit_conv, n_covs),
+        if (kernel_inputs$kernel == "expow") rep(1, n_covs)))
+    res <- uncertainty$SE
 
     scale_est <- data.frame(Mean = opt_results$par_unscale[1:n_covs],
                             SE = res[1:n_covs])
@@ -1392,6 +1390,7 @@ multiScale_optim <- function(fitted_mod,
                 warn_message = 0,
                 call = match.call())
 
+    out$diagnostics$refit_hessian <- uncertainty$diagnostic
     class(out) <- 'multiScaleR'
 
     # Keep the existing warning threshold independent of distance reporting.
@@ -1429,7 +1428,7 @@ multiScale_optim <- function(fitted_mod,
 
     if (isTRUE(max_dist_diag$triggered)) {
       out$warn_message <- c(out$warn_message, 1)
-      cat(red("\n WARNING!!!\n",
+      if (isTRUE(verbose)) cat(red("\n WARNING!!!\n",
               "The estimated scale of effect approaches or exceeds the current search extent.\n",
               "Consider increasing " %+% blue$bold("max_D") %+% " in `kernel_prep` to >="  %+% green$bold(max_dist_diag$suggested_max_D) %+% " to ensure accurate estimation of scale.\n\n"))
     }
@@ -1440,7 +1439,7 @@ multiScale_optim <- function(fitted_mod,
       out$diagnostics$sigma_precision <- .precision_diagnostic(smooth_scale,
                                                                 "sigma_precision")
       out$warn_message <- c(out$warn_message, 2)
-      cat(red("\n WARNING!!!\n",
+      if (isTRUE(verbose)) cat(red("\n WARNING!!!\n",
               "The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.\n",
               "Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.\n\n"))
     }
@@ -1448,7 +1447,7 @@ multiScale_optim <- function(fitted_mod,
     if(!is.null(shape_est) && any((shape_est[,1] / shape_est[,2]) < 2, na.rm = T)){
       out$diagnostics$shape_precision <- .precision_diagnostic(shape_est, "shape_precision")
       out$warn_message <- c(out$warn_message, 3)
-      cat(red("\n WARNING!!!\n",
+      if (isTRUE(verbose)) cat(red("\n WARNING!!!\n",
               "The standard error of one or more `shape` estimates is >= 50% of the estimated mean value.\n",
               "Carefully assess if the Exponential Power kernel is appropriate, whether or not this variable is meaningful in your analysis, and interpret with caution.\n\n"))
     }

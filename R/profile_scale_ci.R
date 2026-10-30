@@ -34,7 +34,7 @@ scale_ci_table <- function(object,
                  min_D = min_D,
                  names = names)
 
-  methods <- rep("wald", nrow(tab))
+  methods <- ifelse(is.finite(tab$SE), "wald", "unavailable")
   names(methods) <- row.names(tab)
 
   if (!isTRUE(profile)) {
@@ -45,8 +45,13 @@ scale_ci_table <- function(object,
   cache_key <- profile_scale_cache_key(object = object,
                                        min_D = min_D,
                                        names = names)
-  if (exists(cache_key, envir = .profile_scale_cache, inherits = FALSE)) {
-    profile_tab <- get(cache_key, envir = .profile_scale_cache, inherits = FALSE)
+  cache_enabled <- is.null(object$opt_context$refit_fn)
+  if (cache_enabled && exists(cache_key, envir = .profile_scale_cache, inherits = FALSE)) {
+    entry <- get(cache_key, envir = .profile_scale_cache, inherits = FALSE)
+  } else entry <- NULL
+  # Verify the payload as well as its bounded digest, including on collisions.
+  if (!is.null(entry) && identical(entry$payload, attr(cache_key, "payload"))) {
+    profile_tab <- entry$result
   } else {
     profile_tab <- try(profile_sigma_intervals(object), silent = TRUE)
     if (inherits(profile_tab, "try-error") || is.null(profile_tab)) {
@@ -58,7 +63,8 @@ scale_ci_table <- function(object,
       stop("Profile-likelihood intervals could not be computed: ", detail,
            call. = FALSE)
     }
-    assign(cache_key, profile_tab, envir = .profile_scale_cache)
+    if (cache_enabled) assign(cache_key, list(payload = attr(cache_key, "payload"), result = profile_tab),
+           envir = .profile_scale_cache)
   }
 
   if (!inherits(profile_tab, "try-error") && !is.null(profile_tab$intervals)) {
@@ -91,8 +97,31 @@ profile_scale_cache_key <- function(object,
     names = names
   )
 
-  paste(as.character(serialize(key_payload, NULL, version = 2)),
-        collapse = "")
+  # Data and refit controls can change while the call and optimum stay equal.
+  model <- object$fitted_mod_original
+  frame <- .msr_selection_frame(.analysis_model(model))
+  if (!is.null(frame)) attr(frame, "terms") <- NULL
+  key_payload$training_inputs <- object$kernel_inputs
+  key_payload$training_frame <- frame
+  key_payload$response <- if (is.list(model)) model$y else NULL
+  key_payload$weights <- if (is.list(model)) model$prior.weights else NULL
+  key_payload$join_by <- object$join_by
+  key_payload$model_class <- class(model)
+  key_payload$family <- tryCatch(stats::family(model)[c("family", "link")],
+    error = function(e) NULL)
+  key_payload$native_data <- if (methods::is(model, "unmarkedFit")) model@data else NULL
+  context <- object$opt_context
+  context$fitted_mod <- context$refit_fn <- NULL
+  key_payload$context <- context
+  # Formula environments may contain the caller's mutable workspace. Do not
+  # serialize them: the retained numeric frame and prepared cells bind the data.
+  key_payload$formula <- tryCatch(paste(deparse(stats::formula(model)), collapse = " "),
+    error = function(e) NULL)
+  payload <- serialize(key_payload, NULL, version = 2)
+  path <- tempfile("msr-profile-key-")
+  on.exit(unlink(path), add = TRUE)
+  writeBin(payload, path)
+  structure(unname(tools::md5sum(path)), payload = payload)
 }
 
 

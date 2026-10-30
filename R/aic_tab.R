@@ -1,3 +1,13 @@
+.msr_selection_family_label <- function(model) {
+  model <- .analysis_model(model)
+  family <- tryCatch(stats::family(model)$family, error = function(e) NULL)
+  if (is.character(family) && length(family) == 1L) return(family)
+  if (inherits(model, c("lm", "gls", "lme"))) return("gaussian")
+  if (inherits(model, "coxph")) return("partial likelihood")
+  if (methods::is(model, "unmarkedFit")) return(class(model)[1L])
+  "unknown"
+}
+
 .msr_selection_model <- function(model) {
   if (inherits(model, "multiScaleR_bayes"))
     stop("AIC/BIC require maximized likelihoods; Bayesian posterior fits need an appropriate posterior predictive comparison, not a posterior objective substituted for logLik.", call. = FALSE)
@@ -114,6 +124,10 @@
     error = function(e) NULL
   )
   if (!is.null(loglik_df)) {
+    # GAM likelihoods use effective degrees of freedom, which need not be integer.
+    if (inherits(analysis_mod, "gam") && is.numeric(loglik_df) &&
+        length(loglik_df) == 1L && is.finite(loglik_df) && loglik_df >= 0)
+      return(as.numeric(loglik_df))
     return(.msr_validate_parameter_count(loglik_df, analysis_mod, "logLik degrees of freedom"))
   }
 
@@ -275,7 +289,7 @@
 #'   (n / K < 40 is a common rule of thumb).
 #' @param mod_names Optional character vector of model names. Length must equal
 #'   \code{length(mod_list)}. By default, names are constructed as
-#'   \code{[kernel]right-hand-side-formula} for \code{multiScaleR} objects.
+#'   \code{[kernel=...; family=...]right-hand-side-formula} for \code{multiScaleR} objects.
 #' @param verbose Logical. If \code{TRUE}, the table is also printed to the
 #'   console. Default: \code{FALSE}.
 #' @param ... Additional arguments (not used).
@@ -285,7 +299,8 @@
 #' \describe{
 #'   \item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
 #'   \item{\code{K}}{Number of fitted likelihood parameters, including
-#'     ancillary parameters such as negative-binomial dispersion, plus optimized
+#'     ancillary parameters such as negative-binomial dispersion (or native
+#'     effective degrees of freedom for GAMs), plus optimized
 #'     scale and shape parameters for \code{multiScaleR} models.}
 #'   \item{\code{AICc} or \code{AIC}}{Information criterion value.}
 #'   \item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}
@@ -370,11 +385,12 @@ aic_tab <- function(mod_list,
   opt_list <- lapply(mod_list, .msr_selection_model)
   mod_df <- .msr_validate_comparable_models(opt_list)
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
-  k <- vapply(mod_list, .msr_selection_parameter_count, integer(1))
+  k <- vapply(mod_list, .msr_selection_parameter_count, numeric(1))
 
   if(is.null(mod_names)){
     mod_eq <- vapply(opt_list, .msr_selection_formula_label, character(1))
-    mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
+    mod_names <- paste0("[kernel=", mod_kernel, "; family=",
+      vapply(opt_list, .msr_selection_family_label, character(1)), "]", mod_eq)
   }
 
   mod_loglik <- vapply(opt_list, .msr_model_loglik, numeric(1))
@@ -433,7 +449,7 @@ aic_tab <- function(mod_list,
 #'   likelihoods, including matching responses, weights, and likelihood measure.
 #' @param mod_names Optional character vector of model names. Length must equal
 #'   \code{length(mod_list)}. By default, names are constructed as
-#'   \code{[kernel]right-hand-side-formula} for \code{multiScaleR} objects.
+#'   \code{[kernel=...; family=...]right-hand-side-formula} for \code{multiScaleR} objects.
 #' @param verbose Logical. If \code{TRUE}, the table is also printed to the
 #'   console. Default: \code{FALSE}.
 #' @param ... Additional arguments (not used).
@@ -443,7 +459,8 @@ aic_tab <- function(mod_list,
 #' \describe{
 #'   \item{\code{Modnames}}{Model name.}
 #'   \item{\code{K}}{Number of fitted likelihood parameters, including
-#'     ancillary parameters such as negative-binomial dispersion, plus optimized
+#'     ancillary parameters such as negative-binomial dispersion (or native
+#'     effective degrees of freedom for GAMs), plus optimized
 #'     scale and shape parameters for \code{multiScaleR} models.}
 #'   \item{\code{BIC}}{Bayesian information criterion value.}
 #'   \item{\code{Delta_BIC}}{Difference from the top model.}
@@ -539,11 +556,12 @@ bic_tab <- function(mod_list,
   opt_list <- lapply(mod_list, .msr_selection_model)
   mod_df <- .msr_validate_comparable_models(opt_list)
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
-  k <- vapply(mod_list, .msr_selection_parameter_count, integer(1))
+  k <- vapply(mod_list, .msr_selection_parameter_count, numeric(1))
 
   if(is.null(mod_names)){
     mod_eq <- vapply(opt_list, .msr_selection_formula_label, character(1))
-    mod_names <- paste0("[" ,mod_kernel, "]",mod_eq)
+    mod_names <- paste0("[kernel=", mod_kernel, "; family=",
+      vapply(opt_list, .msr_selection_family_label, character(1)), "]", mod_eq)
   }
 
   mod_loglik <- vapply(opt_list, .msr_model_loglik, numeric(1))

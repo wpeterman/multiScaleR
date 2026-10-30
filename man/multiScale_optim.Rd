@@ -93,7 +93,7 @@ is reduced automatically.}
 a FORK cluster is used by default (faster). Set \code{TRUE} to force a
 PSOCK cluster on Unix. Default: \code{FALSE}.}
 
-\item{verbose}{Logical. Print optimization status and warnings to the
+\item{verbose}{Logical. Print optimization status and diagnostic blocks to the
 console. Default: \code{TRUE}.}
 
 \item{refit_fn}{Optional function for refitting \code{fitted_mod} during
@@ -427,7 +427,9 @@ The default refit optimizer uses the L-BFGS-B algorithm (bounded quasi-Newton) t
 maximize the log-likelihood over sigma (and shape for \code{"expow"}) while
 holding all regression coefficients at their fitted values for each candidate
 scale. Standard errors are Hessian-based approximations from the outer
-optimization. Summary methods report profile-likelihood confidence intervals
+optimization. Nonfinite, singular, or non-positive-definite active Hessians
+produce missing SEs and a retained diagnostic; the raw Hessian is preserved.
+Summary methods report profile-likelihood confidence intervals
 for sigma when \code{\link{profile_sigma}} has been run on the object;
 otherwise they fall back to Hessian-based intervals.
 Candidate scales that make a covariate undefined at a modeled observation

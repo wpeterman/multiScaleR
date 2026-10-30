@@ -1,3 +1,10 @@
+multiScaleR 0.7.7 (development)
+---------
+* Refit summaries use bounded data-specific profile-cache keys; invalid outer
+  curvature reports missing SEs with retained Hessian diagnostics. Quiet fitting
+  suppresses diagnostic blocks. Selection labels distinguish kernel and response
+  family, and GAM penalties retain native effective degrees of freedom.
+
 multiScaleR 0.7.6 (development)
 ---------
 * Declared fixed-radius surface and landscape metrics enter analytic and Bayesian
