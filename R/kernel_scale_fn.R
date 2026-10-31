@@ -41,6 +41,8 @@
 # unmarked fits differ in whether they retain one formula or a list of
 # component formulas. Only variables in the fitted formulas can be optimized.
 .unmarked_model_formulas <- function(model) {
+  # Retained GDR calls include formulas for components that are not estimated.
+  if (methods::is(model, "unmarkedFitGDR")) return(.msr_gdr_formulas(model))
   collect_formulas <- function(x) {
     if (inherits(x, "formula")) return(list(x))
     if (is.list(x)) return(do.call(c, lapply(x, collect_formulas)))
@@ -700,6 +702,7 @@ build_opt_context <- function(fitted_mod,
       stop("Optimized unmarked covariates must be static `siteCovs`: ",
            paste(missing_site_covs, collapse = ", "), call. = FALSE)
     }
+    if (methods::is(mod, "unmarkedFitGDR")) .msr_gdr_validate_spatial(mod, covs)
     if (!is.null(join_by) && any(covs %in% names(join_by))) {
       stop("`join_by` key columns cannot be optimized covariates.",
            call. = FALSE)

@@ -76,7 +76,10 @@
     expected <- expected[match(actual$covariate, expected$covariate), , drop = FALSE]
     if (!isTRUE(all.equal(as.data.frame(actual), as.data.frame(expected), check.attributes = FALSE)))
       stop("Projected source and metric specifications must match the fitted model.", call. = FALSE)
-    used <- if (methods::is(object$opt_mod, "unmarkedFit"))
+    # A GDR density map needs its state predictors, not every detection layer.
+    used <- if (methods::is(object$opt_mod, "unmarkedFitGDR"))
+      all.vars(.msr_gdr_formulas(object$opt_mod)[[.msr_gdr_prediction_type(object$opt_mod, type)]]) else
+      if (methods::is(object$opt_mod, "unmarkedFit"))
       .unmarked_model_predictors(object$opt_mod) else .model_predictors(.analysis_model(object$opt_mod))
     required <- intersect(object$kernel_inputs$scale_vars$covariate, used)
     if (length(setdiff(required, c(actual$covariate, names(descriptor$scenario_values)))))

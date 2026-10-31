@@ -10,9 +10,17 @@
 .msr_selection_signature <- function(model) {
   model <- .analysis_model(model)
   frame <- .msr_selection_frame(model)
+  observation_definition <- NULL
   unmarked <- methods::is(model, "unmarkedFit")
   if (unmarked) {
     response <- model@data@y
+    # GDR's @y is only the removal history, not its full observation likelihood.
+    if (methods::is(model, "unmarkedFitGDR")) {
+      response <- cbind(model@data@yDistance, model@data@yRemoval)
+      observation_definition <- list(model = "gdistremoval",
+        numPrimary = model@data@numPrimary, dist.breaks = model@data@dist.breaks,
+        unitsIn = model@data@unitsIn, period.lengths = model@data@period.lengths)
+    }
     ids <- rownames(model@data@siteCovs)
     rows <- setdiff(seq_len(nrow(response)), model@sitesRemoved)
     response <- response[rows, , drop = FALSE]
@@ -84,6 +92,7 @@
     if (tolower(family) %in% c("gaussian", "gamma", "inverse.gaussian", "beta", "betar"))
       "continuous" else "unknown"
   list(response = response, weights = unname(weights[order]), measure = measure,
+    observation_definition = observation_definition,
     trials = if (is.null(trials)) NULL else unname(trials[order]), reml = reml,
     design = if (is.null(design)) NULL else design[match(sort(ids), rownames(design)), , drop = FALSE],
     partial_method = if (partial) model$method else NULL,
@@ -103,6 +112,8 @@
   for (other in available[-1L]) {
     if (!equal(ref$response, other$response))
       stop("Models have different retained response values or response layouts; their likelihoods are not comparable.", call. = FALSE)
+    if (!equal(ref$observation_definition, other$observation_definition))
+      stop("Models have different observation definitions, distance bins, units, removal durations or primary-period layouts; their likelihoods are not comparable.", call. = FALSE)
     if (!equal(ref$weights, other$weights))
       stop("Models have different likelihood weights; compare the same weighted observations.", call. = FALSE)
     if (ref$measure != "unknown" && other$measure != "unknown" &&

@@ -39,7 +39,8 @@ matching raw buffers and source/metric specifications in these inputs.}
 
 \item{type}{Predict on the \code{"response"} or \code{"link"} scale for
 analytic fits. Native-refit fits also accept their provider's prediction
-components. Their defaults are response, unmarked state, or Cox linear
+components. Their defaults are response, unmarked state (lambda for
+combined distance-removal models), or Cox linear
 predictor, as appropriate. Unmarked raster prediction requires an explicit
 component. Cox response probabilities are not supplied by this wrapper.}
 

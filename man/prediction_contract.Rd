@@ -46,6 +46,11 @@ The fields describe the calculation:
   \item{fixed_inputs, component}{Whether the rows and controls are bound to a
     snapshot, and its native component when applicable.}
 }
+For combined distance-removal models, \code{native_component} records the
+component's quantity, units, mixture, and native output definition. Its
+\code{unconditional_mean} flag distinguishes ZIP count-component intensity
+from the full abundance or density mean.
+
 Contracts describe the original prediction call. Ordinary data-frame
 subsetting can retain its attributes; it does not recompute the contract for
 a smaller batch. Use the existing row-level new-group flags for individual rows.

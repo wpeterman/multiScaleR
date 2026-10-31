@@ -61,6 +61,10 @@ the same inputs and keys to \code{\link{prepare_prediction}} to retain a
 compact prediction snapshot. Native prediction determines component meaning,
 factor handling, offsets, missing-data behavior, and conditional intervals.
 Neither function adds uncertainty in selected spatial scales.
+For combined distance-removal models, native components are \code{"lambda"},
+\code{"rem"}, and the active \code{"phi"} and \code{"dist"} components.
+\code{\link{predict_gdistremoval}} prepares explicit survey frames and
+combines these parameters into whole-survey detection and expected counts.
 
 Spatial predictors are static site covariates, as required by the unmarked
 fitting adapter. You must supply the native row layout for detection and

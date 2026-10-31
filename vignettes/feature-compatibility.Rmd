@@ -309,6 +309,7 @@ aic_tab(list(fit, glm(y ~ 1, dat, family = poisson())), AICc = FALSE)
 
 See also:
 
+- `vignette("distance-removal", package = "multiScaleR")` for combined detection models, component scales, and survey predictions.
 - `vignette("quickstart", package = "multiScaleR")` for the core fitting workflow.
 - `vignette("surface_metric_covariates", package = "multiScaleR")` for texture definitions and interpretation.
 - `vignette("landscape_metric_covariates", package = "multiScaleR")` for categorical metrics.

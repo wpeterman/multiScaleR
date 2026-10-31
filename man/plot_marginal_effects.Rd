@@ -28,7 +28,12 @@ Default: \code{"Estimated response"}.}
 to evaluate the marginal effect curve for each covariate. Default: \code{100}.}
 
 \item{type}{Character. Prediction type for \code{unmarked} models. One of
-\code{"state"} (default) or \code{"lambda"}. Ignored for non-unmarked
+\code{"state"} (default) or \code{"lambda"}. Combined distance-removal
+models default to \code{"lambda"} and also accept their active
+\code{"phi"}, \code{"dist"}, and \code{"rem"} components. Distance
+curves show the native key-function parameter; removal curves show the
+per-time-unit probability. Use \code{\link{predict_gdistremoval}} for
+integrated detection probabilities. Ignored for non-unmarked
 models.}
 
 \item{link}{Logical. If \code{TRUE}, predictions are passed through the

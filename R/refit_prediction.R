@@ -179,6 +179,7 @@
   unmarked <- methods::is(model, "unmarkedFit")
   # A survival linear predictor or risk is not a within-choice-set probability.
   # Keep its native names, including lp/risk/survival where the model permits.
+  if (methods::is(model, "unmarkedFitGDR")) type <- .msr_gdr_prediction_type(model, type)
   if (is.null(type)) type <- if (unmarked) "state" else
     if (inherits(model, "coxph")) "lp" else "response"
   validate_character_scalar(type, "type")

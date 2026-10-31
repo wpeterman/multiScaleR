@@ -4,6 +4,7 @@
 ^cran-comments\.md$
 ^\.github$
 ^\.gitattributes$
+^\.git$
 ^README\.Rmd$
 ^inst/extdata/.*\.RData$
 ^vignettes/build_vignettes\.R$

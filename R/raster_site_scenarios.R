@@ -75,6 +75,10 @@
       unique(unlist(lapply(formulas, function(f) if (is.null(f)) character() else
         all.vars(f[[length(f)]])), use.names = FALSE)))
   site_vars <- setdiff(union(model_vars, offset_vars), raster_covs)
+  # GDR component maps use explicit scenarios. In particular, do not create
+  # zero rasters for unprojected spatial covariates from other components.
+  if (methods::is(mod, "unmarkedFitGDR"))
+    site_vars <- intersect(site_vars, union(names(site_values), offset_vars))
   if (length(setdiff(names(site_values), site_vars)))
     stop("site_values must name nonraster model predictors; spatial layers cannot be overwritten.", call. = FALSE)
   if (any(names(offset_values) %in% raster_covs))

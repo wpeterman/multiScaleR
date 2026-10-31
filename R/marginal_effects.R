@@ -19,7 +19,12 @@
 #' @param length.out Positive integer. Number of equally spaced points at which
 #'   to evaluate the marginal effect curve for each covariate. Default: \code{100}.
 #' @param type Character. Prediction type for \code{unmarked} models. One of
-#'   \code{"state"} (default) or \code{"lambda"}. Ignored for non-unmarked
+#'   \code{"state"} (default) or \code{"lambda"}. Combined distance-removal
+#'   models default to \code{"lambda"} and also accept their active
+#'   \code{"phi"}, \code{"dist"}, and \code{"rem"} components. Distance
+#'   curves show the native key-function parameter; removal curves show the
+#'   per-time-unit probability. Use \code{\link{predict_gdistremoval}} for
+#'   integrated detection probabilities. Ignored for non-unmarked
 #'   models.
 #' @param link Logical. If \code{TRUE}, predictions are passed through the
 #'   model's inverse link function before plotting (i.e., plotted on the
@@ -185,14 +190,17 @@ plot_marginal_effects <- function(x,
 
   # Extract variables from fitted model
   if (any(grepl("^unmarked", class(mod)))) {
-    if(is.null(type) || !type %in% c("lambda", "state")){
+    gdr <- methods::is(mod, "unmarkedFitGDR")
+    if (gdr) type <- .msr_gdr_prediction_type(mod, if (missing(type)) NULL else type)
+    if(!gdr && (is.null(type) || !type %in% c("lambda", "state"))){
       stop("`type` must be specified as either 'lambda' or 'state'.")
     }
 
     component <- .msr_unmarked_marginal_formula(mod, type)
     vars <- .msr_marginal_variables(component, offsets = TRUE)
     c_vars <- .msr_marginal_variables(component, offsets = FALSE)
-    dat <- unmarked::siteCovs(unmarked::getData(mod))
+    dat <- if (gdr) .msr_gdr_covariates(mod@data)[[type]] else
+      unmarked::siteCovs(unmarked::getData(mod))
     missing_vars <- setdiff(vars, names(dat))
     if (length(missing_vars)) {
       stop("Could not recover site covariates for marginal effects: ",

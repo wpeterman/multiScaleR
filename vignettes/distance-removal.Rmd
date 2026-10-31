@@ -1,0 +1,354 @@
+---
+title: "Combined Distance and Removal Models"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Combined Distance and Removal Models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+                     fig.width = 6, fig.height = 4.25)
+```
+
+A bird can go uncounted because it gives no cue or because the observer fails
+to detect its cue. A combined distance and removal model separates these
+processes while estimating abundance. First-detection time informs cue
+availability. Distance informs perceptibility, the chance of detecting an
+available bird. The model assumes that these processes are independent after
+accounting for the modeled covariates.
+
+This guide follows the combined model developed by Amundson et al. (2014) and
+implemented in `unmarked::gdistremoval()`. Kellner et al. (2023) describe the
+unmarked implementation and an application with point random effects. Here,
+unmarked fits the full likelihood and multiScaleR optimizes environmental
+neighborhoods around the survey points. Start with
+`vignette("quickstart", package = "multiScaleR")` for the spatial workflow.
+
+The artificial data below demonstrate software behavior. They do not establish
+scale recovery or interval coverage. The spatial optimization and full mapping
+chunks are not run during vignette builds because they repeatedly fit the
+hierarchical model. The native model and process predictions are evaluated.
+
+# Separate the model components
+
+The four formulas describe different parts of the model:
+
+| Formula | Native prediction component | Meaning |
+|---|---|---|
+| `lambdaformula` | `"lambda"` | Latent abundance or density intensity |
+| `phiformula` | `"phi"` | Additional availability between repeated visits |
+| `removalformula` | `"rem"` | Cue probability during one unit of survey time |
+| `distanceformula` | `"dist"` | Parameter of the distance detection key |
+
+The `phi` component is estimated only with multiple primary periods. Its
+availability describes temporary absence between visits, which differs from
+cue availability during a survey. Primary periods do not automatically supply
+a model of recruitment or survival. To model abundance changing among years,
+define the appropriate site-year data and dependence structure first.
+
+For a half-normal distance key, `"dist"` returns the detection standard
+deviation in the input distance units. It is not a probability. This parameter
+also differs from an environmental kernel width estimated by multiScaleR.
+Environmental widths describe the neighborhood used to summarize habitat.
+
+# Prepare spatial predictors and paired histories
+
+Use different covariate names when the same raster source should have separate
+scales in different processes. Reusing a covariate name shares its transform
+and scale across all formulas that contain it.
+
+```{r spatial-inputs}
+set.seed(519)
+habitat <- terra::rast(nrows = 30, ncols = 30, xmin = 0, xmax = 600,
+  ymin = 0, ymax = 600, crs = "EPSG:26917")
+xy <- terra::xyFromCell(habitat, seq_len(terra::ncell(habitat)))
+terra::values(habitat) <- sin(xy[, 1] / 47) + cos(xy[, 2] / 61)
+names(habitat) <- "habitat"
+locations <- expand.grid(x = seq(110, 490, length.out = 6),
+                         y = seq(110, 490, length.out = 6))
+points <- sf::st_as_sf(locations, coords = c("x", "y"), crs = 26917)
+variables <- msr_vars(
+  hab_abundance = kernel_var("habitat"),
+  hab_presence = kernel_var("habitat"),
+  hab_distance = kernel_var("habitat"),
+  hab_removal = kernel_var("habitat"))
+inputs <- kernel_prep(points, habitat, scale_vars = variables,
+  kernel = "gaussian", sigma = rep(35, 4), max_D = 100,
+  bin = FALSE, verbose = FALSE)
+site <- data.frame(site = seq_len(nrow(locations)), inputs$kernel_dat)
+```
+
+These four predictors initially summarize the same source at the same width.
+The optimizer can subsequently change each width. Separate names allow this
+choice; they do not guarantee that the data identify four useful scales.
+
+Each detection supplies a distance class and a first-detection-time class.
+For every site and visit, the two histories must have the same total. The
+following simulation generates individuals once per site, then independently
+samples their presence, cue time, and perceptibility on two visits.
+
+```{r paired-data}
+M <- nrow(site)
+T <- 2L
+distance_breaks <- c(0, 25, 60, 100)  # Meters from the observer
+duration <- c(1, 2, 2)                # Five time units in three intervals
+annual <- data.frame(date = rep(c(-0.5, 0.5), M))
+time <- rep(seq(-0.5, 0.5, length.out = M * T), each = 3)
+observation <- data.frame(time = time)
+distance_counts <- removal_counts <- matrix(0, M, T * 3)
+N <- rpois(M, exp(2 + 0.3 * site$hab_abundance))
+for (i in seq_len(M)) for (visit in seq_len(T)) {
+  row <- (i - 1L) * T + visit
+  present <- rbinom(1, N[i], plogis(1 + 0.1 * site$hab_presence[i]))
+  radius <- 100 * sqrt(runif(present))
+  sigma <- exp(log(60) - 0.1 * site$hab_distance[i] + 0.2 * annual$date[row])
+  perceived <- runif(present) < exp(-radius^2 / (2 * sigma^2))
+  cue <- plogis(-0.5 + 0.1 * site$hab_removal[i] + 0.2 * time[(row - 1L) * 3 + 1L])
+  first_time <- rgeom(present, cue) + 1L
+  detected <- perceived & first_time <= sum(duration)
+  cols <- (visit - 1L) * 3 + seq_len(3)
+  distance_counts[i, cols] <- tabulate(cut(radius[detected], distance_breaks,
+    labels = FALSE), nbins = 3)
+  removal_counts[i, cols] <- tabulate(cut(first_time[detected], c(0, cumsum(duration)),
+    labels = FALSE), nbins = 3)
+}
+frame <- unmarked::unmarkedFrameGDR(distance_counts, removal_counts,
+  numPrimary = T, siteCovs = site, yearlySiteCovs = annual,
+  obsCovs = observation, dist.breaks = distance_breaks,
+  unitsIn = "m", period.lengths = duration)
+```
+
+Site covariates have `M` rows. Yearly or visit covariates have `M * T` rows,
+ordered by site and then visit. Observation covariates have `M * T * 3` rows,
+ordered by site, visit, and removal interval. These orders must remain paired
+with the response matrices. Retain site keys so that spatial preparations can
+be joined without rearranging detection histories.
+
+Optimized raster predictors currently enter `siteCovs`. Ordinary visit and
+observation covariates remain in their original slots. Avoid putting the same
+optimized name in those slots, where it would shadow the updated site value.
+Changing raster values within a primary-period series or estimating
+year-varying widths requires an additional supported model specification.
+
+# Fit the joint model and optimize scales
+
+```{r native-fit}
+base_model <- unmarked::gdistremoval(
+  lambdaformula = ~hab_abundance,
+  phiformula = ~hab_presence,
+  removalformula = ~hab_removal + time,
+  distanceformula = ~hab_distance + date,
+  data = frame, mixture = "P", keyfun = "halfnorm",
+  output = "density", unitsOut = "ha", K = 40, se = FALSE)
+```
+
+The native model here omits coefficient SEs to keep the build short. Obtain
+native uncertainty for a real analysis and check convergence and sensitivity
+to `K`, the upper bound used to sum over latent abundance. A larger `K` should
+not materially change estimates or predictions once the sum is adequate.
+
+```{r scale-fit, eval=FALSE}
+base_model <- unmarked::update(base_model, se = TRUE)
+# Skip intermediate coefficient Hessians, but retain them for returned fits.
+fit <- multiScale_optim(base_model, inputs, join_by = site["site"],
+  par = rep(35 / inputs$unit_conv, 4), refit_fn = refit_gdistremoval,
+  backend = "refit", verbose = FALSE)
+summary(fit)
+plot_marginal_effects(fit, type = "lambda", ylab = "Density intensity per ha")
+plot_marginal_effects(fit, type = "dist", ylab = "Distance key parameter (m)")
+plot_marginal_effects(fit, type = "rem", ylab = "Cue probability per time unit")
+```
+
+The optional `refit_gdistremoval()` callback skips coefficient Hessians during
+scalar objective evaluations. It retains the original model's `se` setting
+for returned fits, including the final selected model. It preserves the native
+likelihood, optimizer controls, and coefficient starts. The default refit policy
+is unchanged. The callback can also be passed to PSOCK workers without copying
+local data into a closure.
+
+Read each scale estimate as the neighborhood width for its named covariate.
+A broad interval or a width near the search extent calls for inspection of
+the likelihood profile and alternative starts. The component effect plots
+hold other covariates at reference values and set group deviations to zero.
+They describe component parameters, not the combined observation process.
+
+Supported random intercepts and slopes remain native unmarked model terms.
+Adding `(1 | route)` to a supported formula selects its TMB fitting engine.
+At unsampled groups, an explicit `re.form = NA` sets group deviations to zero.
+It does not average over the distribution of random effects.
+
+# Read the complete observation process
+
+```{r process-predictions}
+process <- predict_gdistremoval(base_model)
+head(process[, c("site", "period", "density", "phi", "availability",
+                 "perceptibility", "detection", "expected_count")])
+```
+
+How to read this output:
+
+| Output | Interpretation |
+|---|---|
+| `density` | Detection-adjusted mean individuals per fitted area unit |
+| `phi` | Availability between visits; one if the fitted model has one visit |
+| `availability` | Chance of giving a cue during the complete survey |
+| `perceptibility` | Distance-integrated chance of detecting an available cue |
+| `detection` | Product of the three observation-process probabilities |
+| `expected_count` | Mean number the specified survey would record |
+
+Density and expected count answer different questions. A site can have high
+density and a low expected count when cue availability or perceptibility is
+low. The helper uses each visit's distance parameter and applies unequal
+removal durations before combining intervals. These are point estimates.
+Their attributes identify the area units, survey area, and conditioning.
+
+For large prediction grids, half-normal and exponential keys use vectorized
+closed integrals, with repeated distance scales evaluated once. The hazard
+key uses numerical integration. These calculations retain the native distance
+units and the point-transect area measure.
+
+When `phi` is modeled, latent abundance and density describe the site's
+superpopulation. Multiplying either by `phi` gives its mean available during
+that visit, before cue availability and perceptibility. Choose the population
+quantity before interpreting or adding up predictions across a state.
+
+With `mixture = "ZIP"`, native `"lambda"` is the Poisson-component intensity.
+`predict_gdistremoval()` multiplies that intensity by the nonstructural-zero
+probability when calculating abundance, density, and expected counts. It
+uses the fitted zero-inflation parameter on its logit scale. NB uses the native
+negative-binomial mean without this ZIP adjustment.
+
+# Predict at new grid sites
+
+For a native lambda map, prepare rasters with the fitted transformations and
+training normalization. Keep source coverage beyond the state boundary so
+that neighborhoods at its edge have the intended support. Crop the final
+prediction afterward. A density map needs only the covariates in its state
+formula; detection-only date, time, or observer values do not need to be
+invented for it.
+
+```{r native-map, eval=FALSE}
+transformed <- kernel_scale.raster(habitat, multiScaleR = fit,
+  scale_vars = variables[variables$covariate == "hab_abundance", , drop = FALSE],
+  scale_center = TRUE, match_buffer = TRUE, verbose = FALSE)
+density_intensity <- predict(fit, transformed, type = "lambda")
+terra::plot(density_intensity)
+```
+
+Only the state predictor needs projection for this map. Other component maps
+require their own spatial layers and explicit date, time, or observer scenarios
+when used by the formula.
+
+To obtain unconditional ZIP means or compare complete survey scenarios on an
+even grid, construct an explicit prediction frame. Zero histories specify the
+row layout, not observations to refit. The following example uses a small
+subset of raster-cell centers; extend it in batches for a large state grid.
+
+```{r grid-process, eval=FALSE}
+cells <- c(225, 236, 405, 416)
+grid_xy <- terra::xyFromCell(habitat, cells)
+grid <- sf::st_as_sf(data.frame(grid_xy), coords = c("x", "y"),
+                     crs = terra::crs(habitat))
+grid_inputs <- kernel_prep(grid, habitat, scale_vars = variables,
+  max_D = fit$max_D, kernel = "gaussian", bin = FALSE, verbose = FALSE)
+keys <- data.frame(site = seq_len(nrow(grid_xy)))
+zeros <- matrix(0, nrow(grid_xy), T * 3)
+grid_frame <- unmarked::unmarkedFrameGDR(zeros, zeros,
+  numPrimary = T, siteCovs = keys,
+  yearlySiteCovs = data.frame(date = rep(c(-0.5, 0.5), nrow(grid_xy))),
+  obsCovs = data.frame(time = rep(0, nrow(grid_xy) * T * 3)),
+  dist.breaks = distance_breaks, unitsIn = "m", period.lengths = duration)
+grid_prediction <- predict_gdistremoval(fit, grid_frame, grid_inputs,
+  join_by = keys, re.form = NA)
+grid_prediction[, c("site", "period", "density", "expected_count")]
+```
+
+The helper joins fitted spatial covariates into the frame using explicit keys.
+It leaves nonspatial scenario values unchanged and does not standardize the
+new prediction sample again. For density totals, multiply density by actual
+nonoverlapping cell areas, including boundary fractions. Summing counts from
+overlapping survey circles would double-count their spatial support.
+
+# Simulate conditional checks and validate geographic prediction
+
+```{r conditional-simulation}
+set.seed(724)
+replicates <- simulate_gdistremoval(base_model, nsim = 2)
+# Each visit's distance and removal histories describe the same detections.
+first_distance_total <- rowSums(replicates[[1]]@yDistance[, 1:3])
+first_removal_total <- rowSums(replicates[[1]]@yRemoval[, 1:3])
+all(first_distance_total == first_removal_total)
+```
+
+The simulator draws latent abundance once per site and shares it across visits.
+It then draws visit counts and allocates them to distance and removal classes.
+It supports P, NB, and ZIP mixtures, including uniform distance keys, and keeps
+incomplete survey histories missing. It uses the integrated calculations in
+this guide rather than changing unmarked's installed methods.
+
+These simulations condition on fitted coefficients, spatial widths, and the
+chosen random-effect policy. They do not draw new group effects or quantify
+uncertainty in estimated variances. A bootstrap intended to include scale or
+model selection must repeat those fitting steps and respect the sampling
+design. The current Bayesian multiScaleR interface does not implement this
+imperfect-detection likelihood.
+
+Before transferring a model statewide, check detection fit, distance/time
+independence, sensitivity to distance truncation, covariate support, and
+geographic coverage. Validate with spatial blocks that keep repeated records
+from a site together. Estimate scales and select models within each training
+fold so that held-out outcomes cannot influence those choices. A successful
+map operation does not establish predictive performance in unsampled regions.
+
+# Quick reference
+
+```{r quick-reference, eval=FALSE}
+# 1. Fit the complete native model, with its original observation structure.
+native <- unmarked::gdistremoval(~hab_abundance, ~hab_presence,
+  ~hab_removal + time, ~hab_distance + date, data = frame,
+  output = "density", K = 40)
+# 2. Estimate named environmental scales without replacing the likelihood.
+fit <- multiScale_optim(native, inputs, join_by = site["site"],
+  backend = "refit", refit_fn = refit_gdistremoval)
+# 3. Inspect native component effects and complete survey expectations.
+plot_marginal_effects(fit, type = "rem")
+survey <- predict_gdistremoval(fit)
+# 4. Simulate conditional paired histories for model checks.
+replicate <- simulate_gdistremoval(fit)[[1]]
+# 5. Apply fitted transforms at new sites; retain training normalization.
+future <- predict_gdistremoval(fit, grid_frame, grid_inputs, join_by = keys)
+```
+
+| Function | Purpose |
+|---|---|
+| `multiScale_optim()` | Optimize spatial covariates through native joint-model refits |
+| `refit_gdistremoval()` | Skip objective Hessians while retaining final native uncertainty settings |
+| `prepare_unmarked_data()` | Prepare explicit native component-prediction rows |
+| `predict_gdistremoval()` | Combine state and observation components into interpretable means |
+| `simulate_gdistremoval()` | Draw conditional paired histories with matched survey totals |
+| `plot_marginal_effects()` | Inspect active state, availability, distance, or removal effects |
+
+See also:
+
+- `vignette("quickstart", package = "multiScaleR")` for spatial preparation.
+- `vignette("feature-compatibility", package = "multiScaleR")` for fitting and prediction boundaries.
+- `vignette("spatial_projection_clamping", package = "multiScaleR")` for projection and extrapolation choices.
+
+# References
+
+Amundson, C. L., Royle, J. A., and Handel, C. M. (2014). A hierarchical model
+combining distance sampling and time removal to estimate detection probability
+during avian point counts. *The Auk* 131:476-494.
+<https://doi.org/10.1642/AUK-14-11.1>.
+
+Kellner, K. F., Smith, A. D., Royle, J. A., Kéry, M., Belant, J. L., and
+Chandler, R. B. (2023). The unmarked R package: Twelve years of advances in
+occurrence and abundance modelling in ecology. *Methods in Ecology and
+Evolution* 14:1408-1415. <https://doi.org/10.1111/2041-210X.14123>.

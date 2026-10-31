@@ -15,6 +15,7 @@
   if (kind == "unmarked") {
     if (is.null(component)) stop("Specify the native unmarked component explicitly.", call. = FALSE)
     model <- object$opt_mod
+    if (methods::is(model, "unmarkedFitGDR")) component <- .msr_gdr_prediction_type(model, component)
     nd <- if (is.null(kernel_inputs)) newdata else
       prepare_unmarked_data(object, newdata, kernel_inputs, join_by, include_fixed)
     if (is.null(kernel_inputs) && !is.null(join_by))

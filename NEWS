@@ -1,3 +1,17 @@
+multiScaleR 0.7.10 (development)
+---------
+* Combined distance-removal models retain active component formulas, reject
+  shadowed optimized predictors, default point/effect predictions to lambda,
+  and compare both observation histories and survey definitions. New GDR
+  helpers calculate complete survey means and conditional paired simulations
+  with visit-specific distance integration and explicit ZIP mean adjustment.
+  Component maps project only required spatial predictors and use explicit
+  nonspatial scenarios rather than automatic zero-valued GDR layers.
+  A worked guide covers component effects, spatial scales, and grid prediction.
+* Vectorized closed integrals accelerate half-normal and exponential prediction.
+  The optional refit_gdistremoval callback omits objective Hessians and retains
+  the original uncertainty settings for returned native fits.
+
 multiScaleR 0.7.9 (development)
 ---------
 * Partial lme4 predictions require only fixed inputs and selected random-effect
