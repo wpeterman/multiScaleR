@@ -24,7 +24,8 @@
   }
   evaluate <- function(par) {
     kd <- .msr_eval_kernel_engine(obj$engine, unname(par[seq_len(nk)]))
-    X <- cbind(obj$X_fixed, kd$value)
+    X <- if (is.null(obj$response_design)) cbind(obj$X_fixed, kd$value) else
+      .msr_response_design_matrix(obj$response_design, kd$value)
     beta <- par[ib]
     eta <- drop(X %*% beta) + obj$offset
     y <- obj$y
@@ -46,10 +47,17 @@
       ll <- stats::dbinom(y, obj$trials, mu, log = TRUE)
       score <- w * (obj$trials * mu - y)
     }
-    bk <- utils::tail(beta, obj$engine$p)
-    gk <- colSums(kd$d_scale * score) * bk
-    if (obj$engine$kernel == "expow")
-      gk <- c(gk, colSums(kd$d_shape * score) * bk)
+    if (is.null(obj$response_design)) {
+      bk <- utils::tail(beta, obj$engine$p)
+      gk <- colSums(kd$d_scale * score) * bk
+      if (obj$engine$kernel == "expow")
+        gk <- c(gk, colSums(kd$d_shape * score) * bk)
+    } else {
+      sensitivity <- .msr_response_kernel_sensitivity(obj$response_design, kd$value, beta)
+      gk <- colSums(kd$d_scale * sensitivity * score)
+      if (obj$engine$kernel == "expow")
+        gk <- c(gk, colSums(kd$d_shape * sensitivity * score))
+    }
     list(value = -sum(w * ll),
          gradient = c(gk, drop(crossprod(X, score)), if (disp) ds))
   }

@@ -15,11 +15,24 @@
   rhs <- formula[[length(formula)]]
   variables <- .msr_marginal_variables(rhs, offsets = TRUE)
   panels <- .msr_marginal_variables(rhs, offsets = FALSE)
+  if (!is.null(spec$response_design) || isTRUE(spec$response$active_frame)) {
+    variables <- .msr_active_formula_variables(spec$response$terms)
+    panel_terms <- spec$response$terms; attr(panel_terms, "offset") <- integer()
+    panels <- .msr_active_formula_variables(panel_terms)
+  }
   reference <- spec$data
-  for (nm in spec$covariates) reference[[nm]] <- spec$response$frame[[nm]]
+  for (nm in spec$covariates) {
+    if (!is.null(spec$response_design$expression_programs)) {
+      reference[[nm]] <- spec$response_design$reference_kernel[, nm]
+    } else {
+      column <- if (is.null(spec$response_design)) nm else
+        spec$response_design$kernel_frame_columns[[nm]]
+      reference[[nm]] <- spec$response$frame[[column]]
+    }
+  }
   if (!all(variables %in% names(reference)))
     stop("The fit must retain base covariates needed for effect curves.", call. = FALSE)
-  training <- cbind(spec$X_fixed, as.matrix(reference[spec$covariates]))
+  training <- .msr_scale_response_matrix(spec, as.list(reference[spec$covariates]))
   defaults <- lapply(reference[variables], function(value) {
     if (all(is.na(value))) stop("Effect covariates must contain observed values.", call. = FALSE)
     if (is.numeric(value)) mean(value, na.rm = TRUE) else value[which(!is.na(value))[1L]]
@@ -37,7 +50,7 @@
       length.out = length.out) else if (is.factor(value))
       value[match(levels(droplevels(value)), as.character(value))] else unique(value[!is.na(value)])
     nd <- as.data.frame(lapply(defaults, function(x) rep(x, length(grid))),
-                         stringsAsFactors = FALSE)
+                         stringsAsFactors = FALSE, check.names = FALSE)
     nd[[nm]] <- grid
     design <- .msr_bayes_prediction_matrix(spec$response, nd, training, response = TRUE)
     offset <- stats::model.offset(design$frame)

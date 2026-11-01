@@ -61,6 +61,22 @@ Basis columns are projected off the fixed scale design and normalized
   The first prototype requires an intercept-only fixed scale design, with
   optional annual random intercepts, so the field is a function of location
   alone. Other fixed scale formulas remain available in the existing models.
+  For a spatial-only scale, use \code{scales = list(habitat = ~1)} when
+  \code{habitat} is the selected kernel predictor. This keeps the fixed
+  log-scale intercept and the spatial field, with no annual scale SD or annual
+  latent coefficients. Preparation and prediction need no year column. Omit
+  temporal terms from the response formula too when no calendar effect is
+  intended anywhere in the model. Existing formulas containing annual scale
+  intercepts remain supported by this private prototype.
+
+  Removing annual effects simplifies the latent structure but does not ensure
+  recovery. Distinguish the realized scale surface from its field-SD
+  hyperparameter, which can remain weakly informed by one spatial realization.
+  If the response provides no information about ecological kernel scale, the
+  field is not identified by the likelihood even without a year effect. A
+  positive field-SD interval under a continuous positive prior does not test
+  the zero-field null. A single spatial SD still belongs to a coupled Gaussian
+  block; it does not make scalar annual integration appropriate.
   It provides no claim of interval calibration or detection of nonstationarity.
   Use the dedicated private prediction adapter; public summaries/prediction
   and scalar/one-SD integrators do not support Gaussian-block specifications.

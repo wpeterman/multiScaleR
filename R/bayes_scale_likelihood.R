@@ -5,7 +5,9 @@
   sum_rows <- if (inherits(par$beta, "advector")) RTMB::rowSums else base::rowSums
   scales <- kernel <- vector("list", length(spec$covariates))
   names(scales) <- names(kernel) <- spec$covariates
-  eta <- drop(spec$X_fixed %*% par$beta[seq_len(ncol(spec$X_fixed))]) + spec$offset
+  expanded <- !is.null(spec$response_design)
+  eta <- if (expanded) spec$offset else
+    drop(spec$X_fixed %*% par$beta[seq_len(ncol(spec$X_fixed))]) + spec$offset
   for (j in seq_along(spec$covariates)) {
     nm <- spec$covariates[j]
     sm <- spec$scales[[nm]]
@@ -27,8 +29,9 @@
       x <- sum_rows(w * spec$V[[nm]]) / sum_rows(w * spec$C[[nm]])
     }
     kernel[[nm]] <- (x - spec$center[[nm]]) / spec$spread[[nm]]
-    eta <- eta + kernel[[nm]] * par$beta[ncol(spec$X_fixed) + j]
+    if (!expanded) eta <- eta + kernel[[nm]] * par$beta[ncol(spec$X_fixed) + j]
   }
+  if (expanded) eta <- eta + .msr_response_design_eta(spec$response_design, kernel, par$beta)
   if (include_response) for (term in spec$response$random)
     if (is.null(term$gaussian_block))
       eta <- eta + exp(par$log_response_sd[term$sd_index]) *

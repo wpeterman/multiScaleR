@@ -90,6 +90,15 @@ test_that("analytic SQ fits use checked rasters without claiming joint scale unc
   nd <- dat; nd$z <- .2
   expected <- predict(object, nd, f$inputs, se.fit = TRUE, uncertainty = "conditional")
   output <- predict(object, inputs, se.fit = TRUE, uncertainty = "conditional")
+  info <- attr(output, "prediction_contract")$uncertainty
+  expect_identical(info$standard_errors, "provided")
+  expect_identical(info$intervals, "conditional_standard_errors_only")
+  point_map <- predict(object, inputs)
+  info <- attr(point_map, "prediction_contract")$uncertainty
+  expect_identical(info$standard_errors, "not_requested")
+  expect_identical(info$intervals, "not_provided")
+  expect_equal(terra::extract(point_map, f$points, ID = FALSE)[[1]],
+    as.numeric(expected$fit), tolerance = 1e-8)
   actual <- terra::extract(output, f$points, ID = FALSE)
   expect_equal(actual$fit, as.numeric(expected$fit), tolerance = 1e-8)
   expect_equal(actual$se.fit, as.numeric(expected$se.fit), tolerance = 1e-8)
@@ -114,6 +123,15 @@ test_that("joint NB2 weighted-SQ rasters use the analytic conditional covariance
   nd <- dat; nd$z <- .2
   expected <- predict(object, nd, f$inputs, se.fit = TRUE, uncertainty = "conditional")
   output <- predict(object, inputs, se.fit = TRUE, uncertainty = "conditional")
+  info <- attr(output, "prediction_contract")$uncertainty
+  expect_identical(info$standard_errors, "provided")
+  expect_identical(info$intervals, "conditional_standard_errors_only")
+  point_map <- predict(object, inputs)
+  info <- attr(point_map, "prediction_contract")$uncertainty
+  expect_identical(info$standard_errors, "not_requested")
+  expect_identical(info$intervals, "not_provided")
+  expect_equal(terra::extract(point_map, f$points, ID = FALSE)[[1]],
+    as.numeric(expected$fit), tolerance = 1e-8)
   actual <- terra::extract(output, f$points, ID = FALSE)
   expect_equal(actual$fit, as.numeric(expected$fit), tolerance = 1e-8)
   expect_equal(actual$se.fit, as.numeric(expected$se.fit), tolerance = 1e-8)

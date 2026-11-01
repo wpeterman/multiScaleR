@@ -140,12 +140,12 @@
 
 .msr_joint_nb2_objective <- function(engine, y, family = "nbinom2",
                                     X_fixed, offset, weights, trials = rep(1, length(y)),
-                                    coefficient_start = "cold") {
+                                    coefficient_start = "cold", response_design = NULL) {
   coefficient_start <- match.arg(coefficient_start, c("cold", "warm"))
   # Reuse validation, but never evaluate the older finite-theta objective here.
-  obj <- .msr_profile_glm_objective(engine, y, family, X_fixed, offset, weights, trials)
+  obj <- .msr_profile_glm_objective(engine, y, family, X_fixed, offset, weights, trials, response_design)
   if (family != "nbinom2") stop("joint_nb2 requires an NB2 log-link model.", call. = FALSE)
-  nk <- length(engine$parameter_names); nb <- ncol(X_fixed) + engine$p
+  nk <- length(engine$parameter_names); nb <- if (is.null(response_design)) ncol(X_fixed) + engine$p else response_design$p
   ib <- nk + seq_len(nb); outer <- c(seq_len(nk), nk + nb + 1L)
   normalizer <- .msr_nb2_normalizer(y, weights,
     cache = identical(engine$implementation, "stream"))
@@ -158,7 +158,9 @@
   design <- function(kp) {
     if (!identical(kp, cache$kernel)) {
       cache$kd <- .msr_eval_kernel_engine(engine, kp)
-      cache$X <- cbind(X_fixed, cache$kd$value); cache$kernel <- kp
+      cache$X <- if (is.null(response_design)) cbind(X_fixed, cache$kd$value) else
+        .msr_response_design_matrix(response_design, cache$kd$value)
+      cache$kernel <- kp
     }
     list(X = cache$X, kd = cache$kd)
   }
@@ -171,9 +173,15 @@
     rho <- max(0, rho); alpha <- expm1(rho)
     z <- design(par[seq_len(nk)]); beta <- par[ib]
     a <- .msr_nb2_terms(y, drop(z$X %*% beta) + offset, alpha, weights, normalizer)
-    bk <- utils::tail(beta, engine$p)
-    gk <- colSums(z$kd$d_scale * a$score) * bk
-    if (engine$kernel == "expow") gk <- c(gk, colSums(z$kd$d_shape * a$score) * bk)
+    if (is.null(response_design)) {
+      bk <- utils::tail(beta, engine$p)
+      gk <- colSums(z$kd$d_scale * a$score) * bk
+      if (engine$kernel == "expow") gk <- c(gk, colSums(z$kd$d_shape * a$score) * bk)
+    } else {
+      sensitivity <- .msr_response_kernel_sensitivity(response_design, z$kd$value, beta)
+      gk <- colSums(z$kd$d_scale * sensitivity * a$score)
+      if (engine$kernel == "expow") gk <- c(gk, colSums(z$kd$d_shape * sensitivity * a$score))
+    }
     result <- list(value = a$value,
       gradient = c(gk, drop(crossprod(z$X, a$score)), a$alpha_score * (1 + alpha)),
       beta = stats::setNames(beta, colnames(z$X)), design = z$X,

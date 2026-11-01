@@ -53,10 +53,19 @@ identifying the single best-supported model rather than model averaging.
 Sigma (and shape for \code{"expow"}) is counted in K.
 Fitted parameter counts and log-likelihood validation follow
 \code{\link{aic_tab}}, including all estimated components of unmarked models.
+spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
+components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
+for its restricted-likelihood interpretation.
+
 The same recoverable response, row, weight, ML/REML, and partial-likelihood
 checks apply. Inapplicable hard-radius shape positions are excluded.
 Bayesian posterior fits are rejected; the name BIC does not make a posterior
 target a sampling likelihood.
+Private spatial prototypes are also rejected; conditional response densities
+do not supply a maximized marginal likelihood.
+Cox and conditional-logistic penalties use the native likelihood event
+count, keeping all alternative rows for comparison checks. See
+\code{\link{aic_tab}} for the sampling-design qualification.
 }
 \examples{
 ## Simulate data

@@ -85,7 +85,9 @@
       count <- count + mapped$n; new_rows <- new_rows | mapped$new_rows
       metadata <- rbind(metadata, mapped$metadata)
     } else sm$random <- list()
-    variables <- union(all.vars(sm$fixed), if (include) names(sm$random) else character())
+    variables <- union(if (isTRUE(sm$active_frame))
+      .msr_active_formula_variables(sm$terms) else all.vars(sm$fixed),
+      if (include) names(sm$random) else character())
     labels <- if (!length(variables)) rep("shared", nrow(data)) else
       apply(as.data.frame(lapply(data[variables], as.character)), 1L,
         function(z) paste(paste(variables, z, sep = "="), collapse = ", "))
@@ -190,8 +192,17 @@
   }); names(spec$delta) <- mean_names
   model_data <- newdata
   for (nm in spec$covariates) model_data[[nm]] <- 0
-  fixed <- .msr_bayes_prediction_matrix(spec$response, model_data, spec$X_fixed, TRUE)
-  spec$X_fixed <- fixed$X
+  training <- if (is.null(spec$response_design)) spec$X_fixed else
+    spec$response_design$multipliers
+  fixed <- .msr_bayes_prediction_matrix(spec$response, model_data, training, TRUE)
+  if (is.null(spec$response_design)) spec$X_fixed <- fixed$X else {
+    tt <- stats::delete.response(spec$response$terms)
+    spec$response_design <- .msr_compile_response_design(tt, fixed$frame,
+      spec$covariates, columns = spec$beta_names,
+      contrasts = spec$response$prediction$contrasts)
+    static <- lengths(spec$response_design$dependence) == 0L
+    spec$X_fixed <- fixed$X[, static, drop = FALSE]
+  }
   spec$offset <- stats::model.offset(fixed$frame)
   if (is.null(spec$offset)) spec$offset <- rep(0, nrow(newdata))
   if (any(!is.finite(spec$offset))) stop("Prediction offsets must be finite.", call. = FALSE)

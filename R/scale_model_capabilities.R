@@ -35,6 +35,12 @@
   capability <- .msr_scale_capability(target, method)
   if (target == "marginal_likelihood" && length(spec$surface$buffers))
     stop("Weighted SQ is not yet supported by private marginal-likelihood fit and limiting adapters.", call. = FALSE)
+  .msr_scale_check_structure(spec, target, method, capability)
+}
+
+# Exact likelihood components share dependence policy, while the unchanged
+# model wrapper above retains fitting admission. Inspect the intact payload.
+.msr_scale_check_structure <- function(spec, target, method, capability) {
   if (.msr_has_gaussian_blocks(spec) &&
       (target == "marginal_likelihood" || method %in% c("marginal_laplace", "importance_corrected")))
     stop("Gaussian projection blocks require the private joint spatial adapter; current scalar and likelihood fit interfaces support grouping intercepts only.", call. = FALSE)

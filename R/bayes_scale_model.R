@@ -1,6 +1,6 @@
 # Formula preparation is deliberately independent of RTMB. Freeze observation
 # identity, contrasts and bin summaries before recording the differentiation tape.
-.msr_bayes_formula <- function(formula, data, response = FALSE) {
+.msr_bayes_formula <- function(formula, data, response = FALSE, active_frame = FALSE) {
   if (!inherits(formula, "formula") || length(formula) != if (response) 3L else 2L)
     stop("Use a two-sided response formula and one-sided scale formulas.", call. = FALSE)
   groups <- character()
@@ -32,7 +32,11 @@
     stop("A grouping variable can occur only once in each formula.", call. = FALSE)
   if (length(setdiff(groups, names(data))))
     stop("Random-effect grouping variables must be columns in data.", call. = FALSE)
-  frame <- stats::model.frame(fixed, data, na.action = stats::na.fail,
+  # Newly expanded/removed prepared terms must not demand dead predictors at
+  # prediction time. Keep native column order, offsets and learned metadata.
+  evaluated <- if (active_frame)
+    .msr_response_active_terms(stats::terms(fixed, data = data)) else fixed
+  frame <- stats::model.frame(evaluated, data, na.action = stats::na.fail,
                               drop.unused.levels = TRUE)
   random <- lapply(groups, function(g) {
     v <- data[[g]]
@@ -44,8 +48,10 @@
     list(group = g, levels = levels(f), index = as.integer(f))
   })
   names(random) <- groups
-  list(formula = formula, fixed = fixed, frame = frame,
+  out <- list(formula = formula, fixed = fixed, frame = frame,
        terms = stats::terms(frame), random = random)
+  if (active_frame) out$active_frame <- TRUE
+  out
 }
 
 .msr_bayes_priors <- function(priors, covariates, inputs) {

@@ -48,6 +48,7 @@
 }
 
 .msr_marginal_inner_audit <- function(spec, parameters, starts = 3L) {
+  .msr_scale_surface_ram(spec)
   joint <- RTMB::MakeADFun(.msr_marginal_objective(spec, TRUE), parameters, silent = TRUE)
   full <- unname(unlist(parameters)); random <- which(names(joint$par) %in% c("scale_z", "response_z"))
   if (!length(random)) return(list(passed = TRUE, gradient = 0, condition = 1,

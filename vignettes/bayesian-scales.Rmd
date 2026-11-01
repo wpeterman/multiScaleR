@@ -130,8 +130,27 @@ documented links. Binomial data can use successes and failures. Gaussian and
 exponential kernel means and optimized weighted surface SQ are supported. SQ
 can appear alone or alongside means. Keep its raw buffers and source specifications;
 means also need binned summaries. The response formula allows offsets,
-ordinary fixed covariates and additive random intercepts. Preparation checks
-the complete model before optional sampling software is needed.
+ordinary fixed covariates and additive random intercepts. Numeric spatial
+predictors can enter R products, crossings, nesting, and factor interactions.
+For example, `habitat * year` estimates separate habitat associations by year;
+it does not introduce a year effect into the spatial-scale formula. An
+interaction among two optimized predictors still has one scale model for each
+predictor. The expanded response coefficients retain the documented normal
+prior in the native factor/contrast basis. Fixed polynomial and spline bases
+retain their training metadata during prediction. Kernel-only scalar
+expressions, such as `I(habitat^2)`, use the same fixed reference transformation
+and original coefficient priors in their native basis. These expressions act
+after kernel extraction and standardization. Learned dynamic bases, fixed-data
+inputs within a dynamic expression, arbitrary or nondifferentiable functions,
+and kernel offsets remain guarded. Preparation checks the complete model before
+optional sampling software is needed.
+
+A dot in a scale formula expands the observation-data columns. Exclude the
+response, row keys, and other unwanted columns explicitly. The active native
+terms determine scale coefficients and their existing priors; removing a
+predictor does not add a coefficient or an annual latent coordinate. Optimized
+response predictors cannot also enter a scale formula. Prediction reuses the
+fitted active terms and does not require columns removed from those formulas.
 
 Weighted SQ measures the square root of the kernel-weighted centered variance,
 using the sum of weights as its denominator. Its scale can use the same annual

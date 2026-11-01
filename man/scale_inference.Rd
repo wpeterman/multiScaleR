@@ -91,7 +91,9 @@ the fitted object or the default optimizer and uncertainty methods.
 \details{
 Coefficients and NB2 theta are reestimated at every constrained scale.
 Weighted SQ uses the same refit and audit machinery. Existing kernel-mean
-coverage studies do not establish interval coverage for surface SQ.
+coverage studies do not establish interval coverage for surface SQ or
+interaction models. Native factor contrasts and product terms are retained
+in every constrained, unrestricted, and bootstrap refit.
 Exponential-power shape is also reestimated. A stronger unrestricted refit
 and a full-range grid can reveal an optimum missed by the original fit;
 the returned reference records this without modifying \code{object}.
@@ -110,7 +112,8 @@ difference. Each detected accepted component is retained. Finite grids can
 still miss narrow regions. A bound-limited endpoint is not a resolved
 confidence limit.
 
-The zero-effect diagnostic fits the model without the kernel coefficient.
+The zero-effect diagnostic removes all response columns involving the
+optimized kernel, including its products and factor interactions.
 If that model is inside the profile likelihood cutoff, every admissible
 scale has a feasible fit inside the cutoff. Scale is then reported as
 unresolved. This is a likelihood diagnostic, not a calibrated test for

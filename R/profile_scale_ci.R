@@ -6,6 +6,17 @@
 
 .profile_scale_cache <- new.env(parent = emptyenv())
 
+.msr_profile_cache_bytes <- function() {
+  keys <- ls(.profile_scale_cache, all.names = TRUE)
+  sum(vapply(keys, function(key) as.numeric(utils::object.size(
+    get(key, envir = .profile_scale_cache, inherits = FALSE))), numeric(1)))
+}
+
+.msr_clear_profile_cache <- function() {
+  rm(list = ls(.profile_scale_cache, all.names = TRUE), envir = .profile_scale_cache)
+  invisible(NULL)
+}
+
 scale_ci_table <- function(object,
                            df,
                            min_D = object$min_D,
@@ -42,15 +53,38 @@ scale_ci_table <- function(object,
     return(tab)
   }
 
-  cache_key <- profile_scale_cache_key(object = object,
-                                       min_D = min_D,
-                                       names = names)
-  cache_enabled <- is.null(object$opt_context$refit_fn)
-  if (cache_enabled && exists(cache_key, envir = .profile_scale_cache, inherits = FALSE)) {
+  budget <- getOption("multiScaleR.profile_cache_max_bytes", 64 * 1024^2)
+  validate_scalar_numeric(budget, "multiScaleR.profile_cache_max_bytes", lower = 0)
+  if (.msr_profile_cache_bytes() > budget) .msr_clear_profile_cache()
+  cache_enabled <- budget > 0 && is.null(object$opt_context$refit_fn)
+  cache_info <- list(status = if (cache_enabled) "enabled" else "disabled",
+    reason = if (budget == 0) "zero_budget" else if (!cache_enabled) "custom_refit" else NULL)
+  cache_key <- NULL
+  entry <- NULL
+  if (cache_enabled) {
+    cache_key <- tryCatch(profile_scale_cache_key(object, min_D, names),
+      error = function(e) {
+        cache_info <<- list(status = "unavailable", reason = conditionMessage(e))
+        warning("Profile cache unavailable; computing intervals without caching: ",
+          conditionMessage(e), call. = FALSE)
+        NULL
+      })
+    if (is.null(cache_key)) cache_enabled <- FALSE else {
+      # Release oversized key payloads before the numerical profile starts.
+      key_bytes <- as.numeric(utils::object.size(list(
+        payload = attr(cache_key, "payload"), result = NULL)))
+      if (key_bytes > budget) {
+        cache_enabled <- FALSE
+        cache_info <- list(status = "disabled", reason = "payload_exceeds_budget")
+        cache_key <- NULL
+      }
+    }
+  }
+  if (cache_enabled && exists(cache_key, envir = .profile_scale_cache, inherits = FALSE))
     entry <- get(cache_key, envir = .profile_scale_cache, inherits = FALSE)
-  } else entry <- NULL
-  # Verify the payload as well as its bounded digest, including on collisions.
-  if (!is.null(entry) && identical(entry$payload, attr(cache_key, "payload"))) {
+  # Verify the full payload as well as the digest; cache corruption is a miss.
+  if (is.list(entry) && identical(entry$payload, attr(cache_key, "payload")) &&
+      is.list(entry$result) && !is.null(entry$result$intervals)) {
     profile_tab <- entry$result
   } else {
     profile_tab <- try(profile_sigma_intervals(object), silent = TRUE)
@@ -63,8 +97,14 @@ scale_ci_table <- function(object,
       stop("Profile-likelihood intervals could not be computed: ", detail,
            call. = FALSE)
     }
-    if (cache_enabled) assign(cache_key, list(payload = attr(cache_key, "payload"), result = profile_tab),
-           envir = .profile_scale_cache)
+    if (cache_enabled) {
+      candidate <- list(payload = attr(cache_key, "payload"), result = profile_tab)
+      bytes <- as.numeric(utils::object.size(candidate))
+      if (bytes <= budget) {
+        if (.msr_profile_cache_bytes() + bytes > budget) .msr_clear_profile_cache()
+        assign(cache_key, candidate, envir = .profile_scale_cache)
+      } else cache_info <- list(status = "disabled", reason = "result_exceeds_budget")
+    }
   }
 
   if (!inherits(profile_tab, "try-error") && !is.null(profile_tab$intervals)) {
@@ -77,6 +117,7 @@ scale_ci_table <- function(object,
   }
 
   attr(tab, "interval_method") <- methods
+  attr(tab, "profile_cache") <- cache_info
   tab
 }
 

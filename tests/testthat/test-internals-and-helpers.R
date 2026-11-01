@@ -49,32 +49,35 @@ test_that("extract_namespace identifies namespaced calls and plain calls", {
 test_that("cluster_prep covers direct, fallback, and error branches", {
   data(quine, package = "MASS")
   nb_mod <- MASS::glm.nb(Days ~ Sex/(Age + Eth * Lrn), data = quine)
-  cl1 <- parallel::makeCluster(1)
-  on.exit(parallel::stopCluster(cl1), add = TRUE)
-
-  pkg1 <- multiScaleR:::cluster_prep(nb_mod, cl1)
+  # Each branch needs a fresh worker, but no branch needs another branch's
+  # cluster to stay open. Close it promptly even if an assertion fails.
+  with_cluster <- function(callback) {
+    cl <- parallel::makeCluster(1)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    callback(cl)
+  }
+  pkg1 <- with_cluster(function(cl) multiScaleR:::cluster_prep(nb_mod, cl))
   expect_equal(pkg1, "MASS")
 
   nb_mod_unqualified <- nb_mod
   nb_mod_unqualified$call[[1]] <- quote(glm.nb)
-  cl1b <- parallel::makeCluster(1)
-  on.exit(parallel::stopCluster(cl1b), add = TRUE)
-
-  pkg1b <- multiScaleR:::cluster_prep(nb_mod_unqualified, cl1b)
+  pkg1b <- with_cluster(function(cl) {
+    package <- multiScaleR:::cluster_prep(nb_mod_unqualified, cl)
+    expect_true(parallel::clusterEvalQ(cl, exists("glm.nb", mode = "function"))[[1]])
+    package
+  })
   expect_equal(pkg1b, "MASS")
-  expect_true(parallel::clusterEvalQ(cl1b, exists("glm.nb", mode = "function"))[[1]])
 
   glm_mod <- glm(mpg ~ wt, data = mtcars)
-  cl2 <- parallel::makeCluster(1)
-  on.exit(parallel::stopCluster(cl2), add = TRUE)
-
-  pkg2 <- multiScaleR:::cluster_prep(glm_mod, cl2)
+  pkg2 <- with_cluster(function(cl) {
+    package <- multiScaleR:::cluster_prep(glm_mod, cl)
+    expect_error(
+      multiScaleR:::cluster_prep(structure(list(), class = "mystery_model"), cl),
+      "Could not determine the package"
+    )
+    package
+  })
   expect_equal(pkg2, "stats")
-
-  expect_error(
-    multiScaleR:::cluster_prep(structure(list(), class = "mystery_model"), cl2),
-    "Could not determine the package"
-  )
 })
 
 test_that("safe_predict and namespace handle supported and unsupported models", {

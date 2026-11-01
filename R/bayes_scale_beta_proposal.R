@@ -79,12 +79,20 @@
   for (begin in seq.int(1L, nrow(samples), by = 256L)) {
     rows <- seq.int(begin, min(begin + 255L, nrow(samples)))
     blocks <- .msr_bayes_parameter_blocks(samples[rows, , drop = FALSE], spec$parameters)
-    kernels <- lapply(seq_along(spec$covariates), function(j) {
-      b <- blocks; b$beta[, fixed + j] <- 1
-      sweep(.msr_bayes_batch_eta(spec, b), 2L, spec$offset, "-")
-    })
+    kernels <- if (is.null(spec$response_design))
+      lapply(seq_along(spec$covariates), function(j) {
+        b <- blocks; b$beta[, fixed + j] <- 1
+        sweep(.msr_bayes_batch_eta(spec, b), 2L, spec$offset, "-")
+      }) else NULL
     for (i in seq_along(rows)) {
-      X <- cbind(spec$X_fixed, do.call(cbind, lapply(kernels, function(k) k[i, ])))
+      X <- if (is.null(spec$response_design))
+        cbind(spec$X_fixed, do.call(cbind, lapply(kernels, function(k) k[i, ]))) else {
+          # One kernel evaluation per candidate, rather than probing a response
+          # coefficient for each expanded column or repeating every kernel.
+          candidate <- lapply(blocks, function(x) unname(x[i, ]))
+          k <- .msr_bayes_components(spec, candidate, include_response = FALSE)$kernel
+          .msr_scale_response_matrix(spec, k)
+        }
       offset <- spec$offset
       for (term in spec$response$random)
         offset <- offset + blocks$response_z[i, term$z_index][term$index] *

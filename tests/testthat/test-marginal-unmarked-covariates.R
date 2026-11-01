@@ -198,3 +198,144 @@ test_that("custom contrasts retain the occupancy link and zero random effects", 
   expect_error(.msr_unmarked_contrast_prediction(zip, ~habitat,
     data.frame(habitat = 0), "state"), "class-specific prediction")
 })
+
+
+test_that("formula symbols distinguish fixed logic, removed terms and random groups", {
+  form <- ~ `land | cover` * Year + I(a | b) + (1 | site) + z - z + offset(log(effort))
+  expect_setequal(.msr_marginal_variables(form, FALSE), c("land | cover", "Year", "a", "b"))
+  expect_setequal(.msr_marginal_variables(form, TRUE), c("land | cover", "Year", "a", "b", "effort"))
+  for (expr in list(quote(1 | site), quote((1 | site)), quote(1 || site)))
+    expect_true(.msr_marginal_random_call(expr))
+  for (expr in list(as.name("land | cover"), quote(I(a | b)), quote(I(a || b))))
+    expect_false(.msr_marginal_random_call(expr))
+  dat <- data.frame(a = 1:3, b = 3:1, site = letters[1:3])
+  tt <- terms(~ . - site - a, data = dat)
+  expect_identical(.msr_marginal_variables(tt, FALSE), "b")
+  expect_identical(.msr_marginal_variables(~1, FALSE), character())
+})
+
+test_that("native unmarked curves retain admitted symbols and exclude removed predictors", {
+  f <- make_marginal_year_fixture()
+  sc <- f$sc
+  name <- "land:cover"
+  names(sc)[names(sc) == "habitat"] <- name
+  contrasts(sc$Year) <- contr.sum(3L)
+  state <- ~ Year * `land:cover` + I((temperature > 15) + (effort > 1) > 0) + unused - unused
+  form <- ~ Year ~ Year * `land:cover` + I((temperature > 15) + (effort > 1) > 0) + unused - unused
+  set.seed(907)
+  present <- rbinom(nrow(sc), 1, .65)
+  y <- replicate(3L, present * rbinom(length(present), 1, .6))
+  models <- list(unmarked::occu(form,
+    unmarked::unmarkedFrameOccu(y = y, siteCovs = sc)),
+    unmarked::pcount(form,
+      unmarked::unmarkedFramePCount(y = f$umf@y, siteCovs = sc), K = 40))
+  open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
+  for (model in models) {
+    obj <- f$obj; obj$opt_mod <- model
+    obj$scl_params <- list(mean = setNames(.4, name), sd = setNames(.2, name))
+    plots <- expect_no_warning(plot_marginal_effects(obj, length.out = 5))
+    expect_setequal(names(plots), c("Year", name, "temperature", "effort"))
+    beta <- unmarked::coef(model, type = "state", altNames = FALSE)
+    V <- unmarked::vcov(model, type = "state")
+    inverse <- if (methods::is(model, "unmarkedFitOccu")) plogis else exp
+    for (v in names(plots)) {
+      nd <- sc[rep(1L, nrow(plots[[v]]$data)), , drop = FALSE]
+      for (nm in c(name, "temperature", "effort")) nd[[nm]] <- mean(sc[[nm]])
+      nd[[v]] <- if (v == name) (plots[[v]]$data$x - .4) / .2 else plots[[v]]$data$x
+      attr(nd$Year, "contrasts") <- attr(sc$Year, "contrasts")
+      X <- model.matrix(state, nd)
+      eta <- drop(X %*% beta)
+      se <- sqrt(rowSums((X %*% V) * X))
+      expect_equal(plots[[v]]$data$fit, unname(inverse(eta)), tolerance = 1e-10)
+      expect_equal(plots[[v]]$data$lwr, unname(inverse(eta - qnorm(.975) * se)), tolerance = 1e-10)
+      expect_equal(plots[[v]]$data$upr, unname(inverse(eta + qnorm(.975) * se)), tolerance = 1e-10)
+    }
+  }
+})
+
+
+test_that("upstream unmarked pipe rejection remains explicit before integration", {
+  f <- make_marginal_year_fixture()
+  sc <- f$sc
+  names(sc)[names(sc) == "habitat"] <- "land | cover"
+  contrasts(sc$Year) <- contr.sum(3L)
+  set.seed(907)
+  present <- rbinom(nrow(sc), 1, .65)
+  y <- replicate(3L, present * rbinom(length(present), 1, .6))
+  # Retain the exact originally failed formula/data/seed. The provider refuses
+  # it before our plotting adapter runs; do not silently rewrite its meaning.
+  form <- ~ Year ~ Year * `land | cover` + I(temperature > 15 | effort > 1)
+  native <- tryCatch(unmarked::occu(form,
+    unmarked::unmarkedFrameOccu(y = y, siteCovs = sc)), error = identity)
+  if (inherits(native, "error")) {
+    expect_match(conditionMessage(native),
+      "Correlated random slopes and intercepts are not supported", fixed = TRUE)
+    cat("UNMARKED_NATIVE_PIPE_GUARD retained\n")
+  } else {
+    # Accept an upstream parser improvement, then test our actual adapter.
+    expect_s4_class(native, "unmarkedFitOccu")
+    obj <- f$obj; obj$opt_mod <- native
+    obj$scl_params <- list(mean = setNames(.4, "land | cover"),
+                           sd = setNames(.2, "land | cover"))
+    open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
+    plots <- expect_no_warning(plot_marginal_effects(obj, length.out = 5))
+    expect_setequal(names(plots), c("Year", "land | cover", "temperature", "effort"))
+    cat("UNMARKED_NATIVE_PIPE_ACCEPTED native adapter checked\n")
+  }
+})
+
+
+test_that("unmarked learned fixed bases retain training geometry and native intervals", {
+  f <- make_marginal_year_fixture()
+  set.seed(907)
+  present <- rbinom(nrow(f$sc), 1, .65)
+  observed <- replicate(3L, present * rbinom(length(present), 1, .6))
+  open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
+  for (custom in c(FALSE, TRUE)) {
+    sc <- f$sc
+    if (custom) contrasts(sc$Year) <- contr.sum(3L)
+    for (basis_call in c("poly(temperature, 2)", "scale(temperature)",
+                         "stats::poly(temperature, 2)", "base::scale(temperature)")) {
+      state <- as.formula(paste("~ Year + habitat +", basis_call,
+        "+ offset(log(effort))"), env = asNamespace("stats"))
+      full <- as.formula(paste("~ Year", deparse1(state)), env = asNamespace("stats"))
+      models <- list(unmarked::occu(full,
+        unmarked::unmarkedFrameOccu(y = observed, siteCovs = sc)),
+        unmarked::pcount(full,
+          unmarked::unmarkedFramePCount(y = f$umf@y, siteCovs = sc), K = 40))
+      # Independent equivalent bare calls carry R's original learned metadata.
+      # The training features must equal the qualified native fit numerically.
+      expected_call <- gsub("stats::poly", "poly", basis_call, fixed = TRUE)
+      expected_call <- gsub("base::scale", "scale", expected_call, fixed = TRUE)
+      expected_state <- as.formula(paste("~ Year + habitat +", expected_call,
+        "+ offset(log(effort))"), env = asNamespace("stats"))
+      training <- model.frame(expected_state, sc, na.action = na.pass)
+      trained <- attr(training, "terms")
+      expect_equal(model.matrix(state, sc), model.matrix(trained, training),
+        tolerance = 1e-12, ignore_attr = TRUE)
+      for (model in models) {
+        obj <- f$obj; obj$opt_mod <- model
+        plots <- expect_no_warning(plot_marginal_effects(obj, length.out = 5))
+        expect_setequal(names(plots), c("Year", "habitat", "temperature"))
+        beta <- unmarked::coef(model, type = "state", altNames = FALSE)
+        V <- unmarked::vcov(model, type = "state")
+        inverse <- if (methods::is(model, "unmarkedFitOccu")) plogis else exp
+        for (v in names(plots)) {
+          nd <- sc[rep(1L, nrow(plots[[v]]$data)), , drop = FALSE]
+          nd$habitat <- mean(sc$habitat)
+          nd$temperature <- mean(sc$temperature)
+          nd$effort <- mean(sc$effort)
+          nd[[v]] <- if (v == "habitat") (plots[[v]]$data$x - .4) / .2 else plots[[v]]$data$x
+          attr(nd$Year, "contrasts") <- if (custom) attr(sc$Year, "contrasts") else NULL
+          frame <- model.frame(trained, nd, na.action = na.pass)
+          X <- model.matrix(trained, frame)
+          eta <- drop(X %*% beta) + model.offset(frame)
+          se <- sqrt(rowSums((X %*% V) * X))
+          expect_equal(plots[[v]]$data$fit, unname(inverse(eta)), tolerance = 1e-10)
+          expect_equal(plots[[v]]$data$lwr, unname(inverse(eta - qnorm(.975) * se)), tolerance = 1e-10)
+          expect_equal(plots[[v]]$data$upr, unname(inverse(eta + qnorm(.975) * se)), tolerance = 1e-10)
+        }
+      }
+    }
+  }
+})

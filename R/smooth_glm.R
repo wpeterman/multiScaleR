@@ -11,7 +11,7 @@
                                        X_fixed = matrix(1, engine$n, 1L),
                                        offset = rep(0, engine$n),
                                        weights = rep(1, engine$n),
-                                       trials = rep(1, engine$n)) {
+                                       trials = rep(1, engine$n), response_design = NULL) {
   family <- match.arg(family, c("gaussian", "poisson", "binomial", "nbinom2"))
   n <- engine$n
   valid_vector <- function(x) is.numeric(x) && length(x) == n && all(is.finite(x))
@@ -48,9 +48,11 @@
     if (!identical(kernel_par, cache$kernel_par)) {
       cache$kernel <- .msr_eval_kernel_engine(engine, kernel_par)
       cache$kernel_par <- kernel_par
+      if (!is.null(response_design))
+        cache$design <- .msr_response_design_matrix(response_design, cache$kernel$value)
     }
     kd <- cache$kernel
-    X <- cbind(X_fixed, kd$value)
+    X <- if (is.null(response_design)) cbind(X_fixed, kd$value) else cache$design
     theta <- if (family == "nbinom2") exp(par[kernel_npar + 1L]) else NA_real_
     if (family == "nbinom2" && (!is.finite(theta) || theta <= 0))
       stop("NB2 theta must be positive and finite.", call. = FALSE)
@@ -83,10 +85,17 @@
       ll <- stats::dnbinom(y, size = theta, mu = mu, log = TRUE)
       eta_score <- weights * (mu - y) / (1 + mu / theta)
     }
-    beta_kernel <- utils::tail(fit$coefficients, engine$p)
-    gradient <- colSums(kd$d_scale * eta_score) * beta_kernel
-    if (engine$kernel == "expow")
-      gradient <- c(gradient, colSums(kd$d_shape * eta_score) * beta_kernel)
+    if (is.null(response_design)) {
+      beta_kernel <- utils::tail(fit$coefficients, engine$p)
+      gradient <- colSums(kd$d_scale * eta_score) * beta_kernel
+      if (engine$kernel == "expow")
+        gradient <- c(gradient, colSums(kd$d_shape * eta_score) * beta_kernel)
+    } else {
+      sensitivity <- .msr_response_kernel_sensitivity(response_design, kd$value, fit$coefficients)
+      gradient <- colSums(kd$d_scale * sensitivity * eta_score)
+      if (engine$kernel == "expow")
+        gradient <- c(gradient, colSums(kd$d_shape * sensitivity * eta_score))
+    }
     if (family == "nbinom2") {
       # Exact NB2 score for log(theta), including the normalizing constants.
       theta_score <- .msr_nb2_theta_score(y, mu, theta, weights)
@@ -103,11 +112,13 @@
     cache$value <- value
     value
   }
-  list(fn = function(par) evaluate(par)$value,
+  out <- list(fn = function(par) evaluate(par)$value,
        gr = function(par) evaluate(par)$gradient, evaluate = evaluate,
        evaluations = function() cache$evaluations,
        parameter_names = parameter_names, engine = engine, family = family,
        y = y, X_fixed = X_fixed, offset = offset, weights = weights, trials = trials)
+  if (!is.null(response_design)) out$response_design <- response_design
+  out
 }
 
 # NB2 log-link Fisher scoring can oscillate even when the conditional

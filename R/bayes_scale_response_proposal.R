@@ -27,9 +27,9 @@
 # Calculate fixed-response predictors for a modest batch of candidates. The
 # distance-bin loop avoids a candidates x observations x bins array.
 .msr_bayes_batch_eta <- function(spec, blocks) {
-  if (length(spec$surface$buffers)) {
-    # SQ uses raw cells, not binned sums. Iterate over this bounded candidate
-    # batch without allocating a candidates x observations x cells array.
+  if (length(spec$surface$buffers) || !is.null(spec$response_design)) {
+    # SQ and expanded products use a bounded candidate loop, without allocating
+    # a candidates x observations x cells/bins/coefficients tensor.
     eta <- matrix(0, nrow(blocks$beta), length(spec$y))
     for (i in seq_len(nrow(eta))) {
       p <- lapply(blocks, function(x) unname(x[i, ]))

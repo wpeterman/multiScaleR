@@ -209,6 +209,14 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #'   limits for `sigma` when feasible. Defaults to \code{FALSE} so summaries
 #'   remain fast. The default refit backend caches profile results during the
 #'   current R session; the analytic-profile backend recomputes them.
+#'   Set \code{options(multiScaleR.profile_cache_max_bytes = 64 * 1024^2)}
+#'   to bound retained refit cache entries (64 MiB by default), or use zero to
+#'   disable caching and clear retained entries on the next profile request.
+#'   Oversized entries and custom refits compute uncached. Cache-key storage
+#'   failures warn and compute the same intervals directly; numerical profile
+#'   failures still raise errors. The returned refit scale table records cache
+#'   availability in its \code{profile_cache} attribute. This option bounds
+#'   retained entries, not temporary key construction or numerical-profile RAM.
 #' @param dimension Character. \code{"2d"} (default) reports the radius
 #'   containing \code{prob} of ideal planar kernel weight as the selected
 #'   distance. \code{"1d"} restores the original distance along a line.

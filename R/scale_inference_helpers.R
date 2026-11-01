@@ -32,10 +32,12 @@
   # Isolate the likelihood cache as well as the returned fit metadata.
   factory <- if (isTRUE(obj$boundary_nb2)) .msr_joint_nb2_objective else .msr_profile_glm_objective
   obj <- factory(obj$engine, obj$y, obj$family,
-    obj$X_fixed, obj$offset, obj$weights, obj$trials)
+    obj$X_fixed, obj$offset, obj$weights, obj$trials,
+    response_design = obj$response_design)
   if (isTRUE(obj$boundary_nb2) && identical(pf$control$coefficient_start, "warm"))
     obj <- .msr_joint_nb2_objective(obj$engine, obj$y, obj$family,
-      obj$X_fixed, obj$offset, obj$weights, obj$trials, coefficient_start = "warm")
+      obj$X_fixed, obj$offset, obj$weights, obj$trials, coefficient_start = "warm",
+      response_design = obj$response_design)
   if (!isTRUE(obj$boundary_nb2) && identical(pf$control$coefficient_start, "warm"))
     obj <- .msr_profile_nb2_continuation(obj)
   validate_scalar_numeric(n_starts, "n_starts", lower = 2, integerish = TRUE)
@@ -62,8 +64,9 @@
   .msr_inference_fit(obj, starts, setup$lower, setup$upper, setup$control, fixed_scale)
 }
 
-# Removing the sole kernel coefficient makes its scale (and shape, if present)
-# irrelevant. This feasible reduced model bounds every scale-profile deviance.
+# Remove every response column depending on the sole optimized kernel. The
+# remaining X_fixed model makes scale and shape irrelevant, including products
+# and factor interactions. It bounds profile deviance; it is not an effect test.
 .msr_nb2_zero_effect <- function(setup) {
   obj <- setup$obj
   if (isTRUE(obj$boundary_nb2)) return(.msr_joint_nb2_zero_effect(setup))
@@ -150,10 +153,12 @@
         stats::rnbinom(obj$engine$n, mu = fitted$fit$fitted.values, size = fitted$theta)
       factory <- if (isTRUE(obj$boundary_nb2)) .msr_joint_nb2_objective else .msr_profile_glm_objective
       boot_obj <- factory(obj$engine, y, "nbinom2",
-        obj$X_fixed, obj$offset, obj$weights, obj$trials)
+        obj$X_fixed, obj$offset, obj$weights, obj$trials,
+    response_design = obj$response_design)
       if (isTRUE(obj$boundary_nb2) && identical(obj$coefficient_start, "warm"))
         boot_obj <- .msr_joint_nb2_objective(obj$engine, y, "nbinom2",
-          obj$X_fixed, obj$offset, obj$weights, obj$trials, coefficient_start = "warm")
+          obj$X_fixed, obj$offset, obj$weights, obj$trials, coefficient_start = "warm",
+      response_design = obj$response_design)
       if (!isTRUE(obj$boundary_nb2) && identical(obj$coefficient_start, "warm"))
         boot_obj <- .msr_profile_nb2_continuation(boot_obj)
       null <- .msr_inference_refit(setup, boot_obj, starts, constrained$par[1L])

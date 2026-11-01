@@ -33,7 +33,7 @@ models.}
 
 \item{link}{Logical. If \code{TRUE}, predictions are passed through the
 model's inverse link function before plotting (i.e., plotted on the
-response scale). For \code{glm} objects this is applied automatically.
+response scale). For \code{glm} and spaMM \code{HLfit} objects this is applied automatically.
 Set to \code{TRUE} manually if predicted values appear to be on the link
 scale. Default: \code{FALSE}.}
 
@@ -75,11 +75,19 @@ and all other predictors are held at their sample mean. For kernel-scaled
 covariates, whose scaled mean is 0, this is equivalent to holding them at
 their average landscape value. Variables used only in model offsets are held
 at their sample mean for prediction but do not receive marginal effect panels.
+Quoted predictor names retain their original spelling in prediction grids.
+Factor contrasts and fixed transformations are evaluated by the fitted model.
 
 For \code{glm} and most GLM-family models, predictions are transformed via
 the inverse link function automatically (e.g., \code{exp()} for Poisson
 log-link models). Confidence intervals are constructed from
 \code{predict(..., se.fit = TRUE)} using \eqn{\pm 1.96 \times SE}.
+
+Native link-scale limits are transformed to the response scale and ordered
+for increasing or decreasing links. Limits with nonfinite standard errors,
+invalid native link/family endpoints, or an inverse-link pole inside the
+interval are unavailable and produce a warning. Fitted values remain native;
+the method does not clip or repair invalid confidence limits.
 
 For \code{unmarked} models, \code{predict(mod, newdata, type = type)} is
 used, and lower/upper bounds come from the \code{lower} and \code{upper}
@@ -97,11 +105,20 @@ For \code{unmarked} random-effects models, prediction uses
 conditional predictions at the stated covariate values, not averages over
 years, sites, or the random-effect distribution. Confidence intervals are
 conditional on the fitted spatial scale.
-Explicit nondefault factor contrasts in ordinary \code{pcount} (Poisson or
-negative-binomial) and \code{occu} fits use \code{unmarked::linearComb()}
-and \code{unmarked::backTransform()} to preserve the fitted design and link.
-Other unmarked classes with such contrasts stop if their prediction method
-cannot safely retain that design.
+Explicit nondefault factor contrasts and learned fixed bases in ordinary
+\code{pcount} (Poisson or negative-binomial) and \code{occu} fits use
+\code{unmarked::linearComb()} and \code{unmarked::backTransform()} to preserve
+the fitted coefficient basis and link. Learned prediction calls are trained
+once on retained site covariates and held fixed across plotting grids.
+Other unmarked classes requiring that fallback stop rather than return a
+different basis or derived-state prediction. Active terms select panels:
+removed terms and random-only groups are excluded, while admitted quoted
+names and fixed logical expressions retain their raw inputs. A logical pipe
+within \code{I()} is a fixed operation, not a random-effect declaration.
+The native unmarked parser may reject pipe-containing names or fixed
+expressions before fitting. Precompute such fixed inputs and use safe
+column names when that occurs; this plotting adapter cannot change a
+formula rejected by the native fitting function.
 
 For models with interaction terms, a message is printed explaining that each
 panel represents a conditional slice (at the mean of the interacting
@@ -109,6 +126,9 @@ variable) rather than the full interaction surface.
 
 \code{HLfit} (spaMM) and \code{zeroinfl} (pscl) models are handled with
 class-specific prediction calls.
+spaMM curves set random effects to zero, evaluate the linear predictor, and
+transform native link-scale \code{fixefVar} limits through the inverse link.
+Its response variance is not used as a confidence interval for the mean.
 When \code{x$opt_mod} is a wrapper object around another fitted model,
 \code{plot_marginal_effects()} uses the nested analysis model for predictor
 discovery, data recovery, and prediction when possible.

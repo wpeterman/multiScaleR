@@ -7,6 +7,7 @@
 }
 
 .msr_marginal_objective <- function(spec, ad = FALSE) {
+  if (ad) .msr_scale_surface_ram(spec)
   normal <- if (ad) RTMB::dnorm else stats::dnorm
   function(parameters) {
     sum(.msr_marginal_response_nll(spec, parameters, ad)) -
@@ -18,6 +19,7 @@
 .msr_marginal_adfun <- function(spec, parameters = spec$parameters) {
   if (!requireNamespace("RTMB", quietly = TRUE))
     stop("Marginal likelihood requires the optional package 'RTMB'.", call. = FALSE)
+  .msr_scale_surface_ram(spec)
   random <- intersect(c("scale_z", "response_z"), names(parameters)[lengths(parameters) > 0L])
   RTMB::MakeADFun(.msr_marginal_objective(spec, ad = TRUE), parameters,
     random = if (length(random)) random else NULL,

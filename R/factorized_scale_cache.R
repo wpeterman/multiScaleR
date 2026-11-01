@@ -1,3 +1,28 @@
+# Standalone numeric tape for a single recoded group. Its population layout
+# and immutable group payload belong to the caller; it is not a fitted model.
+.msr_factorized_group_log_tape <- function(group, initial, unpack) {
+  .msr_factorized_group_check(group, TRUE)
+  if (!is.numeric(initial) || !length(initial) || any(!is.finite(initial)) || !is.function(unpack))
+    stop("Supply a finite numeric group layout and an unpack function.", call. = FALSE)
+  p <- unpack(initial)
+  sizes <- lengths(group$parameters)
+  sizes[c("scale_z", "response_z")] <- c(1L, 0L)
+  if (!is.list(p) || is.null(names(p)) || anyDuplicated(names(p)) ||
+      !identical(names(p), names(group$parameters)) ||
+      !identical(lengths(p), sizes) ||
+      !all(vapply(p, is.numeric, TRUE)) || sum(lengths(p)) != length(initial) ||
+      !identical(as.numeric(unlist(p, use.names = FALSE)), as.numeric(initial)) ||
+      length(p$scale_z) != 1L || length(p$response_z))
+    stop("Supply a matching one-latent integrated-response group layout.", call. = FALSE)
+  force(group); force(unpack)
+  configuration <- RTMB::TapeConfig()
+  on.exit(RTMB::TapeConfig(configuration))
+  RTMB::MakeTape(function(x) {
+    p <- unpack(x)
+    -.msr_factorized_group_joint_nll(group, p, TRUE)
+  }, initial)
+}
+
 # Numeric evaluation of a reusable, small joint-density tape. These tapes are
 # computational caches, not portable fit results or independent R references.
 # Reuse one cache only with its unchanged prepared specification. Supplying it
@@ -5,6 +30,7 @@
 # quadrature bounds, tolerances and the default ordinary audit stay unchanged.
 .msr_factorized_conditional_cache <- function(spec) {
   .msr_factorized_validate(spec)
+  .msr_scale_surface_ram(spec)
   if (!requireNamespace("RTMB", quietly = TRUE))
     stop("Conditional density caching requires optional package 'RTMB'.", call. = FALSE)
   term <- spec$scales[[1L]]$random
@@ -28,10 +54,7 @@
   on.exit(RTMB::TapeConfig(configuration))
   tapes <- lapply(seq_along(term[[1L]]$levels), function(i) {
     group <- .msr_factorized_group(spec, i); force(group)
-    RTMB::MakeTape(function(x) {
-      p <- unpack(x)
-      -sum(.msr_factorized_response_nll(group, p, TRUE)) + RTMB::dnorm(p$scale_z, log = TRUE)
-    }, initial)
+    .msr_factorized_group_log_tape(group, initial, unpack)
   })
   log_density <- function(parameters, group) {
     if (!is.list(parameters) || is.null(names(parameters)) ||

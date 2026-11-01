@@ -13,8 +13,13 @@
   kp <- object$profile_fit$par[seq_len(nk)]
   if (is.null(newdata) && is.null(kernel_inputs)) {
     kd <- .msr_eval_kernel_engine(e, kp)
-    return(list(X = cbind(obj$X_fixed, kd$value), offset = obj$offset,
-                ds = kd$d_scale, dh = kd$d_shape, rows = rownames(contract$frame)))
+    out <- list(X = if (is.null(obj$response_design)) cbind(obj$X_fixed, kd$value) else
+      .msr_response_design_matrix(obj$response_design, kd$value), offset = obj$offset,
+      ds = kd$d_scale, dh = kd$d_shape, rows = rownames(contract$frame))
+    if (!is.null(obj$response_design) && !identical(object$backend, "conditional_logit"))
+      out$kernel_sensitivity <- .msr_response_kernel_sensitivity(obj$response_design, kd$value,
+        object$uncertainty$par[object$uncertainty$beta_index])
+    return(out)
   }
   if (is.null(kernel_inputs) || (is.null(kernel_inputs$binned) && !inherits(e, "msr_surface_engine")) ||
       !identical(kernel_inputs$kernel, e$kernel))
@@ -74,12 +79,20 @@
   mf <- stats::model.frame(tt, data = newdata, xlev = contract$xlevels,
                           na.action = stats::na.fail)
   X <- stats::model.matrix(tt, mf, contrasts.arg = contract$contrasts)
-  X <- X[, c(contract$fixed_columns, e$covariates), drop = FALSE]
+  columns <- if (is.null(obj$response_design)) c(contract$fixed_columns, e$covariates) else
+    obj$response_design$columns
+  X <- X[, columns, drop = FALSE]
   if (any(!is.finite(X))) stop("New design values must be finite.", call. = FALSE)
   offset <- stats::model.offset(mf)
   if (is.null(offset)) offset <- rep(0, nrow(X))
   if (any(!is.finite(offset))) stop("New offsets must be finite.", call. = FALSE)
-  list(X = X, offset = offset, ds = ds, dh = dh, rows = rownames(mf))
+  out <- list(X = X, offset = offset, ds = ds, dh = dh, rows = rownames(mf))
+  if (!is.null(obj$response_design) && !identical(object$backend, "conditional_logit")) {
+    response_design <- .msr_compile_response_design(tt, mf, e$covariates, columns, contract$contrasts)
+    out$kernel_sensitivity <- .msr_response_kernel_sensitivity(response_design, value,
+      object$uncertainty$par[object$uncertainty$beta_index])
+  }
+  out
 }
 
 #' Predict from an analytic multiscale model
@@ -121,6 +134,9 @@
 #'   \code{include_fixed} for verified spatial preparation. Use a named
 #'   \code{native_args} list for controls that share a wrapper argument name,
 #'   such as \code{native_args = list(level = 0)} for nlme population predictions.
+#'   Native S3 argument abbreviations are resolved before row and uncertainty
+#'   checks using the provider's exact-first argument matching. They cannot
+#'   replace the wrapper's verified prediction inputs or bypass its guards.
 #'   Zero-effect predictions may omit random-only grouping or slope inputs,
 #'   while all fixed predictors and offsets remain required. Setting effects
 #'   to zero does not integrate over their distribution. For lme4 partial
@@ -133,12 +149,17 @@
 #' normalized within each supplied choice set, not occurrence probabilities or
 #' a utilization distribution. \code{type = "link"} returns the uncentered
 #' linear predictor; differences within a set describe relative selection.
-#' New predictions require both \code{newdata} with explicit choice-set IDs and
-#' matching \code{kernel_inputs}; each set must have at least two alternatives.
-#' The caller defines complete prediction choice sets. \code{se.fit = TRUE}
+#' The exact type \code{"risk"} returns \code{exp(eta)}, a relative selection
+#' score, not an occurrence probability or utilization distribution. New link
+#' and risk predictions require matching spatial inputs and all fixed formula
+#' inputs; they do not require choice-set IDs. Response predictions additionally
+#' require explicit choice-set IDs, at least two alternatives per set, and
+#' complete prediction choice sets defined by the caller. \code{se.fit = TRUE}
 #' requires \code{uncertainty = "conditional"}, holding scales fixed; intervals
 #' and joint uncertainty are unavailable. Formula offsets and training
-#' standardization are preserved. Native \code{opt_mod} prediction methods use
+#' standardization are preserved. Link and risk outputs leave formula offsets
+#' unshifted; risk SEs use \code{risk * SE(link)}. Native
+#' \code{opt_mod} prediction methods use
 #' their own survival conventions and require already standardized covariates.
 #'
 #' New predictors use the training sample's center and sample standard deviation;
@@ -207,6 +228,13 @@
 #' SE requests raise an error. Wrapper confidence intervals are unavailable.
 #' Random-effect controls retain native meaning; setting effects to zero is
 #' not integration over the random-effect distribution.
+#' For ordinary lm response predictions, \code{native_args = list(interval =
+#' "confidence", level = 0.9)} requests native mean confidence limits;
+#' \code{interval = "prediction"} within that list requests limits for a future
+#' observation, including residual noise. Both require
+#' \code{uncertainty = "conditional"} and retain the native fit/lower/upper
+#' columns for points and maps. They hold kernel parameters fixed. The wrapper's
+#' own \code{interval} remains \code{"none"}.
 #'
 #' \strong{Raster prediction.} First call \code{kernel_scale.raster()} with
 #' the fitted object, \code{scale_center = TRUE}, and
@@ -218,6 +246,19 @@
 #' reconstruct a lost descriptor or establish that supplied maps have the
 #' correct scientific provenance. Recompute after saving and reloading cells
 #' through file formats that discard R attributes.
+#' spaMM refits use retained native model frames for fixed-feature verification.
+#' Zero and selected \code{re.form} predictions require only fixed inputs and
+#' selected random-effect inputs. Native variance attributes retain their own
+#' scales and targets; the generic \code{se.fit} interface remains unavailable
+#' if the native method does not supply a standard-error list.
+#' Cross-row \code{cov.fit = TRUE} and spaMM variance/interval attributes require
+#' point predictions. Raster chunks cannot retain those objects and reject
+#' these controls explicitly. Point predictions preserve native covariance
+#' outputs, including SEs triggered by native controls.
+#' Native covariance, variance and interval controls also require
+#' \code{uncertainty = "conditional"}, even when \code{se.fit = FALSE};
+#' they cannot add uncertainty in the selected kernel parameters.
+#'
 #' Raster outputs retain \code{prediction_contract} and
 #' \code{projection_contract} attributes, including requested clamping,
 #' smoothing, and offset controls. Recompute the preparation after editing cells.
@@ -225,7 +266,10 @@
 #' Raster SEs are conditional on the selected kernel parameters, with
 #' \code{interval = "none"}. Analytic GLM/NB2 maps use the same retained
 #' coefficient information as point predictions. Other maps use native
-#' prediction. Cox maps default to linear predictors; conditional-logistic
+#' prediction. Native matrix components return one band per column; when native
+#' SEs are supplied, fit and SE bands retain their corresponding column order.
+#' GAM term and basis-matrix outputs keep their native component meaning.
+#' Native smoothing-covariance requests do not add kernel-scale uncertainty. Cox maps default to linear predictors; conditional-logistic
 #' maps require \code{type = "link"} or \code{"risk"}, since choice
 #' probabilities need complete point choice sets. Supply native controls in
 #' \code{native_args}. The \code{raster_args} list accepts \code{filename},
@@ -249,7 +293,9 @@ predict.multiScaleR <- function(object, newdata = NULL, kernel_inputs = NULL,
     dots$include_fixed <- NULL
     if (length(dots)) stop("Additional prediction arguments are unsupported for conditional_logit.", call. = FALSE)
     newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
-    return(.msr_predict_clogit(object, newdata, kernel_inputs, match.arg(type),
+    # Admit the exact new name without changing old type abbreviations.
+    conditional_type <- if (identical(type, "risk")) "risk" else match.arg(type)
+    return(.msr_predict_clogit(object, newdata, kernel_inputs, conditional_type,
       se.fit, match.arg(uncertainty), match.arg(interval)))
   }
   if (identical(object$backend, "joint_mixed"))
@@ -281,9 +327,15 @@ predict.multiScaleR <- function(object, newdata = NULL, kernel_inputs = NULL,
   if (uncertainty == "joint") {
     J <- matrix(0, nrow(design$X), nrow(V))
     p <- length(object$profile_fit$contract$covariates)
-    J[, seq_len(p)] <- sweep(design$ds, 2L, utils::tail(beta, p), "*")
-    if (object$kernel_inputs$kernel == "expow")
-      J[, p + seq_len(p)] <- sweep(design$dh, 2L, utils::tail(beta, p), "*")
+    if (is.null(design$kernel_sensitivity)) {
+      J[, seq_len(p)] <- sweep(design$ds, 2L, utils::tail(beta, p), "*")
+      if (object$kernel_inputs$kernel == "expow")
+        J[, p + seq_len(p)] <- sweep(design$dh, 2L, utils::tail(beta, p), "*")
+    } else {
+      J[, seq_len(p)] <- design$ds * design$kernel_sensitivity
+      if (object$kernel_inputs$kernel == "expow")
+        J[, p + seq_len(p)] <- design$dh * design$kernel_sensitivity
+    }
     J[, info$beta_index] <- design$X
   } else J <- design$X
   se_link <- sqrt(pmax(0, rowSums((J %*% V) * J)))

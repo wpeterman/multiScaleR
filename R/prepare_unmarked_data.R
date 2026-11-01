@@ -160,7 +160,8 @@ prepare_unmarked_data <- function(object, newdata, kernel_inputs, join_by,
   if (!length(fixed)) return(list(covariates = character(),
                                   center = numeric(), spread = numeric()))
   if (unmarked) site_covs <- model@data@siteCovs else {
-    site_covs <- if (inherits(model, "merMod")) model@frame else if (is.list(model)) {
+    site_covs <- if (inherits(model, "merMod")) model@frame else
+      if (inherits(model, "HLfit")) .msr_selection_frame(model) else if (is.list(model)) {
       if (is.data.frame(model$model)) model$model else if (is.data.frame(model$frame))
         model$frame else if (inherits(model, "lme") && is.data.frame(model$data)) {
           # nlme retains original data separately; restrict it to fitted rows.

@@ -26,15 +26,21 @@
     stop("Observation IDs do not match binned point_ids; supply row_id explicitly.",
          call. = FALSE)
   surface <- .msr_scale_surface_names(inputs)
-  covs <- intersect(all.vars(formula[[3L]]), c(names(inputs$binned$vsum), surface))
+  candidates <- c(names(inputs$binned$vsum), surface)
+  discovery <- data
+  for (nm in setdiff(candidates, names(discovery))) discovery[[nm]] <- 0
+  # terms expands dot and removes inactive terms without evaluating a dynamic
+  # transform or choosing a prior. Random-term validation remains downstream.
+  active <- .msr_active_formula_variables(stats::terms(formula, data = discovery))
+  covs <- intersect(active, candidates)
   if (!length(covs))
     stop("The response formula must include at least one binned kernel predictor.", call. = FALSE)
-  if (length(setdiff(all.vars(formula), c(names(data), covs))))
+  if (length(setdiff(c(all.vars(formula[[2L]]), active), c(names(data), covs))))
     stop("All response formula variables must be columns in data or prepared kernel predictors.",
          call. = FALSE)
   specs <- inputs$scale_vars
   if (!is.null(specs)) {
-    used <- specs[specs$covariate %in% all.vars(formula), , drop = FALSE]
+    used <- specs[specs$covariate %in% active, , drop = FALSE]
     optimized <- used[used$optimize, , drop = FALSE]
     if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface)) || any(!optimized$covariate %in% covs))
       stop("Only kernel means and optimized weighted SQ can be spatial predictors in the Bayesian response formula.",
@@ -80,26 +86,28 @@
     stop("Kernel predictors must vary across fitting observations at the prior median scale.",
          call. = FALSE)
   model_data <- data
+  candidates <- c(names(inputs$binned$vsum), .msr_scale_surface_names(inputs))
+  inactive <- setdiff(intersect(all.vars(formula), candidates), covs)
+  for (nm in setdiff(inactive, names(model_data))) model_data[[nm]] <- 0
+  active_frame <- length(inactive) > 0L || "." %in% all.vars(formula)
   for (j in seq_along(covs))
     model_data[[covs[j]]] <- (raw[, j] - center[j]) / spread[j]
-  rf <- .msr_bayes_formula(formula, model_data, response = TRUE)
+  rf <- .msr_bayes_formula(formula, model_data, response = TRUE, active_frame = active_frame)
   tt <- rf$terms
-  for (label in attr(tt, "term.labels")) {
-    expr <- str2lang(label)
-    hit <- intersect(all.vars(expr), covs)
-    if (length(hit) && !(length(hit) == 1L && identical(expr, as.name(hit))))
-      stop("Kernel predictors must be bare additive terms in the response formula.",
-           call. = FALSE)
-  }
+  .msr_validate_kernel_expressions(tt, covs)
   for (i in attr(tt, "offset"))
     if (length(intersect(all.vars(attr(tt, "variables")[[i + 1L]]), covs)))
       stop("Kernel predictors cannot occur in offsets.", call. = FALSE)
   X <- stats::model.matrix(tt, rf$frame)
   if (any(!is.finite(X)) || anyDuplicated(colnames(X)) ||
-      qr(X)$rank < ncol(X) || !all(covs %in% colnames(X)))
+      qr(X)$rank < ncol(X))
     stop("The response formula needs a finite, full-rank fixed-effect design.", call. = FALSE)
-  fixed_columns <- setdiff(colnames(X), covs)
+  response_design <- if (.msr_response_design_required(tt, covs, colnames(X)))
+    .msr_compile_response_design(tt, rf$frame, covs) else NULL
+  fixed_columns <- if (is.null(response_design)) setdiff(colnames(X), covs) else
+    colnames(X)[lengths(response_design$dependence) == 0L]
   Xfixed <- X[, fixed_columns, drop = FALSE]
+  beta_names <- if (is.null(response_design)) c(fixed_columns, covs) else colnames(X)
   rf$prediction <- .msr_bayes_design_info(rf$frame, X, response = TRUE)
   y <- stats::model.response(rf$frame)
   trials <- rep(1, nrow(data))
@@ -129,11 +137,22 @@
   names(scale_models) <- covs
   scale_beta <- scale_z <- log_scale_sd <- numeric()
   for (nm in covs) {
-    if (length(intersect(all.vars(scales[[nm]]), covs)))
+    scale_variables <- all.vars(scales[[nm]])
+    scale_dot <- "." %in% scale_variables
+    scale_data <- data
+    if (scale_dot) {
+      # Placeholder values only make dead terms available to native parsing.
+      # Active variables must still exist in the caller's observation data.
+      for (v in setdiff(scale_variables, c(names(scale_data), "."))) scale_data[[v]] <- 0
+      used <- .msr_active_formula_variables(stats::terms(scales[[nm]], data = scale_data))
+    } else used <- scale_variables
+    if (length(intersect(used, covs)))
       stop("Scale formulas cannot use kernel predictors.", call. = FALSE)
-    if (length(setdiff(all.vars(scales[[nm]]), names(data))))
+    if (length(setdiff(used, names(data))))
       stop("All scale formula variables must be columns in data.", call. = FALSE)
-    sf <- .msr_bayes_formula(scales[[nm]], data)
+    sf <- .msr_bayes_formula(scales[[nm]], scale_data, active_frame = scale_dot)
+    if (length(intersect(.msr_active_formula_variables(sf$terms), covs)))
+      stop("Scale formulas cannot use kernel predictors.", call. = FALSE)
     if (length(attr(sf$terms, "offset")))
       stop("Scale formulas cannot contain offsets.", call. = FALSE)
     S <- stats::model.matrix(sf$terms, sf$frame)
@@ -161,7 +180,8 @@
       log_scale_sd <- c(log_scale_sd, log(.2))
       sf$random[[k]] <- term
     }
-    variables <- all.vars(scales[[nm]])
+    variables <- if (scale_dot) union(.msr_active_formula_variables(sf$terms),
+      names(sf$random)) else all.vars(scales[[nm]])
     labels <- if (!length(variables)) rep("shared", nrow(data)) else
       apply(as.data.frame(lapply(data[variables], as.character)), 1L,
         function(z) paste(paste(variables, z, sep = "="), collapse = ", "))
@@ -204,14 +224,20 @@
        covariates = covs, kernel = inputs$kernel, unit_conv = inputs$unit_conv,
        support = c(min_D = inputs$min_D, max_D = inputs$max_D),
        V = means$V, C = means$C, delta = delta, center = center, spread = spread,
-       response = rf, X_fixed = Xfixed, beta_names = c(fixed_columns, covs),
+       response = rf, X_fixed = Xfixed, beta_names = beta_names,
        scales = scale_models, family = family, y = as.numeric(y), trials = as.numeric(trials),
        offset = offset,
-       parameters = list(beta = rep(0, ncol(Xfixed) + length(covs)),
+       parameters = list(beta = rep(0, length(beta_names)),
          scale_beta = scale_beta, scale_z = scale_z, log_scale_sd = log_scale_sd,
          response_z = response_z, log_response_sd = log_response_sd,
          log_dispersion = if (family %in% c("gaussian", "nbinom2"))
            0 else numeric()))
+  if (!is.null(response_design)) {
+    response_design$native_terms <- rf$terms
+    if (!is.null(response_design$expression_programs))
+      response_design$reference_kernel <- as.matrix(model_data[, covs, drop = FALSE])
+    out$response_design <- response_design
+  }
   if (inherits(engine, "msr_surface_engine")) {
     out$surface <- list(buffers = engine$buffers, specs = engine$surface_specs)
     out$surface$memory <- .msr_scale_surface_size(out$surface)

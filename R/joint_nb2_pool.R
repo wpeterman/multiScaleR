@@ -20,7 +20,8 @@
 .msr_joint_nb2_pool <- function(obj, bounds, control, pool) {
   payload <- list(engine = obj$engine, y = obj$y, family = obj$family,
     X_fixed = obj$X_fixed, offset = obj$offset, weights = obj$weights,
-    trials = obj$trials, coefficient_start = obj$coefficient_start)
+    trials = obj$trials, coefficient_start = obj$coefficient_start,
+    response_design = obj$response_design)
   .msr_joint_pool_ram(payload, length(pool))
   signature <- .msr_joint_pool_signature()
   # Do not stop or reconfigure a caller-owned cluster, including on errors.

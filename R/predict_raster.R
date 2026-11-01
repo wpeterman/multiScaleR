@@ -51,6 +51,9 @@
                                               model$se.fit, model$native_args)
   if (is.list(value) && !is.data.frame(value) && !is.null(value$fit))
     value <- data.frame(fit = value$fit, se.fit = value$se.fit)
+  # Terra dispatches its writer on result class. Provider matrix subclasses
+  # retain every numerical column, but need a plain matrix at this boundary.
+  if (is.matrix(value) && is.object(value)) value <- unclass(value)
   if (NROW(value) != nrow(data))
     stop("The native component must return one prediction row per raster cell.", call. = FALSE)
   value
@@ -110,6 +113,14 @@
       stop("native_args must uniquely name native prediction controls.", call. = FALSE)
     dots <- c(dots, nested)
   }
+  dots <- .msr_native_control_names(model, dots)
+  if (.msr_native_lm_interval(model, dots, type) != "none" && uncertainty != "conditional")
+    stop("Native intervals require uncertainty = 'conditional'; kernel uncertainty is not included.", call. = FALSE)
+  if (isTRUE(as.logical(dots[["cov.fit"]])))
+    stop("Cross-row native covariance requires point predictions; raster chunks cannot retain it.", call. = FALSE)
+  if (inherits(model, "HLfit") && (length(dots[["intervals"]]) ||
+      any(vapply(dots[["variances"]], function(x) !identical(x, FALSE), logical(1)))))
+    stop("Native variance and interval attributes require point predictions; raster output cannot retain them.", call. = FALSE)
   if (any(names(dots) %in% c("join_by", "include_fixed")))
     stop("Point preparation controls do not apply to computed rasters.", call. = FALSE)
   if (identical(object$backend, "conditional_logit") && is.null(dots$reference))
@@ -132,7 +143,10 @@
       profile_fit = list(contract = list(covariates = contract$covariates)),
       kernel_inputs = list(kernel = object$kernel_inputs$kernel)), class = "multiScaleR_prediction")
     thin$analytic <- list(contract = list(terms = contract$terms, xlevels = contract$xlevels,
-      contrasts = contract$contrasts, columns = c(contract$fixed_columns, contract$covariates)),
+      contrasts = contract$contrasts,
+      columns = if (is.null(contract$objective$response_design))
+        c(contract$fixed_columns, contract$covariates) else
+          contract$objective$response_design$columns),
       prototype = prototype)
     thin$object <- NULL
   }
@@ -165,6 +179,8 @@
       kernel = "fixed_at_estimate", conditioning = "selected_kernel_parameters",
       intervals = "conditional_standard_errors_only",
       omitted = c("kernel_parameter_uncertainty", "observation_noise"), fixed_inputs = TRUE)
+  attr(output, "prediction_contract") <- .msr_returned_prediction_uncertainty(
+    attr(output, "prediction_contract"), se.fit)
   attr(output, "projection_contract") <- descriptor
   output
 }

@@ -3,13 +3,26 @@
 .msr_prepare_refit_prediction <- function(object, newdata, kernel_inputs,
     max_bytes, component, native_args, join_by, include_fixed) {
   model <- .analysis_model(object$opt_mod)
+  if (!is.list(native_args) || (length(native_args) &&
+      (is.null(names(native_args)) || anyNA(names(native_args)) ||
+       any(!nzchar(names(native_args))) || anyDuplicated(names(native_args)) ||
+       any(names(native_args) %in% c("object", "newdata", "type", "se.fit")))))
+    stop("native_args must uniquely name supported native prediction controls.", call. = FALSE)
+  native_args <- .msr_native_control_names(model, native_args, newdata = !is.null(newdata))
   allowed <- c("re.form", "allow.new.levels", "na.action", "reference", "level")
+  if (inherits(model, "lm") && !inherits(model, "glm")) allowed <- c(allowed, "interval")
+  if (inherits(model, "HLfit")) {
+    allowed <- c(allowed, "variances", "intervals")
+  }
   if (inherits(model, "gam")) allowed <- c(allowed,
     "exclude", "terms", "unconditional", "iterms.type", "block.size")
   if (!is.list(native_args) || (length(native_args) &&
       (is.null(names(native_args)) || anyNA(names(native_args)) ||
        any(!names(native_args) %in% allowed) || anyDuplicated(names(native_args)))))
     stop("native_args must uniquely name supported native prediction controls.", call. = FALSE)
+  if (inherits(model, "HLfit") && is.list(native_args$variances) &&
+      isTRUE(as.logical(native_args$variances$cov)))
+    stop("Cross-row native covariance attributes require point predictions.", call. = FALSE)
   model <- .analysis_model(object$opt_mod)
   if (is.null(model)) stop("Prediction preparation requires a retained fitted native model.", call. = FALSE)
   if (is.null(component)) {

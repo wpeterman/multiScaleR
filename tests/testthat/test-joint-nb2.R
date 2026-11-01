@@ -135,9 +135,10 @@ test_that("joint NB2 supports weighted two-kernel fits and rejects invalid start
   expect_equal(predict(j), predict(p), tolerance = 2e-4)
   expect_error(joint_nb2_fit(f, par = c(.001, .25)), "Invalid starts")
   expect_error(joint_nb2_fit(f, profile_control = list(iter.max = 1)), "No analytic GLM start")
-  # Model row alignment and unsupported kernel interactions use the same guards.
+  # Expanded kernel interactions retain the native design contract.
   f$model <- glm(y ~ cover * hab, data = f$data, family = MASS::negative.binomial(2))
-  expect_error(joint_nb2_fit(f), "bare additive")
+  expect_s3_class(.msr_profile_contract(f$model, f$inputs)$objective$response_design,
+    "msr_response_design")
 })
 
 test_that("joint NB2 retains weak-scale safeguards and fits exponential-power kernels", {

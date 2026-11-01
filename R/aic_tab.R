@@ -11,6 +11,8 @@
 .msr_selection_model <- function(model) {
   if (inherits(model, "multiScaleR_bayes"))
     stop("AIC/BIC require maximized likelihoods; Bayesian posterior fits need an appropriate posterior predictive comparison, not a posterior objective substituted for logLik.", call. = FALSE)
+  if (inherits(model, "msr_spatial_scale_prototype"))
+    stop("Private spatial prototypes have no qualified maximized marginal likelihood for AIC/BIC; conditional response densities and posterior objectives are not substitutes.", call. = FALSE)
   if (inherits(model, "multiScaleR")) {
     return(model$opt_mod)
   }
@@ -38,6 +40,23 @@
   if (inherits(analysis_mod, "glm")) return(as.integer(stats::nobs(analysis_mod)))
 
   as.integer(n_obs(analysis_mod)[1])
+}
+
+
+.msr_selection_nobs <- function(model) {
+  analysis_mod <- .analysis_model(.msr_selection_model(model))
+  if (!inherits(analysis_mod, "coxph")) return(.msr_model_nobs(analysis_mod))
+
+  # survival's likelihood metadata counts events, while row matching must
+  # retain every alternative in each conditional choice set.
+  n <- tryCatch(attr(stats::logLik(analysis_mod), "nobs"),
+                error = function(e) NULL)
+  if (!is.numeric(n) || length(n) != 1L || !is.finite(n) ||
+      n < 1 || n > .Machine$integer.max || n != floor(n)) {
+    stop("Cox information criteria require a positive integer native logLik event count; alternative rows cannot substitute.",
+         call. = FALSE)
+  }
+  as.integer(n)
 }
 
 
@@ -115,6 +134,15 @@
 
   if (methods::is(analysis_mod, "unmarkedFit")) {
     return(.msr_unmarked_parameter_count(analysis_mod))
+  }
+
+  if (inherits(analysis_mod, "HLfit")) {
+    if (!requireNamespace("spaMM", quietly = TRUE))
+      stop("spaMM is required to recover HLfit likelihood parameter counts.", call. = FALSE)
+    # DoF is the provider's marginal-IC count, including fitted dispersion,
+    # covariance and correlation terms. extractAIC's edf counts fixed terms only.
+    k <- sum(spaMM::DoF(analysis_mod))
+    return(.msr_validate_parameter_count(k, analysis_mod, "spaMM marginal parameter metadata"))
   }
 
   # logLik degrees of freedom include ancillary likelihood parameters such as
@@ -317,7 +345,10 @@
 #' the \code{AICcmodavg} package. For \code{multiScaleR} objects, the optimized
 #' (refitted) model stored in \code{opt_mod} is used for log-likelihood and
 #' parameter count. The sigma parameter (and shape for \code{"expow"}) is added
-#' to K automatically. For plain model objects in a mixed list, sigma is not
+#' to K automatically. Private spatial prototypes are rejected because they
+#' have no qualified maximized marginal likelihood; conditional response
+#' densities and posterior objectives are not substitutes.
+#' For plain model objects in a mixed list, sigma is not
 #' added to K. The fitted model's log-likelihood degrees of freedom are used
 #' when available, so negative-binomial dispersion contributes one parameter.
 #' For \code{unmarkedFit} models, native AIC and log-likelihood metadata
@@ -336,6 +367,20 @@
 #' response measure. Binomial counts and proportions with their trial weights
 #' are compared on the same count representation. Zero-weight GLM rows and
 #' removed unmarked sites are excluded from the used-observation count.
+#' For Cox and conditional-logistic fits, AICc and BIC use the event count
+#' reported by native \code{logLik} metadata. Each supported one-used-step
+#' choice set contributes one event. All alternative rows are still checked
+#' for comparability. This follows the native survival BIC convention; it does
+#' not adjust for dependence among steps or animals or establish AICc validity
+#' for a particular sampling design. Missing event-count metadata raises an error.
+#' For spaMM \code{HLfit} models, \code{spaMM::DoF()} supplies the full
+#' parameter count, including estimated residual, covariance and correlation
+#' parameters. Realized random effects are not counted as parameters. The native
+#' default log-likelihood target is retained (\code{p_v} for ordinary ML,
+#' \code{p_bv} for REML); absolute REML criteria can therefore differ from
+#' spaMM's marginal AIC, which uses \code{p_v}. The same-design restriction
+#' below applies to those restricted-likelihood comparisons.
+#'
 #' ML and REML fits cannot be mixed; REML comparisons require the same
 #' recoverable fixed-effect design. Cox partial-likelihood comparisons require
 #' matching methods and equivalent stratum partitions. These checks cannot
@@ -383,7 +428,8 @@ aic_tab <- function(mod_list,
   p <- list(...)
 
   opt_list <- lapply(mod_list, .msr_selection_model)
-  mod_df <- .msr_validate_comparable_models(opt_list)
+  .msr_validate_comparable_models(opt_list)
+  mod_n <- vapply(opt_list, .msr_selection_nobs, integer(1))
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
   k <- vapply(mod_list, .msr_selection_parameter_count, numeric(1))
 
@@ -394,7 +440,7 @@ aic_tab <- function(mod_list,
   }
 
   mod_loglik <- vapply(opt_list, .msr_model_loglik, numeric(1))
-  if (isTRUE(AICc) && any(mod_df <= k + 1L)) {
+  if (isTRUE(AICc) && any(mod_n <= k + 1L)) {
     stop("AICc requires n > K + 1 for every model; use `AICc = FALSE` for AIC.",
          call. = FALSE)
   }
@@ -406,7 +452,7 @@ aic_tab <- function(mod_list,
                         K = k,
                         modnames = mod_names,
                         second.ord = FALSE,
-                        nobs = mod_df,
+                        nobs = mod_n,
                         sort = TRUE)
 
     if(isTRUE(verbose)){
@@ -423,7 +469,7 @@ aic_tab <- function(mod_list,
                         K = k,
                         modnames = mod_names,
                         second.ord = TRUE,
-                        nobs = mod_df,
+                        nobs = mod_n,
                         sort = TRUE)
 
     if(isTRUE(verbose)){
@@ -477,10 +523,19 @@ aic_tab <- function(mod_list,
 #' Sigma (and shape for \code{"expow"}) is counted in K.
 #' Fitted parameter counts and log-likelihood validation follow
 #' \code{\link{aic_tab}}, including all estimated components of unmarked models.
+#' spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
+#' components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
+#' for its restricted-likelihood interpretation.
+#'
 #' The same recoverable response, row, weight, ML/REML, and partial-likelihood
 #' checks apply. Inapplicable hard-radius shape positions are excluded.
 #' Bayesian posterior fits are rejected; the name BIC does not make a posterior
 #' target a sampling likelihood.
+#' Private spatial prototypes are also rejected; conditional response densities
+#' do not supply a maximized marginal likelihood.
+#' Cox and conditional-logistic penalties use the native likelihood event
+#' count, keeping all alternative rows for comparison checks. See
+#' \code{\link{aic_tab}} for the sampling-design qualification.
 #' @export
 #'
 #' @usage
@@ -554,7 +609,8 @@ bic_tab <- function(mod_list,
   p <- list(...)
 
   opt_list <- lapply(mod_list, .msr_selection_model)
-  mod_df <- .msr_validate_comparable_models(opt_list)
+  .msr_validate_comparable_models(opt_list)
+  mod_n <- vapply(opt_list, .msr_selection_nobs, integer(1))
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
   k <- vapply(mod_list, .msr_selection_parameter_count, numeric(1))
 
@@ -570,7 +626,7 @@ bic_tab <- function(mod_list,
   tab <- bictabCustom(logL = mod_loglik,
                       K = k,
                       modnames = mod_names,
-                      nobs = mod_df,
+                      nobs = mod_n,
                       sort = TRUE)
 
   if(isTRUE(verbose)){

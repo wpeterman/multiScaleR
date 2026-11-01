@@ -55,13 +55,47 @@
 }
 
 .msr_scale_surface_ram <- function(spec) {
-  if (!length(spec$surface$buffers)) return(invisible(NULL))
+  design <- spec$response_design
+  if (!length(spec$surface$buffers) && is.null(design)) return(invisible(NULL))
   memory <- .msr_scale_surface_size(spec$surface)
   total <- .msr_total_ram_bytes()
   estimate <- 4 * memory$retained_bytes + memory$estimated_AD_bytes + 1024^3
-  if (!is.finite(total) || total <= 0)
-    stop("Cannot detect RAM for weighted-SQ differentiation; no tape was launched.", call. = FALSE)
-  if (estimate > .75 * total)
-    stop("Weighted-SQ raw buffers exceed the conservative differentiation RAM budget.", call. = FALSE)
+  if (!is.null(design)) {
+    if (!identical(dim(design$multipliers), c(design$n, design$p)) ||
+        design$n != length(spec$y) || design$p != length(spec$parameters$beta))
+      stop("Expanded response dimensions do not match the differentiation payload.", call. = FALSE)
+    # Additional planning allowance for retained numeric multipliers and their
+    # AD response operations. This is not a bound on the library's peak tape.
+    estimate <- estimate + 4 * as.numeric(utils::object.size(design)) +
+      512 * as.double(design$n) * design$p
+  }
+  if (!is.finite(total) || total <= 0) {
+    if (is.null(design)) stop("Cannot detect RAM for weighted-SQ differentiation; no tape was launched.", call. = FALSE)
+    stop("Cannot detect RAM for expanded-response differentiation; no tape was launched.", call. = FALSE)
+  }
+  if (estimate > .75 * total) {
+    if (is.null(design)) stop("Weighted-SQ raw buffers exceed the conservative differentiation RAM budget.", call. = FALSE)
+    stop("Expanded response and raw buffers exceed the conservative differentiation RAM budget.", call. = FALSE)
+  }
   invisible(estimate)
+}
+
+
+# Exact equal-cell limits of weighted SQ. The nearest limit includes every
+# exactly tied valid minimum-distance cell; no finite bandwidth approximates it.
+.msr_scale_surface_limit <- function(buffers, limit) {
+  limit <- match.arg(limit, c("broad", "nearest"))
+  if (!is.list(buffers) || !length(buffers))
+    stop("Exact SQ limits require retained nonempty raw buffers.", call. = FALSE)
+  vapply(buffers, function(b) {
+    if (!is.numeric(b$v) || !is.numeric(b$d) || !length(b$v) ||
+        length(b$v) != length(b$d) || any(!is.finite(b$v)) ||
+        any(!is.finite(b$d) | b$d < 0))
+      stop("Exact SQ limits require matching finite values and nonnegative distances.", call. = FALSE)
+    v <- if (limit == "nearest") b$v[b$d == min(b$d)] else b$v
+    v <- v - v[1L]
+    result <- sqrt(mean((v - mean(v))^2))
+    if (!is.finite(result)) stop("Exact SQ limit is not finite.", call. = FALSE)
+    result
+  }, 0)
 }

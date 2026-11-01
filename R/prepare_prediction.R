@@ -31,9 +31,18 @@
 #'   \code{iterms.type}, and \code{block.size}. The controls and native
 #'   warnings are bound to the snapshot. Unconditional GAM SEs request native
 #'   smoothing-parameter covariance; they do not add kernel-scale uncertainty.
+#'   Ordinary lm refits also accept native \code{interval} and \code{level}
+#'   controls for mean confidence or future-observation prediction intervals.
+#'   spaMM refits accept \code{variances} and \code{intervals}; cross-row
+#'   covariance attributes require point predictions instead of a snapshot.
 #'   GAM rows retain all formula-input requirements, including excluded-term
 #'   inputs. The unchecked \code{newdata.guaranteed} shortcut is unsupported.
-#'   Selected lme4 effects and GAM terms are recorded in prediction contracts.
+#'   Selected lme4/spaMM effects and GAM terms are recorded in prediction contracts.
+#'   Supported native S3 control abbreviations are resolved to their full names
+#'   before checking the snapshot allowlist and are recorded by those names.
+#'   spaMM refits use retained native frames to verify fixed features; zero or
+#'   selected effects follow the provider's row requirements. Unsupported native
+#'   SE requests stay explicit errors and are recorded separately from point output.
 #' @param join_by For native-refit spatial predictions, explicit site keys with
 #'   one row per prepared prediction site, in spatial input order. Requires
 #'   both \code{newdata} and \code{kernel_inputs}. See
@@ -60,7 +69,9 @@
 #'
 #' Reuse avoids rebuilding the spatial engine when requesting several output
 #' types for the same rows. Uncertainty restrictions remain those of the fitted
-#' model. In particular, conditional-logistic standard errors require
+#' model. Conditional-logistic snapshots without valid choice-set IDs support
+#' linear predictors and relative scores, but reject response probabilities and
+#' retain the reason in their response contract. In particular, their SEs require
 #' \code{uncertainty = "conditional"}; scale uncertainty is not added.
 #' Snapshots can be saved with \code{saveRDS()} and restored with \code{readRDS()}.
 #'
@@ -87,7 +98,12 @@
 #' provider lacks standard errors, point predictions remain available and a
 #' later SE request replays the recorded error. Errors in point predictions
 #' still abort preparation. These snapshots retain native uncertainty
-#' distinctions and do not add scale uncertainty or observation noise.
+#' distinctions and do not add kernel-scale uncertainty. Native prediction
+#' intervals and response variances retain the provider's observation noise.
+#' Cached native intervals or variance attributes require
+#' \code{uncertainty = "conditional"}, including when \code{se.fit = FALSE}.
+#' Native controls remain bound to the snapshot; leave the wrapper's
+#' \code{interval = "none"} when retrieving those native outputs.
 #' The returned
 #' table preserves native columns, intervals, missing-value handling, and
 #' component interpretation. Native standard errors and intervals condition on
@@ -158,11 +174,10 @@ prepare_prediction <- function(object, newdata = NULL, kernel_inputs = NULL,
     stop("Preparation requires a profile_glm, joint_nb2, or conditional_logit fit.", call. = FALSE)
   contract <- object$profile_fit$contract
   groups <- contract$groups
-  if (identical(object$backend, "conditional_logit") &&
-      (!is.null(newdata) || !is.null(kernel_inputs))) {
-    if (!is.data.frame(newdata) || !contract$strata_name %in% names(newdata))
-      stop("New predictions require explicit choice-set IDs in newdata.", call. = FALSE)
-    groups <- .msr_clogit_groups(newdata[[contract$strata_name]])
+  choice_groups_error <- NULL
+  if (identical(object$backend, "conditional_logit")) {
+    groups <- tryCatch(.msr_clogit_prediction_groups(object, newdata, kernel_inputs),
+      error = function(e) { choice_groups_error <<- conditionMessage(e); NULL })
   }
   design <- .msr_profile_prediction_design(object, newdata, kernel_inputs)
   out <- list(backend = object$backend, design = design,
@@ -181,8 +196,14 @@ prepare_prediction <- function(object, newdata = NULL, kernel_inputs = NULL,
     out$uncertainty <- object$uncertainty
     out$opt_mod <- list(family = object$opt_mod$family)
   }
-  out$prediction_contract <- stats::setNames(lapply(c("response", "link"),
-    function(type) .msr_analytic_prediction_contract(object, type)), c("response", "link"))
+  types <- c("response", "link", if (identical(object$backend, "conditional_logit")) "risk")
+  out$prediction_contract <- stats::setNames(lapply(types,
+    function(type) .msr_analytic_prediction_contract(object, type)), types)
+  if (!is.null(choice_groups_error)) {
+    out$choice_groups_error <- choice_groups_error
+    out$prediction_contract$response$available <- FALSE
+    out$prediction_contract$response$unavailable_reason <- choice_groups_error
+  }
   class(out) <- "multiScaleR_prediction"
   if (as.numeric(utils::object.size(out)) > max_bytes)
     stop("Prepared predictions exceed max_bytes; use fewer rows or an explicit larger budget.", call. = FALSE)

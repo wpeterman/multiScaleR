@@ -94,8 +94,8 @@ test_that("full posterior includes likelihood constants, priors and SD Jacobians
 
 test_that("unsupported designs fail explicitly instead of changing the model", {
   f <- bayesian_scale_fixture()
-  expect_error(multiScale_bayes(count ~ habitat * year, f$inputs, f$data,
-    row_id = "key", method = "prepare"), "bare additive")
+  expect_s3_class(multiScale_bayes(count ~ habitat * year, f$inputs, f$data,
+    row_id = "key", method = "prepare")$specification$response_design, "msr_response_design")
   expect_error(multiScale_bayes(count ~ habitat + (temp | site), f$inputs, f$data,
     row_id = "key", method = "prepare"), "random intercepts")
   expect_error(prepare_bayesian_fixture(f, scales = list(habitat = ~0 + temp)), "factor levels")

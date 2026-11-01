@@ -34,7 +34,7 @@
 
   p <- spec$parameters
   kernel <- .msr_bayes_components(spec, p)$kernel
-  X <- cbind(spec$X_fixed, do.call(cbind, kernel))
+  X <- .msr_scale_response_matrix(spec, kernel)
   glm_family <- switch(family, gaussian = stats::gaussian(), binomial = stats::binomial(),
     stats::poisson())
   warnings <- character()

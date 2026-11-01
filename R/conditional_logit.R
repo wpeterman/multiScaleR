@@ -12,6 +12,35 @@
   groups
 }
 
+# Match prediction expressions to the original native calls, retaining learned
+# polynomial/spline metadata without trying to invert transformed frame values.
+.msr_clogit_prediction_terms <- function(native, formula) {
+  out <- stats::terms(formula)
+  variables <- as.list(attr(out, "variables"))[-1L]
+  original <- as.list(attr(native, "variables"))[-1L]
+  prediction <- as.list(attr(native, "predvars"))[-1L]
+  if (length(prediction) != length(original))
+    stop("Cannot recover saved prediction transformations from Cox terms.", call. = FALSE)
+  indices <- vapply(variables, function(ex) {
+    i <- which(vapply(original, identical, logical(1), y = ex))
+    if (length(i) != 1L)
+      stop("Cannot match saved Cox prediction expressions.", call. = FALSE)
+    i
+  }, integer(1))
+  attr(out, "predvars") <- as.call(c(list(as.name("list")), prediction[indices]))
+  classes <- attr(native, "dataClasses")
+  if (length(classes) == length(original)) attr(out, "dataClasses") <- classes[indices]
+  out
+}
+
+#' @exportS3Method stats::terms
+#' @noRd
+terms.msr_clogit_frame_formula <- function(x, ...) {
+  out <- attr(x, "msr_frame_terms", exact = TRUE)
+  if (!inherits(out, "terms")) stop("Invalid saved conditional-logistic frame formula.")
+  out
+}
+
 .msr_clogit_contract <- function(model, inputs, implementation = "reference") {
   if (!requireNamespace("survival", quietly = TRUE))
     stop("conditional_logit requires the optional survival package.", call. = FALSE)
@@ -26,12 +55,23 @@
     stop("Missing-row omission, subsets, weights, robust clustering and separate offsets are unsupported; prepare complete choice sets explicitly.", call. = FALSE)
   tt <- stats::terms(m)
   labels <- attr(tt, "term.labels")
-  sg <- grep("^strata\\(", labels)
+  expressions <- lapply(labels, str2lang)
+  sg <- which(vapply(expressions, function(ex)
+    is.call(ex) && identical(ex[[1L]], as.name("strata")), logical(1)))
+  has_call <- function(ex, names) {
+    if (!is.call(ex)) return(FALSE)
+    head <- ex[[1L]]
+    if (is.call(head) && identical(head[[1L]], as.name("::")) && length(head) == 3L)
+      head <- head[[3L]]
+    (is.symbol(head) && as.character(head) %in% names) ||
+      any(vapply(as.list(ex)[-1L], has_call, logical(1), names = names))
+  }
   specials <- attr(tt, "specials")
-  if (length(sg) != 1L || length(str2lang(labels[sg])) != 2L ||
-      !is.symbol(str2lang(labels[sg])[[2L]]) ||
+  if (length(sg) != 1L || length(expressions[[sg]]) != 2L ||
+      !is.symbol(expressions[[sg]][[2L]]) ||
       inherits(m, "coxph.penal") || any(lengths(specials[setdiff(names(specials), "strata")]) > 0L) ||
-      any(grepl("cluster\\(|frailty\\(|tt\\(|pspline\\(|strata\\(.*:", labels)))
+      any(vapply(expressions[-sg], has_call, logical(1), names = "strata")) ||
+      any(vapply(expressions, has_call, logical(1), names = c("cluster", "frailty", "tt", "pspline"))))
     stop("Use one bare strata(choice_id) term; random effects and special Cox terms are unsupported.", call. = FALSE)
   strata_name <- as.character(str2lang(labels[sg])[[2L]])
   y <- stats::model.response(m$model)
@@ -44,44 +84,49 @@
   specs <- inputs$scale_vars
   surface_names <- if (is.null(specs)) character() else specs$covariate[
     specs$type == "surface" & specs$metric == "sq" & specs$weighted & specs$optimize]
-  covs <- intersect(all.vars(stats::delete.response(tt)),
+  active_vars <- .msr_active_formula_variables(tt)
+  covs <- intersect(active_vars,
                     c(names(inputs$binned$vsum), surface_names))
   if (!length(covs) || strata_name %in% covs)
     stop("Require additive kernel predictors distinct from choice-set IDs.", call. = FALSE)
-  for (label in labels) {
-    ex <- str2lang(label); involved <- intersect(all.vars(ex), covs)
-    if (length(involved) && !(length(involved) == 1L && identical(ex, as.name(involved))))
-      stop("Kernel predictors must be bare additive terms; kernel interactions/transforms are unsupported.", call. = FALSE)
-  }
+  .msr_validate_kernel_expressions(tt, covs)
   for (idx in attr(tt, "offset"))
     if (length(intersect(all.vars(attr(tt, "variables")[[idx + 1L]]), covs)))
       stop("Kernel predictors cannot occur in offsets.", call. = FALSE)
   if (!is.null(specs)) {
-    used <- specs[specs$covariate %in% all.vars(tt), , drop = FALSE]
+    used <- specs[specs$covariate %in% active_vars, , drop = FALSE]
     optimized <- used[used$optimize, , drop = FALSE]
     if (!all(optimized$covariate %in% covs))
       stop("conditional_logit optimizes smooth kernel means and weighted SQ only; hard-radius surface optimization requires the refit backend.", call. = FALSE)
   }
   dat <- .model_data(m)
   required <- all.vars(stats::formula(m))
-  if (!is.data.frame(dat) ||
-      anyDuplicated(rownames(dat)) || anyNA(match(rownames(m$model), rownames(dat))))
-    stop("Cannot recover explicit formula variables and retained row IDs.", call. = FALSE)
-  dat <- dat[match(rownames(m$model), rownames(dat)), , drop = FALSE]
   response <- stats::formula(m)[[2L]]
   response_vars <- all.vars(response)
   if (!is.call(response) || length(response_vars) != 1L || !is.symbol(response[[length(response)]]))
     stop("Use a direct case response rather than a transformed response.", call. = FALSE)
-  # insight may expose this validated constant-time response under `x`.
-  if (!response_vars %in% names(dat)) dat[[response_vars]] <- as.numeric(y[, 2L])
-  if (!all(required %in% names(dat)) || !identical(as.numeric(dat[[response_vars]]), as.numeric(y[, 2L])))
-    stop("Cannot recover explicit formula variables and the original case response.", call. = FALSE)
-  if (!identical(.msr_clogit_groups(dat[[strata_name]], y[, 2L]), groups))
-    stop("Recovered data do not preserve the fitted choice sets.", call. = FALSE)
+  frame_mode <- !is.data.frame(dat) || !all(setdiff(required, response_vars) %in% names(dat))
+  if (frame_mode) {
+    # Fixed expressions and offsets are already evaluated in the saved frame.
+    # They do not depend on the optimized bare kernel columns. Do not invent
+    # raw inputs to an irreversible transform or rely on an expired amt call.
+    dat <- m$model
+  } else {
+    if (anyDuplicated(rownames(dat)) || anyNA(match(rownames(m$model), rownames(dat))))
+      stop("Cannot recover explicit formula variables and retained row IDs.", call. = FALSE)
+    dat <- dat[match(rownames(m$model), rownames(dat)), , drop = FALSE]
+    # insight may expose this validated constant-time response under `x`.
+    if (!response_vars %in% names(dat)) dat[[response_vars]] <- as.numeric(y[, 2L])
+    if (!identical(as.numeric(dat[[response_vars]]), as.numeric(y[, 2L])))
+      stop("Cannot recover explicit formula variables and the original case response.", call. = FALSE)
+    if (!identical(.msr_clogit_groups(dat[[strata_name]], y[, 2L]), groups))
+      stop("Recovered data do not preserve the fitted choice sets.", call. = FALSE)
+  }
   X <- stats::model.matrix(m)
-  if (anyNA(stats::coef(m)) || any(!is.finite(X)) || anyDuplicated(colnames(X)) ||
-      !all(covs %in% colnames(X)))
+  if (anyNA(stats::coef(m)) || any(!is.finite(X)) || anyDuplicated(colnames(X)))
     stop("Require finite, nonaliased coefficients and additive numeric kernel columns.", call. = FALSE)
+  products <- .msr_response_design_required(tt, covs, colnames(X))
+  if (products) { frame_mode <- TRUE; dat <- m$model }
   fixed <- setdiff(colnames(X), covs)
   offset <- stats::model.offset(m$model)
   if (is.null(offset)) offset <- rep(0, nrow(X))
@@ -97,40 +142,70 @@
     paste(deparse(attr(tt, "variables")[[i + 1L]]), collapse = ""), "")
   pred_formula <- stats::reformulate(c(labels[-sg], offsets),
     intercept = attr(tt, "intercept") == 1L, env = environment(tt))
-  pred_terms <- stats::terms(stats::model.frame(pred_formula, dat, na.action = stats::na.fail))
-  list(model = m, data = dat, frame = m$model, covariates = covs,
+  pred_terms <- if (frame_mode) .msr_clogit_prediction_terms(tt, pred_formula) else
+    stats::terms(stats::model.frame(pred_formula, dat, na.action = stats::na.fail))
+  response_design <- if (products) .msr_compile_response_design(pred_terms,
+    .msr_response_frame_subset(tt, m$model, pred_terms), covs, colnames(X), m$contrasts) else NULL
+  if (!is.null(response_design))
+    fixed <- response_design$columns[lengths(response_design$dependence) == 0L]
+  out <- list(model = m, data = dat, frame = m$model, covariates = covs,
     strata_name = strata_name, groups = groups, y = as.numeric(y[, 2L]),
     X_fixed = X[, fixed, drop = FALSE], offset = offset, engine = engine,
     terms = pred_terms, fixed_columns = fixed,
     contrasts = m$contrasts, xlevels = m$xlevels[setdiff(names(m$xlevels), labels[sg])],
-    original_columns = colnames(X))
+    original_columns = colnames(X),
+    native_data_mode = if (frame_mode) "retained_model_frame" else "raw_variables")
+  if (!is.null(response_design)) out$response_design <- response_design
+  out
 }
 
 # Stable normalization also defines prediction probabilities on a finite set.
 .msr_clogit_softmax <- function(eta, groups) {
-  probability <- log_probability <- numeric(length(eta))
-  for (s in seq_along(groups)) {
-    i <- groups[[s]]; shift <- max(eta[i]); w <- exp(eta[i] - shift)
-    log_probability[i] <- eta[i] - shift - log(sum(w)); probability[i] <- w / sum(w)
+  .Call("_multiScaleR_msr_choice_softmax_cpp", eta, groups, PACKAGE = "multiScaleR")
+}
+
+# Choice-set membership belongs to normalized probabilities, not to the
+# uncentered linear selection index or its exponentiated relative score.
+.msr_clogit_prediction_groups <- function(object, newdata, kernel_inputs) {
+  contract <- object$profile_fit$contract
+  if (!is.null(newdata) || !is.null(kernel_inputs)) {
+    if (!is.data.frame(newdata) || !contract$strata_name %in% names(newdata))
+      stop("New predictions require explicit choice-set IDs in newdata.", call. = FALSE)
+    return(.msr_clogit_groups(newdata[[contract$strata_name]]))
   }
-  list(probability = probability, log_probability = log_probability)
+  if (is.null(contract$groups)) {
+    reason <- object$choice_groups_error
+    if (is.null(reason)) reason <- "Response probabilities require explicit complete choice-set IDs."
+    stop(reason, call. = FALSE)
+  }
+  contract$groups
 }
 
 .msr_clogit_objective <- function(contract) {
   e <- contract$engine; nk <- length(e$parameter_names)
-  nb <- ncol(contract$X_fixed) + e$p
+  response_design <- contract$response_design
+  nb <- if (is.null(response_design)) ncol(contract$X_fixed) + e$p else response_design$p
   cached <- NULL; previous <- NULL
+  previous_kernel <- NULL; kernel_data <- kernel_design <- NULL
   evaluate <- function(par) {
     if (identical(par, previous)) return(cached)
     if (length(par) != nk + nb || any(!is.finite(par))) stop("Invalid joint parameters.")
-    kd <- .msr_eval_kernel_engine(e, unname(par[seq_len(nk)]))
-    X <- cbind(contract$X_fixed, kd$value); beta <- par[nk + seq_len(nb)]
+    kp <- unname(par[seq_len(nk)])
+    if (!identical(kp, previous_kernel)) {
+      kernel_data <<- .msr_eval_kernel_engine(e, kp)
+      kernel_design <<- if (is.null(response_design)) cbind(contract$X_fixed, kernel_data$value) else
+        .msr_response_design_matrix(response_design, kernel_data$value)
+      previous_kernel <<- kp
+    }
+    kd <- kernel_data; X <- kernel_design; beta <- par[nk + seq_len(nb)]
     eta <- drop(X %*% beta) + contract$offset
     if (any(!is.finite(eta))) stop("Nonfinite linear predictor.")
     z <- .msr_clogit_softmax(eta, contract$groups)
     residual <- z$probability - contract$y
-    gradient <- c(colSums(kd$d_scale * residual) * utils::tail(beta, e$p),
-                  drop(crossprod(X, residual)))
+    kernel_score <- if (is.null(response_design))
+      colSums(kd$d_scale * residual) * utils::tail(beta, e$p) else
+      colSums(kd$d_scale * residual * .msr_response_kernel_sensitivity(response_design, kd$value, beta))
+    gradient <- c(kernel_score, drop(crossprod(X, residual)))
     value <- -sum(z$log_probability[contract$y == 1])
     previous <<- par
     cached <<- list(value = value, gradient = gradient, X = X,
@@ -145,13 +220,37 @@
 # public survival fitter. No internal survival routines or Hessian bypasses.
 .msr_clogit_native <- function(contract, kp) {
   nd <- contract$data; kd <- .msr_eval_kernel_engine(contract$engine, unname(kp))
-  for (nm in contract$covariates) nd[[nm]] <- kd$value[, nm]
+  if (!is.null(contract$response_design$expression_programs)) {
+    nd <- .msr_response_update_frame(contract$response_design, nd, kd$value)
+  } else {
+    for (nm in contract$covariates) {
+      field <- if (is.null(contract$response_design)) nm else contract$response_design$kernel_frame_columns[[nm]]
+      nd[[field]] <- kd$value[, nm]
+    }
+  }
   for (nm in names(contract$contrasts))
     if (nm %in% names(nd) && is.factor(nd[[nm]])) stats::contrasts(nd[[nm]]) <- contract$contrasts[[nm]]
-  fit <- survival::coxph(stats::formula(contract$model), data = nd,
+  frame_mode <- identical(contract$native_data_mode, "retained_model_frame")
+  formula <- stats::formula(contract$model)
+  if (frame_mode) {
+    native_terms <- stats::terms(contract$model)
+    # Public coxph still performs the independent coefficient/information fit.
+    # Only training evaluation uses aliases to the exact saved expression values.
+    attr(native_terms, "predvars") <- as.call(c(list(as.name("list")), lapply(names(nd), as.name)))
+    # A terms object changes `[` semantics used by coxph's response-overlap
+    # check. Keep ordinary formula indexing and supply the cached terms via S3.
+    attr(formula, "msr_frame_terms") <- native_terms
+    class(formula) <- c("msr_clogit_frame_formula", "formula")
+  }
+  fit <- survival::coxph(formula, data = nd,
     method = contract$model$method, model = TRUE, x = TRUE, y = TRUE,
     na.action = stats::na.fail,
     control = survival::coxph.control(iter.max = 100L, eps = 1e-10))
+  if (frame_mode) {
+    fit$terms <- stats::terms(contract$model)
+    fit$formula <- stats::formula(contract$model)
+    attr(fit$model, "terms") <- fit$terms
+  }
   fit$call$formula <- stats::formula(contract$model)
   fit$call$method <- contract$model$method
   fit
@@ -273,6 +372,10 @@ update.msr_conditional_clogit <- function(object, ..., data = NULL) {
   scale <- exp(kp) * inputs$unit_conv
   # Store only the reusable data contract, not closures retaining all start fits.
   contract$objective <- list(engine = e, X_fixed = contract$X_fixed, offset = contract$offset)
+  if (!is.null(contract$response_design)) {
+    contract$objective$response_design <- contract$response_design
+    contract$response_design <- NULL
+  }
   if (inherits(e, "msr_surface_engine")) {
     # Raw cells already live in kernel_inputs. Rebuild the filtered prediction
     # buffers on demand rather than retaining a second copy in every fit.
@@ -300,6 +403,7 @@ update.msr_conditional_clogit <- function(object, ..., data = NULL) {
     join_by = NULL, opt_context = NULL, profile_scale_est = NULL,
     diagnostics = .empty_diagnostics(), next_run = NULL, warn_message = 0, call = call)
   out$diagnostics$conditional_logit <- list(attempted_starts = nrow(records), eligible_starts = length(good),
+    native_data_mode = contract$native_data_mode,
     boundary = any(kp - b$lower < 1e-5 | b$upper - kp < 1e-5),
     uncertainty_available = FALSE, reasons = out$uncertainty$reasons)
   class(out) <- "multiScaleR"
@@ -312,12 +416,8 @@ update.msr_conditional_clogit <- function(object, ..., data = NULL) {
     stop("conditional_logit supports conditional SEs only; joint uncertainty and intervals are unavailable.", call. = FALSE)
   if (!is.logical(se.fit) || length(se.fit) != 1L || is.na(se.fit)) stop("se.fit must be logical.")
   contract <- object$profile_fit$contract
-  groups <- contract$groups
-  if (!is.null(newdata) || !is.null(kernel_inputs)) {
-    if (!is.data.frame(newdata) || !contract$strata_name %in% names(newdata))
-      stop("New predictions require explicit choice-set IDs in newdata.", call. = FALSE)
-    groups <- .msr_clogit_groups(newdata[[contract$strata_name]])
-  }
+  groups <- if (type == "response")
+    .msr_clogit_prediction_groups(object, newdata, kernel_inputs) else NULL
   d <- .msr_profile_prediction_design(object, newdata, kernel_inputs)
   if (inherits(object, "multiScaleR_prediction")) {
     beta <- object$coefficients
@@ -328,14 +428,15 @@ update.msr_conditional_clogit <- function(object, ..., data = NULL) {
     V <- if (se.fit) stats::vcov(m)[colnames(d$X), colnames(d$X), drop = FALSE] else NULL
   }
   eta <- drop(d$X %*% beta) + d$offset
-  probability <- .msr_clogit_softmax(eta, groups)$probability
-  fit <- if (type == "link") eta else probability
+  probability <- if (type == "response") .msr_clogit_softmax(eta, groups)$probability else NULL
+  fit <- switch(type, link = eta, risk = exp(eta), response = probability)
   names(fit) <- d$rows
   if (!se.fit) return(fit)
   J <- d$X
   if (type == "response") for (g in groups)
     J[g, ] <- probability[g] * sweep(d$X[g, , drop = FALSE], 2L,
       colSums(d$X[g, , drop = FALSE] * probability[g]))
+  if (type == "risk") J <- J * fit
   list(fit = fit, se.fit = sqrt(pmax(0, rowSums((J %*% V) * J))),
        type = type, uncertainty = "conditional")
 }

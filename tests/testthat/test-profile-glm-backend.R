@@ -94,9 +94,10 @@ test_that("retained rows and fixed transformed designs have explicit contracts",
   expect_equal(x$opt_mod$model$group, model$model$group)
   bad <- f
   bad$model <- glm(y ~ hab * z, data = f$data, family = poisson())
-  expect_error(profile_glm_fit(bad), "bare additive")
+  expect_s3_class(.msr_profile_contract(bad$model, bad$inputs)$objective$response_design,
+    "msr_response_design")
   bad$model <- glm(y ~ log(abs(hab) + 1), data = f$data, family = poisson())
-  expect_error(profile_glm_fit(bad), "bare additive")
+  expect_error(profile_glm_fit(bad), "Unsupported dynamic function: abs")
   bad$model <- glm(y ~ hab + offset(hab), data = f$data, family = poisson())
   expect_error(profile_glm_fit(bad), "offsets")
   bad$model <- glm(y ~ hab, data = f$data, family = poisson(), offset = log(exposure))

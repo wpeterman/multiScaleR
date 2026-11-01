@@ -1,6 +1,13 @@
 # Compare retained likelihood outcomes, rather than a mutable formula call.
 .msr_selection_frame <- function(model) {
   if (inherits(model, "merMod")) return(model@frame)
+  if (inherits(model, "HLfit")) {
+    if (!requireNamespace("spaMM", quietly = TRUE)) return(NULL)
+    # spaMM builds this from its retained data, not a caller's mutable data name.
+    frame <- tryCatch(stats::model.frame(model), error = function(e) NULL)
+    if (is.data.frame(frame)) return(frame)
+    return(NULL)
+  }
   if (!is.list(model)) return(NULL)
   if (is.data.frame(model$model)) return(model$model)
   if (is.data.frame(model$frame)) return(model$frame)
@@ -62,12 +69,21 @@
   }
   reml <- if (inherits(model, "merMod")) lme4::isREML(model) else
     if (inherits(model, "glmmTMB")) isTRUE(model$modelInfo$REML) else
-    if (inherits(model, c("gls", "lme"))) identical(model$method, "REML") else FALSE
+    if (inherits(model, c("gls", "lme"))) identical(model$method, "REML") else
+      if (inherits(model, "HLfit")) {
+        label <- tryCatch(names(stats::logLik(model)), error = function(e) NULL)
+        isTRUE(tolower(label) %in% "p_bv")
+      } else FALSE
   design <- if (reml) tryCatch(stats::model.matrix(model), error = function(e) NULL) else NULL
   if (reml && is.null(design)) {
     dat <- .model_data(model)
     design <- tryCatch(stats::model.matrix(stats::delete.response(stats::terms(model)),
       data = dat, contrasts.arg = model$contrasts), error = function(e) NULL)
+  }
+  if (reml && inherits(model, "HLfit") && !is.null(design) &&
+      is.null(rownames(design)) && !is.null(frame) && nrow(design) == nrow(frame)) {
+    # spaMM's native X omits row names; its rows follow the retained frame.
+    rownames(design) <- rownames(frame)
   }
   partial <- inherits(model, "coxph")
   strata <- NULL

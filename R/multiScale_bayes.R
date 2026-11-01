@@ -4,9 +4,14 @@
 #' its own formula for spatial scale. Year-specific scales can borrow information
 #' through a shared distribution while response effects account for repeated sites.
 #'
-#' @param formula Two-sided response formula. Spatial predictors must be bare
-#'   additive terms. Fixed covariates, factors, formula offsets, and additive
-#'   random intercepts such as \code{(1 | site)} are supported.
+#' @param formula Two-sided response formula. Numeric spatial predictors can
+#'   enter native R crossings, nesting, and factor interactions, such as
+#'   \code{habitat * year} or \code{habitat:forest}. Fixed transformations,
+#'   formula offsets, and additive random intercepts such as \code{(1 | site)}
+#'   are supported. Kernel-only scalar arithmetic and supported smooth base
+#'   functions retain the native coefficient basis. Fixed inputs within a
+#'   dynamic expression, learned dynamic bases, arbitrary or nondifferentiable
+#'   functions, and kernel-valued offsets remain guarded.
 #' @param inputs Prepared inputs from \code{\link{kernel_prep}} or
 #'   \code{\link{kernel_prep_by_group}}. Gaussian and exponential kernel means
 #'   and optimized weighted surface SQ are supported, alone or together.
@@ -28,6 +33,9 @@
 #'   the same distance prior for every factor level, without estimated pooling.
 #'   Other formulas need an intercept. The default \code{NULL} uses one shared
 #'   scale per predictor, equivalent to \code{~1} for every predictor.
+#'   A dot expands observation-data columns; remove response variables, row
+#'   keys, and unrelated columns explicitly. Optimized response predictors
+#'   cannot also predict spatial scales. Removed terms add no scale parameters.
 #' @param family Response family: \code{"nbinom2"} (default, log link),
 #'   \code{"poisson"} (log), \code{"binomial"} (logit), or \code{"gaussian"}
 #'   (identity). Binomial responses are binary or
@@ -389,6 +397,15 @@
 #'   \code{\link{multiScale_optim}};
 #'   \code{vignette("bayesian-scales", package = "multiScaleR")} and
 #'   \code{vignette("bayesian-computation", package = "multiScaleR")}.
+#' @details
+#' Kernel-only scalar arithmetic such as \code{I(habitat^2)}, and supported
+#' smooth base functions, use the same fixed reference transformation and
+#' native coefficient basis as other response terms. Priors retain their
+#' original normalized factors in that basis. These expressions act on the
+#' standardized kernel predictor, not on raster cells before smoothing.
+#' Learned dynamic bases, fixed-data inputs inside a dynamic expression,
+#' arbitrary or nondifferentiable functions, and kernel offsets remain
+#' unsupported. Nonfinite expression domains are errors; values are not clipped.
 #' @export
 multiScale_bayes <- function(formula, inputs, data, scales = NULL,
                              family = c("nbinom2", "poisson", "binomial", "gaussian"),

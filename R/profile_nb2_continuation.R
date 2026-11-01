@@ -5,7 +5,7 @@
     stop("Warm coefficient starts require an NB2 model.", call. = FALSE)
   warm <- .msr_joint_nb2_objective(reference$engine, reference$y, reference$family,
     reference$X_fixed, reference$offset, reference$weights, reference$trials,
-    coefficient_start = "warm")
+    coefficient_start = "warm", response_design = reference$response_design)
   evaluate <- function(par) {
     if (!is.numeric(par) || length(par) != length(reference$parameter_names) ||
         any(!is.finite(par)) ||

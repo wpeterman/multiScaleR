@@ -1,7 +1,32 @@
+# Exact one-group likelihood component. Gaussian response effects, when
+# present, are already integrated by the response leaf; population priors stay
+# outside this target. The annual latent density has all normalizing constants.
+.msr_factorized_group_joint_nll <- function(group, parameters, ad = FALSE) {
+  if (length(parameters[["scale_z"]]) != 1L || length(parameters[["response_z"]]))
+    stop("Supply one annual latent value and integrated response effects.", call. = FALSE)
+  normal <- if (ad) RTMB::dnorm else stats::dnorm
+  sum(.msr_factorized_response_nll(group, parameters, ad)) -
+    normal(parameters[["scale_z"]], log = TRUE)
+}
+
+# Normalized joint-density tape for one recoded group at fixed population
+# parameters. This is a diagnostic arithmetic component, not a fitted model.
+.msr_factorized_group_score_tape <- function(group, parameters) {
+  .msr_factorized_group_check(group, TRUE)
+  if (length(parameters$response_z))
+    stop("Group score tapes require integrated response effects, not response latent parameters.", call. = FALSE)
+  p <- parameters; p$scale_z <- 0
+  obj <- RTMB::MakeADFun(function(q) .msr_factorized_group_joint_nll(group, q, TRUE),
+    p, silent = TRUE)
+  list(spec = group, obj = obj, outer = which(names(obj$par) != "scale_z"),
+    z = which(names(obj$par) == "scale_z"))
+}
+
 # Independent cold-audit derivatives from conditional score moments.
 .msr_factorized_score_adfun <- function(spec, parameters=spec$parameters,
                                         rel.tol=1e-9, step=1) {
   .msr_factorized_validate(spec)
+  .msr_scale_surface_ram(spec)
   parameters$scale_z <- parameters$response_z <- numeric()
   if(!length(spec$scales[[1L]]$random))
     return(.msr_factorized_adfun(spec,parameters,rel.tol,step))
@@ -14,12 +39,8 @@
     }
     p
   }
-  groups<-lapply(seq_along(spec$scales[[1L]]$random[[1L]]$levels),function(i) {
-    g<-.msr_factorized_group(spec,i);p<-parameters;p$scale_z<-0
-    obj<-RTMB::MakeADFun(function(q)
-      sum(.msr_factorized_response_nll(g,q,TRUE))-RTMB::dnorm(q$scale_z,log=TRUE),p,silent=TRUE)
-    list(spec=g,obj=obj,outer=which(names(obj$par)!="scale_z"),z=which(names(obj$par)=="scale_z"))
-  })
+  groups<-lapply(seq_along(spec$scales[[1L]]$random[[1L]]$levels),function(i)
+    .msr_factorized_group_score_tape(.msr_factorized_group(spec,i),parameters))
   state<-new.env(parent=emptyenv());state$theta<-NULL;state$order<--1L
   state$last.par<-theta;state$parList<-function(x,par=NULL)unpack(x)
   evaluate<-function(x,order) {

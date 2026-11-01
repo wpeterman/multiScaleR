@@ -1,27 +1,67 @@
+# Resolve native R argument abbreviations before policy/data checks, using the
+# same exact-first matching as the eventual S3 method. Values are never evaluated.
+.msr_native_control_names <- function(model, controls, newdata = TRUE) {
+  if (!length(controls) || is.null(model) || methods::is(model, "unmarkedFit"))
+    return(controls)
+  method <- NULL
+  kinds <- class(model)
+  if (isS4(model)) kinds <- unique(c(kinds, methods::extends(class(model))))
+  for (kind in kinds) {
+    method <- utils::getS3method("predict", kind, optional = TRUE,
+      envir = asNamespace("stats"))
+    if (!is.null(method)) break
+  }
+  if (is.null(method)) return(controls)
+  fixed <- c("object", "type", "se.fit", if (newdata) "newdata")
+  tokens <- paste0(".msr_native_control_", seq_along(controls))
+  values <- stats::setNames(lapply(tokens, as.name), names(controls))
+  call <- as.call(c(list(as.name(".native_predict")),
+    stats::setNames(rep(list(NULL), length(fixed)), fixed), values))
+  matched <- as.list(match.call(definition = method, call = call, expand.dots = TRUE))[-1L]
+  index <- match(vapply(matched, function(value)
+    if (is.symbol(value)) as.character(value) else "", ""), tokens)
+  used <- !is.na(index)
+  names(controls)[index[used]] <- names(matched)[used]
+  if (any(names(controls) %in% c("object", "newdata", "type", "se.fit")))
+    stop("Native controls cannot replace wrapper object, newdata, type or se.fit; use the wrapper arguments.", call. = FALSE)
+  controls
+}
+
 # Recognize documented zero-effect controls without comparing formula environments.
 # This describes conditioning at zero, never integration over random effects.
 .msr_native_zero_random_effects <- function(model, controls, kind = NULL) {
   if (inherits(model, "lme") || identical(kind, "lme")) {
-    level <- controls$level
+    level <- controls[["level"]]
     return(is.numeric(level) && length(level) == 1L && !is.na(level) && level == 0)
   }
-  if (!inherits(model, c("merMod", "glmmTMB")) &&
+  if (!inherits(model, c("merMod", "glmmTMB", "HLfit")) &&
       !methods::is(model, "unmarkedFit") &&
-      !isTRUE(kind %in% c("glmmTMB", "unmarked", "merMod", "lmerMod", "glmerMod")))
+      !isTRUE(kind %in% c("glmmTMB", "unmarked", "merMod", "lmerMod", "glmerMod", "HLfit")))
     return(FALSE)
-  value <- controls$re.form
+  value <- controls[["re.form"]]
   (is.atomic(value) && length(value) == 1L && is.na(value)) ||
     (inherits(value, "formula") && length(value) == 2L &&
       is.numeric(value[[2L]]) && length(value[[2L]]) == 1L &&
       !is.na(value[[2L]]) && value[[2L]] == 0)
 }
 
-# Partial selection is documented for lme4. Other providers validate their own
+# Partial selection is documented for lme4 and spaMM. Other providers validate their own
 # controls without borrowing lme4's row requirements.
 .msr_native_selected_random_effects <- function(model, controls, kind = NULL) {
-  (inherits(model, "merMod") || isTRUE(kind %in% c("merMod", "lmerMod", "glmerMod"))) &&
-    inherits(controls$re.form, "formula") &&
+  (inherits(model, c("merMod", "HLfit")) || isTRUE(kind %in% c("merMod", "lmerMod", "glmerMod", "HLfit"))) &&
+    inherits(controls[["re.form"]], "formula") &&
     !.msr_native_zero_random_effects(model, controls, kind)
+}
+
+# Native lm interval columns refer to response predictions. Term components
+# keep their existing native fit/SE interface rather than borrowing that target.
+.msr_native_lm_interval <- function(model, controls, type = NULL) {
+  if (!inherits(model, "lm") || inherits(model, "glm") || is.null(controls[["interval"]]))
+    return("none")
+  interval <- match.arg(controls[["interval"]], c("none", "confidence", "prediction"))
+  if (interval != "none" && !is.null(type) && !type %in% c("response", "link"))
+    stop("Native lm intervals require response predictions, not term components.", call. = FALSE)
+  interval
 }
 
 # Shared native-refit transformation. Keep physical scales, source definitions,
@@ -157,6 +197,13 @@
       stop("Native prediction controls must not be supplied twice.", call. = FALSE)
     dots <- c(dots, native_args)
   }
+  dots <- .msr_native_control_names(model, dots, newdata = !is.null(newdata))
+  native_uncertainty <- .msr_native_lm_interval(model, dots, type) != "none" ||
+    isTRUE(as.logical(dots[["cov.fit"]])) ||
+    (inherits(model, "HLfit") && (length(dots[["intervals"]]) ||
+      any(vapply(dots[["variances"]], function(x) !identical(x, FALSE), logical(1)))))
+  if (native_uncertainty && uncertainty != "conditional")
+    stop("Native covariance/variance controls require uncertainty = 'conditional'; kernel uncertainty is not included.", call. = FALSE)
   join_by <- dots$join_by
   include_fixed <- if (is.null(dots$include_fixed)) FALSE else dots$include_fixed
   dots[c("join_by", "include_fixed")] <- NULL
@@ -177,6 +224,7 @@
 .msr_native_prediction_rows <- function(object, newdata, type, se.fit, dots = list()) {
   model <- .analysis_model(object$opt_mod)
   unmarked <- methods::is(model, "unmarkedFit")
+  dots <- .msr_native_control_names(model, dots, newdata = !is.null(newdata))
   # A survival linear predictor or risk is not a within-choice-set probability.
   # Keep its native names, including lp/risk/survival where the model permits.
   if (is.null(type)) type <- if (unmarked) "state" else
@@ -204,7 +252,7 @@
         # Inspect fixed syntax directly. Formula environments do not decide
         # whether grouping columns or random-only slopes are needed.
         required <- .msr_marginal_variables(formula[[length(formula)]], offsets = TRUE)
-        if (selected) required <- union(required, all.vars(dots$re.form))
+        if (selected) required <- union(required, all.vars(dots[["re.form"]]))
         if (inherits(model, "glmmTMB")) for (f in
             model$modelInfo$allForm[c("ziformula", "dispformula")])
           if (!is.null(f)) required <- union(required,
@@ -227,6 +275,6 @@
       (!is.list(value) || is.null(value$se.fit)))
     stop("The native prediction method did not supply se.fit; this model's uncertainty needs its native inference interface.", call. = FALSE)
   attr(value, "prediction_contract") <- .msr_native_prediction_contract(
-    object, if (unmarked) "unmarked" else class(model)[1L], type, dots)
+    object, if (unmarked) "unmarked" else class(model)[1L], type, dots, se.fit = se.fit, output = value)
   value
 }

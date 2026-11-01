@@ -1,7 +1,8 @@
 # Compiler-free joint likelihood. Uses the optional RTMB dependency;
 # no changes to the Bayesian objective, priors, or parameterization.
 .msr_mixed_rtmb <- function(engine, X, Xzi, y, offset, group, parameters,
-                           family = c('nbinom2','poisson'), fixed_scale=FALSE) {
+                           family = c('nbinom2','poisson'), fixed_scale=FALSE,
+                           response_design=NULL) {
  family<-match.arg(family)
  stopifnot(engine$kernel %in% c('gaussian','exp'),isTRUE(engine$standardize),
   nrow(X)==length(y),nrow(Xzi)==length(y),length(offset)==length(y),
@@ -11,9 +12,23 @@
  means<-if(inherits(engine,'msr_surface_engine'))engine$means else engine
  distance<-if(!is.null(means))matrix(rep(means$distance^power,each=engine$n),engine$n) else NULL
  n<-engine$n;p<-engine$p
+ if(!is.null(response_design)) {
+  stopifnot(identical(dim(response_design$multipliers),c(n,response_design$p)),
+    response_design$n==n,response_design$q==p,
+    length(parameters$beta)==response_design$p)
+  # Additional response-design planning allowance, not a peak-tape bound.
+  total<-.msr_total_ram_bytes()
+  estimate<-1024^3+4*as.numeric(utils::object.size(response_design))+
+    512*as.double(n)*response_design$p
+  if(!is.finite(total)||total<=0)stop('Cannot detect RAM for expanded mixed differentiation.',call.=FALSE)
+  if(estimate>.75*total)stop('Expanded mixed response exceeds the conservative differentiation RAM budget.',call.=FALSE)
+ }
  # Every builder has its own cold inner optimizer and scale tape.
  fn<-function(par) {
-  eta<-drop(X %*% par$beta[seq_len(ncol(X))])+offset+par$b[group]
+  expanded<-!is.null(response_design)
+  eta<-if(expanded)offset+par$b[group] else
+    drop(X %*% par$beta[seq_len(ncol(X))])+offset+par$b[group]
+  kernel<-if(expanded)stats::setNames(vector('list',p),engine$covariates) else NULL
   for(j in seq_len(p)) {
    name<-engine$covariates[j]
    if(inherits(engine,'msr_surface_engine') && name %in% names(engine$buffers)) {
@@ -31,8 +46,9 @@
    }
    centered<-x-sum(x)/n
    x<-centered/sqrt(sum(centered^2)/(n-1))
-   eta<-eta+x*par$beta[ncol(X)+j]
+   if(expanded)kernel[[j]]<-x else eta<-eta+x*par$beta[ncol(X)+j]
   }
+  if(expanded)eta<-eta+.msr_response_design_eta(response_design,kernel,par$beta)
   ll<-if(family=='nbinom2')RTMB::dnbinom_robust(y,eta,2*eta-par$log_theta,log=TRUE)
       else RTMB::dpois(y,exp(eta),log=TRUE)
   if(ncol(Xzi)>0L) {
@@ -54,7 +70,7 @@
 
 # Bridge from a validated native fit to the joint RTMB objective.
 # Deliberately narrow: log Poisson/NB2, one conditional random intercept,
-# constant dispersion, and direct additive numeric kernel columns. Native
+# constant dispersion, and native numeric kernel products. Native
 # fitted objects remain responsible for final prediction and covariance.
 .msr_native_mixed_design <- function(model, engine, kernel_names,
                                         kernel_par, engine_row_ids, check_kernel = TRUE) {
@@ -84,14 +100,9 @@
  if (!is.numeric(y) || !is.null(dim(y))) fail('A numeric count response is required.')
  if (length(kernel_names) != engine$p || anyDuplicated(kernel_names))
    fail('Kernel names do not match the engine.')
- # Inspect language objects rather than matching substrings in variable names.
+ # Native fixed terms retain expanded products and quoted predictor names.
  tt <- info$reTrms$cond$terms$fixed
- labels <- attr(tt, 'term.labels')
- for (name in kernel_names) {
-   uses <- vapply(labels, function(x) name %in% all.vars(str2lang(x)), TRUE)
-   if (sum(uses) != 1L || !identical(labels[uses], name))
-     fail('Kernel variables must be direct additive conditional terms.')
- }
+ .msr_validate_kernel_expressions(tt, kernel_names)
  offsets <- attr(tt, 'offset')
  if (length(offsets) && any(kernel_names %in%
      all.vars(as.call(c(quote(list), as.list(attr(tt, 'variables'))[-1L][offsets])))))
@@ -106,14 +117,23 @@
    fail('Zero-inflation offsets are unsupported.')
  Xfull <- stats::model.matrix(model, component = 'cond')
  Xzi <- stats::model.matrix(model, component = 'zi')
- if (!all(kernel_names %in% colnames(Xfull))) fail('Missing numeric kernel columns.')
+ expanded <- .msr_response_design_required(tt, kernel_names, colnames(Xfull))
+ response_design <- if(expanded) {
+   frame <- .msr_response_frame_subset(attr(mf,'terms'),mf,tt)
+   .msr_compile_response_design(tt,frame,kernel_names,columns=colnames(Xfull),
+     contrasts=info$contrasts)
+ } else NULL
  kv <- .msr_eval_kernel_engine(engine, unname(kernel_par))$value
- if (check_kernel && !isTRUE(all.equal(unname(Xfull[, kernel_names, drop = FALSE]),
-                      unname(kv), tolerance = 1e-10)))
+ expected <- if(expanded).msr_response_design_matrix(response_design,kv) else kv
+ observed <- if(expanded)Xfull else Xfull[,kernel_names,drop=FALSE]
+ if (check_kernel && !(identical(dim(observed),dim(expected)) &&
+     isTRUE(all.equal(as.numeric(observed),as.numeric(expected),tolerance=1e-10))))
    fail('Kernel values or their row order disagree with the native design.')
- X <- Xfull[, !colnames(Xfull) %in% kernel_names, drop = FALSE]
+ static <- if(expanded)lengths(response_design$dependence)==0L else
+   !colnames(Xfull)%in%kernel_names
+ X <- Xfull[,static,drop=FALSE]
  fx <- glmmTMB::fixef(model)
- order <- c(colnames(X), kernel_names)
+ order <- if(expanded)colnames(Xfull) else c(colnames(X), kernel_names)
  if (!setequal(names(fx$cond), order) || !identical(names(fx$zi), colnames(Xzi)))
    fail('Native coefficients do not match the retained design.')
  group_name <- names(re$cnms)[1L]
@@ -126,8 +146,13 @@
    gamma = unname(fx$zi), b = unname(random[, 1L]),
    log_sd = log(unname(attr(glmmTMB::VarCorr(model)$cond[[group_name]], 'stddev'))),
    log_theta = if (fam$family == 'nbinom2') log(stats::sigma(model)) else 0)
- list(engine = engine, X = X, Xzi = Xzi, y = y, offset = offset,
+ out <- list(engine = engine, X = X, Xzi = Xzi, y = y, offset = offset,
       group = group, parameters = parameters, family = fam$family)
+ if(!is.null(response_design)) {
+   attr(response_design$native_terms,'.Environment')<-baseenv()
+   out$response_design<-response_design
+ }
+ out
 }
 
 
@@ -172,6 +197,14 @@
                                                    kp, engine_row_ids)
      same_design <- all(vapply(c('X', 'Xzi', 'y', 'offset', 'group', 'family'),
        function(nm) identical(args[[nm]], terminal_args[[nm]]), TRUE))
+     # Static multipliers, native columns and kernel dependencies must agree
+     # across independently constructed native fits, without comparing envs.
+     fields<-c('multipliers','dependence','groups','covariates','columns',
+       'kernel_frame_columns','n','p','q','assignment','contrasts',
+       'expression_programs','expression_frame_columns','expression_nodes')
+     same_design<-same_design && identical(is.null(args$response_design),
+       is.null(terminal_args$response_design)) &&
+       identical(args$response_design[fields],terminal_args$response_design[fields])
      delta <- if (eligible_native(terminal)) abs(value + as.numeric(stats::logLik(terminal))) else Inf
      ok <- opt$convergence == 0L && isTRUE(sd$pdHess) &&
        eligible_native(terminal) && same_design && is.finite(delta) && delta < 1e-5

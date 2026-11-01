@@ -84,6 +84,52 @@ GLM/NB2 maps use the same retained information as their point predictions.
 See `vignette("feature-compatibility", package = "multiScaleR")` for the
 complete feature/method matrix, explicit scenarios, and smoothing contracts.
 
+## Retain the conditional step-selection target
+
+The conditional-logistic backend requires one used step and at least one
+available alternative per complete choice set. It preserves an `amt::fit_issf()`
+wrapper's original movement proposals and other metadata. Fixed movement terms,
+factors, transformations and formula offsets retain their native meaning. A
+saved model frame can supply their training values after the original fitting
+call has ended, without reconstructing raw inputs from a squared or compound
+expression. New-data predictions require those raw inputs and retain learned
+training transformations, such as a polynomial basis.
+
+For an existing step table and aligned spatial preparation, the workflow is:
+
+```{r conditional-step-workflow, eval=FALSE}
+library(amt)
+library(survival)
+
+# Keep these used and available steps fixed throughout optimization.
+ssf <- fit_issf(step_data,
+  case_ ~ habitat + sl_ + log_sl_ + cos_ta_ +
+    offset(log(effort)) + strata(step_id_), model = TRUE)
+opt <- multiScale_optim(ssf, step_inputs, backend = "conditional_logit",
+  n_cores = 1, verbose = FALSE)
+
+# Correct the original proposals using the selected model's movement terms.
+corrected_step_length <- update_sl_distr(opt$opt_mod)
+corrected_turn_angle <- update_ta_distr(opt$opt_mod)
+```
+
+Movement corrections require terms appropriate to the proposal distributions;
+the backend does not add missing movement terms. Conditional coefficient
+intervals, including `amt::log_rss(..., ci = "se")`, condition on the selected
+kernel scales. They do not include scale uncertainty. Raster relative risks
+remain selection scores, while response probabilities normalize over explicit
+choice sets. AICc/BIC use native Cox event counts, equal to the number of choice
+sets in this supported case. All alternative rows remain part of comparison
+checks. This convention does not correct dependence among steps or animals or
+establish AICc validity for a particular design. The profile GLM/NB2 and
+conditional-logistic backends support native R interactions, crossing and
+nesting with numeric kernel predictors. Optimized-predictor transformations
+and kernel offsets remain outside these analytic contracts. Joint mixed and
+Bayesian formula restrictions remain separate. GAMs use the native-refit
+route to retain their smooth and penalty targets. Native log-RSS scenarios
+must already contain the fitted standardized kernel values; amt does not
+reconstruct spatial covariates or add kernel uncertainty.
+
 ## Read the prepared target before fitting
 
 Preparation checks rows, bins, formulas and priors and freezes the reference

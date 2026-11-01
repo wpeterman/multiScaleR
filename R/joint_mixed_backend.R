@@ -20,14 +20,16 @@
   surface_names <- if (is.null(specs)) character() else specs$covariate[
     specs$type == "surface" & specs$metric == "sq" & specs$weighted & specs$optimize]
   spatial_names <- c(names(inputs$binned$vsum), surface_names)
-  covs <- intersect(all.vars(stats::formula(model)), spatial_names)
+  fixed_terms <- model$modelInfo$reTrms$cond$terms$fixed
+  active <- .msr_active_formula_variables(fixed_terms)
+  covs <- intersect(active, spatial_names)
   other_spatial <- intersect(spatial_names, unique(c(
     all.vars(model$modelInfo$allForm$ziformula), all.vars(model$modelInfo$allForm$dispformula))))
   if (length(other_spatial))
     stop("Spatial predictors in zero-inflation or dispersion formulas are unsupported.", call. = FALSE)
   if (!length(covs)) stop("No supported spatial predictors occur in the formula.", call. = FALSE)
   if (!is.null(specs)) {
-    used <- specs[specs$covariate %in% all.vars(stats::formula(model)), , drop = FALSE]
+    used <- specs[specs$covariate %in% active, , drop = FALSE]
     optimized <- used[used$optimize, , drop = FALSE]
     if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface_names)) || !all(optimized$covariate %in% covs))
       stop("joint_mixed requires optimized kernel means or weighted surface SQ.", call. = FALSE)
@@ -75,6 +77,10 @@
   kd <- .msr_eval_kernel_engine(engine, kp)
   scale <- exp(kp) * inputs$unit_conv
   missing_hessian <- matrix(NA_real_, length(kp), length(kp))
+  # Keep only modeled raw columns, with fitted kernel values, so transformed
+  # effect curves do not depend on a cold refit's temporary data environment.
+  prediction_data <- dat[, required, drop = FALSE]
+  for (nm in covs) prediction_data[[nm]] <- kd$value[, nm]
   out <- list(backend = "joint_mixed",
     scale_est = data.frame(Mean = scale, SE = NA_real_, row.names = covs), shape_est = NULL,
     optim_results = list(par = exp(kp), par_unscale = scale, value = best$objective,
@@ -84,7 +90,8 @@
     kernel_inputs = inputs[setdiff(names(inputs), c("min_D", "max_D"))],
     scl_params = list(mean = stats::setNames(kd$center, covs), sd = stats::setNames(kd$spread, covs)),
     join_by = NULL, opt_context = NULL, profile_scale_est = NULL,
-    mixed_fit = list(engine = engine, log_scale = kp, starts = bounds$starts,
+    mixed_fit = list(engine = engine, log_scale = kp, prediction_data = prediction_data,
+      starts = bounds$starts,
       lower = bounds$lower, upper = bounds$upper, start_results = fits$outcomes,
       selected = fits$selected, required = setdiff(required, c(all.vars(stats::formula(model)[[2L]]), covs))),
     uncertainty = list(available = FALSE, reasons = "Mixed-model scale uncertainty is not calibrated."),
@@ -104,13 +111,28 @@
 
 .msr_predict_mixed <- function(object, newdata, kernel_inputs, type, se.fit,
                                 uncertainty, interval, include_fixed = FALSE, ...) {
-  if (interval != "none" || (se.fit && uncertainty != "conditional"))
+  dots <- list(...)
+  native_args <- dots$native_args
+  dots$native_args <- NULL
+  if (!is.null(native_args)) {
+    reserved <- c("object", "newdata", "type", "se.fit", "kernel_inputs", "include_fixed", "native_args")
+    if (!is.list(native_args) || (length(native_args) &&
+        (is.null(names(native_args)) || anyNA(names(native_args)) ||
+         any(!nzchar(names(native_args))) || anyDuplicated(names(native_args)) ||
+         any(names(native_args) %in% c(reserved, names(dots))))))
+      stop("native_args must uniquely name native controls, excluding wrapper controls and duplicates.", call. = FALSE)
+    dots <- c(dots, native_args)
+  }
+  dots <- .msr_native_control_names(object$opt_mod, dots)
+  native_covariance <- isTRUE(as.logical(dots[["cov.fit"]]))
+  if (interval != "none" || ((se.fit || native_covariance) && uncertainty != "conditional"))
     stop("joint_mixed supports conditional prediction SEs only; use uncertainty = 'conditional' and interval = 'none'.", call. = FALSE)
   if (!is.logical(se.fit) || length(se.fit) != 1L || is.na(se.fit))
     stop("se.fit must be one logical value.", call. = FALSE)
   newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
   newdata <- .msr_mixed_prediction_data(object, newdata, kernel_inputs)
-  stats::predict(object$opt_mod, newdata = newdata, type = type, se.fit = se.fit, ...)
+  do.call(stats::predict, c(list(object = object$opt_mod, newdata = newdata,
+    type = type, se.fit = se.fit), dots))
 }
 
 # Shared by live prediction and frozen native-output snapshots. Keep spatial

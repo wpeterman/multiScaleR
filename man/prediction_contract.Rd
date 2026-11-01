@@ -20,7 +20,7 @@ The fields describe the calculation:
   \item{inference_target, method}{The posterior, likelihood, conditional
     likelihood, or native target, and its retained computation label.}
   \item{quantity, output_scale}{Expected response, linear predictor, kernel
-    scale, replicate response, choice probability, or named native component,
+    scale, a contrast between kernel scales, replicate response, choice probability, or named native component,
     on the stated output scale. Native component meanings remain model specific.}
   \item{target_population, effects}{The supplied prediction rows and policies
     for known and unseen groups. Sampled new effects are shared by each group's
@@ -43,9 +43,40 @@ The fields describe the calculation:
     availability is separate from this status.}
   \item{metadata_establishes_eligibility}{Always \code{FALSE}. Read the original
     fit diagnostics before interpreting predictions.}
+  \item{target_population}{Specified prediction rows, or specified location
+    pairs for private spatial scale contrasts.}
   \item{fixed_inputs, component}{Whether the rows and controls are bound to a
-    snapshot, and its native component when applicable.}
+    snapshot, and the named component when applicable.}
 }
+Private spatial contrasts use \code{quantity = "kernel_scale_contrast"}
+and \code{output_scale = "log_ratio"} or \code{"ratio"}. Both locations use
+the same complete joint vector. Their intervals summarize the contrasts,
+rather than differences between marginal interval endpoints. Observation
+noise is omitted and calibration remains unestablished.
+
+Native point and raster contracts record \code{uncertainty$standard_errors}
+as \code{"provided"} or \code{"not_requested"}, and separately retain
+\code{se.fit_requested}. Provider controls such as glmmTMB's \code{cov.fit}
+can return SEs even when the wrapper's \code{se.fit} is false. Returned native
+covariance is conditional on selected kernel parameters. spaMM variance
+attributes retain their native meaning: \code{fixefVar} and \code{predVar}
+are on the linear-predictor scale; \code{residVar} and \code{respVar} are on
+the response scale. Response variance includes observation noise and is
+distinct from uncertainty in the mean. These components are recorded in
+\code{native_variances}; their numerical attributes remain unchanged.
+Native interval attributes are listed separately in \code{native_intervals}
+and retain the provider's selected target.
+Native lm interval columns record \code{native_mean_confidence} or
+\code{native_prediction_interval} and their bound \code{interval_level}.
+Only the latter includes future-observation noise. Both include native
+parameter uncertainty and hold the selected kernel fixed.
+Refit snapshot contracts describe their cached point output;
+\code{conditional_se_available} separately records whether a cached SE
+request succeeded. Unmarked snapshots describe retained native confidence
+tables. Mixed native snapshots retain point/SE choices;
+\code{"selection_by_request"} identifies that capability description.
+None of these fields certifies finite SEs, covariance eligibility, or calibration.
+
 Contracts describe the original prediction call. Ordinary data-frame
 subsetting can retain its attributes; it does not recompute the contract for
 a smaller batch. Use the existing row-level new-group flags for individual rows.
@@ -55,6 +86,11 @@ Posterior predictive replicates include it. New-group predictions also carry
 the explicitly requested group variation. Native confidence intervals and
 standard errors condition on selected kernel parameters. Likelihood summaries
 conditional on one population parameter vector omit its estimation uncertainty.
+Conditional-logistic linear predictors and exponentiated relative selection
+scores need no prediction choice sets. Choice probabilities require complete
+sets. A snapshot can retain a probability-unavailability reason while its
+link and risk outputs remain available. Relative scores are not occurrence
+probabilities or utilization distributions.
 These uncertainty targets are distinct. No contract establishes interval
 calibration or upgrades a rejected fit.
 }

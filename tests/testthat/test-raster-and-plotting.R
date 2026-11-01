@@ -218,8 +218,10 @@ test_that("plot_marginal_effects mocked branches cover HLfit, missing CI, and nu
     namespace = function(x) invisible("fakepkg"),
     find_predictors = function(x) list(c("x")),
     get_data = function(x, ...) data.frame(y = 1:5, x = seq(1, 5)),
-    link_inverse = function(x) NULL,
-    predict = function(object, newdata, variances = NULL, re.form = NULL) {
+    link_inverse = function(x) identity,
+    predict = function(object, newdata, variances = NULL, re.form = NULL, type = "link") {
+      expect_identical(type, "link")
+      expect_true(variances$fixefVar)
       out <- seq_len(nrow(newdata))
       attr(out, "fixefVar") <- rep(0.25, nrow(newdata))
       out

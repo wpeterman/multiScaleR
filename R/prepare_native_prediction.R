@@ -3,6 +3,13 @@
 .msr_prepare_native_prediction <- function(object, newdata, kernel_inputs,
     max_bytes, component, native_args, join_by = NULL, include_fixed = FALSE) {
   kind <- if (identical(object$backend, "joint_mixed")) "glmmTMB" else "unmarked"
+  if (kind == "glmmTMB" && is.list(native_args) &&
+      (!length(native_args) || (!is.null(names(native_args)) &&
+        !anyNA(names(native_args)) && all(nzchar(names(native_args))) &&
+        !anyDuplicated(names(native_args)) &&
+        !any(names(native_args) %in% c("object", "newdata", "type", "se.fit")))))
+    native_args <- .msr_native_control_names(object$opt_mod, native_args,
+      newdata = !is.null(newdata))
   allowed <- if (kind == "glmmTMB") c("re.form", "allow.new.levels", "na.action") else
     c("backTransform", "na.rm", "appendData", "level", "re.form")
   if (!is.list(native_args) || (length(native_args) &&
@@ -73,7 +80,8 @@
                                  names(join_by)))
   }
   out$prediction_contract <- stats::setNames(lapply(types, function(type)
-    .msr_native_prediction_contract(object, kind, type, native_args)), types)
+    .msr_native_prediction_contract(object, kind, type, native_args,
+      se.fit = if (kind == "unmarked") TRUE else NULL)), types)
   if (as.numeric(utils::object.size(out)) > max_bytes)
     stop("Prepared predictions exceed max_bytes; use fewer rows or an explicit larger budget.", call. = FALSE)
   out
@@ -88,7 +96,10 @@
     interval <- match.arg(interval, c("none", "confidence"))
     if (!is.logical(se.fit) || length(se.fit) != 1L || is.na(se.fit))
       stop("se.fit must be one logical value.", call. = FALSE)
-    if (interval != "none" || (se.fit && uncertainty != "conditional"))
+    info <- object$prediction_contract[[type]]$uncertainty
+    native_attributes <- length(info$native_intervals) > 0L ||
+      length(info$native_variances$components) > 0L
+    if (interval != "none" || ((se.fit || native_attributes) && uncertainty != "conditional"))
       stop(paste0(if (object$native_kind == "refit") "Refit" else "joint_mixed",
         " supports conditional prediction SEs only; use uncertainty = 'conditional' and interval = 'none'."), call. = FALSE)
     item <- object$results[[type]][[if (se.fit) "se" else "point"]]

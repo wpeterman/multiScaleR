@@ -1,5 +1,136 @@
-multiScaleR 0.7.9 (development)
+multiScaleR 0.7.10
+* Integrate native formula designs, weighted-SQ prerequisites, and supported
+  spatial and step-selection prediction contracts.
+* Preserve fitted reference transforms, expanded parameter counts, priors,
+  diagnostics, and distinct likelihood and uncertainty targets.
+* Add focused compatibility tests and generated documentation; retain private
+  fitting restrictions until their numerical and reference gates pass.
+
+Development details
+* Keep learned unmarked fixed bases at their training definition across effect
+  curves, with native coefficient covariance and inverse links.
+* Use active native terms for unmarked curves, distinguishing fixed-expression
+  syntax from actual random-effect declarations in plotting metadata.
+* Retain formula-offset metadata for native conditional GLM predictions that
+  request standard errors.
+- Retain native factor products in one-kernel NB2 scale profiles and bootstrap targets; the zero-effect ceiling removes the entire kernel-dependent coefficient block.
+
+* Retain native scalar kernel expressions in analytic and prepared targets,
+  with complete derivatives, cold frames, reference units and coefficient priors.
+
+* Retain native product columns in checked analytic raster predictions.
+* Support conditional-logistic link and relative-risk projections without
+  prediction choice sets, retaining probability and uncertainty safeguards.
+* Normalize step-selection choice sets in one registered deterministic native call.
+
+* Connect native response products and factor interactions to joint mixed
+  likelihoods and retain raw transform inputs for native effect curves.
+
+* Connect native response products and factor interactions to prepared Bayesian
+  targets, proposals, prediction and curves, and private marginal/group/limit
+  calculations, preserving reference normalization, priors and admission guards.
+* Include expanded response dimensions in conservative AD memory planning.
+
+* Add native R product/factor/crossing designs to analytic GLM/NB2 and
+  conditional-logistic fitting, covariance, prediction and snapshots, preserving
+  legacy targets and all original numerical gates.
+* Reject GAM targets in ordinary analytic GLM adapters instead of discarding
+  their smooth bases; native GAM refitting and prediction remain available.
+* Preserve quoted predictor names and parse interaction annotations from native
+  terms in marginal effect plots.
+
+* Use native Cox event counts for AICc/BIC penalties while retaining all
+  alternative rows for comparison, with direct amt wrapper compatibility tests.
+* Retain fixed transformations and compound offsets in conditional-logistic
+  native refits when an amt fitting call no longer exposes the original data.
+
+* Add private paired spatial scale contrasts from complete joint vectors, with explicit ratio/log-ratio prediction contracts.
+* Add private conditional spatial response densities and explicit AIC/BIC admission guards, keeping population and realized latent dimensions separate.
+* Add private location-specific spatial scale probability diagnostics using original retained chains, preserving scalar probability rules and public guards.
+* Add private spatial-only scale summaries and point maps with frozen reference
+  diagnostics, joint uncertainty and explicit calibration limits.
+
+* Add private spatial mean and replicate prediction through shared kernel and
+  weighted-SQ validation, preserving frozen fields, joint draws, observation
+  noise distinctions and public fitting guards.
+
+* Document and validate private spatial-only scale fields without annual effects,
+  preserving fixed normalization, priors and uncertainty distinctions.
+
+* Add a private optimized exact-limit audit component while preserving all original starts, failures, curvature, Poisson and large-SD checks; finite weighted-SQ fitting remains guarded.
+
+* Add ordinary weighted-SQ likelihood evaluation components with independent
+  numerical coordinates, preserving fitting admission and uncertainty targets.
+
+* Retain provenance and population dimensions for exact weighted-SQ kernel
+  components, with native density and existing AD-constructor compatibility.
+
+* Add explicit whole-model weighted-SQ limiting likelihood components while
+  retaining private fitting admission and all numerical safeguards.
+
+* Extend prepared group likelihood limits to supported scale covariates and
+  factor cell means while retaining fitting and numerical safeguards.
+
+* Retain feasible large-SD group-mixture witnesses in private likelihood audits,
+  distinguishing selected zero-SD candidates from models with SD fixed at zero.
+
+* Add a guarded prepared-group large-SD likelihood limit adapter that retains
+  fixed references, normalized endpoint densities, and existing fitting gates.
+
+* Check large-SD weighted-SQ conditional probabilities and quantiles against
+  independent native integrals while preserving uncertainty distinctions.
+
+* Check exact zero-SD weighted-SQ likelihood faces, their remaining derivatives,
+  and population-parameter counts without changing private fitting safeguards.
+
+* Check large-SD weighted-SQ score and information identities independently
+  for tied and unique nearest-cell support.
+
+* Check unique-nearest weighted-SQ raw values and slopes across derivative
+  engines, with independent AD curvature tests.
+
+* Check full nuisance derivatives of private weighted-SQ likelihood coordinates
+  at larger annual SDs against independent native finite differences.
+
+* Check private weighted-SQ likelihood coordinates at large annual SDs against
+  independent log-weight references, retaining the finite-fit safeguards.
+
+* Share normalized group targets across score and numeric cache tapes, with
+  conditional density parity and strict source/layout/RAM safeguards.
+
+* Share the private score audit's normalized group-density tape with explicit
+  group/RAM checks and independent signed-score moment tests.
+
+* Share and verify physical log-scale group quadrature with the original
+  coordinate Jacobian, unbounded tails, and private fitting safeguards.
+
+* Share the guarded factorized likelihood's normalized one-group quadrature
+  with focused raw-SQ integration and observation-alignment checks.
+
+* Add internal, tested group-mixture limiting arithmetic without changing
+  private fit admission or the existing limiting-model audit.
+
+* Keep private factorized observation metadata aligned with group buffers and
+  verify neutral raw-SQ density derivatives and physical-unit equivalence.
+
 ---------
+* Strengthen internal weighted-SQ tape admission and exact kernel-limit
+  prerequisites while retaining the private likelihood fitting restrictions.
+* Native S3 argument abbreviations obey prediction safeguards. Marginal-effect
+  intervals are ordered after inverse-link transformation; invalid native
+  limits are reported as unavailable without changing fitted values.
+* Native lm mean-confidence and future-observation interval columns retain
+  their conditional uncertainty targets across points, maps, and snapshots.
+  Refit snapshots also preserve compact spaMM variance and interval attributes.
+* Real spaMM compatibility now verifies fixed metrics from retained frames,
+  supports zero/selected-effect rows, transforms link-scale plot limits, and
+  counts all native likelihood parameters. Provider-triggered SEs/covariance
+  are identified; raster requests that would lose native covariance fail explicitly.
+* Native and raster prediction contracts distinguish returned standard errors
+  from point-only outputs and separately recorded snapshot capabilities.
+* Refit profile caching has a retained-memory budget and explicit uncached
+  operation for oversized payloads or unavailable key storage. Numerical profile
+  failures remain errors; cache identity checks and target definitions are retained.
 * Partial lme4 predictions require only fixed inputs and selected random-effect
   inputs. Shared contracts retain selected effects and GAM term controls while
   preserving native validation and uncertainty distinctions.

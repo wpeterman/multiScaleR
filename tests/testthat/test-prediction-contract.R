@@ -148,6 +148,12 @@ test_that("native snapshots retain exact native output and survive metadata-free
   object <- f$obj
   snapshot <- prepare_prediction(object, component = "state")
   expected <- unmarked::predict(object$opt_mod, type = "state")
+  expect_identical(snapshot$prediction_contract$state$uncertainty$standard_errors, "provided")
+  point <- predict(object, type = "state")
+  expect_equal(as.numeric(point), expected$Predicted)
+  expect_identical(attr(point, "prediction_contract")$uncertainty$standard_errors, "not_requested")
+  table <- predict(object, type = "state", se.fit = TRUE, uncertainty = "conditional")
+  expect_identical(attr(table, "prediction_contract")$uncertainty$standard_errors, "provided")
   expect_identical(predict(snapshot), expected)
   expect_identical(snapshot$prediction_contract$state$component, "state")
   expect_null(snapshot$opt_mod)

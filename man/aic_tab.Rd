@@ -58,7 +58,10 @@ The table is constructed using \code{\link[AICcmodavg]{aictabCustom}} from
 the \code{AICcmodavg} package. For \code{multiScaleR} objects, the optimized
 (refitted) model stored in \code{opt_mod} is used for log-likelihood and
 parameter count. The sigma parameter (and shape for \code{"expow"}) is added
-to K automatically. For plain model objects in a mixed list, sigma is not
+to K automatically. Private spatial prototypes are rejected because they
+have no qualified maximized marginal likelihood; conditional response
+densities and posterior objectives are not substitutes.
+For plain model objects in a mixed list, sigma is not
 added to K. The fitted model's log-likelihood degrees of freedom are used
 when available, so negative-binomial dispersion contributes one parameter.
 For \code{unmarkedFit} models, native AIC and log-likelihood metadata
@@ -77,6 +80,20 @@ response values, binomial trials, likelihood weights, and the likelihood's
 response measure. Binomial counts and proportions with their trial weights
 are compared on the same count representation. Zero-weight GLM rows and
 removed unmarked sites are excluded from the used-observation count.
+For Cox and conditional-logistic fits, AICc and BIC use the event count
+reported by native \code{logLik} metadata. Each supported one-used-step
+choice set contributes one event. All alternative rows are still checked
+for comparability. This follows the native survival BIC convention; it does
+not adjust for dependence among steps or animals or establish AICc validity
+for a particular sampling design. Missing event-count metadata raises an error.
+For spaMM \code{HLfit} models, \code{spaMM::DoF()} supplies the full
+parameter count, including estimated residual, covariance and correlation
+parameters. Realized random effects are not counted as parameters. The native
+default log-likelihood target is retained (\code{p_v} for ordinary ML,
+\code{p_bv} for REML); absolute REML criteria can therefore differ from
+spaMM's marginal AIC, which uses \code{p_v}. The same-design restriction
+below applies to those restricted-likelihood comparisons.
+
 ML and REML fits cannot be mixed; REML comparisons require the same
 recoverable fixed-effect design. Cox partial-likelihood comparisons require
 matching methods and equivalent stratum partitions. These checks cannot

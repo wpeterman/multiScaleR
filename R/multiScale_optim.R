@@ -556,9 +556,10 @@
 #' bare \code{strata(choice_id)} term. IDs must identify sets uniquely across
 #' animals and bursts. Row names must match prepared point IDs. Explicitly
 #' prepare complete sets before fitting; omitted missing rows, subsets, weights,
-#' robust clustering and special Cox terms are rejected. Kernel predictors must
-#' be bare additive terms. Fixed covariates can include factors, transformations
-#' and formula offsets when their original inputs are recoverable. Optimized
+#' robust clustering and special Cox terms are rejected. Numeric kernel predictors
+#' may enter native R interaction, crossing and nesting terms, including crosses
+#' with factors or other optimized predictors. Fixed transformations and offsets
+#' retain their native meaning and saved training values. Optimized
 #' kernel-weighted surface SQ predictors are also supported when the matching
 #' raw buffers are retained. These use the weighted root-mean-square deviation,
 #' not hard-radius sample SD. Their scales remain independent, and prediction
@@ -568,8 +569,12 @@
 #' New predictions require these columns explicitly unless
 #' \code{include_fixed = TRUE} verifies and reuses their original normalization.
 #' Optimization of hard-radius
-#' landscape/surface metrics and interactions involving optimized spatial
-#' predictors are not supported by this backend; use the default refit backend.
+#' landscape/surface metrics, learned dynamic bases, arbitrary or
+#' nondifferentiable functions, fixed context inside a dynamic expression, and
+#' kernel-dependent offsets remain unsupported. Kernel-only scalar arithmetic
+#' and supported smooth base functions use the shared response contract.
+#' A quoted choice-set ID is still one bare variable; special-call text inside
+#' a quoted predictor name is not interpreted as a Cox special term.
 #'
 #' Conditional-logistic fitting uses serial independent L-BFGS-B starts, with
 #' cold coefficient initialization and a cold native survival refit at every
@@ -584,7 +589,14 @@
 #' contains \code{start_results}. \code{profile_fit$starts} stores log-scale
 #' starting values and \code{winner} identifies the selected record. Final
 #' \code{opt_mod} retains the native conditional fit and amt metadata when
-#' supplied. Its internal prediction contract omits duplicate fitting data to
+#' supplied. If the original fitting call no longer exposes its raw data,
+#' retained model-frame values support fixed transformations, factors and
+#' compound offsets without attempting to invert them. Cold native refits
+#' retain the original prediction transformations, including learned polynomial
+#' bases. New-data prediction still requires the formula's raw inputs.
+#' The original amt proposal distributions remain unchanged; apply amt's
+#' movement-distribution updates to \code{opt_mod} when appropriate for the
+#' movement terms included in the model. Its internal prediction contract omits duplicate fitting data to
 #' reduce serialized size; the original model remains in
 #' \code{fitted_mod_original}. Updating the conditional fit requires explicit data with already
 #' standardized kernel covariates; otherwise rerun the original multiscale fit.
@@ -599,8 +611,9 @@
 #' integrating random intercepts by the Laplace approximation. It supports
 #' log-link Poisson and NB2 glmmTMB fits with one conditional random intercept,
 #' constant dispersion, and optional fixed-effects zero inflation. Use
-#' Gaussian or negative exponential kernels, direct additive numeric spatial
-#' terms, retained model row names matching prepared point IDs, and
+#' Gaussian or negative exponential kernels, native R crossings, nesting or
+#' factor interactions of numeric spatial predictors, retained model row names
+#' matching prepared point IDs, and
 #' \code{n_cores = 1}. Random slopes, multiple grouping terms, spatial terms in
 #' zero-inflation or dispersion formulas, non-unit weights, priors, parameter
 #' maps, and REML are unsupported. Raw formula variables must be recoverable
@@ -612,7 +625,9 @@
 #'
 #' For \code{joint_mixed}, \code{opt_mod} is the final native glmmTMB fit.
 #' \code{mixed_fit} records log scales, bounds, starts, all outcomes, and the
-#' selected start. \code{diagnostics$joint_mixed} reports eligibility and scale
+#' selected start. Narrow raw prediction data retain fixed-transform inputs
+#' for effect curves after temporary native-refit data are no longer available.
+#' \code{diagnostics$joint_mixed} reports eligibility and scale
 #' boundary flags. Scale uncertainty has not been calibrated: scale SEs and
 #' legacy scale Hessians are \code{NA}, and joint intervals are unavailable.
 #' Native coefficient and prediction covariance condition on the selected
@@ -661,10 +676,19 @@
 #' unavailable. Interior joint covariance returned by \code{vcov()} retains
 #' log(theta) coordinates, as for \code{"profile_glm"}.
 #'
-#' Kernel predictors must be bare additive numeric terms. Fixed covariates may
-#' include factors, transforms, and interactions, using the fitted design's
-#' terms and contrasts. Interactions or transformations involving kernel
-#' predictors, kernel-dependent offsets, hard-radius metrics, random effects,
+#' Numeric kernel predictors may enter native R product, crossing and nesting
+#' terms, including factor interactions and products of optimized predictors.
+#' Native terms and fitted contrast coding define the coefficient layout;
+#' all kernel, coefficient and cross derivatives enter joint uncertainty.
+#' GAMs retain their smooth and penalty targets through the native-refit backend;
+#' they are not treated as ordinary unpenalized GLMs here. Kernel-only scalar
+#' arithmetic inside \code{I()}, and the base functions \code{exp}, \code{log},
+#' \code{sqrt}, \code{sin}, \code{cos}, and \code{tan}, retain their native
+#' coefficient basis and analytic derivatives. Their inputs must be optimized
+#' kernel values or literal constants. Nonfinite domains are errors.
+#' Fixed inputs within a dynamic expression, learned dynamic bases,
+#' nondifferentiable or arbitrary functions, kernel-dependent offsets,
+#' hard-radius metrics, random effects,
 #' and zero inflation are unsupported. Put offsets in the formula with
 #' \code{offset()}, rather than in the separate model argument.
 #'

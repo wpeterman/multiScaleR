@@ -60,6 +60,9 @@ models. For refit points, also accepts \code{join_by} and
 \code{include_fixed} for verified spatial preparation. Use a named
 \code{native_args} list for controls that share a wrapper argument name,
 such as \code{native_args = list(level = 0)} for nlme population predictions.
+Native S3 argument abbreviations are resolved before row and uncertainty
+checks using the provider's exact-first argument matching. They cannot
+replace the wrapper's verified prediction inputs or bypass its guards.
 Zero-effect predictions may omit random-only grouping or slope inputs,
 while all fixed predictors and offsets remain required. Setting effects
 to zero does not integrate over their distribution. For lme4 partial
@@ -90,12 +93,17 @@ For \code{conditional_logit}, \code{type = "response"} returns probabilities
 normalized within each supplied choice set, not occurrence probabilities or
 a utilization distribution. \code{type = "link"} returns the uncentered
 linear predictor; differences within a set describe relative selection.
-New predictions require both \code{newdata} with explicit choice-set IDs and
-matching \code{kernel_inputs}; each set must have at least two alternatives.
-The caller defines complete prediction choice sets. \code{se.fit = TRUE}
+The exact type \code{"risk"} returns \code{exp(eta)}, a relative selection
+score, not an occurrence probability or utilization distribution. New link
+and risk predictions require matching spatial inputs and all fixed formula
+inputs; they do not require choice-set IDs. Response predictions additionally
+require explicit choice-set IDs, at least two alternatives per set, and
+complete prediction choice sets defined by the caller. \code{se.fit = TRUE}
 requires \code{uncertainty = "conditional"}, holding scales fixed; intervals
 and joint uncertainty are unavailable. Formula offsets and training
-standardization are preserved. Native \code{opt_mod} prediction methods use
+standardization are preserved. Link and risk outputs leave formula offsets
+unshifted; risk SEs use \code{risk * SE(link)}. Native
+\code{opt_mod} prediction methods use
 their own survival conventions and require already standardized covariates.
 
 New predictors use the training sample's center and sample standard deviation;
@@ -152,6 +160,13 @@ normalization requirements. Standard errors require
 SE requests raise an error. Wrapper confidence intervals are unavailable.
 Random-effect controls retain native meaning; setting effects to zero is
 not integration over the random-effect distribution.
+For ordinary lm response predictions, \code{native_args = list(interval =
+"confidence", level = 0.9)} requests native mean confidence limits;
+\code{interval = "prediction"} within that list requests limits for a future
+observation, including residual noise. Both require
+\code{uncertainty = "conditional"} and retain the native fit/lower/upper
+columns for points and maps. They hold kernel parameters fixed. The wrapper's
+own \code{interval} remains \code{"none"}.
 
 \strong{Raster prediction.} First call \code{kernel_scale.raster()} with
 the fitted object, \code{scale_center = TRUE}, and
@@ -163,6 +178,19 @@ definitions, normalization, and support against this fit. It does not
 reconstruct a lost descriptor or establish that supplied maps have the
 correct scientific provenance. Recompute after saving and reloading cells
 through file formats that discard R attributes.
+spaMM refits use retained native model frames for fixed-feature verification.
+Zero and selected \code{re.form} predictions require only fixed inputs and
+selected random-effect inputs. Native variance attributes retain their own
+scales and targets; the generic \code{se.fit} interface remains unavailable
+if the native method does not supply a standard-error list.
+Cross-row \code{cov.fit = TRUE} and spaMM variance/interval attributes require
+point predictions. Raster chunks cannot retain those objects and reject
+these controls explicitly. Point predictions preserve native covariance
+outputs, including SEs triggered by native controls.
+Native covariance, variance and interval controls also require
+\code{uncertainty = "conditional"}, even when \code{se.fit = FALSE};
+they cannot add uncertainty in the selected kernel parameters.
+
 Raster outputs retain \code{prediction_contract} and
 \code{projection_contract} attributes, including requested clamping,
 smoothing, and offset controls. Recompute the preparation after editing cells.
@@ -170,7 +198,10 @@ smoothing, and offset controls. Recompute the preparation after editing cells.
 Raster SEs are conditional on the selected kernel parameters, with
 \code{interval = "none"}. Analytic GLM/NB2 maps use the same retained
 coefficient information as point predictions. Other maps use native
-prediction. Cox maps default to linear predictors; conditional-logistic
+prediction. Native matrix components return one band per column; when native
+SEs are supplied, fit and SE bands retain their corresponding column order.
+GAM term and basis-matrix outputs keep their native component meaning.
+Native smoothing-covariance requests do not add kernel-scale uncertainty. Cox maps default to linear predictors; conditional-logistic
 maps require \code{type = "link"} or \code{"risk"}, since choice
 probabilities need complete point choice sets. Supply native controls in
 \code{native_args}. The \code{raster_args} list accepts \code{filename},

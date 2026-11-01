@@ -23,8 +23,11 @@ extern SEXP _multiScaleR_msr_adjacency_events_eval_cpp(SEXP, SEXP, SEXP, SEXP, S
 extern SEXP _multiScaleR_msr_surface_weighted_sq_cpp(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _multiScaleR_msr_surface_sq_prefix_cpp(SEXP);
 
+extern SEXP _multiScaleR_msr_choice_softmax_cpp(SEXP, SEXP);
+
 // Register native routines
 static const R_CallMethodDef CallEntries[] = {
+  {"_multiScaleR_msr_choice_softmax_cpp", (DL_FUNC) &_multiScaleR_msr_choice_softmax_cpp, 2},
   {"_multiScaleR_ci_func_cpp", (DL_FUNC) &_multiScaleR_ci_func_cpp, 4},
   {"_multiScaleR_landscape_composition_metric_cpp", (DL_FUNC) &_multiScaleR_landscape_composition_metric_cpp, 9},
   {"_multiScaleR_landscape_edge_metric_cpp", (DL_FUNC) &_multiScaleR_landscape_edge_metric_cpp, 7},

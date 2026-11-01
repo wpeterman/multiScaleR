@@ -29,6 +29,8 @@
 .msr_profile_contract <- function(model, inputs, kernel_engine = "reference") {
   if (!inherits(model, "glm") || !is.data.frame(model$model))
     stop("profile_glm requires a glm or MASS::glm.nb fit with model = TRUE.", call. = FALSE)
+  if (inherits(model, "gam"))
+    stop("GAM smooth and penalty targets require backend = 'refit'; analytic GLM backends require ordinary unpenalized GLMs.", call. = FALSE)
   if (inputs$kernel == "fixed")
     stop("profile_glm requires smooth kernels.", call. = FALSE)
   if (!is.null(model$call$offset))
@@ -45,11 +47,12 @@
   specs <- inputs$scale_vars
   surface_names <- if (is.null(specs)) character() else specs$covariate[
     specs$type == "surface" & specs$metric == "sq" & specs$weighted & specs$optimize]
-  covs <- intersect(all.vars(stats::delete.response(tt)), c(names(inputs$binned$vsum), surface_names))
+  active_vars <- .msr_active_formula_variables(tt)
+  covs <- intersect(active_vars, c(names(inputs$binned$vsum), surface_names))
   if (!length(covs))
     stop("No supported spatial predictors occur in the model formula; kernel means require bin = TRUE.", call. = FALSE)
   if (!is.null(specs)) {
-    used <- specs[specs$covariate %in% all.vars(tt), , drop = FALSE]
+    used <- specs[specs$covariate %in% active_vars, , drop = FALSE]
     optimized <- used[used$optimize, , drop = FALSE]
     if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface_names)))
       stop("profile_glm supports optimized kernel means and weighted surface SQ only; use refit for other surface metrics or hard-radius predictors.",
@@ -59,30 +62,24 @@
     if (any(!used$optimize)) .msr_fixed_training_contract(list(opt_mod = model,
       kernel_inputs = inputs))
   }
-  # A kernel covariate must correspond to one additive design column. Fixed
-  # covariates may have interactions/transforms, using the fitted terms object.
-  for (label in attr(tt, "term.labels")) {
-    expr <- str2lang(label)
-    involved <- intersect(all.vars(expr), covs)
-    if (length(involved) && !(length(involved) == 1L &&
-                             identical(expr, as.name(involved))))
-      stop("Kernel predictors must be bare additive terms; interactions and transformations involving them are unsupported.",
-           call. = FALSE)
-  }
+  .msr_validate_kernel_expressions(tt, covs)
   for (idx in attr(tt, "offset")) {
     if (length(intersect(all.vars(attr(tt, "variables")[[idx + 1L]]), covs)))
       stop("Kernel predictors cannot occur in offsets.", call. = FALSE)
   }
-  if (!all(covs %in% names(mf)) ||
-      !all(vapply(mf[covs], function(z) is.numeric(z) && is.null(dim(z)), logical(1))))
-    stop("Kernel predictors must be numeric model-frame columns.", call. = FALSE)
   X <- stats::model.matrix(tt, mf, contrasts.arg = model$contrasts)
   if (anyDuplicated(colnames(X)))
     stop("Design column names must be distinct; rename colliding factor levels or predictors.",
          call. = FALSE)
-  if (!all(covs %in% colnames(X)) || any(!is.finite(X)))
+  if (any(!is.finite(X)))
     stop("The fitted model must have a finite, recoverable design matrix.", call. = FALSE)
-  fixed_columns <- setdiff(colnames(X), covs)
+  response_design <- if (.msr_response_design_required(tt, covs, colnames(X)))
+    .msr_compile_response_design(tt, mf, covs, colnames(X), model$contrasts) else NULL
+  if (is.null(response_design) && (!all(covs %in% names(mf)) ||
+      !all(vapply(mf[covs], function(z) is.numeric(z) && is.null(dim(z)), logical(1)))))
+    stop("Kernel predictors must be numeric model-frame columns.", call. = FALSE)
+  fixed_columns <- if (is.null(response_design)) setdiff(colnames(X), covs) else
+    response_design$columns[lengths(response_design$dependence) == 0L]
   rows <- .msr_profile_input_rows(mf, inputs)
   e <- if (any(covs %in% surface_names))
     .msr_prepare_surface_engine(inputs, covs, rows, implementation = kernel_engine) else
@@ -113,7 +110,7 @@
   if (is.null(offset)) offset <- rep(0, nrow(mf))
   objective <- .msr_profile_glm_objective(e, as.numeric(y), family,
                                         X[, fixed_columns, drop = FALSE],
-                                        offset, weights, trials)
+                                        offset, weights, trials, response_design)
   list(objective = objective, frame = mf, terms = tt, original_columns = colnames(X),
        fixed_columns = fixed_columns, contrasts = model$contrasts,
        xlevels = model$xlevels, rows = rows, covariates = covs)
@@ -210,7 +207,14 @@
   obj <- contract$objective
   kd <- .msr_eval_kernel_engine(obj$engine, unname(kernel_par))
   mf <- contract$frame
-  for (nm in contract$covariates) mf[[nm]] <- kd$value[, nm]
+  if (!is.null(obj$response_design$expression_programs)) {
+    mf <- .msr_response_update_frame(obj$response_design, mf, kd$value)
+  } else {
+    for (nm in contract$covariates) {
+      field <- if (is.null(obj$response_design)) nm else obj$response_design$kernel_frame_columns[[nm]]
+      mf[[field]] <- kd$value[, nm]
+    }
+  }
   X <- fitted$design[, contract$original_columns, drop = FALSE]
   fit <- stats::glm.fit(X, if (obj$family == "binomial") obj$y / obj$trials else obj$y,
                        start = if (isTRUE(obj$boundary_nb2)) unname(fitted$beta[colnames(X)]) else NULL,
@@ -222,6 +226,9 @@
   # group with multiplied trials. Keep the likelihood's combinatorial constants.
   fit$aic <- 2 * fitted$value + 2 * (ncol(X) + (obj$family %in% c("gaussian", "nbinom2")))
   fit$model <- mf
+  # glm.fit stores offset-adjusted predictors but not glm's offset metadata.
+  # Native predict(..., se.fit = TRUE) needs the same retained formula offset.
+  if (length(attr(contract$terms, "offset"))) fit$offset <- obj$offset
   fit$terms <- contract$terms
   fit$formula <- stats::formula(model)
   fit$contrasts <- contract$contrasts
@@ -283,7 +290,7 @@ summary.msr_conditional_glm <- function(object, ...) {
     old <- contract$objective
     contract$objective <- .msr_joint_nb2_objective(old$engine, old$y, old$family,
       old$X_fixed, old$offset, old$weights, old$trials,
-      coefficient_start = control$coefficient_start)
+      coefficient_start = control$coefficient_start, response_design = old$response_design)
   } else if (identical(control$coefficient_start, "warm")) {
     contract$objective <- .msr_profile_nb2_continuation(contract$objective)
   }

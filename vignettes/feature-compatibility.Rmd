@@ -47,6 +47,21 @@ and estimates its bandwidth instead.
 
 The analytic rows include `profile_glm`, `joint_nb2`, `conditional_logit`, and
 `joint_mixed`, subject to their response and formula restrictions.
+`profile_glm`, `joint_nb2` and `conditional_logit` accept native R product,
+crossing and nesting terms involving numeric kernel predictors, including
+factor interactions. Native terms and fitted contrasts define the columns.
+Kernel-only scalar arithmetic and supported smooth base functions retain their
+native coefficient basis. Learned dynamic bases, fixed context within a dynamic
+expression, arbitrary or nondifferentiable functions, and kernel offsets remain
+guarded.
+Bayesian preparation, targets, prediction, conditional coefficient proposals,
+and covariate curves use the same native response products with frozen contrast
+and fixed-transformation metadata. Private marginal/factorized components retain
+their structural and numerical admission requirements. Joint mixed models use native response products and factor coding for their
+supported count families, with independent cold/native/Hessian audits. Their
+raw fixed-transform inputs are retained for effect curves; scale uncertainty
+remains unavailable. GAMs use native refitting, preserving their smooth
+and penalty targets.
 Exponential-power means are supported by the profile GLM/NB2 machinery;
 the conditional-logistic, joint mixed, and Bayesian adapters require Gaussian or exponential
 kernels. Analytic and Bayesian kernel means require distance bins. Weighted SQ
@@ -314,3 +329,83 @@ See also:
 - `vignette("landscape_metric_covariates", package = "multiScaleR")` for categorical metrics.
 - `vignette("inference-contracts", package = "multiScaleR")` for likelihood, posterior, and uncertainty distinctions.
 - `vignette("bayesian-prediction", package = "multiScaleR")` for joint-draw spatial expectations and observation simulation.
+
+One-kernel NB2 `scale_inference()` assessments retain native products and factor
+contrasts in constrained, unrestricted, and bootstrap refits. The zero-effect
+diagnostic removes every response column involving that kernel. It is a
+feasible likelihood ceiling, not a calibrated test for an interaction or kernel
+effect. Existing kernel-mean coverage studies do not establish interval coverage
+for weighted SQ or interactions. All starts, failures, cold checks, dispersion
+boundaries, and uncertainty qualifications remain part of the assessment.
+
+### Relative step-selection projections
+
+For `conditional_logit`, `type = "link"` returns the uncentered linear selection
+index, and the exact type `"risk"` returns its exponential. These scores need
+matching spatial inputs and the fixed formula variables, but no prediction
+choice-set IDs. They describe relative selection, not occurrence probabilities
+or a utilization distribution. Standard errors require
+`uncertainty = "conditional"` and hold the estimated kernel parameters fixed.
+
+`type = "response"` still normalizes within complete caller-defined choice sets,
+with at least two alternatives in each set. A snapshot without valid set IDs
+supports link and risk outputs, records why response probabilities are
+unavailable, and refuses a response request. It does not invent groups.
+
+Checked analytic raster prediction retains every native coefficient column,
+including kernel-by-factor products and fixed learned transformations. Raster
+standard errors remain conditional on the selected scales. The normalization
+engine uses one registered native call with stable max shifting; independent
+native likelihood and cold-start checks remain in place. No comparative speedup
+is claimed from validation performed alongside other R work.
+
+Conditional-backend link and risk scores leave formula offsets unshifted. Risk
+standard errors use the delta method, `risk * SE(link)`, conditional on the
+selected kernel. Native survival predictions retain their provider's reference
+and standard-error conventions; do not equate them merely because both outputs
+are called risk.
+
+### Formula expansion and kernel arithmetic
+
+R treats `habitat * year` as main effects plus their interaction. `habitat:year`
+requests the interaction alone. Formula powers expand crossings; `habitat^2`
+is not a numeric square. Use `I(habitat^2)` for a quadratic response term.
+
+Kernel-only scalar expressions support arithmetic and the base functions `exp`,
+`log`, `sqrt`, `sin`, `cos`, and `tan`. They act on the standardized kernel
+predictors after extraction. They do not transform raster cells before
+smoothing. Native coefficient columns, contrasts, normalized priors and the
+original fixed reference transformation are retained. Priors remain expressed
+in that chosen native coefficient basis.
+
+Expressions must be pointwise functions of optimized kernels and literal
+constants. Fixed-data inputs inside a dynamic expression, learned dynamic
+bases, arbitrary or nondifferentiable functions, and kernel-valued offsets
+retain explicit guards. Nonfinite domains are errors, with no clipping.
+All fitting, covariance, native refit, scale-profile and private-admission
+safeguards still apply. Supporting a formula does not establish identification
+or calibrated intervals.
+
+
+For unmarked effect curves, active native terms select the panels. Removing a
+term removes its panel; offsets still supply prediction inputs, and random-only
+grouping columns do not receive panels. Admitted quoted names, such as
+`` `land:cover` ``, and fixed expressions retain their native coefficient basis
+and conditional intervals.
+
+A pipe inside `I(a | b)` is a fixed logical operation in R. The native unmarked
+parser can nevertheless reject that expression, or a quoted name containing a
+pipe, before fitting. Precompute the logical predictor as a named column and
+rename pipe-containing columns before the native fit when this happens. For complete,
+nonmissing logical inputs, `I(as.integer(a) + as.integer(b) > 0)` also expresses
+a fixed OR without a pipe token. With missing inputs, precompute the original
+`a | b` expression to retain R's missing-value logic. These preparations are explicit; multiScaleR does not
+silently replace a native random-effect declaration or alter the fitted target.
+
+
+For supported ordinary unmarked occupancy and count curves, a learned fixed
+basis such as `poly(temperature, 2)` or `scale(temperature)` retains its training
+prediction call, including the equivalent `stats::poly()` and `base::scale()`
+forms. The plotting grid does not recenter, rescale, or refit that
+basis. Curves use native coefficient covariance and inverse links, with random
+effects set to zero; they remain conditional on the fitted spatial scales.

@@ -23,7 +23,7 @@
 #'   models.
 #' @param link Logical. If \code{TRUE}, predictions are passed through the
 #'   model's inverse link function before plotting (i.e., plotted on the
-#'   response scale). For \code{glm} objects this is applied automatically.
+#'   response scale). For \code{glm} and spaMM \code{HLfit} objects this is applied automatically.
 #'   Set to \code{TRUE} manually if predicted values appear to be on the link
 #'   scale. Default: \code{FALSE}.
 #' @param draws For Bayesian fits, a positive number of stored draws to select
@@ -54,11 +54,19 @@
 #' covariates, whose scaled mean is 0, this is equivalent to holding them at
 #' their average landscape value. Variables used only in model offsets are held
 #' at their sample mean for prediction but do not receive marginal effect panels.
+#' Quoted predictor names retain their original spelling in prediction grids.
+#' Factor contrasts and fixed transformations are evaluated by the fitted model.
 #'
 #' For \code{glm} and most GLM-family models, predictions are transformed via
 #' the inverse link function automatically (e.g., \code{exp()} for Poisson
 #' log-link models). Confidence intervals are constructed from
 #' \code{predict(..., se.fit = TRUE)} using \eqn{\pm 1.96 \times SE}.
+#'
+#' Native link-scale limits are transformed to the response scale and ordered
+#' for increasing or decreasing links. Limits with nonfinite standard errors,
+#' invalid native link/family endpoints, or an inverse-link pole inside the
+#' interval are unavailable and produce a warning. Fitted values remain native;
+#' the method does not clip or repair invalid confidence limits.
 #'
 #' For \code{unmarked} models, \code{predict(mod, newdata, type = type)} is
 #' used, and lower/upper bounds come from the \code{lower} and \code{upper}
@@ -76,11 +84,20 @@
 #' conditional predictions at the stated covariate values, not averages over
 #' years, sites, or the random-effect distribution. Confidence intervals are
 #' conditional on the fitted spatial scale.
-#' Explicit nondefault factor contrasts in ordinary \code{pcount} (Poisson or
-#' negative-binomial) and \code{occu} fits use \code{unmarked::linearComb()}
-#' and \code{unmarked::backTransform()} to preserve the fitted design and link.
-#' Other unmarked classes with such contrasts stop if their prediction method
-#' cannot safely retain that design.
+#' Explicit nondefault factor contrasts and learned fixed bases in ordinary
+#' \code{pcount} (Poisson or negative-binomial) and \code{occu} fits use
+#' \code{unmarked::linearComb()} and \code{unmarked::backTransform()} to preserve
+#' the fitted coefficient basis and link. Learned prediction calls are trained
+#' once on retained site covariates and held fixed across plotting grids.
+#' Other unmarked classes requiring that fallback stop rather than return a
+#' different basis or derived-state prediction. Active terms select panels:
+#' removed terms and random-only groups are excluded, while admitted quoted
+#' names and fixed logical expressions retain their raw inputs. A logical pipe
+#' within \code{I()} is a fixed operation, not a random-effect declaration.
+#' The native unmarked parser may reject pipe-containing names or fixed
+#' expressions before fitting. Precompute such fixed inputs and use safe
+#' column names when that occurs; this plotting adapter cannot change a
+#' formula rejected by the native fitting function.
 #'
 #' For models with interaction terms, a message is printed explaining that each
 #' panel represents a conditional slice (at the mean of the interacting
@@ -88,6 +105,10 @@
 #'
 #' \code{HLfit} (spaMM) and \code{zeroinfl} (pscl) models are handled with
 #' class-specific prediction calls.
+#' spaMM curves set random effects to zero, evaluate the linear predictor, and
+#' transform native link-scale \code{fixefVar} limits through the inverse link.
+#' Its response variance is not used as a confidence interval for the mean.
+
 #' When \code{x$opt_mod} is a wrapper object around another fitted model,
 #' \code{plot_marginal_effects()} uses the nested analysis model for predictor
 #' discovery, data recovery, and prediction when possible.
@@ -190,9 +211,14 @@ plot_marginal_effects <- function(x,
     }
 
     component <- .msr_unmarked_marginal_formula(mod, type)
-    vars <- .msr_marginal_variables(component, offsets = TRUE)
-    c_vars <- .msr_marginal_variables(component, offsets = FALSE)
     dat <- unmarked::siteCovs(unmarked::getData(mod))
+    active_terms <- stats::terms(component, data = dat)
+    vars <- .msr_marginal_variables(active_terms, offsets = TRUE)
+    c_vars <- .msr_marginal_variables(active_terms, offsets = FALSE)
+    # Native model.frame can still evaluate variables removed by '-'. Supply
+    # their original context without adding them or random groups as panels.
+    frame_variables <- as.list(attr(active_terms, "variables"))[-1L]
+    vars <- unique(c(vars, unlist(lapply(frame_variables, all.vars), use.names = FALSE)))
     missing_vars <- setdiff(vars, names(dat))
     if (length(missing_vars)) {
       stop("Could not recover site covariates for marginal effects: ",
@@ -212,6 +238,8 @@ plot_marginal_effects <- function(x,
       attr(values, "contrasts") <- NULL
       !isTRUE(all.equal(fitted, stats::contrasts(values)))
     }, logical(1)))
+    # Freeze learned fixed prediction calls once on the native training rows.
+    basis <- .msr_unmarked_curve_basis(active_terms, dat)
     plot_list <- lapply(c_vars, function(v) {
       values <- dat[[v]]
       if (all(is.na(values))) {
@@ -233,7 +261,7 @@ plot_marginal_effects <- function(x,
 
       newdata <- as.data.frame(lapply(pred_defaults, function(value) {
         rep(value, length(x_seq))
-      }), stringsAsFactors = FALSE)
+      }), stringsAsFactors = FALSE, check.names = FALSE)
       newdata[[v]] <- x_seq
 
       # unmarked's data-frame prediction path drops explicit contrasts in
@@ -244,8 +272,8 @@ plot_marginal_effects <- function(x,
           if (custom_contrasts) attr(dat[[factor_var]], "contrasts") else NULL
       }
       preds <- tryCatch(
-        if (custom_contrasts) {
-          .msr_unmarked_contrast_prediction(mod, component, newdata, type)
+        if (custom_contrasts || basis$learned) {
+          .msr_unmarked_contrast_prediction(mod, basis$terms, newdata, type)
         } else {
           unmarked::predict(mod, newdata = newdata, type = type, re.form = NA)
         },
@@ -266,8 +294,18 @@ plot_marginal_effects <- function(x,
     })
 
   } else {
-    c_vars <- find_predictors(analysis_mod)[[1]]
-    vars <- unlist(find_predictors(analysis_mod))
+    if (identical(x$backend, "conditional_logit")) {
+      vars <- .msr_active_formula_variables(x$profile_fit$contract$terms)
+      c_vars <- vars
+    } else if (inherits(analysis_mod, c("glm", "lm"))) {
+      # Native terms retain active variables and quoted names without a
+      # provider's optional name-sanitizing interpretation.
+      vars <- .msr_active_formula_variables(stats::terms(analysis_mod))
+      c_vars <- vars
+    } else {
+      c_vars <- find_predictors(analysis_mod)[[1]]
+      vars <- unlist(find_predictors(analysis_mod))
+    }
     # Offset-only variables describe effort, not covariate effects. Keep them
     # in vars so prediction holds them at their mean, but omit their panels.
     # A variable that also enters as a model term remains a plotted covariate.
@@ -279,12 +317,31 @@ plot_marginal_effects <- function(x,
       }, error = function(e) character(0))
       c_vars <- setdiff(c_vars, setdiff(offset_vars, term_vars))
     }
-    dat_all <- .model_data(analysis_mod)
+    dat_all <- if (identical(x$backend, "joint_mixed") &&
+      is.data.frame(x$mixed_fit$prediction_data)) x$mixed_fit$prediction_data else
+        .model_data(analysis_mod)
     if(is.null(dat_all)){
       dat_all <- extract_model_data(analysis_mod)
     }
     if(is.null(dat_all)){
       stop("Could not recover the original model data needed to plot marginal effects.")
+    }
+
+    design <- x$profile_fit$contract$objective$response_design
+    if (!is.null(design$expression_programs)) {
+      # Evaluated powers cannot identify the underlying signed kernel values.
+      # Rebuild those values from the selected, verified spatial preparation.
+      e <- x$profile_fit$contract$objective$engine
+      if (inherits(e, "msr_surface_engine") && isTRUE(e$rebuild_from_inputs))
+        e <- .msr_prepare_surface_engine(x$kernel_inputs, e$covariates, e$rows,
+                                         e$standardize, e$implementation)
+      value <- .msr_eval_kernel_engine(e,
+        x$profile_fit$par[seq_along(e$parameter_names)])$value
+      if (nrow(dat_all) != nrow(value)) stop("Effect-curve training rows do not match the fitted kernels.")
+      for (nm in e$covariates) dat_all[[nm]] <- value[, nm]
+      missing <- setdiff(vars, names(dat_all))
+      if (length(missing)) stop("Raw fixed-transform inputs were not retained for effect curves: ",
+        paste(missing, collapse = ", "), ". Refit with recoverable raw training data.", call. = FALSE)
     }
 
     # Parse formula term labels to detect I() polynomial and interaction terms.
@@ -296,18 +353,21 @@ plot_marginal_effects <- function(x,
       error = function(e) character(0)
     )
     poly_terms  <- fterms[grepl("^I\\(", fterms)]
-    inter_terms <- fterms[grepl(":", fterms, fixed = TRUE)]
+    term_order <- tryCatch(attr(stats::terms(formula(analysis_mod)), "order"),
+      error = function(e) integer())
+    inter_terms <- fterms[term_order > 1L]
+    poly_variables <- lapply(poly_terms, function(term) all.vars(str2lang(term)))
+    inter_variables <- lapply(inter_terms, function(term) all.vars(str2lang(term)))
 
     # Which base variables appear inside an I() term?
     poly_vars <- c_vars[sapply(c_vars, function(v) {
-      length(poly_terms) > 0 &&
-        any(grepl(paste0("\\b", v, "\\b"), poly_terms))
+      any(vapply(poly_variables, function(names) v %in% names, logical(1)))
     })]
 
     # Which base variables appear in at least one interaction term?
     inter_vars <- if(length(inter_terms) > 0) {
       c_vars[sapply(c_vars, function(v) {
-        any(grepl(paste0("\\b", v, "\\b"), inter_terms))
+        any(vapply(inter_variables, function(names) v %in% names, logical(1)))
       })]
     } else character(0)
 
@@ -363,13 +423,14 @@ plot_marginal_effects <- function(x,
       # newdata only needs to contain the base variable names.
       newdata <- as.data.frame(
         lapply(pred_defaults, function(value) rep(value, length(x_seq))),
-        stringsAsFactors = FALSE
+        stringsAsFactors = FALSE, check.names = FALSE
       )
       newdata[[v]] <- x_seq
 
       if(inherits(analysis_mod, "HLfit")){
         preds_ <- tryCatch(
-          predict(analysis_mod, newdata = newdata, variances = list(respVar = TRUE), re.form = NA),
+          predict(analysis_mod, newdata = newdata, type = "link",
+            variances = list(fixefVar = TRUE), re.form = NA),
           error = function(e) {
             stop(
               sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
@@ -420,14 +481,16 @@ plot_marginal_effects <- function(x,
         upr  <- preds$CI_high
         if(is.null(lwr) && is.null(upr)) lwr <- upr <- NA
 
-      } else if(!native_mixed_response && !is.null(link_inverse(analysis_mod)) && link){
+      } else if(!native_mixed_response && !is.null(link_inverse(analysis_mod)) && (link || inherits(analysis_mod, "HLfit"))){
         if(!inherits(preds, 'list') || (is.list(preds) && length(preds) == 1)){
           fit_ <- link_inverse(analysis_mod)(as.data.frame(preds)[, 1])
           lwr  <- upr <- NA
         } else {
           fit_ <- link_inverse(analysis_mod)(preds[[1]])
-          lwr  <- link_inverse(analysis_mod)(preds[[1]] + qnorm(0.025) * preds[[2]])
-          upr  <- link_inverse(analysis_mod)(preds[[1]] + qnorm(0.975) * preds[[2]])
+          bounds <- .msr_native_link_ci(analysis_mod, preds[[1]], preds[[2]],
+            link_inverse(analysis_mod))
+          lwr <- bounds$lower
+          upr <- bounds$upper
         }
 
       } else {
@@ -455,22 +518,16 @@ plot_marginal_effects <- function(x,
 
     # Note any I() terms involving this variable
     if(v %in% poly_vars) {
-      rel_poly <- poly_terms[sapply(poly_terms, function(pt) {
-        grepl(paste0("\\b", v, "\\b"), pt)
-      })]
+      rel_poly <- poly_terms[vapply(poly_variables, function(names) v %in% names, logical(1))]
       subtitle_parts <- c(subtitle_parts,
                           paste0("Includes: ", paste(rel_poly, collapse = ", ")))
     }
 
     # Note the mean-conditioning for interaction terms
     if(v %in% inter_vars) {
-      partner_terms <- inter_terms[sapply(inter_terms, function(t) {
-        v %in% strsplit(t, ":")[[1]]
-      })]
-      others <- unique(unlist(lapply(
-        strsplit(partner_terms, ":"),
-        function(parts) parts[parts != v]
-      )))
+      partners <- inter_variables[vapply(inter_variables,
+        function(names) v %in% names, logical(1))]
+      others <- setdiff(unique(unlist(partners, use.names = FALSE)), v)
       subtitle_parts <- c(subtitle_parts,
                           paste0("At mean of: ", paste(others, collapse = ", ")))
     }
@@ -481,10 +538,19 @@ plot_marginal_effects <- function(x,
       xlab(df$variable[1]) +
       ylab(ylab) +
       theme_cowplot()
-    if (native_mixed_response)
+    if (all(is.na(df$lwr)) && all(is.na(df$upr)))
+      p <- p + labs(caption = paste(c(
+        if (native_mixed_response || inherits(analysis_mod, "HLfit"))
+          "Random effects are set to zero, not integrated.",
+        "Confidence limits unavailable; point predictions condition on spatial scales."), collapse = " "))
+    else if (native_mixed_response)
       p <- p + labs(caption = paste(
         "Random effects are set to zero, not integrated.",
         "Intervals use native response-scale standard errors and condition on spatial scales."))
+    else if (inherits(analysis_mod, "HLfit"))
+      p <- p + labs(caption = paste(
+        "Random effects are set to zero, not integrated.",
+        "Limits transform native link-scale fixed-effect uncertainty and condition on spatial scales."))
     else if (!all(is.na(df$lwr)))
       p <- p + labs(caption = "Confidence limits condition on the selected spatial scales.")
 
@@ -539,14 +605,74 @@ plot_marginal_effects <- function(x,
 # Formula variables are data columns; factor contrasts are coefficient names.
 # Grouping variables describe random effects, and offset-only variables need
 # prediction defaults but do not describe a separate effect to plot.
+# A quoted name may contain a pipe. Logical pipes inside I() or another
+# fixed function are not formula random-effect terms.
+.msr_marginal_random_call <- function(expr) {
+  while (is.call(expr) && identical(expr[[1L]], as.name("(")) && length(expr) == 2L)
+    expr <- expr[[2L]]
+  is.call(expr) && is.symbol(expr[[1L]]) &&
+    as.character(expr[[1L]]) %in% c("|", "||")
+}
+
 .msr_marginal_variables <- function(expr, offsets) {
-  if (!is.call(expr)) return(all.vars(expr))
-  fun <- as.character(expr[[1]])[1]
-  if (fun %in% c("|", "||") || (!offsets && fun == "offset")) {
-    return(character())
+  if (inherits(expr, c("terms", "formula"))) {
+    tt <- stats::terms(expr)
+    expressions <- lapply(attr(tt, "term.labels"), str2lang)
+    if (offsets) {
+      variables <- as.list(attr(tt, "variables"))[-1L]
+      expressions <- c(expressions, variables[attr(tt, "offset")])
+    }
+    return(as.character(unique(unlist(lapply(expressions,
+      .msr_marginal_variables, offsets = offsets), use.names = FALSE))))
   }
-  unique(unlist(lapply(as.list(expr)[-1], .msr_marginal_variables,
-                       offsets = offsets), use.names = FALSE))
+  if (!is.call(expr)) return(all.vars(expr))
+  fun <- if (is.symbol(expr[[1L]])) as.character(expr[[1L]]) else ""
+  if (.msr_marginal_random_call(expr) || (!offsets && fun == "offset"))
+    return(character())
+  # Only formula operators can introduce a random-effect term. Preserve every
+  # raw input in a fixed function, including logical |/|| inside I().
+  if (!fun %in% c("~", "+", "-", "*", "/", ":", "^", "%in%", "("))
+    return(all.vars(expr))
+  as.character(unique(unlist(lapply(as.list(expr)[-1L], .msr_marginal_variables,
+    offsets = offsets), use.names = FALSE)))
+}
+
+
+# Reconstruct the native fixed training frame before site removal. Store only
+# its learned prediction terms; never relearn a basis on a hypothetical grid.
+.msr_unmarked_curve_basis <- function(component, data) {
+  tt <- stats::terms(component, data = data)
+  labels <- attr(tt, "term.labels")
+  keep <- !vapply(lapply(labels, str2lang), .msr_marginal_random_call, logical(1))
+  variables <- as.list(attr(tt, "variables"))[-1L]
+  offsets <- vapply(variables[attr(tt, "offset")], deparse1, character(1), backtick = TRUE)
+  labels <- c(labels[keep], offsets)
+  intercept <- attr(tt, "intercept") == 1L
+  form <- if (length(labels)) stats::reformulate(labels, intercept = intercept,
+    env = attr(tt, ".Environment")) else stats::as.formula(if (intercept) "~1" else "~0",
+      env = attr(tt, ".Environment"))
+  frame <- stats::model.frame(form, data, na.action = stats::na.pass,
+    drop.unused.levels = FALSE)
+  fixed <- attr(frame, "terms")
+  # R's prediction-call methods historically recognize bare function heads.
+  # Recover metadata for these identical, explicitly qualified base functions
+  # from the evaluated training columns, retaining their qualified calls.
+  prediction <- as.list(attr(fixed, "predvars"))
+  for (j in seq_along(frame)) {
+    ex <- prediction[[j + 1L]]
+    if (!is.call(ex) || !is.call(head <- ex[[1L]]) ||
+        !identical(head[[1L]], as.name("::")) || length(head) != 3L) next
+    known <- (identical(head[[2L]], as.name("stats")) && identical(head[[3L]], as.name("poly"))) ||
+      (identical(head[[2L]], as.name("base")) && identical(head[[3L]], as.name("scale")))
+    if (!known) next
+    bare <- ex; bare[[1L]] <- head[[3L]]
+    learned_call <- stats::makepredictcall(frame[[j]], bare)
+    learned_call[[1L]] <- head
+    prediction[[j + 1L]] <- learned_call
+  }
+  attr(fixed, "predvars") <- as.call(prediction)
+  list(terms = fixed,
+    learned = !identical(attr(fixed, "predvars"), attr(fixed, "variables")))
 }
 
 
@@ -562,7 +688,8 @@ plot_marginal_effects <- function(x,
          "matrix and class-specific prediction method.", call. = FALSE)
   }
   terms <- stats::terms(component)
-  random <- which(grepl("|", attr(terms, "term.labels"), fixed = TRUE))
+  random <- which(vapply(lapply(attr(terms, "term.labels"), str2lang),
+    .msr_marginal_random_call, logical(1)))
   if (length(random)) terms <- stats::drop.terms(terms, random, keep.response = FALSE)
   frame <- stats::model.frame(terms, newdata, na.action = stats::na.pass)
   X <- stats::model.matrix(terms, frame)
@@ -697,3 +824,35 @@ namespace <- function(x) {
 }
 
 utils::globalVariables(c("fit", "lwr", "upr"))
+
+
+# Transform native mean limits only on a valid branch. Sorting handles a
+# decreasing inverse link; it cannot repair a pole, invalid domain or bad SE.
+.msr_native_link_ci <- function(model, fit, se, inverse) {
+  eta_lower <- fit + qnorm(.025) * se
+  eta_upper <- fit + qnorm(.975) * se
+  valid <- is.finite(fit) & is.finite(se) & se >= 0 &
+    is.finite(eta_lower) & is.finite(eta_upper)
+  family <- tryCatch(stats::family(model), error = function(e) NULL)
+  if (is.function(family$valideta)) for (i in which(valid))
+    valid[i] <- isTRUE(family$valideta(c(eta_lower[i], eta_upper[i])))
+  if (isTRUE(family$link %in% c("inverse", "1/mu^2")))
+    valid <- valid & !(eta_lower <= 0 & eta_upper >= 0)
+  if (identical(family$link, "sqrt")) valid <- valid & eta_lower >= 0
+  lower <- upper <- rep(NA_real_, length(fit))
+  index <- which(valid)
+  if (length(index)) {
+    a <- as.numeric(inverse(eta_lower[index]))
+    b <- as.numeric(inverse(eta_upper[index]))
+    acceptable <- is.finite(a) & is.finite(b)
+    if (is.function(family$validmu)) for (j in which(acceptable))
+      acceptable[j] <- isTRUE(family$validmu(c(a[j], b[j])))
+    valid[index[!acceptable]] <- FALSE
+    lower[index[acceptable]] <- pmin(a[acceptable], b[acceptable])
+    upper[index[acceptable]] <- pmax(a[acceptable], b[acceptable])
+  }
+  if (any(!valid)) warning(sprintf(
+    "Native mean confidence limits were not shown for %d row(s): nonfinite SEs or limits outside the native link/family domain.",
+    sum(!valid)), call. = FALSE)
+  list(lower = lower, upper = upper)
+}
