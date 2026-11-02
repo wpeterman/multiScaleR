@@ -30,7 +30,7 @@
       stop("include_fixed requires explicit kernel_inputs and newdata.", call. = FALSE)
     types <- component
   } else {
-    model <- object$opt_mod
+    model <- .msr_native_fixed_metadata(object$opt_mod)
     newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
     nd <- .msr_mixed_prediction_data(object, newdata, kernel_inputs)
     types <- if (is.null(component)) c("response", "link") else component

@@ -187,7 +187,7 @@ plot_marginal_effects <- function(x,
   }
 
   mod <- x$opt_mod
-  analysis_mod <- .analysis_model(mod)
+  analysis_mod <- .msr_native_fixed_metadata(.analysis_model(mod))
   scl <- x$scl_params
   namespace(analysis_mod)
   native_mixed_response <- inherits(analysis_mod, c("glmmTMB", "merMod"))
@@ -653,24 +653,7 @@ plot_marginal_effects <- function(x,
       env = attr(tt, ".Environment"))
   frame <- stats::model.frame(form, data, na.action = stats::na.pass,
     drop.unused.levels = FALSE)
-  fixed <- attr(frame, "terms")
-  # R's prediction-call methods historically recognize bare function heads.
-  # Recover metadata for these identical, explicitly qualified base functions
-  # from the evaluated training columns, retaining their qualified calls.
-  prediction <- as.list(attr(fixed, "predvars"))
-  for (j in seq_along(frame)) {
-    ex <- prediction[[j + 1L]]
-    if (!is.call(ex) || !is.call(head <- ex[[1L]]) ||
-        !identical(head[[1L]], as.name("::")) || length(head) != 3L) next
-    known <- (identical(head[[2L]], as.name("stats")) && identical(head[[3L]], as.name("poly"))) ||
-      (identical(head[[2L]], as.name("base")) && identical(head[[3L]], as.name("scale")))
-    if (!known) next
-    bare <- ex; bare[[1L]] <- head[[3L]]
-    learned_call <- stats::makepredictcall(frame[[j]], bare)
-    learned_call[[1L]] <- head
-    prediction[[j + 1L]] <- learned_call
-  }
-  attr(fixed, "predvars") <- as.call(prediction)
+  fixed <- .msr_fixed_prediction_terms(attr(frame, "terms"), frame)
   list(terms = fixed,
     learned = !identical(attr(fixed, "predvars"), attr(fixed, "variables")))
 }

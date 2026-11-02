@@ -222,7 +222,7 @@
 
 # Shared native target for prepared point rows and checked raster chunks.
 .msr_native_prediction_rows <- function(object, newdata, type, se.fit, dots = list()) {
-  model <- .analysis_model(object$opt_mod)
+  model <- .msr_native_fixed_metadata(.analysis_model(object$opt_mod))
   unmarked <- methods::is(model, "unmarkedFit")
   dots <- .msr_native_control_names(model, dots, newdata = !is.null(newdata))
   # A survival linear predictor or risk is not a within-choice-set probability.

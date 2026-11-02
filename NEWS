@@ -1,3 +1,16 @@
+multiScaleR 0.7.11
+* Preserve fixed training transformations in native refit, mixed, snapshot,
+  raster and curve routes, and recover retained legacy analytic metadata.
+* Retain fixed training metadata in returned native Cox fits as well as wrapper predictions.
+* Reuse fitted fixed normalization across analytic, prepared, unmarked, and
+  admitted conditional-logistic prediction paths, including qualified calls.
+* Distinguish fixed logical expressions from actual random-effect declarations
+  in prepared response and scale formulas.
+* Check public weighted-SQ point, snapshot, and raster predictions against
+  independent training transforms and native conditional covariance.
+* Qualify native fixed spline metadata without changing native spline methods;
+  use the R-recommended splines package only in focused tests.
+
 multiScaleR 0.7.10
 * Integrate native formula designs, weighted-SQ prerequisites, and supported
   spatial and step-selection prediction contracts.

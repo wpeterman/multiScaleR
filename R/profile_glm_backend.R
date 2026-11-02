@@ -43,7 +43,7 @@
     stop("profile_glm supports Gaussian identity, Poisson/NB2 log, and binomial logit models.",
          call. = FALSE)
   mf <- model$model
-  tt <- stats::terms(model)
+  tt <- .msr_fixed_prediction_terms(stats::terms(model), mf)
   specs <- inputs$scale_vars
   surface_names <- if (is.null(specs)) character() else specs$covariate[
     specs$type == "surface" & specs$metric == "sq" & specs$weighted & specs$optimize]

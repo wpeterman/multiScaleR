@@ -86,7 +86,7 @@
     optim_results = list(par = exp(kp), par_unscale = scale, value = best$objective,
       convergence = best$optim$convergence, message = best$optim$message,
       hessian = missing_hessian, hessian_unscale = missing_hessian),
-    opt_mod = fits$model, fitted_mod_original = model, min_D = inputs$min_D, max_D = inputs$max_D,
+    opt_mod = .msr_native_fixed_metadata(fits$model), fitted_mod_original = model, min_D = inputs$min_D, max_D = inputs$max_D,
     kernel_inputs = inputs[setdiff(names(inputs), c("min_D", "max_D"))],
     scl_params = list(mean = stats::setNames(kd$center, covs), sd = stats::setNames(kd$spread, covs)),
     join_by = NULL, opt_context = NULL, profile_scale_est = NULL,
@@ -131,7 +131,7 @@
     stop("se.fit must be one logical value.", call. = FALSE)
   newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
   newdata <- .msr_mixed_prediction_data(object, newdata, kernel_inputs)
-  do.call(stats::predict, c(list(object = object$opt_mod, newdata = newdata,
+  do.call(stats::predict, c(list(object = .msr_native_fixed_metadata(object$opt_mod), newdata = newdata,
     type = type, se.fit = se.fit), dots))
 }
 

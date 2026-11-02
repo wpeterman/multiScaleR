@@ -409,3 +409,38 @@ prediction call, including the equivalent `stats::poly()` and `base::scale()`
 forms. The plotting grid does not recenter, rescale, or refit that
 basis. Curves use native coefficient covariance and inverse links, with random
 effects set to zero; they remain conditional on the fitted spatial scales.
+
+
+Known qualified fixed transformations use the evaluated training metadata in
+profile GLM/NB2 and prepared response/scale formulas. Subset and new prediction
+rows retain the original center and spread for `base::scale()`. Fixed logical
+expressions inside `I()` retain R meaning during preparation; formula random
+terms remain subject to the existing additive-intercept contract.
+
+The supported one-case conditional-logistic adapter preserves original fixed
+training metadata when removing the choice-set stratum. Qualified fixed
+`base::scale()` and `stats::poly()` calls keep their original expression names,
+contrasts, offsets, and coefficient geometry. This does not admit additional Cox
+structures or provide joint scale uncertainty.
+
+Fixed training transformations also apply to new rows with a constant predictor,
+reordered sites, saved prediction snapshots, and raster prediction blocks.
+Qualified `base::scale()` calls use the original training center and spread.
+Native fixed spline terms retain their training knots and boundaries. These
+checks preserve coefficient-conditional uncertainty; they do not establish
+joint scale uncertainty or admit additional model structures.
+
+
+Native LM/GLM, single-component GAM, lme4 and glmmTMB prediction routes retain
+fixed training transformations for qualified `base::scale()` and `stats::poly()`
+calls. This applies to point predictions, prepared numerical snapshots, raster
+blocks and effect curves when the original raw curve variables are available.
+A single new value or a constant raster does not define a new standard deviation.
+The native coefficients, covariance, fitted likelihood and diagnostics stay fixed.
+
+Full analytic fits saved before this repair can recover prediction metadata
+from their retained evaluated native frame. Numerical-only snapshots have no
+such frame, so prepare them again from the full fit. This recovery does not
+supply missing raw variables for a curve, change a prior, add joint scale
+uncertainty or qualify a new model component. Multi-component GAM transformations
+that require a metadata change remain explicitly guarded pending component tests.

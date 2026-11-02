@@ -7,6 +7,11 @@
   walk <- function(x, additive = TRUE) {
     if (!is.call(x)) return(x)
     op <- as.character(x[[1L]])[1L]
+    # Formula operators can declare random terms. Pipes inside a fixed function
+    # such as I(a | b) retain ordinary R meaning and are not random effects.
+    if (!op %in% c("(", "|", "||", "+", "-", "*", "/", ":", "^", "%in%")) return(x)
+    if (op == "||")
+      stop("Random terms must be additive random intercepts, (1 | group).", call. = FALSE)
     if (op == "(") return(walk(x[[2L]], additive))
     if (op == "|") {
       if (!additive || !identical(x[[2L]], 1) || !is.symbol(x[[3L]]))
@@ -38,6 +43,7 @@
     .msr_response_active_terms(stats::terms(fixed, data = data)) else fixed
   frame <- stats::model.frame(evaluated, data, na.action = stats::na.fail,
                               drop.unused.levels = TRUE)
+  attr(frame, "terms") <- .msr_fixed_prediction_terms(stats::terms(frame), frame)
   random <- lapply(groups, function(g) {
     v <- data[[g]]
     if (!is.atomic(v) || !is.null(dim(v)) || anyNA(v) || any(!nzchar(as.character(v))))

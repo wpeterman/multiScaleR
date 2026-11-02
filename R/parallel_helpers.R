@@ -160,8 +160,9 @@ cluster_prep <- function(model, cl) {
 #' Extract the Namespace from a Model Call
 #'
 #' This function attempts to extract the package namespace from the call
-#' used to fit a model object, assuming the function was called using the
-#' `pkg::fun()` syntax.
+#' used to fit a model object, when the fitting function was called using
+#' `pkg::fun()` or `pkg:::fun()` syntax. Qualifiers inside a formula or another
+#' argument do not identify the fitting package.
 #'
 #' @param x A fitted model object.
 #'
@@ -177,10 +178,12 @@ extract_namespace <- function(x) {
     get_call(x),
     error = function(e) NULL
   )
-  if (!is.null(fc)) {
-    fc <- paste(fc, collapse = "")  # ensure single string
-    if (grepl("::", fc)) sub("::.*", "", fc) else NULL
-  }
+  # A qualifier in the formula or data is unrelated to the fitting function.
+  if (is.null(fc) || !is.call(fc)) return(NULL)
+  fun <- fc[[1L]]
+  if (is.call(fun) && length(fun) == 3L &&
+      as.character(fun[[1L]]) %in% c("::", ":::"))
+    as.character(fun[[2L]]) else NULL
 }
 
 

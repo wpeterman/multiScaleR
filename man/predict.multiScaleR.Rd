@@ -158,6 +158,13 @@ preparation. See \code{\link{prepare_unmarked_data}} for the key and fixed
 normalization requirements. Standard errors require
 \code{uncertainty = "conditional"} and native support. Unsupported native
 SE requests raise an error. Wrapper confidence intervals are unavailable.
+Fixed qualified \code{base::scale()} and \code{stats::poly()} calls use
+their retained training transformation for supported LM/GLM, single-component
+GAM, lme4, and glmmTMB predictions. New rows do not relearn the center or
+spread. Recovery requires an aligned evaluated training frame. Legacy full
+analytic fits can recover this metadata; numerical-only snapshots must be
+prepared again. Nested learned calls and additional multi-component layouts
+require separate preparation.
 Random-effect controls retain native meaning; setting effects to zero is
 not integration over the random-effect distribution.
 For ordinary lm response predictions, \code{native_args = list(interval =

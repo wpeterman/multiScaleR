@@ -75,7 +75,15 @@
   ds <- derivative(kd$d_scale, train$d_scale)
   dh <- if (e$kernel == "expow") derivative(kd$d_shape, train$d_shape) else kd$d_shape
   for (nm in e$covariates) newdata[[nm]] <- value[, nm]
-  tt <- stats::delete.response(contract$terms)
+  tt <- contract$terms
+  # Older full fits can retain incomplete prediction terms while their native
+  # evaluated frame still contains the original fixed training transformation.
+  if (.msr_needs_fixed_metadata(tt)) {
+    native <- .analysis_model(object$opt_mod)
+    tt <- .msr_fixed_prediction_terms(tt, .msr_response_frame_subset(
+      stats::terms(native), native$model, tt))
+  }
+  tt <- stats::delete.response(tt)
   mf <- stats::model.frame(tt, data = newdata, xlev = contract$xlevels,
                           na.action = stats::na.fail)
   X <- stats::model.matrix(tt, mf, contrasts.arg = contract$contrasts)
@@ -226,6 +234,13 @@
 #' normalization requirements. Standard errors require
 #' \code{uncertainty = "conditional"} and native support. Unsupported native
 #' SE requests raise an error. Wrapper confidence intervals are unavailable.
+#' Fixed qualified \code{base::scale()} and \code{stats::poly()} calls use
+#' their retained training transformation for supported LM/GLM, single-component
+#' GAM, lme4, and glmmTMB predictions. New rows do not relearn the center or
+#' spread. Recovery requires an aligned evaluated training frame. Legacy full
+#' analytic fits can recover this metadata; numerical-only snapshots must be
+#' prepared again. Nested learned calls and additional multi-component layouts
+#' require separate preparation.
 #' Random-effect controls retain native meaning; setting effects to zero is
 #' not integration over the random-effect distribution.
 #' For ordinary lm response predictions, \code{native_args = list(interval =

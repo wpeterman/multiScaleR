@@ -15,8 +15,9 @@ A character string with the namespace (package name), or `NULL`
 }
 \description{
 This function attempts to extract the package namespace from the call
-used to fit a model object, assuming the function was called using the
-`pkg::fun()` syntax.
+used to fit a model object, when the fitting function was called using
+`pkg::fun()` or `pkg:::fun()` syntax. Qualifiers inside a formula or another
+argument do not identify the fitting package.
 }
 \details{
 For internal use

@@ -1,3 +1,51 @@
+# Validated metadata release 0.7.11, November 1 evening
+
+The fixed training-transformation updates are validated for release0.7.11.
+Full60: normal vignette-enabled Status OK;19592 installed assertions passed,
+0failures, unchanged12warnings/10skips. Version-only full61: Status OK, normal
+vignettes rebuilt. All runtime, tests and documentation bytes match full60.
+The initial commit/push is directly authorized. No merge is authorized.
+Follow continuation_20261030/RESUME.md and release120-verified-state01.json.
+Multi-component GAM and explicit raw-reference curves are the next batches;
+keep those future changes uncommitted pending separate authority. Preserve
+priors, fixed references, guards, diagnostics and uncertainty distinctions.
+Current window ends November2at06:00EST; controller14 and the bounded heartbeat
+must stop and checkpoint bythat cutoff. The older notes below are historical.
+
+# Current native metadata update, November 1
+
+Updated 2026-11-01T13:20:01.083217-05:00. Current working source436matches full60: fresh normal
+vignette-enabled Status OK, 19592passing installed assertions,
+0failures, same12warnings/10skips;138source-local focused assertions clean.
+The thirteen checked118paths are applied UNCOMMITTED, preserving all earlier113
+work, priors, references, information, diagnostics and uncertainty distinctions.
+Original tests/thresholds/ledgers and fourteen numerical markers are unchanged.
+Namespace qualifiers in formulas no longer corrupt fitting-package detection.
+Published inference-dev remainsc548dc8b/0.7.10; no further staging/commit/bump/
+merge/push. Owned R0; foreign jobs untouched; no automation. Follow
+continuation_20261030/RESUME.md, noon-final-checkpoint01.json and
+NATIVE_COMPONENTS_NEXT_20261101.md. Earlier pending116/ACTIVE/cutoff notes are
+historical. A future window needs new producer/controller identities.
+
+# Current uncommitted fixed-metadata update, November 1
+
+Updated 2026-11-01T09:47:57.603062-05:00. Published inference-dev remainsc548dc8b/0.7.10(remote verified).
+The subsequent435-file fixed-metadata adapter113is applied UNCOMMITTED with
+fresh full59normal vignette-enabled Status OK and exact-archive suite19474pass,
+0fail, same12warnings/10skips;1005focused assertions clean. Priors, numerical
+gates, diagnostics, fixed references and uncertainty distinctions are preserved.
+All original test bytes/per-file ledgers and fourteen markers are unchanged.
+No new commit, staging, version bump, merge or push followed the initial release.
+
+No owned R remains; foreign RStudio is untouched. No new launches today.
+Follow continuation_20261030/RESUME.md and morning-final-checkpoint01.json.
+Native/legacy audit112is prepared but unlaunched; raw-reference curves83and
+additional class/component/kernel targets need separate validation. No-year
+spatial admission remains private and reference qualification unresolved.
+Closed producers must not be replayed. A future numerical window needs a new
+immutable controller;11expires today. The older pending105/ACTIVE/cutoff notes
+below are historical and superseded by this checkpoint.
+
 # Validated integration release0.7.10
 
 The normal vignette-enabled version0.7.10check is Status OK. Only DESCRIPTION

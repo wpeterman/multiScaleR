@@ -136,14 +136,18 @@ terms.msr_clogit_frame_formula <- function(x, ...) {
     .msr_prepare_surface_engine(inputs, covs, rows, implementation = implementation) else
     .msr_prepare_kernel_engine(inputs$binned, covs, rows, inputs$kernel,
                                implementation = implementation)
+  # Preserve structural and complete-row admission errors before recovering
+  # prediction metadata. A malformed native design must still be rejected.
+  if (length(attr(tt, "predvars")) != length(attr(tt, "variables")))
+    stop("Cannot recover saved prediction transformations from Cox terms.", call. = FALSE)
+  tt <- .msr_fixed_prediction_terms(tt, m$model)
   # Rebuild prediction terms on the retained data: drop.terms() can leave Cox
   # predvars pointing at a removed strata term instead of a formula offset.
   offsets <- vapply(attr(tt, "offset"), function(i)
     paste(deparse(attr(tt, "variables")[[i + 1L]]), collapse = ""), "")
   pred_formula <- stats::reformulate(c(labels[-sg], offsets),
     intercept = attr(tt, "intercept") == 1L, env = environment(tt))
-  pred_terms <- if (frame_mode) .msr_clogit_prediction_terms(tt, pred_formula) else
-    stats::terms(stats::model.frame(pred_formula, dat, na.action = stats::na.fail))
+  pred_terms <- .msr_clogit_prediction_terms(tt, pred_formula)
   response_design <- if (products) .msr_compile_response_design(pred_terms,
     .msr_response_frame_subset(tt, m$model, pred_terms), covs, colnames(X), m$contrasts) else NULL
   if (!is.null(response_design))
@@ -251,6 +255,10 @@ terms.msr_clogit_frame_formula <- function(x, ...) {
     fit$formula <- stats::formula(contract$model)
     attr(fit$model, "terms") <- fit$terms
   }
+  # The returned native model must use the same fixed training transformation
+  # as wrapper predictions. Learned kernel-dependent bases remain inadmissible.
+  fit$terms <- .msr_fixed_prediction_terms(fit$terms, contract$frame)
+  attr(fit$model, "terms") <- fit$terms
   fit$call$formula <- stats::formula(contract$model)
   fit$call$method <- contract$model$method
   fit
