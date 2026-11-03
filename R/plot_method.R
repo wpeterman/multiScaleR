@@ -39,7 +39,8 @@
 #' Distances refer to an ideal untruncated kernel. Actual retained weight can
 #' differ with \code{max_D}, raster edges, missing cells, and cell geometry.
 #'
-#' Hard-radius covariates show a uniform buffer and mark its full radius,
+#' Hard-radius covariates, including every fitted fixed-kernel scale, show
+#' a uniform buffer and mark its full radius,
 #' regardless of \code{prob} or \code{dimension}. A shaded interval is drawn
 #' only when finite limits are available.
 #' @examples

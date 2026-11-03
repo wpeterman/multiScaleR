@@ -159,12 +159,44 @@ normalization requirements. Standard errors require
 \code{uncertainty = "conditional"} and native support. Unsupported native
 SE requests raise an error. Wrapper confidence intervals are unavailable.
 Fixed qualified \code{base::scale()} and \code{stats::poly()} calls use
-their retained training transformation for supported LM/GLM, single-component
-GAM, lme4, and glmmTMB predictions. New rows do not relearn the center or
+their retained training transformation for supported LM/GLM, GAM, lme4,
+glmmTMB and time-fixed, unpenalized native Cox predictions. GAMs with multiple linear predictors retain each
+component's terms, coefficient spans and native output columns. Response
+columns keep the fitted family's meaning; for example, the second
+\code{mgcv::gaulss()} response column is reciprocal standard deviation,
+and multinomial response columns are category probabilities. New rows do not relearn the center or
 spread. Recovery requires an aligned evaluated training frame. Legacy full
 analytic fits can recover this metadata; numerical-only snapshots must be
-prepared again. Nested learned calls and additional multi-component layouts
-require separate preparation.
+prepared again. Nested learned calls and unsupported native structures
+require separate preparation. Native GAM term selection, exclusions and
+smoothing-parameter covariance requests retain their native behavior;
+none includes uncertainty in the selected spatial scales.
+Package predictions from the native mgcv GAM method retain saved factor
+coding for interaction-only terms when session contrast options change.
+Fitted coefficients, covariance and diagnostics remain unchanged. Other
+GAM providers retain their native prediction methods.
+Package BAM predictions retain the native discrete and block algorithms while
+restoring fitted coding in serial and native worker calls. Explicit term
+exclusions also reach the native worker predictor. Worker mgcv versions and
+prediction implementations must agree with the parent. Other providers keep
+their native dispatch; numerical snapshots do not retain external clusters.
+Ordinary BAM workers retain \code{iterms} matrices, term labels and the native
+intercept constant, including models without factor coding. Native GAM
+controls forwarded through BAM, such as \code{iterms.type} and
+\code{unconditional}, reach those workers; native warning conditions also
+reach the parent call. Transported calls identify the native method and
+controls, with symbolic references to model and prediction data. Their
+messages and classes are retained without carrying those evaluated data.
+A BAM smoothing-covariance request preserves the
+provider's covariance-retention decision and unavailable-correction warning.
+Optimized discrete prediction retains its native \code{iterms}-to-\code{terms}
+warning and target. Select \code{discrete = FALSE} for ordinary \code{iterms}.
+Native providers may also warn when selecting terms from a model with no
+parametric coefficients. These warnings retain their native meaning.
+For ziplss response predictions, the native mean is unchanged and its
+standard error propagates full native coefficient covariance through both
+predictors, preserving signed cross-covariance. This omits count noise and
+ecological-scale uncertainty. Custom family prediction hooks remain guarded.
 Random-effect controls retain native meaning; setting effects to zero is
 not integration over the random-effect distribution.
 For ordinary lm response predictions, \code{native_args = list(interval =

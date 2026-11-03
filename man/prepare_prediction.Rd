@@ -63,6 +63,10 @@ also supports \code{exclude}, \code{terms}, \code{unconditional},
 \code{iterms.type}, and \code{block.size}. The controls and native
 warnings are bound to the snapshot. Unconditional GAM SEs request native
 smoothing-parameter covariance; they do not add kernel-scale uncertainty.
+BAM snapshots also accept \code{discrete}. Set it to \code{FALSE} for
+ordinary \code{iterms} predictions. The optimized discrete provider resets
+\code{iterms} to \code{terms} with its native warning. A smoothing correction
+request is distinct from a correction actually available to the provider.
 Ordinary lm refits also accept native \code{interval} and \code{level}
 controls for mean confidence or future-observation prediction intervals.
 spaMM refits accept \code{variances} and \code{intervals}; cross-row

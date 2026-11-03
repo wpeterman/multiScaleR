@@ -37,7 +37,11 @@
 #'   When \code{TRUE}, each cell is weighted by the model's distance kernel
 #'   (the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
 #'   parameter is the kernel scale (sigma), exactly as for a kernel-weighted
-#'   mean. Kernel weights vary continuously with sigma. SQ is smooth away from
+#'   mean. Gaussian, exponential, and exponential-power weights vary
+#'   continuously with sigma. With \code{kernel = "fixed"}, the fitted
+#'   parameter is a hard cutoff radius and weights change as cells enter or
+#'   leave the buffer. Its radius SE and Wald limits are missing; weighted
+#'   metric definitions and training normalization are retained. SQ is smooth away from
 #'   zero variance; absolute deviations and standardized higher moments have
 #'   additional nonsmooth or undefined cases. Weighting is available only for the
 #'   distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
@@ -394,7 +398,11 @@ msr_vars <- function(...) {
 }
 
 
-.msr_hard_radius_covariates <- function(scale_vars) {
+.msr_hard_radius_covariates <- function(scale_vars, kernel = NULL,
+                                         covariates = scale_vars$covariate) {
+  # A uniform kernel changes support in cell steps for every fitted scale.
+  # Explicit names also cover saved fits without scale specifications.
+  if (identical(kernel, "fixed")) return(as.character(covariates))
   if (is.null(scale_vars) || is.null(scale_vars$type) ||
       is.null(scale_vars$covariate)) return(character())
   weighted <- if ("weighted" %in% names(scale_vars)) {
@@ -916,7 +924,8 @@ print.multiScaleR_vars <- function(x, ...) {
 .msr_shape_values <- function(object) {
   if (is.null(object$shape_est)) return(NULL)
   value <- stats::setNames(object$shape_est$Mean, rownames(object$shape_est))
-  hard <- intersect(names(value), .msr_hard_radius_covariates(object$kernel_inputs$scale_vars))
+  hard <- intersect(names(value), .msr_hard_radius_covariates(object$kernel_inputs$scale_vars,
+    object$kernel_inputs$kernel, names(value)))
   value[hard] <- 1
   value
 }

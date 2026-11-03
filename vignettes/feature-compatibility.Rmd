@@ -35,12 +35,18 @@ during the vignette build.
 `landscape_var()` describes categorical composition or configuration. An
 unweighted metric uses a circular neighborhood with a hard boundary. Its radius
 can be fixed or estimated. A weighted surface metric uses the selected kernel
-and estimates its bandwidth instead.
+and estimates its bandwidth instead. With `kernel = "fixed"`, that parameter
+is a hard cutoff radius for kernel means and weighted metrics alike. Their
+metric formulas and training normalization are retained. Radius SEs and
+Wald limits are missing; request `summary(fit, profile = TRUE)` for profile
+limits and inspect the stepped likelihood. Native coefficient SEs remain
+conditional on the selected radius. Fitted distance tables and kernel
+plots show the full radius in both dimensional definitions.
 
 | Feature | Native refit | Analytic likelihood backends | Bayesian scales |
 |:--------|:-------------|:----------------------------|:----------------|
 | Kernel mean | Gaussian, exponential, exponential-power, or fixed kernel | Supported smooth kernels under the chosen backend's contract | Gaussian or exponential |
-| Weighted surface SQ | Gaussian, exponential, or exponential-power | Gaussian or exponential, including mixtures with means | Gaussian or exponential, alone or with means |
+| Weighted surface SQ | Gaussian, exponential, exponential-power, or fixed kernel | Gaussian or exponential, including mixtures with means | Gaussian or exponential, alone or with means |
 | Weighted SA, skewness, or kurtosis | Gaussian, exponential, or exponential-power | Not implemented | Not implemented |
 | Estimated hard-radius surface or landscape metric | Supported, including mixtures with exponential-power means | Not implemented for the discontinuous radius | Not implemented |
 | Fixed-radius metric | Prepared once and used as a native predictor | Ordinary numeric predictor with verified original preparation | Ordinary numeric predictor with verified original preparation |
@@ -431,7 +437,7 @@ checks preserve coefficient-conditional uncertainty; they do not establish
 joint scale uncertainty or admit additional model structures.
 
 
-Native LM/GLM, single-component GAM, lme4 and glmmTMB prediction routes retain
+Native LM/GLM, GAM, lme4, glmmTMB and time-fixed, unpenalized Cox prediction routes retain
 fixed training transformations for qualified `base::scale()` and `stats::poly()`
 calls. This applies to point predictions, prepared numerical snapshots, raster
 blocks and effect curves when the original raw curve variables are available.
@@ -442,5 +448,200 @@ Full analytic fits saved before this repair can recover prediction metadata
 from their retained evaluated native frame. Numerical-only snapshots have no
 such frame, so prepare them again from the full fit. This recovery does not
 supply missing raw variables for a curve, change a prior, add joint scale
-uncertainty or qualify a new model component. Multi-component GAM transformations
+uncertainty or qualify a new model component. Unsupported native GAM layouts
 that require a metadata change remain explicitly guarded pending component tests.
+
+## GAMs with multiple linear predictors
+
+Native refit predictions retain the complete component structure of a fitted
+`mgcv::gam()` model. Each component uses its fitted fixed transformations,
+factor contrasts and coefficient columns. Point predictions, numerical
+snapshots and checked rasters retain native link, response, term and basis
+outputs. Select term outputs with the native `terms` or `exclude` controls.
+The native warning for unavailable multi-predictor `iterms` behavior is retained.
+
+Response columns depend on the family. A Gaussian location-scale (`gaulss`)
+fit returns its mean and reciprocal standard deviation. A multinomial fit
+returns category probabilities, which can outnumber its linear predictors.
+Here the family's scale describes response variation. The ecological kernel
+bandwidths remain separate fitted spatial parameters.
+These columns are not interchangeable and the prediction contract records the
+native family and number of linear predictors.
+
+Native standard errors require `uncertainty = "conditional"`. The
+`unconditional = TRUE` native control requests mgcv's smoothing-parameter
+covariance correction when available. Both choices condition on the selected
+ecological kernel scales. Neither is a full Bayesian ecological-scale
+prediction. Snapshot preparation stores numerical outputs and the selected
+controls, rather than a fitted model or its formula environment.
+
+For effect curves, select a native output column with `component`. The default
+`link = FALSE` plots a linear predictor. Set `link = TRUE` to plot a native
+response column. For multinomial fits the number of response columns can exceed
+the number of linear predictors. These curves use native output-scale Wald
+limits and hold the fitted kernel scales and smoothing parameters fixed.
+Fixed metadata recovery does not recover discarded raw fitting data or qualify
+data-dependent transformations inside smooth terms.
+
+## Supply raw reference rows for transformed effect curves
+
+A fitted model frame may retain `poly(temperature, 2)`, `I(elevation^2)` or a
+compound offset without retaining the corresponding raw columns. A square
+cannot establish the sign of its original input. An orthogonal polynomial
+basis also needs its fitted prediction metadata. Supply `reference_data` when
+you retained the raw predictor values separately. This option is available for
+checked native LM/GLM, GAM and time-fixed, unpenalized Cox structures.
+
+Reference rows need explicit row names identifying the retained fitted rows.
+The function matches those IDs, evaluates the fitted prediction terms and
+checks every retained feature, native design or smooth basis, factor coding
+and formula offset. Nonfinite values, missing rows or inputs, new levels and
+changed features raise an error. The comparison uses the fitted transformation
+and contrasts. It does not relearn them on the supplied rows or on a plotting
+grid.
+
+```{r raw-reference-curves, eval=FALSE}
+# training_data contains the raw predictors for these actual fitted rows.
+fit_rows <- row.names(fit$opt_mod$model)
+index <- match(fit_rows, row.names(training_data))
+stopifnot(!anyNA(index))
+reference <- training_data[index, , drop = FALSE]
+row.names(reference) <- fit_rows
+
+# Supply the matched raw context, including raw inputs to formula offsets.
+curves <- plot_marginal_effects(fit, reference_data = reference)
+attr(curves, "reference_data_contract")
+
+# For a multiple-predictor GAM, select the output column explicitly.
+link_curves <- plot_marginal_effects(gam_fit, reference_data = gam_reference,
+  component = 2)
+response_curves <- plot_marginal_effects(gam_fit, reference_data = gam_reference,
+  component = 2, link = TRUE)
+```
+
+For native refits, the reference must contain the final fitted, standardized
+spatial columns alongside the raw fixed predictors. Retain those columns
+during fitting. Analytic GLM/NB2 and admitted conditional-logistic fits rebuild
+selected kernel values from their verified preparation before checking the
+reference. Original preparation and normalization remain authoritative.
+
+Passing this check establishes observable feature equivalence for the claimed
+row IDs. It cannot prove a unique original raw value from a many-to-one
+transformation. The returned `reference_data_contract` records that limitation.
+The model is not refit and its coefficients, covariance, diagnostics and priors
+remain unchanged. Curves remain conditional on the fitted ecological scales.
+
+Unmarked and Bayesian curves retain their existing structured-data and
+posterior-reference requirements. External call offsets, unsupported native
+structures, matrix-valued raw curve inputs and nested learned transformations
+without fixed prediction metadata remain guarded. A supplied raw data frame
+does not remove those requirements.
+
+Conditional-logistic Cox curves default to log relative risk. Their
+`link = TRUE` curves exponentiate that score, including for a native `clogit`
+fit. These are relative selection scores rather than occurrence probabilities
+or probabilities normalized within a complete choice set.
+
+Native GAM predictions also retain the fitted factor coding when a factor
+appears only inside an interaction. Changing session contrast options after
+fitting does not redefine these package predictions. Factor levels come from
+the retained fitting metadata, including for single-row or blocked prediction.
+Coefficients, covariance and fitting diagnostics stay unchanged. Additional
+GAM providers retain their own native prediction methods.
+
+Logical expressions such as `I(z > 0)` can appear in GAM interactions.
+Prediction retains their logical type and the fitted coding, including when
+a prediction block contains only `TRUE` or only `FALSE`. This also applies
+to multi-component GAMs and verified raw-reference curves.
+
+For `mgcv::ziplss()` models, `plot_marginal_effects(..., link = TRUE,
+component = 1, reference_data = raw_data)` selects the overall expected count
+across absence and presence. Both linear predictors contribute to that mean.
+Response standard errors propagate their full coefficient covariance,
+including signed cross-covariance. The original native mean is retained.
+The resulting Wald limits describe uncertainty in the mean. They omit count
+noise and uncertainty in the selected ecological scales, and can extend below
+zero. With `link = FALSE`, the two original link predictors remain selectable.
+The prediction contract identifies the covariance calculation separately from
+the provider's response-SE formula. Native smoothing-covariance controls keep
+their meaning for point and prepared predictions.
+
+Ordinary native Cox and `survival::clogit()` refits can recover qualified
+fixed scaling and polynomial metadata from their retained evaluated training
+frames. Unequal subsets, one-row predictions, numerical snapshots, checked
+raster blocks and verified raw-reference curves reuse the fitting definition.
+Linear predictors and relative risk keep their native meanings and conditional
+standard errors; neither is a within-step choice probability. Recovery does
+not change event counts, native parameter degrees of freedom, coefficients,
+covariance, likelihood or diagnostics. Missing evaluated frames and metadata
+changes for penalized, time-varying or multistate structures remain guarded.
+
+Package predictions from native `mgcv::bam()` fits retain the fitted factor
+coding when session contrasts change. Native block controls and optimized
+discrete prediction remain in place. Native parallel prediction workers also
+receive saved coding and explicit term exclusions. Their mgcv version and
+prediction implementation must match the parent; a mismatch stops prediction.
+The checks use declared Gaussian software fixtures, not a speed benchmark or
+an interval-calibration study. Mean standard errors keep the native coefficient
+covariance target and omit ecological-scale uncertainty and observation noise.
+Numerical snapshots cache the requested outputs without retaining a worker pool.
+
+
+For ordinary BAM prediction, `type = "iterms"` returns a row-by-term matrix,
+including its native intercept constant. Worker prediction retains that
+geometry, selected or excluded terms, and the `iterms.type` control. These
+routes also support native Gaussian BAM fits without factors and fits whose
+formula contains only smooth terms. The optimized discrete provider resets
+`iterms` to `terms` and issues its native warning. Use `discrete = FALSE` when
+you need ordinary `iterms`; for a numerical snapshot, bind this choice with
+`native_args = list(discrete = FALSE)` and `component = "iterms"`.
+
+An `unconditional = TRUE` request does not guarantee an available
+smoothing-adjusted covariance. Native BAM may discard that covariance and
+warn that the correction is unavailable. Its coefficient-covariance decision
+is preserved, and warning conditions from ordinary prediction workers also
+reach the parent call. Read these SEs as conditional on the ecological scales;
+they do not include observation noise or full-posterior uncertainty. Native
+EDF and likelihood parameter counts remain distinct from the two selected
+ecological parameters in the declared Gaussian software checks.
+
+
+Native mgcv versions may also warn when selecting or excluding terms from a
+model with no parametric coefficients. That provider warning is retained
+alongside the native numerical result. It is separate from the fitted-mode
+convergence, score and curvature checks.
+
+
+Warnings transported from ordinary BAM workers retain their native messages,
+classes and prediction controls. Their calls identify the native method and
+refer to fitted models and prediction rows symbolically, avoiding extra copies
+of those data in warning payloads. Provider version and the symbolic argument
+names remain attached as diagnostic context. The worker's original warning
+is retained; unrelated native warning calls are unchanged.
+
+
+Native Gaussian, binomial and Poisson BAM fits use the shared point,
+numerical-snapshot, checked-map and raw-reference curve routes. Ordinary
+prediction supports factor interactions, `I(z^2)` terms and native smooths;
+set `discrete = FALSE` when requesting ordinary `iterms` output. Native
+parallel scalar and matrix outputs retain their provider geometry, which can
+differ from serial geometry. Term matrices retain their labels and intercept
+constant. Native likelihood degrees of freedom supply the coefficient,
+smoothing and family-dispersion contribution to AIC/BIC; only selected
+ecological scale parameters and applicable expow shapes are added.
+
+For a single-predictor GAM or BAM, `plot_marginal_effects()` inherits the GLM
+automatic response transformation. Both values of `link` retain response
+curves, with inverse-link bounds from conditional link-scale Wald intervals.
+Use `predict(..., type = "link")` for link-scale predictions. Multi-component
+GAM curves have an explicit component choice: `link = FALSE` selects a linear
+predictor and `link = TRUE` selects a native response component. These
+conventions preserve the existing interfaces.
+
+Binomial response predictions are probabilities, including models fitted to
+success/failure counts. Trial counts enter the fitted likelihood and
+covariance; they do not automatically convert predictions to counts for new
+trials. Poisson response predictions are conditional expected counts. Neither
+response SEs nor these curve intervals add ecological-scale uncertainty,
+observation noise or full-posterior uncertainty. Native BAM rejects general
+families; use an appropriate native GAM for multi-predictor families instead.

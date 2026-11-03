@@ -50,6 +50,15 @@
     frame <- model$frame
     tt <- attr(frame, "terms")
     if (!.msr_needs_fixed_metadata(tt)) return(model)
+  } else if (inherits(model, "coxph")) {
+    tt <- stats::terms(model)
+    if (!.msr_needs_fixed_metadata(tt)) return(model)
+    # Only retained time-fixed, unpenalized Cox prediction terms are qualified.
+    # This repairs metadata without changing a native fit or its uncertainty.
+    if (inherits(model, c("coxphms", "coxph.penal")) ||
+        length(attr(tt, "specials")$tt))
+      stop("Fixed prediction recovery requires a checked time-fixed, unpenalized native Cox structure.", call. = FALSE)
+    frame <- model$model
   } else if (inherits(model, c("lm", "glm"))) {
     frame <- model$model
     tt <- model$terms
@@ -64,9 +73,18 @@
   repair <- function(terms) .msr_fixed_prediction_terms(terms,
     .msr_response_frame_subset(original, frame, terms))
   if (inherits(model, "gam") && !inherits(parametric, "terms")) {
-    updated <- lapply(parametric, repair)
-    if (!identical(updated, parametric))
-      stop("Qualified fixed transformations in multi-component GAMs require separately checked component metadata.", call. = FALSE)
+    # mgcv stores combined term labels on the list itself. Preserve them,
+    # component order and coefficient spans while repairing each terms object.
+    labels <- attr(parametric, "term.labels")
+    if (length(parametric) != length(model$nsdf) ||
+        length(labels) != sum(vapply(parametric, function(t)
+          length(attr(t, "term.labels")), integer(1))))
+      stop("Cannot align native GAM component terms and coefficient spans.", call. = FALSE)
+    updated <- parametric
+    updated[] <- lapply(parametric, repair)
+    model$pterms <- updated
+    model$terms <- repair(tt)
+    attr(model$model, "terms") <- repair(original)
     return(model)
   }
   fixed <- repair(tt)

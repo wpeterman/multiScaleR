@@ -61,6 +61,12 @@
 #' the response scale. Response variance includes observation noise and is
 #' distinct from uncertainty in the mean. These components are recorded in
 #' \code{native_variances}; their numerical attributes remain unchanged.
+#' Native ziplss response means combine both linear predictors. Their standard
+#' errors propagate the full native coefficient covariance through that mean,
+#' retaining signed cross-covariance. The contract records
+#' \code{response_standard_error_method} and distinguishes this calculation
+#' from the provider's response-SE formula. Kernel uncertainty and count noise
+#' remain omitted; native smoothing-covariance requests keep their meaning.
 #' Native interval attributes are listed separately in \code{native_intervals}
 #' and retain the provider's selected target.
 #' Native lm interval columns record \code{native_mean_confidence} or
@@ -267,10 +273,24 @@ NULL
     fixed_inputs = TRUE, component = type)
   if (selected) out$effects$selection <- paste(deparse(native_args[["re.form"]]), collapse = " ")
   if (inherits(model, "gam") || identical(kind, "gam")) {
+    if (is.list(model$pterms) && !inherits(model$pterms, "terms")) {
+      # Multiple response columns need their family's native interpretation.
+      if (type == "response") out$quantity <- "native_component"
+      out$native_components <- list(provider = "mgcv", family = model$family$family,
+        linear_predictors = length(model$pterms), interpretation = "native_family_specific")
+    }
     out$uncertainty$smoothing_parameters <- if (isTRUE(native_args[["unconditional"]]))
       "native_unconditional_requested" else "native_default_conditional"
+    if (type == "response" && .msr_gam_ziplss_model(model)) {
+      out$native_components$response_outputs <- 1L
+      out$native_components$response_quantities <- "overall_expected_count"
+      out$uncertainty$response_standard_error_method <- "delta_full_native_coefficient_covariance"
+      out$uncertainty$native_provider_response_SE_used <- FALSE
+    }
     out$term_selection <- list(terms = native_args[["terms"]], exclude = native_args[["exclude"]],
       iterms.type = native_args[["iterms.type"]])
+    if (inherits(model, "bam") && "discrete" %in% names(native_args))
+      out$term_selection$discrete_requested <- native_args[["discrete"]]
   }
   provided <- if (is.null(output)) se.fit else if (kind == "unmarked")
     is.data.frame(output) && "SE" %in% names(output) else

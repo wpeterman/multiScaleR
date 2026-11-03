@@ -16,6 +16,7 @@
   }
   if (inherits(model, "gam")) allowed <- c(allowed,
     "exclude", "terms", "unconditional", "iterms.type", "block.size")
+  if (inherits(model, "bam")) allowed <- c(allowed, "discrete")
   if (!is.list(native_args) || (length(native_args) &&
       (is.null(names(native_args)) || anyNA(names(native_args)) ||
        any(!names(native_args) %in% allowed) || anyDuplicated(names(native_args)))))

@@ -23,13 +23,33 @@
 #'   models.
 #' @param link Logical. If \code{TRUE}, predictions are passed through the
 #'   model's inverse link function before plotting (i.e., plotted on the
-#'   response scale). For \code{glm} and spaMM \code{HLfit} objects this is applied automatically.
+#'   response scale). For \code{glm} and spaMM \code{HLfit} objects this is applied
+#'   automatically. Single-predictor GAM and BAM objects inherit that GLM behavior:
+#'   both settings retain response-scale curves. Use \code{predict(..., type = "link")}
+#'   for their native link-scale predictions.
 #'   Set to \code{TRUE} manually if predicted values appear to be on the link
-#'   scale. Default: \code{FALSE}.
+#'   scale. Default: \code{FALSE}. For a multi-component GAM, \code{FALSE}
+#'   selects native link-scale output and \code{TRUE} selects native
+#'   response-scale output; \code{component} chooses the column.
 #' @param draws For Bayesian fits, a positive number of stored draws to select
 #'   evenly across the retained sample, or explicit draw indices. The default
 #'   \code{NULL} uses at most 1000 evenly spaced draws. Ignored for frequentist
 #'   fits. Bayesian curves use the response scale regardless of \code{link}.
+#'
+#' @param reference_data Optional data frame of raw predictor values for the
+#'   retained fitted rows. Default: \code{NULL}, which keeps existing data
+#'   recovery. Supply unique explicit row names matching the native training
+#'   frame. Rows may be reordered. The supplied values must reproduce the
+#'   fitted features, native design, factor coding and offsets. This option is
+#'   available for retained native LM/GLM, GAM and Cox fits; other structures
+#'   retain their existing data requirements. See Details.
+#' @param component Optional positive integer selecting a native output column
+#'   in a GAM with multiple linear predictors. Required for those fits and
+#'   otherwise must be \code{NULL}. With \code{link = FALSE}, select a linear
+#'   predictor. With \code{link = TRUE}, select a native response column, whose
+#'   interpretation and number depend on the fitted family.
+#'   For ziplss response curves, select \code{component = 1}: the overall
+#'   expected count combines both linear predictors.
 #'
 #' @return A named list of \code{ggplot2} objects, one per covariate. Plots are
 #'   printed as a side effect and the list is returned invisibly. Each plot
@@ -56,6 +76,13 @@
 #' at their sample mean for prediction but do not receive marginal effect panels.
 #' Quoted predictor names retain their original spelling in prediction grids.
 #' Factor contrasts and fixed transformations are evaluated by the fitted model.
+#' For ziplss, response-scale Wald limits propagate the full native coefficient
+#' covariance through both predictors. These are mean confidence limits,
+#' without count noise or uncertainty in the selected ecological scales.
+#' They are not intervals for a future count and may extend below zero.
+#'
+#' Native GAM curves retain the saved factor coding for interaction-only
+#' factors, including when session contrast options change after fitting.
 #'
 #' For \code{glm} and most GLM-family models, predictions are transformed via
 #' the inverse link function automatically (e.g., \code{exp()} for Poisson
@@ -113,6 +140,33 @@
 #' \code{plot_marginal_effects()} uses the nested analysis model for predictor
 #' discovery, data recovery, and prediction when possible.
 #'
+#' Supplied \code{reference_data} is matched to retained fitted row IDs and
+#' checked against the evaluated training features, full native coefficient
+#' design or smooth basis, contrasts and formula offsets. Missing inputs,
+#' nonfinite values, unknown levels and mismatches raise an error. Offsets
+#' supplied outside the formula and unsupported nested learned transformations
+#' are rejected. This verifies observable feature equivalence. It cannot prove
+#' unique original raw values from a square, polynomial or other many-to-one
+#' transformation, and it does not refit the model. Cox strata and cluster-only
+#' inputs use their first observed reference value in other panels, preserving
+#' an actual fitted group. The returned list records
+#' this distinction in its \code{reference_data_contract} attribute.
+#' For analytic expression designs, selected spatial predictors are rebuilt
+#' from the verified fitted preparation. Native refit references must carry
+#' the fitted, standardized spatial columns. Unmarked and Bayesian curves
+#' retain their existing structured data and posterior-reference contracts.
+#'
+#' For a GAM with multiple linear predictors, select \code{component} explicitly.
+#' Link curves use the selected predictor's active variables. Response curves
+#' consider all component inputs because a response column may depend on
+#' several predictors. Native response meanings are preserved. For example,
+#' \code{mgcv::gaulss()} returns mean and reciprocal standard deviation, while
+#' multinomial response columns are category probabilities. Limits use native
+#' standard errors on the selected output scale and condition on fitted
+#' smoothing parameters and ecological scales. They do not add observation
+#' noise or represent the package's full Bayesian scale uncertainty. The
+#' returned \code{prediction_contract} identifies the native output column.
+#'
 #' Mixed-model curves set response random effects to zero. glmmTMB curves use
 #' native response predictions, including zero inflation or truncated-family
 #' means, with native response-scale Wald limits when available. This is a
@@ -167,10 +221,14 @@ plot_marginal_effects <- function(x,
                                   ylab = "Estimated response",
                                   length.out = 100,
                                   type = "state",
-                                  link = FALSE, draws = NULL) {
+                                  link = FALSE, draws = NULL,
+                                  reference_data = NULL, component = NULL) {
   validate_scalar_logical(link, "link")
-  if (inherits(x, "multiScaleR_bayes"))
+  if (inherits(x, "multiScaleR_bayes")) {
+    if (!is.null(reference_data) || !is.null(component))
+      stop("reference_data and component do not redefine Bayesian effect curves.", call. = FALSE)
     return(.msr_bayes_marginal_effects(x, ylab, length.out, draws))
+  }
   if (!is.null(draws)) stop("draws applies only to Bayesian effect curves.", call. = FALSE)
   if(!inherits(x, "multiScaleR")){
     stop("`x` must be a fitted `multiScaleR` object.")
@@ -189,14 +247,29 @@ plot_marginal_effects <- function(x,
   mod <- x$opt_mod
   analysis_mod <- .msr_native_fixed_metadata(.analysis_model(mod))
   scl <- x$scl_params
+  native_gam_components <- inherits(analysis_mod, "gam") &&
+    is.list(analysis_mod$pterms) && !inherits(analysis_mod$pterms, "terms")
+  if (native_gam_components) {
+    if (is.null(component))
+      stop("Multi-component GAM effect curves require an explicit native output selection with component.", call. = FALSE)
+    validate_scalar_numeric(component, "component", integerish = TRUE, positive = TRUE)
+    if (!link && component > length(analysis_mod$pterms))
+      stop("component must select an available native GAM linear predictor.", call. = FALSE)
+  } else if (!is.null(component))
+    stop("component applies only to multi-component GAM effect curves.", call. = FALSE)
+  reference <- if (is.null(reference_data)) NULL else
+    .msr_curve_reference_context(x, analysis_mod, reference_data)
+  if (!is.null(reference)) analysis_mod <- reference$model
   namespace(analysis_mod)
   native_mixed_response <- inherits(analysis_mod, c("glmmTMB", "merMod"))
   if (missing(ylab) && inherits(analysis_mod, "coxph"))
     ylab <- if (link) "Relative risk" else "Log relative risk"
 
-  if(inherits(analysis_mod, "glm")){
+  if(inherits(analysis_mod, "glm") && !native_gam_components){
     link <- TRUE
   }
+  if (missing(ylab) && native_gam_components)
+    ylab <- paste("Native GAM", if (link) "response column" else "linear predictor", component)
 
   # These are populated for non-unmarked models; used when building plot subtitles
   poly_terms  <- character(0)
@@ -294,9 +367,30 @@ plot_marginal_effects <- function(x,
     })
 
   } else {
+    # A conditional Cox score uses exp(lp), even when generic metadata treats
+    # the clogit subclass as binomial. It is not an occurrence probability.
+    curve_inverse <- if (inherits(analysis_mod, "coxph")) exp else
+      if (!native_mixed_response && !native_gam_components &&
+          !inherits(analysis_mod, "zeroinfl")) link_inverse(analysis_mod) else NULL
+    curve_predictor <- if (inherits(analysis_mod, "gam")) .msr_predict_gam else predict
+    cox_groups <- if (inherits(analysis_mod, "coxph"))
+      .msr_cox_curve_conditioning(stats::terms(analysis_mod)) else
+        list(inputs = character(), fixed_panel_inputs = character())
     if (identical(x$backend, "conditional_logit")) {
       vars <- .msr_active_formula_variables(x$profile_fit$contract$terms)
       c_vars <- vars
+    } else if (native_gam_components) {
+      forms <- stats::formula(analysis_mod)
+      vars <- unique(unlist(lapply(forms, .msr_marginal_variables, offsets = TRUE),
+        use.names = FALSE))
+      panels <- lapply(forms, .msr_marginal_variables, offsets = FALSE)
+      c_vars <- if (link) unique(unlist(panels, use.names = FALSE)) else panels[[component]]
+      context <- unique(unlist(lapply(analysis_mod$pterms, function(tt) {
+        expressions <- as.list(attr(tt, "variables"))[-1L]
+        if (attr(tt, "response") > 0L) expressions <- expressions[-attr(tt, "response")]
+        unlist(lapply(expressions, all.vars), use.names = FALSE)
+      }), use.names = FALSE))
+      vars <- union(vars, context)
     } else if (inherits(analysis_mod, c("glm", "lm"))) {
       # Native terms retain active variables and quoted names without a
       # provider's optional name-sanitizing interpretation.
@@ -306,20 +400,24 @@ plot_marginal_effects <- function(x,
       c_vars <- find_predictors(analysis_mod)[[1]]
       vars <- unlist(find_predictors(analysis_mod))
     }
+    vars <- union(vars, cox_groups$inputs)
+    c_vars <- setdiff(c_vars, setdiff(cox_groups$inputs, cox_groups$fixed_panel_inputs))
     # Offset-only variables describe effort, not covariate effects. Keep them
     # in vars so prediction holds them at their mean, but omit their panels.
     # A variable that also enters as a model term remains a plotted covariate.
     offset_vars <- tryCatch(insight::find_offset(analysis_mod), error = function(e) NULL)
-    if (length(offset_vars) > 0) {
+    if (!native_gam_components && length(offset_vars) > 0) {
       term_vars <- tryCatch({
         labels <- attr(stats::terms(formula(analysis_mod)), "term.labels")
         if (length(labels)) all.vars(stats::reformulate(labels)) else character(0)
       }, error = function(e) character(0))
       c_vars <- setdiff(c_vars, setdiff(offset_vars, term_vars))
     }
-    dat_all <- if (identical(x$backend, "joint_mixed") &&
-      is.data.frame(x$mixed_fit$prediction_data)) x$mixed_fit$prediction_data else
-        .model_data(analysis_mod)
+    if (!is.null(reference)) vars <- union(vars, reference$required_inputs)
+    dat_all <- if (!is.null(reference)) reference$data else
+      if (identical(x$backend, "joint_mixed") &&
+        is.data.frame(x$mixed_fit$prediction_data)) x$mixed_fit$prediction_data else
+          .model_data(analysis_mod)
     if(is.null(dat_all)){
       dat_all <- extract_model_data(analysis_mod)
     }
@@ -328,7 +426,7 @@ plot_marginal_effects <- function(x,
     }
 
     design <- x$profile_fit$contract$objective$response_design
-    if (!is.null(design$expression_programs)) {
+    if (is.null(reference) && !is.null(design$expression_programs)) {
       # Evaluated powers cannot identify the underlying signed kernel values.
       # Rebuild those values from the selected, verified spatial preparation.
       e <- x$profile_fit$contract$objective$engine
@@ -344,17 +442,21 @@ plot_marginal_effects <- function(x,
         paste(missing, collapse = ", "), ". Refit with recoverable raw training data.", call. = FALSE)
     }
 
+    absent <- setdiff(vars, names(dat_all))
+    if (length(absent)) stop("Raw inputs were not retained for effect curves: ",
+      paste(absent, collapse = ", "), ". Supply verified reference_data.", call. = FALSE)
+
     # Parse formula term labels to detect I() polynomial and interaction terms.
     # predict() handles I(x^2) automatically when newdata contains the base column,
     # so no special prediction logic is needed. Detection is used only for plot
     # annotations and the interaction warning below.
-    fterms <- tryCatch(
-      attr(stats::terms(formula(analysis_mod)), "term.labels"),
-      error = function(e) character(0)
-    )
+    curve_terms <- if (native_gam_components) lapply(forms, stats::terms) else
+      list(tryCatch(stats::terms(formula(analysis_mod)), error = function(e) NULL))
+    fterms <- unlist(lapply(curve_terms, attr, "term.labels"), use.names = FALSE)
+    term_order <- unlist(lapply(curve_terms, attr, "order"), use.names = FALSE)
+    unique_terms <- !duplicated(fterms)
+    fterms <- fterms[unique_terms]; term_order <- term_order[unique_terms]
     poly_terms  <- fterms[grepl("^I\\(", fterms)]
-    term_order <- tryCatch(attr(stats::terms(formula(analysis_mod)), "order"),
-      error = function(e) integer())
     inter_terms <- fterms[term_order > 1L]
     poly_variables <- lapply(poly_terms, function(term) all.vars(str2lang(term)))
     inter_variables <- lapply(inter_terms, function(term) all.vars(str2lang(term)))
@@ -392,7 +494,9 @@ plot_marginal_effects <- function(x,
       }
 
       values <- dat_all[[var]]
-      if (is.numeric(values)) {
+      if (var %in% setdiff(cox_groups$inputs, c_vars)) {
+        pred_defaults[[var]] <- values[1L]
+      } else if (is.numeric(values)) {
         pred_defaults[[var]] <- mean(values, na.rm = TRUE)
       } else {
         keep <- which(!is.na(values))[1]
@@ -427,7 +531,9 @@ plot_marginal_effects <- function(x,
       )
       newdata[[v]] <- x_seq
 
-      if(inherits(analysis_mod, "HLfit")){
+      if (native_gam_components) {
+        preds <- .msr_gam_curve_component(analysis_mod, newdata, component, link)
+      } else if(inherits(analysis_mod, "HLfit")){
         preds_ <- tryCatch(
           predict(analysis_mod, newdata = newdata, type = "link",
             variances = list(fixefVar = TRUE), re.form = NA),
@@ -465,7 +571,7 @@ plot_marginal_effects <- function(x,
                          reference = "zero", se.fit = TRUE)
       } else {
         preds <- tryCatch(
-          predict(analysis_mod, newdata = newdata, se.fit = TRUE),
+          curve_predictor(analysis_mod, newdata = newdata, se.fit = TRUE),
           error = function(e) {
             stop(
               sprintf("Failed to compute marginal effects for covariate '%s': %s", v, e$message),
@@ -475,20 +581,34 @@ plot_marginal_effects <- function(x,
         )
       }
 
-      if(inherits(analysis_mod, "zeroinfl")) {
+      if (native_gam_components) {
+        if (is.list(preds)) {
+          fit_ <- preds$fit
+          se <- preds$se.fit
+          invalid <- !is.finite(se) | se < 0
+          if (any(invalid)) {
+            warning("Native GAM confidence limits unavailable for nonfinite or negative standard errors.", call. = FALSE)
+            se[invalid] <- NA_real_
+          }
+          lwr <- fit_ + qnorm(.025) * se
+          upr <- fit_ + qnorm(.975) * se
+        } else {
+          fit_ <- preds; lwr <- upr <- NA_real_
+        }
+      } else if(inherits(analysis_mod, "zeroinfl")) {
         fit_ <- preds$Predicted
         lwr  <- preds$CI_low
         upr  <- preds$CI_high
         if(is.null(lwr) && is.null(upr)) lwr <- upr <- NA
 
-      } else if(!native_mixed_response && !is.null(link_inverse(analysis_mod)) && (link || inherits(analysis_mod, "HLfit"))){
+      } else if(!native_mixed_response && !is.null(curve_inverse) && (link || inherits(analysis_mod, "HLfit"))){
         if(!inherits(preds, 'list') || (is.list(preds) && length(preds) == 1)){
-          fit_ <- link_inverse(analysis_mod)(as.data.frame(preds)[, 1])
+          fit_ <- curve_inverse(as.data.frame(preds)[, 1])
           lwr  <- upr <- NA
         } else {
-          fit_ <- link_inverse(analysis_mod)(preds[[1]])
+          fit_ <- curve_inverse(preds[[1]])
           bounds <- .msr_native_link_ci(analysis_mod, preds[[1]], preds[[2]],
-            link_inverse(analysis_mod))
+            curve_inverse)
           lwr <- bounds$lower
           upr <- bounds$upper
         }
@@ -554,6 +674,13 @@ plot_marginal_effects <- function(x,
     else if (!all(is.na(df$lwr)))
       p <- p + labs(caption = "Confidence limits condition on the selected spatial scales.")
 
+    if (native_gam_components)
+      p <- p + labs(caption = paste("Native GAM", if (link) "response column" else "linear predictor",
+        component, if (link && .msr_gam_ziplss_model(analysis_mod))
+          ". Limits propagate full coefficient covariance through both predictors;" else
+          ". Limits use native standard errors on this output scale;",
+        "kernel scales and smoothing parameters are fixed at their fitted values."))
+
     discrete <- !is.numeric(df$x)
     if (discrete) {
       p <- p + ggplot2::geom_point()
@@ -578,6 +705,13 @@ plot_marginal_effects <- function(x,
   names(gg_list) <- c_vars
 
   lapply(gg_list, print)
+  if (!is.null(reference)) attr(gg_list, "reference_data_contract") <- reference$contract
+  if (native_gam_components) {
+    contract <- .msr_native_prediction_contract(x, "gam", if (link) "response" else "link",
+      list(), se.fit = TRUE)
+    contract$native_output <- list(type = if (link) "response" else "link", column = component)
+    attr(gg_list, "prediction_contract") <- contract
+  }
   invisible(gg_list)
 }
 
@@ -816,7 +950,8 @@ utils::globalVariables(c("fit", "lwr", "upr"))
   eta_upper <- fit + qnorm(.975) * se
   valid <- is.finite(fit) & is.finite(se) & se >= 0 &
     is.finite(eta_lower) & is.finite(eta_upper)
-  family <- tryCatch(stats::family(model), error = function(e) NULL)
+  family <- if (inherits(model, "coxph")) NULL else
+    tryCatch(stats::family(model), error = function(e) NULL)
   if (is.function(family$valideta)) for (i in which(valid))
     valid[i] <- isTRUE(family$valideta(c(eta_lower[i], eta_upper[i])))
   if (isTRUE(family$link %in% c("inverse", "1/mu^2")))

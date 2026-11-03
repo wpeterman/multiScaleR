@@ -12,6 +12,16 @@
     if (!is.null(method)) break
   }
   if (is.null(method)) return(controls)
+  if (inherits(model, "bam") && requireNamespace("mgcv", quietly = TRUE) &&
+      identical(method, get("predict.bam", envir = asNamespace("mgcv")))) {
+    # Native BAM forwards these controls through dots to GAM. Resolve their
+    # abbreviations for policy/provenance too. This signature is for matching
+    # only; the actual provider function is never changed or executed here.
+    delegated <- formals(get("predict.gam", envir = asNamespace("mgcv")))
+    signature <- formals(method)
+    added <- delegated[setdiff(names(delegated), names(signature))]
+    formals(method) <- c(signature[names(signature) != "..."], added, signature["..."])
+  }
   fixed <- c("object", "type", "se.fit", if (newdata) "newdata")
   tokens <- paste0(".msr_native_control_", seq_along(controls))
   values <- stats::setNames(lapply(tokens, as.name), names(controls))
@@ -127,7 +137,7 @@
     par <- stored[idx] * (train$unit_conv / inputs$unit_conv)
     if (inputs$kernel == "expow") {
       shape <- stored[p + idx]
-      active <- !optimized %in% .msr_hard_radius_covariates(specs)
+      active <- !optimized %in% .msr_hard_radius_covariates(specs, inputs$kernel, optimized)
       if (!isTRUE(all.equal(unname(shape[active]), unname(object$shape_est[optimized[active], "Mean"]),
                             tolerance = 0, check.attributes = FALSE)))
         stop("Stored fitted parameters disagree with reported kernel shapes.", call. = FALSE)
@@ -243,6 +253,9 @@
       if (identical(type, "det") && "formula" %in% methods::slotNames(model) &&
           length(model@formula) == 3L) component <- model@formula[[2L]]
       required <- .msr_marginal_variables(component, offsets = TRUE)
+    } else if (inherits(model, "gam") && is.list(model$pterms) &&
+        !inherits(model$pterms, "terms")) {
+      required <- .model_predictors(model)
     } else {
       formula <- stats::formula(model)
       required <- union(.model_predictors(model),
@@ -267,7 +280,8 @@
   }
   args <- c(list(object = model, type = type), dots)
   if (!is.null(newdata)) args$newdata <- newdata
-  predictor <- if (unmarked) unmarked::predict else stats::predict
+  predictor <- if (unmarked) unmarked::predict else if (inherits(model, "gam"))
+    .msr_predict_gam else stats::predict
   if (!unmarked) args$se.fit <- se.fit
   value <- do.call(predictor, args)
   if (unmarked && !se.fit) value <- value$Predicted

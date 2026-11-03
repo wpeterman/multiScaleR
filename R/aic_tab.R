@@ -204,7 +204,8 @@
     extra_k <- extra_k + nrow(model$scale_est)
   }
   if (!is.null(model$shape_est)) {
-    hard <- .msr_hard_radius_covariates(model$kernel_inputs$scale_vars)
+    hard <- .msr_hard_radius_covariates(model$kernel_inputs$scale_vars,
+      model$kernel_inputs$kernel, rownames(model$shape_est))
     extra_k <- extra_k + sum(!rownames(model$shape_est) %in% hard)
   }
 

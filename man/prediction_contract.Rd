@@ -64,6 +64,12 @@ are on the linear-predictor scale; \code{residVar} and \code{respVar} are on
 the response scale. Response variance includes observation noise and is
 distinct from uncertainty in the mean. These components are recorded in
 \code{native_variances}; their numerical attributes remain unchanged.
+Native ziplss response means combine both linear predictors. Their standard
+errors propagate the full native coefficient covariance through that mean,
+retaining signed cross-covariance. The contract records
+\code{response_standard_error_method} and distinguishes this calculation
+from the provider's response-SE formula. Kernel uncertainty and count noise
+remain omitted; native smoothing-covariance requests keep their meaning.
 Native interval attributes are listed separately in \code{native_intervals}
 and retain the provider's selected target.
 Native lm interval columns record \code{native_mean_confidence} or

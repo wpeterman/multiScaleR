@@ -393,7 +393,7 @@ However, the log-likelihood surface for σ is often asymmetric, especially when 
 
 To request profile-likelihood CIs, pass `profile = TRUE` to `summary()`:
 
-For landscape metrics and unweighted surface metrics whose radius changes in discrete cell steps, the Hessian standard error is not a useful measure of uncertainty. Their default summary displays `NA` for the standard error and Wald interval. Inspect the likelihood profile and report the parameter as a radius in map units. An interval drawn from a profile cutoff does not by itself establish coverage for a stepped likelihood. Candidate scales that make a covariate undefined at modeled observations are rejected so likelihoods retain the same sample.
+For landscape metrics, unweighted surface metrics, and all estimated radii under `kernel = "fixed"`, whose support changes in discrete cell steps, the Hessian standard error is not a useful measure of uncertainty. Their default summary displays `NA` for the standard error and Wald interval. Inspect the likelihood profile and report the parameter as a radius in map units. An interval drawn from a profile cutoff does not by itself establish coverage for a stepped likelihood. Candidate scales that make a covariate undefined at modeled observations are rejected so likelihoods retain the same sample.
 
 ```{r eval=FALSE}
 summary(opt1, profile = TRUE)
@@ -1089,7 +1089,7 @@ kernel_dist(opt2, dimension = "1d")
 
 ```
 
-By default, `kernel_dist()` returns the radius of the circle containing the requested share of ideal planar kernel weight (`dimension = "2d"`). Set `dimension = "1d"` for the original distance along a line. For distance-weighted kernels, the planar radius is larger; hard-radius covariates report the same full radius for both. With manually supplied `kernel = "fixed"`, the function instead describes a uniform kernel: its cumulative-weight distance is `sigma * sqrt(prob)` in 2D or `sigma * prob` in 1D, not the full buffer radius of a fitted hard-radius metric.
+By default, `kernel_dist()` returns the radius of the circle containing the requested share of ideal planar kernel weight (`dimension = "2d"`). Set `dimension = "1d"` for the original distance along a line. For distance-weighted kernels, the planar radius is larger; hard-radius covariates report the same full radius for both. With manually supplied `kernel = "fixed"`, the function instead describes a uniform kernel: its cumulative-weight distance is `sigma * sqrt(prob)` in 2D or `sigma * prob` in 1D, not the full buffer radius reported for a fitted hard-radius metric or fitted fixed kernel.
 
 It's also possible to calculate the distance encompassed by specified kernels without a fitted model.
 

@@ -183,7 +183,8 @@ A list of class \code{"multiScaleR"} containing:
   \item{\code{scale_est}}{Data frame with one row per optimized covariate and
     two columns: \code{Mean} (optimized sigma on the original projection
     scale) and \code{SE} (Hessian-based standard error). \code{SE} is
-    \code{NA} for hard-radius landscape and unweighted surface metrics,
+    \code{NA} for hard-radius landscape and unweighted surface metrics
+    and for every estimated radius under \code{kernel = "fixed"},
     whose likelihood changes in steps. Row names are covariate names.}
   \item{\code{shape_est}}{Data frame of the same structure as
     \code{scale_est} for the shape parameter, or \code{NULL} when
@@ -460,8 +461,10 @@ Candidate scales that make a covariate undefined at a modeled observation
 are rejected, so the optimizer compares likelihoods for the same sample.
 The final \code{sample_size} diagnostic reports prepared and fitted row
 counts; for repeated-site \code{unmarked} data it also reports the number
-of distinct prepared spatial sites. For hard-radius landscape and
-unweighted surface metrics, Hessian uncertainty is not meaningful; use
+of distinct prepared spatial sites. Hard-radius landscape and unweighted
+surface metrics, and all estimated fixed-kernel radii, omit Hessian SEs
+and Wald limits. The raw optimizer Hessian remains available for
+compatibility and diagnostics; it is not inverted for those radii. Use
 \code{summary(x, profile = TRUE)} for profile-likelihood intervals.
 
 \strong{Binned acceleration}

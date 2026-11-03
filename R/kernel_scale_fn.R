@@ -15,6 +15,10 @@
 
 
 .model_predictors <- function(model) {
+  # The combined native GAM terms include inputs from every linear predictor.
+  if (inherits(model, "gam") && is.list(model$pterms) &&
+      !inherits(model$pterms, "terms"))
+    return(.msr_active_formula_variables(stats::terms(model)))
   vars <- tryCatch(
     unname(unlist(find_predictors(model))),
     error = function(e) character()

@@ -87,7 +87,7 @@ test_that("fitted plot markers and intervals use the chosen dimension", {
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
   fit <- make_core_fixture()$opt
-  for (kernel in c("gaussian", "exp", "expow", "fixed")) {
+  for (kernel in c("gaussian", "exp", "expow")) {
     fit$kernel_inputs$kernel <- kernel
     fit$shape_est <- if (kernel == "expow") data.frame(Mean = 1.5, SE = 0.1,
                                                       row.names = "cont1") else NULL

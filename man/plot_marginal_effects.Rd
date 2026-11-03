@@ -10,7 +10,9 @@ plot_marginal_effects(
   length.out = 100,
   type = "state",
   link = FALSE,
-  draws = NULL
+  draws = NULL,
+  reference_data = NULL,
+  component = NULL
 )
 }
 \arguments{
@@ -33,14 +35,35 @@ models.}
 
 \item{link}{Logical. If \code{TRUE}, predictions are passed through the
 model's inverse link function before plotting (i.e., plotted on the
-response scale). For \code{glm} and spaMM \code{HLfit} objects this is applied automatically.
+response scale). For \code{glm} and spaMM \code{HLfit} objects this is applied
+automatically. Single-predictor GAM and BAM objects inherit that GLM behavior:
+both settings retain response-scale curves. Use \code{predict(..., type = "link")}
+for their native link-scale predictions.
 Set to \code{TRUE} manually if predicted values appear to be on the link
-scale. Default: \code{FALSE}.}
+scale. Default: \code{FALSE}. For a multi-component GAM, \code{FALSE}
+selects native link-scale output and \code{TRUE} selects native
+response-scale output; \code{component} chooses the column.}
 
 \item{draws}{For Bayesian fits, a positive number of stored draws to select
 evenly across the retained sample, or explicit draw indices. The default
 \code{NULL} uses at most 1000 evenly spaced draws. Ignored for frequentist
 fits. Bayesian curves use the response scale regardless of \code{link}.}
+
+\item{reference_data}{Optional data frame of raw predictor values for the
+retained fitted rows. Default: \code{NULL}, which keeps existing data
+recovery. Supply unique explicit row names matching the native training
+frame. Rows may be reordered. The supplied values must reproduce the
+fitted features, native design, factor coding and offsets. This option is
+available for retained native LM/GLM, GAM and Cox fits; other structures
+retain their existing data requirements. See Details.}
+
+\item{component}{Optional positive integer selecting a native output column
+in a GAM with multiple linear predictors. Required for those fits and
+otherwise must be \code{NULL}. With \code{link = FALSE}, select a linear
+predictor. With \code{link = TRUE}, select a native response column, whose
+interpretation and number depend on the fitted family.
+For ziplss response curves, select \code{component = 1}: the overall
+expected count combines both linear predictors.}
 }
 \value{
 A named list of \code{ggplot2} objects, one per covariate. Plots are
@@ -77,6 +100,13 @@ their average landscape value. Variables used only in model offsets are held
 at their sample mean for prediction but do not receive marginal effect panels.
 Quoted predictor names retain their original spelling in prediction grids.
 Factor contrasts and fixed transformations are evaluated by the fitted model.
+For ziplss, response-scale Wald limits propagate the full native coefficient
+covariance through both predictors. These are mean confidence limits,
+without count noise or uncertainty in the selected ecological scales.
+They are not intervals for a future count and may extend below zero.
+
+Native GAM curves retain the saved factor coding for interaction-only
+factors, including when session contrast options change after fitting.
 
 For \code{glm} and most GLM-family models, predictions are transformed via
 the inverse link function automatically (e.g., \code{exp()} for Poisson
@@ -132,6 +162,33 @@ Its response variance is not used as a confidence interval for the mean.
 When \code{x$opt_mod} is a wrapper object around another fitted model,
 \code{plot_marginal_effects()} uses the nested analysis model for predictor
 discovery, data recovery, and prediction when possible.
+
+Supplied \code{reference_data} is matched to retained fitted row IDs and
+checked against the evaluated training features, full native coefficient
+design or smooth basis, contrasts and formula offsets. Missing inputs,
+nonfinite values, unknown levels and mismatches raise an error. Offsets
+supplied outside the formula and unsupported nested learned transformations
+are rejected. This verifies observable feature equivalence. It cannot prove
+unique original raw values from a square, polynomial or other many-to-one
+transformation, and it does not refit the model. Cox strata and cluster-only
+inputs use their first observed reference value in other panels, preserving
+an actual fitted group. The returned list records
+this distinction in its \code{reference_data_contract} attribute.
+For analytic expression designs, selected spatial predictors are rebuilt
+from the verified fitted preparation. Native refit references must carry
+the fitted, standardized spatial columns. Unmarked and Bayesian curves
+retain their existing structured data and posterior-reference contracts.
+
+For a GAM with multiple linear predictors, select \code{component} explicitly.
+Link curves use the selected predictor's active variables. Response curves
+consider all component inputs because a response column may depend on
+several predictors. Native response meanings are preserved. For example,
+\code{mgcv::gaulss()} returns mean and reciprocal standard deviation, while
+multinomial response columns are category probabilities. Limits use native
+standard errors on the selected output scale and condition on fitted
+smoothing parameters and ecological scales. They do not add observation
+noise or represent the package's full Bayesian scale uncertainty. The
+returned \code{prediction_contract} identifies the native output column.
 
 Mixed-model curves set response random effects to zero. glmmTMB curves use
 native response predictions, including zero inflation or truncated-family

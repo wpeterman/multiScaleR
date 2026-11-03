@@ -76,7 +76,11 @@ neighborhood and the optimized scale parameter is that neighborhood radius.
 When \code{TRUE}, each cell is weighted by the model's distance kernel
 (the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
 parameter is the kernel scale (sigma), exactly as for a kernel-weighted
-mean. Kernel weights vary continuously with sigma. SQ is smooth away from
+mean. Gaussian, exponential, and exponential-power weights vary
+continuously with sigma. With \code{kernel = "fixed"}, the fitted
+parameter is a hard cutoff radius and weights change as cells enter or
+leave the buffer. Its radius SE and Wald limits are missing; weighted
+metric definitions and training normalization are retained. SQ is smooth away from
 zero variance; absolute deviations and standardized higher moments have
 additional nonsmooth or undefined cases. Weighting is available only for the
 distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),

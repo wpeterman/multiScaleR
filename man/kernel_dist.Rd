@@ -49,7 +49,8 @@ covariate and three columns, all in map units: \code{Mean} (distance at the
 estimated sigma), \code{2.5\%} (distance at the lower 95\% limit of sigma),
 and \code{97.5\%} (distance at the upper 95\% limit of sigma). Values are
 rounded to two decimal places. For hard-radius covariates (landscape metrics
-and unweighted surface metrics) the row reports the radius itself, whichever
+and unweighted surface metrics, plus every estimated fixed-kernel radius)
+the row reports the radius itself, whichever
 \code{dimension} is requested.
 
 When kernel parameters are supplied directly via \code{...}: a single numeric
@@ -75,7 +76,12 @@ For \code{conditional_logit}, point distances remain available but scale
 uncertainty has not been calibrated, so distance confidence limits are missing.
 Native-refit point distances remain available when a scale SE is non-finite;
 their Wald limits are then missing. A hard-radius metric reports its radius
-directly and has no kernel shape, including in an expow mixture.
+directly and has no kernel shape, including in an expow mixture. A fitted
+\code{kernel = "fixed"} likewise reports its cutoff radius, with no
+Hessian-based interval. Stored profile limits are retained. Native
+coefficient SEs remain conditional on the selected radius. Manually
+supplied uniform-kernel parameters still return the requested weight
+quantile under the chosen dimensional definition.
 
 \strong{Default change.} Version 0.7.4 and later use
 \code{dimension = "2d"} for distances, summaries, and kernel plots. Earlier

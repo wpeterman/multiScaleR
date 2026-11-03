@@ -1,3 +1,35 @@
+multiScaleR 0.7.12
+* Treat estimated fixed-kernel scales as hard radii: omit Hessian SEs and
+  Wald bands, retain profile limits, and preserve coefficient uncertainty.
+* Cover binomial and Poisson BAM workflows across all kernels; clarify automatic
+  response curves, native parallel shapes and likelihood parameter penalties.
+* Avoid carrying fitted data inside native BAM warning calls; add four-kernel
+  map, raw-reference curve and parameter-penalty regression coverage.
+* Keep BAM worker term matrices, native controls and warning conditions intact;
+  allow ordinary term prediction in numerical BAM snapshots.
+* Preserve fitted BAM coding across serial and native-worker prediction,
+  keeping optimized discrete behavior and explicit term exclusions.
+* Recover retained fixed transformations for ordinary native Cox subsets,
+  snapshots, checked maps and verified raw-reference curves.
+* Propagate full coefficient covariance for ziplss response means and add
+  scalar expected-count effect curves with explicit uncertainty provenance.
+* Preserve native logical-term coding alongside fitted GAM factor contrasts.
+* Preserve fitted GAM factor coding for interaction-only terms across point,
+  snapshot, raster and effect-curve prediction when session contrasts change.
+* Retain native Cox strata and cluster inputs for effect curves, holding
+  group-only inputs at an observed value without adding effect panels.
+* Keep conditional Cox effect curves on log relative-risk or relative-risk
+  scales, including native clogit subclasses.
+* Add verified raw reference rows for native effect curves when transformed
+  training frames no longer retain their raw inputs.
+* Select multi-component GAM link or family-specific response columns
+  explicitly, preserving native conditional uncertainty.
+
+* Preserve fixed training transformations and native component labels in
+  multiple-linear-predictor GAM point, snapshot and checked raster predictions.
+* Keep family-specific response columns and native smoothing covariance
+  distinct from uncertainty in selected ecological scales.
+
 multiScaleR 0.7.11
 * Preserve fixed training transformations in native refit, mixed, snapshot,
   raster and curve routes, and recover retained legacy analytic metadata.

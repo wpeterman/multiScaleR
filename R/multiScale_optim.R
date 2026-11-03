@@ -487,7 +487,8 @@
 #'   \item{\code{scale_est}}{Data frame with one row per optimized covariate and
 #'     two columns: \code{Mean} (optimized sigma on the original projection
 #'     scale) and \code{SE} (Hessian-based standard error). \code{SE} is
-#'     \code{NA} for hard-radius landscape and unweighted surface metrics,
+#'     \code{NA} for hard-radius landscape and unweighted surface metrics
+#'     and for every estimated radius under \code{kernel = "fixed"},
 #'     whose likelihood changes in steps. Row names are covariate names.}
 #'   \item{\code{shape_est}}{Data frame of the same structure as
 #'     \code{scale_est} for the shape parameter, or \code{NULL} when
@@ -756,8 +757,10 @@
 #' are rejected, so the optimizer compares likelihoods for the same sample.
 #' The final \code{sample_size} diagnostic reports prepared and fitted row
 #' counts; for repeated-site \code{unmarked} data it also reports the number
-#' of distinct prepared spatial sites. For hard-radius landscape and
-#' unweighted surface metrics, Hessian uncertainty is not meaningful; use
+#' of distinct prepared spatial sites. Hard-radius landscape and unweighted
+#' surface metrics, and all estimated fixed-kernel radii, omit Hessian SEs
+#' and Wald limits. The raw optimizer Hessian remains available for
+#' compatibility and diagnostics; it is not inverted for those radii. Use
 #' \code{summary(x, profile = TRUE)} for profile-likelihood intervals.
 #'
 #' \strong{Binned acceleration}
@@ -1353,7 +1356,8 @@ multiScale_optim <- function(fitted_mod,
     #                              opt_results$par[(n_covs + 1):(n_covs * 2)]^2)
     # opt_results$hessian_unscale <- opt_results$hessian #* kernel_inputs$unit_conv
 
-    hard_radius <- .msr_hard_radius_covariates(kernel_inputs$scale_vars)
+    hard_radius <- .msr_hard_radius_covariates(kernel_inputs$scale_vars,
+      kernel_inputs$kernel, r_vars)
     n_se <- n_covs * if (kernel_inputs$kernel == "expow") 2L else 1L
     active <- rep(!r_vars %in% hard_radius, length.out = n_se)
     uncertainty <- .msr_refit_hessian_se(opt_results$hessian_unscale, active,
@@ -1364,7 +1368,8 @@ multiScale_optim <- function(fitted_mod,
     scale_est <- data.frame(Mean = opt_results$par_unscale[1:n_covs],
                             SE = res[1:n_covs])
     rownames(scale_est) <- r_vars
-    hard_radius <- .msr_hard_radius_covariates(kernel_inputs$scale_vars)
+    hard_radius <- .msr_hard_radius_covariates(kernel_inputs$scale_vars,
+      kernel_inputs$kernel, r_vars)
     scale_est[intersect(rownames(scale_est), hard_radius), "SE"] <- NA_real_
 
     if(kernel_inputs$kernel == 'expow') {

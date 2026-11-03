@@ -44,8 +44,9 @@ An object of class \code{summary_multiScaleR}. Kernel-scale limits
   90\%). Both tables have columns
   \code{Mean}, \code{2.5\%}, and \code{97.5\%}, and hard-radius covariates
   report their radius in both. See \code{\link{kernel_dist}} for when to
-  use each. For hard-radius landscape and unweighted
-  surface metrics, Hessian standard errors and Wald limits are shown as
+  use each. For hard-radius landscape and unweighted surface metrics,
+  and all estimated radii under \code{kernel = "fixed"}, Hessian
+  standard errors and Wald limits are shown as
   \code{NA}; use \code{profile = TRUE} for profile-likelihood limits.
   Profiling errors are reported instead of silently returning invalid limits.
 }

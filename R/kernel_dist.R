@@ -47,7 +47,8 @@
 #' estimated sigma), \code{2.5\%} (distance at the lower 95\% limit of sigma),
 #' and \code{97.5\%} (distance at the upper 95\% limit of sigma). Values are
 #' rounded to two decimal places. For hard-radius covariates (landscape metrics
-#' and unweighted surface metrics) the row reports the radius itself, whichever
+#' and unweighted surface metrics, plus every estimated fixed-kernel radius)
+#' the row reports the radius itself, whichever
 #' \code{dimension} is requested.
 #'
 #' When kernel parameters are supplied directly via \code{...}: a single numeric
@@ -64,7 +65,12 @@
 #' uncertainty has not been calibrated, so distance confidence limits are missing.
 #' Native-refit point distances remain available when a scale SE is non-finite;
 #' their Wald limits are then missing. A hard-radius metric reports its radius
-#' directly and has no kernel shape, including in an expow mixture.
+#' directly and has no kernel shape, including in an expow mixture. A fitted
+#' \code{kernel = "fixed"} likewise reports its cutoff radius, with no
+#' Hessian-based interval. Stored profile limits are retained. Native
+#' coefficient SEs remain conditional on the selected radius. Manually
+#' supplied uniform-kernel parameters still return the requested weight
+#' quantile under the chosen dimensional definition.
 #'
 #' \strong{Default change.} Version 0.7.4 and later use
 #' \code{dimension = "2d"} for distances, summaries, and kernel plots. Earlier
@@ -227,7 +233,17 @@ kernel_dist <- function(model,
       # browser()
 
       dist_list <- vector('list', nrow(ci_))
-      hard_radius <- .msr_hard_radius_covariates(model$kernel_inputs$scale_vars)
+      hard_radius <- .msr_hard_radius_covariates(model$kernel_inputs$scale_vars,
+        model$kernel_inputs$kernel, rownames(ci_))
+      if (length(hard_radius)) {
+        hard <- intersect(rownames(ci_), hard_radius)
+        ci_[hard, "SE"] <- NA_real_
+        methods <- attr(ci_, "interval_method")
+        no_profile <- if (is.null(model$profile_scale_est)) hard else
+          if (is.null(methods)) character() else
+            hard[is.na(methods[hard]) | methods[hard] %in% c("wald", "unavailable")]
+        ci_[no_profile, c("2.5%", "97.5%")] <- NA_real_
+      }
       for(i in 1:nrow(ci_)){
         is_landscape <- rownames(ci_)[[i]] %in% hard_radius
         if (isTRUE(is_landscape) && is.finite(ci_[i, 1])) {
