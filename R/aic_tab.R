@@ -62,6 +62,8 @@
 
 .msr_model_loglik <- function(model) {
   analysis_mod <- .analysis_model(.msr_selection_model(model))
+  checked <- .msr_bam_nb_selection(analysis_mod)
+  if (!is.null(checked)) return(checked$loglik)
   value <- tryCatch(
     if (methods::is(analysis_mod, "unmarkedFit")) {
       unmarked::logLik(analysis_mod)
@@ -145,6 +147,9 @@
     return(.msr_validate_parameter_count(k, analysis_mod, "spaMM marginal parameter metadata"))
   }
 
+  checked <- .msr_bam_nb_selection(analysis_mod)
+  if (!is.null(checked)) return(checked$K)
+
   # logLik degrees of freedom include ancillary likelihood parameters such as
   # negative-binomial theta, which coefficient tables may omit.
   loglik_df <- tryCatch(
@@ -194,9 +199,9 @@
 }
 
 
-.msr_selection_parameter_count <- function(model) {
+.msr_selection_parameter_count <- function(model, native_k = NULL) {
   if (!inherits(model, "multiScaleR")) {
-    return(.msr_parameter_count(model))
+    return(if (is.null(native_k)) .msr_parameter_count(model) else native_k)
   }
 
   extra_k <- 0L
@@ -209,7 +214,8 @@
     extra_k <- extra_k + sum(!rownames(model$shape_est) %in% hard)
   }
 
-  .msr_parameter_count(model$opt_mod) + extra_k
+  if (is.null(native_k)) native_k <- .msr_parameter_count(model$opt_mod)
+  native_k + extra_k
 }
 
 
@@ -352,6 +358,16 @@
 #' For plain model objects in a mixed list, sigma is not
 #' added to K. The fitted model's log-likelihood degrees of freedom are used
 #' when available, so negative-binomial dispersion contributes one parameter.
+#' A native mgcv negative-binomial BAM is checked against the normalized count
+#' likelihood. A retained outer scale flag can otherwise add one to both
+#' the reported log-likelihood and parameter count, even though its family
+#' scale is one. Verified occurrences use the normalized likelihood and
+#' native effective degrees of freedom plus estimated theta, with no extra
+#' scale parameter. Fixed theta adds no parameter. The table's
+#' \code{likelihood_adjustments} attribute records native and used likelihoods
+#' and regression-model counts for affected input positions, before adding
+#' ecological scale or shape parameters to the table's K. Unknown inconsistencies raise an
+#' error. Fitted coefficients, covariance and diagnostics remain unchanged.
 #' For \code{unmarkedFit} models, native AIC and log-likelihood metadata
 #' determine the count, including detection coefficients, factor contrasts,
 #' mixture parameters, and estimated random-effect variances. Optimizer and
@@ -432,7 +448,9 @@ aic_tab <- function(mod_list,
   .msr_validate_comparable_models(opt_list)
   mod_n <- vapply(opt_list, .msr_selection_nobs, integer(1))
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
-  k <- vapply(mod_list, .msr_selection_parameter_count, numeric(1))
+  likelihood <- lapply(opt_list, .msr_bam_nb_selection)
+  k <- vapply(seq_along(mod_list), function(i)
+    .msr_selection_parameter_count(mod_list[[i]], if (is.null(likelihood[[i]])) NULL else likelihood[[i]]$K), numeric(1))
 
   if(is.null(mod_names)){
     mod_eq <- vapply(opt_list, .msr_selection_formula_label, character(1))
@@ -440,7 +458,8 @@ aic_tab <- function(mod_list,
       vapply(opt_list, .msr_selection_family_label, character(1)), "]", mod_eq)
   }
 
-  mod_loglik <- vapply(opt_list, .msr_model_loglik, numeric(1))
+  mod_loglik <- vapply(seq_along(opt_list), function(i) if (is.null(likelihood[[i]]))
+    .msr_model_loglik(opt_list[[i]]) else likelihood[[i]]$loglik, numeric(1))
   if (isTRUE(AICc) && any(mod_n <= k + 1L)) {
     stop("AICc requires n > K + 1 for every model; use `AICc = FALSE` for AIC.",
          call. = FALSE)
@@ -456,6 +475,8 @@ aic_tab <- function(mod_list,
                         nobs = mod_n,
                         sort = TRUE)
 
+    adjustments <- .msr_selection_adjustments(likelihood)
+    if (length(adjustments)) attr(tab, "likelihood_adjustments") <- adjustments
     if(isTRUE(verbose)){
       return(print(tab))
     } else {
@@ -473,6 +494,8 @@ aic_tab <- function(mod_list,
                         nobs = mod_n,
                         sort = TRUE)
 
+    adjustments <- .msr_selection_adjustments(likelihood)
+    if (length(adjustments)) attr(tab, "likelihood_adjustments") <- adjustments
     if(isTRUE(verbose)){
       return(print(tab))
     } else {
@@ -524,6 +547,9 @@ aic_tab <- function(mod_list,
 #' Sigma (and shape for \code{"expow"}) is counted in K.
 #' Fitted parameter counts and log-likelihood validation follow
 #' \code{\link{aic_tab}}, including all estimated components of unmarked models.
+#' The same checked negative-binomial BAM adjustment and
+#' \code{likelihood_adjustments} attribute apply. This retains estimated theta
+#' while excluding a nonexistent extra scale parameter.
 #' spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
 #' components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
 #' for its restricted-likelihood interpretation.
@@ -613,7 +639,9 @@ bic_tab <- function(mod_list,
   .msr_validate_comparable_models(opt_list)
   mod_n <- vapply(opt_list, .msr_selection_nobs, integer(1))
   mod_kernel <- vapply(mod_list, .msr_kernel_label, character(1))
-  k <- vapply(mod_list, .msr_selection_parameter_count, numeric(1))
+  likelihood <- lapply(opt_list, .msr_bam_nb_selection)
+  k <- vapply(seq_along(mod_list), function(i)
+    .msr_selection_parameter_count(mod_list[[i]], if (is.null(likelihood[[i]])) NULL else likelihood[[i]]$K), numeric(1))
 
   if(is.null(mod_names)){
     mod_eq <- vapply(opt_list, .msr_selection_formula_label, character(1))
@@ -621,7 +649,8 @@ bic_tab <- function(mod_list,
       vapply(opt_list, .msr_selection_family_label, character(1)), "]", mod_eq)
   }
 
-  mod_loglik <- vapply(opt_list, .msr_model_loglik, numeric(1))
+  mod_loglik <- vapply(seq_along(opt_list), function(i) if (is.null(likelihood[[i]]))
+    .msr_model_loglik(opt_list[[i]]) else likelihood[[i]]$loglik, numeric(1))
   # * BIC ---------------------------------------------------------------------
 
   tab <- bictabCustom(logL = mod_loglik,
@@ -630,6 +659,8 @@ bic_tab <- function(mod_list,
                       nobs = mod_n,
                       sort = TRUE)
 
+  adjustments <- .msr_selection_adjustments(likelihood)
+  if (length(adjustments)) attr(tab, "likelihood_adjustments") <- adjustments
   if(isTRUE(verbose)){
     return(print(tab))
   } else {

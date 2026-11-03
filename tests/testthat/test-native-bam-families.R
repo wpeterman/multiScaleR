@@ -58,31 +58,7 @@ native_bam_family_fixture <- local({
   }
 })
 
-bam_family_slice <- function(value, rows) {
-  if (is.list(value)) { result <- lapply(value, bam_family_slice, rows = rows); attributes(result) <- attributes(value); return(result) }
-  if (is.matrix(value)) result <- value[rows, , drop = FALSE] else if (length(dim(value)) == 1L) {
-    labels <- dimnames(value); result <- array(as.numeric(value)[rows], length(rows),
-      dimnames = if (is.null(labels)) NULL else list(labels[[1L]][rows]))
-  } else result <- value[rows]
-  for (name in setdiff(names(attributes(value)), c("names", "dim", "dimnames"))) attr(result, name) <- attr(value, name)
-  result
-}
-
-bam_family_clean <- function(value) {
-  attr(value, "prediction_contract") <- NULL
-  if (is.list(value)) { result <- lapply(value, bam_family_clean); attributes(result) <- attributes(value); return(result) }
-  if (is.matrix(value)) rownames(value) <- NULL else names(value) <- NULL
-  value
-}
-
-bam_family_oracle <- function(entry, newdata, type, controls = list()) {
-  vars <- intersect(all.vars(delete.response(terms(entry$model))), names(entry$data))
-  old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old), add = TRUE)
-  source <- entry$data[vars]
-  result <- do.call(stats::predict, c(list(object = entry$model, newdata = rbind(source, newdata[vars]),
-    type = type, se.fit = type != "lpmatrix", discrete = FALSE, n.threads = 1L), controls))
-  bam_family_slice(result, nrow(source) + seq_len(nrow(newdata)))
-}
+# Shared prediction helpers are loaded from helper-native-bam.R.
 
 test_that("binomial and Poisson BAM points and snapshots preserve native formulas", {
   skip_if_not_installed("mgcv")
@@ -206,5 +182,101 @@ test_that("non-Gaussian BAM workers retain native parallel shapes and serial val
       expect_equal(bam_family_clean(actual), bam_family_clean(target), tolerance = 1e-8)
       expect_equal(flatten(bam_family_clean(actual)), flatten(serial), tolerance = 1e-8)
     }
+  }
+})
+
+test_that("optimized binomial and Poisson BAM predictions retain exact native batches", {
+  skip_if_not_installed("mgcv")
+  # Reuse the existing failure-retaining fixture, including every fit gate.
+  cases <- native_bam_family_fixture()
+  cases <- cases[grepl("_discrete$", names(cases))]
+  expect_length(cases, 8L)
+  old <- options(contrasts = c("contr.treatment", "contr.poly"))
+  on.exit(options(old), add = TRUE)
+  coding <- function(expr) {
+    before <- options(contrasts = c("contr.sum", "contr.poly"))
+    on.exit(options(before), add = TRUE)
+    force(expr)
+  }
+  capture <- function(expr) {
+    conditions <- list()
+    value <- withCallingHandlers(force(expr), warning = function(w) {
+      conditions[[length(conditions) + 1L]] <<- list(message = conditionMessage(w), classes = class(w))
+      invokeRestart("muffleWarning")
+    })
+    list(value = value, warnings = conditions)
+  }
+  clean <- function(x) {
+    attr(x, "prediction_contract") <- NULL
+    if (is.data.frame(x)) x <- as.matrix(x)
+    if (is.list(x)) {
+      result <- lapply(x, clean); attributes(result) <- attributes(x)
+      return(result)
+    }
+    if (is.matrix(x)) rownames(x) <- NULL else names(x) <- NULL
+    x
+  }
+  types <- c("link", "response", "terms", "iterms", "lpmatrix")
+  native_callback <- .msr_native_raster_eval
+  for (entry in cases) {
+    model <- entry$model; before <- model; object <- entry$object
+    variables <- intersect(all.vars(delete.response(terms(model))), names(entry$data))
+    for (type in types) for (rows in list(seq_len(nrow(entry$data)), c(1L, 17L, 24L), 17L)) {
+      nd <- entry$data[rows, , drop = FALSE]
+      expected <- coding(capture(predict(model, nd[variables], type = type,
+        se.fit = type != "lpmatrix", discrete = TRUE, n.threads = 1L)))
+      actual <- capture(predict(object, nd, entry$f$inputs, include_fixed = TRUE,
+        type = type, se.fit = type != "lpmatrix", uncertainty = "conditional",
+        discrete = TRUE, n.threads = 1L))
+      expect_equal(clean(actual$value), clean(expected$value), tolerance = 1e-8)
+      expect_identical(actual$warnings, expected$warnings)
+    }
+    nd <- entry$data[c(1L, 17L, 24L), , drop = FALSE]
+    for (type in types) {
+      snapshot <- prepare_prediction(object, nd, entry$f$inputs, include_fixed = TRUE,
+        component = type, native_args = list(discrete = TRUE))
+      expected <- coding(capture(predict(model, nd[variables], type = type,
+        se.fit = type != "lpmatrix", discrete = TRUE, n.threads = 1L)))
+      actual <- capture(predict(unserialize(serialize(snapshot, NULL)), type = type,
+        se.fit = type != "lpmatrix", uncertainty = "conditional"))
+      expect_equal(clean(actual$value), clean(expected$value), tolerance = 1e-8)
+      expect_identical(actual$warnings, expected$warnings)
+    }
+    grid <- kernel_scale.raster(entry$f$rasters, multiScaleR = object, include_fixed = TRUE,
+      scale_center = TRUE, match_buffer = TRUE, site_values = list(group = "b", z = .2), verbose = FALSE)
+    batches <- list()
+    checked_callback <- function(model, data) {
+      seen <- list()
+      value <- withCallingHandlers(native_callback(model, data), warning = function(w)
+        seen[[length(seen) + 1L]] <<- list(message = conditionMessage(w), classes = class(w)))
+      # Discrete predictions can depend on their batch. Compare the exact rows
+      # received by the original callback, rather than a substituted grid.
+      expected <- coding(capture(do.call(stats::predict, c(list(object = model$object$opt_mod,
+        newdata = data, type = model$type, se.fit = model$se.fit), model$native_args))))
+      target <- expected$value
+      if (is.list(target) && !is.data.frame(target) && !is.null(target$fit))
+        target <- data.frame(fit = target$fit, se.fit = target$se.fit)
+      if (is.matrix(target) && is.object(target)) target <- unclass(target)
+      batches[[length(batches) + 1L]] <<- list(rows = nrow(data),
+        equal = isTRUE(all.equal(clean(value), clean(target), tolerance = 1e-8)),
+        warnings_equal = identical(seen, expected$warnings))
+      value
+    }
+    for (type in types) {
+      batches <- list()
+      checked <- with_mocked_bindings(capture(predict(object, grid, type = type,
+        se.fit = type != "lpmatrix", uncertainty = "conditional", discrete = TRUE,
+        raster_args = list(cores = 1L))), .msr_native_raster_eval = checked_callback)
+      actual <- capture(predict(object, grid, type = type, se.fit = type != "lpmatrix",
+        uncertainty = "conditional", discrete = TRUE, raster_args = list(cores = 1L)))
+      expect_true(length(batches) > 0L)
+      expect_true(all(vapply(batches, function(x) x$rows > 0L && x$equal, logical(1))))
+      expect_true(all(vapply(batches, `[[`, logical(1), "warnings_equal")))
+      expect_equal(terra::values(actual$value), terra::values(checked$value), tolerance = 1e-8)
+      expect_true(isTRUE(terra::compareGeom(actual$value, checked$value)))
+      expect_identical(actual$warnings, checked$warnings)
+    }
+    expect_identical(.msr_native_raster_eval, native_callback)
+    expect_identical(model, before)
   }
 })

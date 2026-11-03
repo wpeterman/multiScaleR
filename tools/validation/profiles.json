@@ -1,0 +1,26 @@
+{
+  "purpose": "Choose relevant feedback while preserving the complete acceptance suite.",
+  "focused": {
+    "reference_and_metric": "(curve-reference|kernel-bins|surface-metrics)",
+    "native_bam": "native-bam",
+    "selection_and_radius": "(aic|bic|selection|fixed-kernel-radius)"
+  },
+  "full": {
+    "normal_vignette_build": true,
+    "normal_check_arguments": ["--no-manual", "--no-tests"],
+    "exact_archive_installed_tests": "all",
+    "NOT_CRAN": true,
+    "maximum_owned_socket_workers": 2,
+    "threads": 1,
+    "scientific_markers_required": 14,
+    "prior_skip_identities_must_be_reviewed": true,
+    "prior_warning_identities_must_be_reviewed": true
+  },
+  "policy": [
+    "Focused passes describe only their frozen source and selected files.",
+    "Final acceptance always pairs the normal check with every exact-archive test.",
+    "Assertion totals are evidence summaries, not growth targets.",
+    "Share unchanged fixture helpers; retain scientific and regression assertions.",
+    "Do not silently skip slow gates or discard failures to reduce counts or time."
+  ]
+}

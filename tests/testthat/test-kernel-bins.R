@@ -34,7 +34,7 @@ test_that("binned optimization recovers the same sigma as the exact path", {
   lo <- e[1] + 0.12 * (e[2] - e[1]); hi <- e[2] - 0.12 * (e[2] - e[1])
   set.seed(3)
   pts <- terra::vect(cbind(stats::runif(40, lo, hi), stats::runif(40, lo, hi)),
-                     type = "points")
+                     type = "points", crs = terra::crs(rs))
 
   ki_exact <- kernel_prep(pts, rs, max_D = 150, kernel = "gaussian",
                           verbose = FALSE, bin = FALSE)
@@ -68,7 +68,7 @@ test_that("lean mode drops cell data, still optimizes, and matches binned", {
   lo <- e[1] + 0.12 * (e[2] - e[1]); hi <- e[2] - 0.12 * (e[2] - e[1])
   set.seed(5)
   pts <- terra::vect(cbind(stats::runif(40, lo, hi), stats::runif(40, lo, hi)),
-                     type = "points")
+                     type = "points", crs = terra::crs(rs))
 
   ki_bin <- kernel_prep(pts, rs, max_D = 150, kernel = "gaussian",
                         verbose = FALSE, bin = TRUE, nbins = 256)
@@ -105,7 +105,7 @@ test_that("store_cell_data = FALSE is ignored when landscape metrics are present
   lo <- e[1] + 0.15 * (e[2] - e[1]); hi <- e[2] - 0.15 * (e[2] - e[1])
   set.seed(9)
   pts <- terra::vect(cbind(stats::runif(25, lo, hi), stats::runif(25, lo, hi)),
-                     type = "points")
+                     type = "points", crs = terra::crs(land))
 
   vars <- msr_vars(lc_ed = landscape_var("lc", metric = "ed", radius = 80))
   ki <- kernel_prep(pts, land, max_D = 200, kernel = "gaussian",

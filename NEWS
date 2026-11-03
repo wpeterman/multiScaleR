@@ -1,3 +1,16 @@
+multiScaleR 0.7.13
+* Extend Gamma and negative-binomial BAM point, snapshot, map, effect-curve
+  and model-selection regression coverage with native targets and diagnostics.
+* Verify native negative-binomial BAM likelihood/count bookkeeping for model
+  selection, correcting a duplicated unit-scale contribution with recorded
+  provenance while preserving fitted coefficients, covariance and diagnostics.
+* Give spatial test fixtures their declared CRS and assert existing separation
+  warnings explicitly, preserving observations and diagnostic behavior.
+* Release verified effect-curve basis matrices before predicting fitted links,
+  retaining full native comparisons, tolerances and conditional uncertainty.
+* Add exact native-batch regression coverage for optimized binomial and Poisson
+  BAM point, snapshot and raster predictions across all four kernels.
+
 multiScaleR 0.7.12
 * Treat estimated fixed-kernel scales as hard radii: omit Hessian SEs and
   Wald bands, retain profile limits, and preserve coefficient uncertainty.

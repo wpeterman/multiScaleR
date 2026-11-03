@@ -306,7 +306,8 @@ test_that("optimized surface specs evaluate during model refits", {
     y = c(1, 0, 1, 0, 1),
     kernel_inputs$kernel_dat
   )
-  mod <- glm(y ~ elev_sq, family = binomial(), data = dat)
+  expect_warning(mod <- glm(y ~ elev_sq, family = binomial(), data = dat),
+    "fitted probabilities numerically 0 or 1 occurred")
   opt_context <- build_opt_context(
     fitted_mod = mod,
     cov_df = kernel_inputs$raw_cov,
@@ -316,15 +317,16 @@ test_that("optimized surface specs evaluate during model refits", {
     n_cols = kernel_inputs$n_cols
   )
 
-  neg_ll <- kernel_scale_fn(
+  expect_warning(neg_ll <- kernel_scale_fn(
     par = 0.5,
     d_list = kernel_inputs$d_list,
     cov_df = kernel_inputs$raw_cov,
     kernel = kernel_inputs$kernel,
     fitted_mod = mod,
     opt_context = opt_context
-  )
-  final <- kernel_scale_fn(
+  ),
+    "fitted probabilities numerically 0 or 1 occurred")
+  expect_warning(final <- kernel_scale_fn(
     par = 0.5,
     d_list = kernel_inputs$d_list,
     cov_df = kernel_inputs$raw_cov,
@@ -332,7 +334,8 @@ test_that("optimized surface specs evaluate during model refits", {
     fitted_mod = mod,
     opt_context = opt_context,
     mod_return = TRUE
-  )
+  ),
+    "fitted probabilities numerically 0 or 1 occurred")
 
   expect_true(is.finite(neg_ll))
   expect_s3_class(final$mod, "glm")

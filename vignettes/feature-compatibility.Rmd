@@ -620,15 +620,16 @@ names remain attached as diagnostic context. The worker's original warning
 is retained; unrelated native warning calls are unchanged.
 
 
-Native Gaussian, binomial and Poisson BAM fits use the shared point,
+Native Gaussian, binomial, Poisson, Gamma and negative-binomial BAM fits use the shared point,
 numerical-snapshot, checked-map and raw-reference curve routes. Ordinary
 prediction supports factor interactions, `I(z^2)` terms and native smooths;
 set `discrete = FALSE` when requesting ordinary `iterms` output. Native
 parallel scalar and matrix outputs retain their provider geometry, which can
 differ from serial geometry. Term matrices retain their labels and intercept
-constant. Native likelihood degrees of freedom supply the coefficient,
-smoothing and family-dispersion contribution to AIC/BIC; only selected
-ecological scale parameters and applicable expow shapes are added.
+constant. Native effective degrees of freedom supply the coefficient and
+smoothing contribution to AIC/BIC, with the actual family nuisance parameters
+described below; selected ecological scales and applicable expow shapes are
+added once.
 
 For a single-predictor GAM or BAM, `plot_marginal_effects()` inherits the GLM
 automatic response transformation. Both values of `link` retain response
@@ -645,3 +646,59 @@ trials. Poisson response predictions are conditional expected counts. Neither
 response SEs nor these curve intervals add ecological-scale uncertainty,
 observation noise or full-posterior uncertainty. Native BAM rejects general
 families; use an appropriate native GAM for multi-predictor families instead.
+
+
+Optimized discrete prediction (`discrete = TRUE`) is also checked for native
+binomial and Poisson BAMs across all four kernels, with point, saved-snapshot
+and raster output compared to the same native prediction batch. Discrete
+predictions can depend on the batch used to construct their approximation;
+ordinary predictions or a different row batch are separate targets. Native
+warnings, term matrices and conditional coefficient uncertainty are retained.
+These software checks do not establish statistical calibration or speedups.
+
+
+### Native BAM family coverage
+
+The native-refit adapters also support Gamma models with a log link and
+negative-binomial models using `mgcv::nb()` with fixed or estimated `theta`. The software checks
+pair a kernel mean with weighted SQ, fixed factor coding, a numeric product,
+a polynomial term and a native smooth. They retain each fit's convergence,
+coefficient-score, information and covariance checks.
+
+| Family | Ordinary prediction | Optimized discrete prediction | Information-criterion nuisance parameters |
+|:-------|:--------------------|:------------------------------|:-----------------------------------------|
+| Gaussian | Points, snapshots, maps, curves and workers | Native controls and checked outputs | Native effective degrees of freedom and estimated residual scale |
+| Binomial or Poisson | Points, snapshots, maps, curves and workers | Same-batch points, snapshots and maps | Native effective degrees of freedom; no residual scale |
+| Gamma with log link | Points, snapshots, maps, curves and workers | Same-batch points, snapshots and maps | Native effective degrees of freedom and estimated residual scale |
+| Negative binomial | Points, snapshots, maps, curves and workers | Same-batch points, snapshots and maps | Native effective degrees of freedom and estimated `theta`; fixed `theta` adds none |
+
+The Gamma and estimated-theta negative-binomial cases cover Gaussian,
+exponential, exponential-power and fixed kernels. Fixed-theta cases use a
+Gaussian kernel. These tests check adapter compatibility at declared spatial
+scales; they do not demonstrate ecological-scale recovery or interval coverage.
+Some ordinary family fixtures require a tighter native fitting tolerance to
+meet the unchanged coefficient-score gate. Package fitting defaults remain
+unchanged; inspect diagnostics for your own fits.
+
+Gamma response predictions are conditional positive means. Negative-binomial
+response predictions are conditional expected counts. Their mean SEs and curve
+bands use native coefficient covariance, holding ecological scales fixed.
+They do not add observation noise, uncertainty from estimating `theta`,
+ecological-scale uncertainty or full-posterior uncertainty.
+
+Some native mgcv versions label `mgcv::nb()` BAM scale as estimated even
+though the fitted family has unit scale. In those verified cases, native
+`logLik()` and its parameter count each include one extra unit. `aic_tab()`
+and `bic_tab()` check the normalized negative-binomial response density and
+the actual native effective degrees of freedom before correcting that specific
+bookkeeping discrepancy. Estimated `theta` still counts once; fixed `theta`
+does not count. Other discrepancies produce an error. The correction leaves
+AIC unchanged, while AICc and BIC use the corrected count. Fitted coefficients,
+covariance and native diagnostic objects are retained.
+
+An affected table has a `likelihood_adjustments` attribute recording the
+original input position, native and used log-likelihoods, regression parameter
+counts, and nuisance counts. These recorded regression counts precede any
+selected ecological scales and applicable shapes added to the table's `K`.
+A fixed radius contributes no fitted parameter. A selected hard cutoff still
+counts once even though its Hessian radius SE is unavailable.

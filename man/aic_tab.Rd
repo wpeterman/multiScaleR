@@ -64,6 +64,16 @@ densities and posterior objectives are not substitutes.
 For plain model objects in a mixed list, sigma is not
 added to K. The fitted model's log-likelihood degrees of freedom are used
 when available, so negative-binomial dispersion contributes one parameter.
+A native mgcv negative-binomial BAM is checked against the normalized count
+likelihood. A retained outer scale flag can otherwise add one to both
+the reported log-likelihood and parameter count, even though its family
+scale is one. Verified occurrences use the normalized likelihood and
+native effective degrees of freedom plus estimated theta, with no extra
+scale parameter. Fixed theta adds no parameter. The table's
+\code{likelihood_adjustments} attribute records native and used likelihoods
+and regression-model counts for affected input positions, before adding
+ecological scale or shape parameters to the table's K. Unknown inconsistencies raise an
+error. Fitted coefficients, covariance and diagnostics remain unchanged.
 For \code{unmarkedFit} models, native AIC and log-likelihood metadata
 determine the count, including detection coefficients, factor contrasts,
 mixture parameters, and estimated random-effect variances. Optimizer and

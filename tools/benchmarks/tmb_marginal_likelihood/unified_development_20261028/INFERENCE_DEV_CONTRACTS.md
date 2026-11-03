@@ -54,6 +54,24 @@ trial initialization, convergence, penalized score, positive information, and
 covariance assertions. Model-selection tests retain native family labels,
 observation counts, and spatial-parameter penalties.
 
+Gamma and `mgcv::nb()` BAM checks extend points, numerical snapshots, maps,
+raw-reference curves, ordinary workers, and model selection. Estimated-theta
+cases and Gamma cases cover all four kernels; fixed-theta cases use Gaussian
+kernels. Retain the native convergence, score, information, and covariance
+gates. Tighter fitting controls used by declared software fixtures do not change
+package fitting defaults or establish ecological-scale calibration.
+
+For verified native NB BAM unit-scale bookkeeping discrepancies, selection
+tables use the normalized count density and actual effective-degree-of-freedom
+count. Estimated theta counts once; fixed theta and the known unit scale do
+not add estimated parameters. Record native and used values in the table's
+`likelihood_adjustments` attribute. Other model counts and all fitted objects
+retain their existing definitions. Unknown discrepancies fail explicitly.
+
+Effect-curve verification keeps its complete native basis comparison and
+1e-10 tolerance. Verified matrices are released before link prediction.
+Blockwise comparison still requires separate equivalence and failure tests.
+
 ## Private inference gates
 
 Keep existing analytic/Bayesian kernel and family admissions. The fixed-kernel
@@ -68,12 +86,17 @@ scale-surface recovery. Retain null failures and approximation qualifications.
 
 ## Continued validation and refinement
 
-The next prepared native prediction audit concerns optimized discrete BAM
-points, snapshots, and maps. Compare the actual native provider on the exact
+Optimized discrete BAM points, snapshots, and maps have regression coverage.
+For further family or control extensions, compare the actual native provider on the exact
 same batch of rows. An ordinary prediction target cannot substitute for an
 optimized one. Prove raster instrumentation preserves the unmodified public
 route, and retain warning identities, geometry, and missing-value positions.
 Build any new audit from the accepted release source and commit identity.
+
+Next inspect the legacy fixed-theta NB provider and weighted-likelihood
+bookkeeping before declaring a bounded software audit. Confirm its actual
+fitting and likelihood conventions first. Keep private fitting admissions and
+every scientific numerical gate unchanged.
 
 Use focused regression tests and generated documentation, followed by a normal
 vignette-enabled package check and the complete installed suite from that exact

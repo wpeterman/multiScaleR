@@ -180,6 +180,9 @@ restoring fitted coding in serial and native worker calls. Explicit term
 exclusions also reach the native worker predictor. Worker mgcv versions and
 prediction implementations must agree with the parent. Other providers keep
 their native dispatch; numerical snapshots do not retain external clusters.
+Optimized discrete predictions for native binomial and Poisson BAMs retain
+native values, warning behavior and output geometry across point, snapshot
+and raster routes. Raster comparisons use the exact native prediction batch.
 Ordinary BAM workers retain \code{iterms} matrices, term labels and the native
 intercept constant, including models without factor coding. Native GAM
 controls forwarded through BAM, such as \code{iterms.type} and

@@ -1,3 +1,23 @@
+# Observe allocation lifetime without measuring or claiming peak RAM savings.
+curve_reference_observe_basis_lifetime <- function(object, model, reference) {
+  predictor <- .msr_predict_gam; observed <- list()
+  watch <- function(object, ...) {
+    args <- list(...)
+    if (identical(args$type, "link")) {
+      caller <- parent.frame()
+      observed[[length(observed) + 1L]] <<- vapply(c("fitted_design", "reference_design"),
+        exists, logical(1), envir = caller, inherits = FALSE)
+    }
+    do.call(predictor, c(list(object = object), args))
+  }
+  result <- with_mocked_bindings(.msr_curve_reference_context(object, model, reference),
+    .msr_predict_gam = watch)
+  expect_length(observed, 1L)
+  expect_identical(unname(observed[[1L]]), c(FALSE, FALSE))
+  expect_identical(.msr_predict_gam, predictor)
+  result
+}
+
 # Supplied raw inputs establish fitted feature equivalence, not an inverse of
 # evaluated transformations. All targets below use existing software fixtures.
 test_that("expired GLM curves verify raw references with quotes, bases and offsets", {
@@ -131,7 +151,9 @@ test_that("raw references verify only retained fitted rows after native NA exclu
   for (model in models) {
     reference <- dat[row.names(model$model), , drop = FALSE]
     row.names(reference) <- row.names(model$model)
-    context <- .msr_curve_reference_context(f$object, model, reference)
+    context <- if (inherits(model, "gam"))
+      curve_reference_observe_basis_lifetime(f$object, model, reference) else
+        .msr_curve_reference_context(f$object, model, reference)
     expect_identical(row.names(context$data), row.names(model$model))
     expect_equal(context$contract$fitted_rows, nrow(dat) - 1L)
     expect_true(context$contract$native_design_and_offsets_verified)
@@ -225,6 +247,23 @@ test_that("multi-component GAM curves select native link and response columns ex
     bare <- make(kind, FALSE); model <- make(kind, TRUE)
     object <- f$object; object$opt_mod <- model; original <- model
     reference <- dat; row.names(reference) <- row.names(model$model)
+    checked <- curve_reference_observe_basis_lifetime(object, model, reference)
+    expect_true(checked$contract$native_design_and_offsets_verified)
+    predictor <- .msr_predict_gam
+    for (bad in c(.01, Inf, NaN)) {
+      calls <- 0L
+      wrong_basis <- function(object, ...) {
+        args <- list(...); value <- do.call(predictor, c(list(object = object), args))
+        if (identical(args$type, "lpmatrix")) {
+          calls <<- calls + 1L
+          if (calls == 2L) value[nrow(value), ncol(value)] <- value[nrow(value), ncol(value)] + bad
+        }
+        value
+      }
+      expect_error(with_mocked_bindings(.msr_curve_reference_context(object, model, reference),
+        .msr_predict_gam = wrong_basis), "does not reproduce the fitted native design or basis")
+      expect_identical(calls, 2L)
+    }
     expect_error(plot_marginal_effects(object, reference_data = reference), "explicit native output selection")
     expect_error(plot_marginal_effects(object, component = 0, reference_data = reference), "component")
     expect_error(plot_marginal_effects(object, component = 3, reference_data = reference), "linear predictor")

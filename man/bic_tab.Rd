@@ -53,6 +53,9 @@ identifying the single best-supported model rather than model averaging.
 Sigma (and shape for \code{"expow"}) is counted in K.
 Fitted parameter counts and log-likelihood validation follow
 \code{\link{aic_tab}}, including all estimated components of unmarked models.
+The same checked negative-binomial BAM adjustment and
+\code{likelihood_adjustments} attribute apply. This retains estimated theta
+while excluding a nonexistent extra scale parameter.
 spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
 components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
 for its restricted-likelihood interpretation.

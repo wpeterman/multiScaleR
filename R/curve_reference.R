@@ -139,6 +139,10 @@
       !identical(colnames(fitted_design), colnames(reference_design)) ||
       !equivalent(fitted_design, reference_design))
     stop("reference_data does not reproduce the fitted native design or basis.", call. = FALSE)
+  # Keep the exact full-basis comparison above. Release both large matrices
+  # before another native prediction can allocate a coefficient design.
+  # Garbage collection remains under R's normal allocation policy.
+  rm(fitted_design, reference_design)
   if (inherits(model, "gam")) {
     eta <- .msr_predict_gam(model, newdata = prediction_data, type = "link")
     saved_eta <- model$linear.predictors

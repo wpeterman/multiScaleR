@@ -1,0 +1,5 @@
+input <- jsonlite::fromJSON(commandArgs(TRUE)[[1L]])
+.libPaths(c(input$dependency_overlay, .libPaths()))
+invisible(lapply(list.files(file.path(input$package, "R"), pattern = "[.]R$", full.names = TRUE), parse))
+invisible(lapply(list.files(file.path(input$package, "tests/testthat"), pattern = "[.]R$", full.names = TRUE), parse))
+roxygen2::roxygenise(input$package)
