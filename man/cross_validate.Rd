@@ -37,7 +37,9 @@ supplied values. No fitting rows are silently omitted for missing values.}
 \code{\link{kernel_prep}} with cell-level distances and source values
 retained. Use \code{store_cell_data = TRUE}. Its buffer, initial scales,
 metric definitions and other controls must be chosen independently of the
-assessment outcomes. Lean-only and grouped preparation are not supported.}
+assessment outcomes. Modern \code{\link{kernel_prep_by_group}} inputs
+are supported when their named \code{raster_group} map aligns with prepared
+row IDs. Lean-only preparation is not supported.}
 
 \item{folds}{Uniquely named list of explicit splits. Each split contains
 nonempty character vectors \code{analysis} and \code{assessment} of row
@@ -110,6 +112,11 @@ An object of class \code{multiScaleR_cv}, a list containing:
       per fold. Failures are retained and never retried automatically.}
     \item{\code{prediction_contracts}}{Existing prediction contracts per fold,
       retaining the native conditioning and uncertainty distinctions.}
+    \item{\code{raster_groups}}{For grouped raster inputs, named fixed-map
+      labels for analysis/assessment IDs per fold, retained even on failure.
+      Otherwise \code{NULL}. These are input maps, not fitted random effects.}
+    \item{\code{targets}}{Compact used-row responses, trials and weights for
+      guarded comparison with \code{\link{cv_tab}}. Never used in fitting.}
     \item{\code{fits}}{Full fold fits when \code{keep_fits = TRUE}; otherwise
       \code{NULL}. These fits use only their own training data.}
     \item{\code{complete}, \code{settings}, \code{call}}{Whether all planned
@@ -120,15 +127,26 @@ An object of class \code{multiScaleR_cv}, a list containing:
 \description{
 Refit ecological scales and GLM coefficients using only each training set,
 then score predictions for the explicitly held-out rows. A fold is one
-training and assessment split. This first stage supports ordinary Gaussian,
+training and assessment split. This function supports ordinary Gaussian,
 Poisson and binomial GLMs and runs folds sequentially.
 }
 \details{
 Raw spatial buffers are reused without changing them. Initial spatial
 normalization and pooled representative bin distances are learned from the
-training rows only. The bin domain remains the predeclared physical buffer.
+training rows only. The bin domain is fixed from the declared buffer and,
+for modern preparation, the raster cell-size envelope. Intersecting cells
+can have centers beyond the nominal buffer; their values are retained.
+The geometric domain is independent of assessment data. Legacy stored inputs
+without cell geometry retain the original strict buffer-center gate; rebuild
+them with the current preparation function if it rejects their distances.
 Assessment values use the frozen training bins and normalization. Existing
 coefficient, scale, shape and numerical-diagnostic calculations are unchanged.
+Grouped raster maps select fixed source covariates by row. Their group map
+is validated before fitting and subset with the buffers. Scales and
+coefficients use the pooled training rows; assessment preprocessing remains
+frozen. Map labels do not introduce annual/random effects, extra fitted
+parameters or spatially varying scales. Explicit formula group effects keep
+their native fitting, parameter counts and new-level prediction guards.
 
 Negative log scores retain Poisson/binomial likelihood constants and average
 over positive-weight observations using frequency weights. Binomial Brier
@@ -146,7 +164,9 @@ complement \code{\link{aic_tab}}; they are not AIC values or Akaike weights.
 Read \code{complete} first. Inspect failed folds and original diagnostics
 before ranking models. Partial fold scores remain available for diagnosis,
 while an incomplete pooled summary stays \code{NA}. This stage does not
-generate random/spatial folds or score GAMs, mixed, unmarked or Bayesian fits.
+score GAMs, mixed, unmarked or Bayesian fits. See
+\code{\link{grouped_cv_folds}} and \code{\link{spatial_cv_folds}} for
+deterministic whole-group and spatial-grid fold construction.
 }
 \examples{
 # Explicit folds can be checked before any fitting is attempted.

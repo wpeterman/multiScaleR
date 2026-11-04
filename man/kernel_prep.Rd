@@ -116,6 +116,9 @@ A list of class \code{"multiScaleR_data"} containing:
     containing raw raster cell values within the buffer, aligned with
     \code{d_list}. Each point is stored as a dense or sparse matrix,
     whichever is smaller. \code{NULL} in lean mode.}
+  \item{\code{cell_size}}{Fixed x/y raster cell dimensions in map units.
+    CV uses these to retain intersecting cells whose centers extend beyond
+    \code{max_D}, without learning a bin domain from assessment rows.}
   \item{\code{kernel}}{Character string identifying the kernel used.}
   \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
     (scaled) parameter space.}

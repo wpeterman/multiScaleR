@@ -177,3 +177,26 @@ CV score comparisons must match planned targets, splits, responses, trials
 and weights and retain failures. Predictive scores are not AIC weights or
 additional parameter penalties. Further model-class scoring requires separate
 predictive-target qualification; all existing private admission guards remain.
+
+## Qualified CV folds and fixed map geometry
+
+Grouped/spatial generators return explicit whole-unit row-ID splits. Spatial
+buffers exclude complete training units and use projected point distances. CV
+refits scales, coefficients and learned transforms within training rows. Native
+grouped rasters select fixed input maps; their row labels are validated and
+subset with their raw buffers. Neither map labels nor pixel geometry add fitted
+parameters, annual effects or spatially varying scales.
+
+CV bin domains use declared extraction radius plus half the fixed cell diagonal
+when known. The original distance tolerance stays unchanged, all intersecting
+cells remain, and no held-out maximum selects the domain. Legacy unknown grid
+geometry keeps its strict old gate. Freeze geometry with training bin references.
+
+cv_tab matches splits/outcomes/trials/weights and ranks compatible held-out
+losses without penalties or Akaike weights. select_cv uses only retained native
+training fits and their full K/likelihood guards. Preserve exact ties/failures,
+selected row/map records, candidate settings and the inherited-controls label.
+Point scoring does not integrate parameter/selection uncertainty, add intervals
+or establish calibration. Matched-set, mixed, GAM, unmarked and Bayesian scoring
+need separate target qualification; never substitute zero random effects for
+integration or posterior objectives for maximized likelihoods.

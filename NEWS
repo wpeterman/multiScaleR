@@ -1,3 +1,12 @@
+multiScaleR 0.7.15
+* Retain intersecting raster cells in CV bins using fixed pixel geometry; preserve
+  native extraction, parameter bounds, likelihoods and numerical guards.
+* Align fixed grouped raster maps within CV splits and retain selection controls.
+* Add whole-group and projected spatial-grid CV folds with optional buffers.
+* Compare compatible CV prediction scores and evaluate training-only AIC/AICc/BIC
+  model selection with native parameter counts and retained failures.
+* Add ordinary GLM CV references and a worked model-selection vignette.
+
 multiScaleR 0.7.14
 * Retry unsuccessful RAM discovery and use a direct Windows physical-memory query with the existing CIM fallback. Memory admission limits are unchanged.
 * Add explicit-fold GLM cross-validation with training-only scale fitting,

@@ -101,8 +101,22 @@ cv_stage1_fixture <- function() {
           r_stack.df = m$inputs$raw_cov[[i]][, "canopy", drop = FALSE])[1L], 0)
       m$data$continuous <- m$data$continuous + .7 * as.numeric(scale(raw_canopy))
       multiple <- run(continuous ~ hab + canopy + z + group, m$data, m$inputs, m$folds[1L])
+      # Six fixed-map metadata cases reuse the existing raw-cell fixtures.
+      # No new draws, seeds or study panels; the original lifecycle cap is24.
+      tag <- function(inputs) {
+        inputs$raster_group <- stats::setNames(rep(c("mapA", "mapB"), length.out = nrow(inputs$kernel_dat)),
+          rownames(inputs$kernel_dat))
+        inputs
+      }
+      grouped <- list(
+        gaussian = run(formulas$gaussian, inputs = tag(f$inputs), folds = f$folds[1L]),
+        poisson = run(formulas$poisson, inputs = tag(f$inputs), folds = f$folds[1L], family = "poisson", weights = w),
+        binomial = run(formulas$binomial, inputs = tag(f$inputs), folds = f$folds[1L], family = "binomial", weights = w),
+        refit = run(formulas$gaussian, inputs = tag(f$inputs), folds = f$folds[1L], backend = "refit"),
+        sq = run(continuous ~ hab + z + group, s$data, tag(s$inputs), s$folds[1L]),
+        expow = run(formulas$gaussian, k$data, tag(k$inputs), k$folds[1L]))
       list(fixture = f, formulas = formulas, weights = w, fits = fits, leak = leak,
-        refit = refit, other = other, sq = sq, failed = failed, multiple = multiple, planned_scale_fits = planned)
+        refit = refit, other = other, sq = sq, failed = failed, multiple = multiple, grouped = grouped, planned_scale_fits = planned)
     }, error = function(e) { cv_stage1_cache$failure <- e; stop(e) })
   }
   cv_stage1_cache$value
@@ -277,4 +291,166 @@ test_that("invalid fold and model contracts fail before any scale fit", {
   expect_error(cross_validate(continuous ~ hab + absent, f$data, f$inputs, f$folds), "every formula variable")
   expect_error(.msr_cv_outcome(continuous ~ hab, transform(f$data, continuous = NA_real_), "gaussian"), "finite")
   expect_error(.msr_cv_outcome(I(scale(continuous)) ~ hab, f$data, "gaussian"), "predefine")
+})
+
+# These checks reuse the existing optimized fixture; they add no scale fits.
+test_that("fold generators produce explicit splits accepted by scale CV", {
+  z <- cv_stage1_fixture(); f <- z$fixture; ids <- rownames(f$data)
+  generated <- grouped_cv_folds(as.character(seq_along(ids) %% 3L), 3, ids)
+  spatial <- spatial_cv_folds(cbind((seq_along(ids) %% 3L) * 100, 0), 50, 3, ids, crs = 32617)
+  for (folds in list(generated, spatial)) {
+    actual <- lapply(folds, function(s) sort(s$assessment))
+    original <- lapply(f$folds, function(s) sort(s$assessment))
+    expect_equal(unname(actual), unname(original), ignore_attr = TRUE)
+    expect_identical(.msr_cv_folds(folds, ids), folds)
+  }
+  expect_identical(z$fits$poisson$targets$row_id, sort(ids))
+  expect_equal(z$fits$poisson$targets$observed, f$data[sort(ids), "count"])
+})
+
+test_that("ordinary GLM references, CV tables and training selection match native oracles", {
+  z <- cv_stage1_fixture(); f <- z$fixture
+  null <- cross_validate_glm(count ~ 1, f$data, f$folds, "poisson", weights = z$weights, keep_fits = TRUE)
+  trend <- cross_validate_glm(count ~ poly(z, 2) + group + offset(log(exposure)), f$data,
+    f$folds, "poisson", weights = z$weights, keep_fits = TRUE)
+  expect_true(null$complete); expect_true(trend$complete)
+  models <- list(spatial = z$fits$poisson, null = null, trend = trend)
+  tab <- cv_tab(models, "neg_log_score")
+  expect_setequal(tab$Modnames, names(models)); expect_true(all(diff(tab$Score) >= 0))
+  for (nm in names(models)) {
+    x <- models[[nm]]; p <- x$predictions
+    expected <- weighted.mean(-dpois(p$observed, p$prediction, log = TRUE), p$weight)
+    expect_equal(tab$Score[tab$Modnames == nm], expected)
+    expect_equal(cv_tab(models, "rmse")$Score[cv_tab(models, "rmse")$Modnames == nm],
+      sqrt(weighted.mean((p$observed - p$prediction)^2, p$weight)))
+  }
+  per <- cv_tab(models, "neg_log_score", by_fold = TRUE)
+  expect_equal(nrow(per), 9L)
+  expect_setequal(per$Fold, names(f$folds))
+  for (criterion in c("AIC", "AICc", "BIC")) {
+    chosen <- select_cv(models, criterion, ties = "first", keep_fits = TRUE)
+    expect_true(chosen$complete, info = paste(unlist(chosen$errors), collapse = "; "))
+    expect_identical(chosen$settings$selection_uncertainty, "not_integrated")
+    for (fold in names(f$folds)) {
+      fits <- lapply(models, function(x) x$fits[[fold]])
+      native <- if (criterion == "BIC") bic_tab(fits, mod_names = names(models)) else
+        aic_tab(fits, AICc = criterion == "AICc", mod_names = names(models))
+      expect_equal(chosen$selection$tables[[fold]], native)
+      winner <- native$Modnames[which.min(native[[criterion]])]
+      expect_identical(chosen$selection$chosen[[fold]], winner)
+      expect_identical(chosen$fits[[fold]], models[[winner]]$fits[[fold]])
+      expect_equal(chosen$predictions[chosen$predictions$fold == fold, ],
+        models[[winner]]$predictions[models[[winner]]$predictions$fold == fold, ], ignore_attr = TRUE)
+      # Native GLM count plus optimized scale/shape counts remain provider-owned.
+      expect_equal(native$K[native$Modnames == "spatial"],
+        attr(logLik(z$fits$poisson$fits[[fold]]$opt_mod), "df") + 1)
+    }
+    expect_true(all(is.finite(cv_tab(list(selected = chosen, null = null), "neg_log_score")$Score)))
+  }
+  tied <- select_cv(list(first = null, second = null), "AIC")
+  expect_false(tied$complete); expect_true(all(is.na(tied$summary$estimate)))
+  expect_match(tied$errors$a$message, "tie")
+  expect_true(all(is.na(tied$selection$chosen)))
+  fixed <- select_cv(list(first = null, second = null), "AIC", ties = "first")
+  expect_true(fixed$complete); expect_true(all(fixed$selection$chosen == "first")); expect_null(fixed$fits)
+  # Valid arithmetic copies alter assessment predictions, never training fits.
+  changed <- models
+  changed$trend$predictions$prediction <- rep(100, nrow(changed$trend$predictions))
+  expect_identical(select_cv(changed, "AIC", ties = "first")$selection$chosen,
+    select_cv(models, "AIC", ties = "first")$selection$chosen)
+  expect_error(select_cv(list(compact = cross_validate_glm(count ~ 1, f$data, f$folds, "poisson", weights = z$weights))), "retain every")
+  expect_error(aic_tab(list(null)), "use cv_tab")
+  expect_error(bic_tab(list(null)), "use cv_tab")
+  replaced <- null
+  replaced$fits$a <- do.call(glm, list(formula = count ~ 1, data = f$data, family = poisson(), weights = z$weights))
+  expect_error(select_cv(list(original = null, replaced = replaced)), "analysis row IDs")
+})
+
+test_that("CV comparison binds split plans, training-only targets, trials and weights", {
+  z <- cv_stage1_fixture(); x <- z$fits$poisson
+  variants <- list(x, x, x, x)
+  variants[[1]]$folds$a$analysis <- rev(variants[[1]]$folds$a$assessment)
+  variants[[2]]$targets$observed[1] <- variants[[2]]$targets$observed[1] + 1
+  variants[[3]]$targets$weight[1] <- variants[[3]]$targets$weight[1] + 1
+  variants[[4]]$targets$trials[1] <- 2
+  for (other in variants) expect_error(cv_tab(list(original = x, other = other), "rmse"))
+  incomplete <- z$failed
+  expect_error(cv_tab(list(bad = incomplete), "rmse"), "complete")
+  legacy <- x; legacy$targets <- NULL
+  expect_equal(cv_tab(list(current = x, legacy = legacy), "rmse")$Score, rep(x$summary$estimate[1], 2))
+  partial <- legacy
+  partial$folds <- partial$folds["a"]; partial$predictions <- partial$predictions[partial$predictions$fold == "a", ]
+  partial$fold_results <- partial$fold_results[1, ]
+  expect_error(cv_tab(list(partial = partial), "rmse"), "Legacy CV targets")
+  badfit <- x; badfit$fits$a$opt_mod$model$count[1] <- 999
+  expect_error(select_cv(list(good = x, bad = badfit)), "training responses")
+  expect_error(cv_tab(list(x, x), "rmse"), "uniquely named")
+  expect_error(cv_tab(list(good = x), "AIC"), "supported metric")
+  expect_error(cv_tab(list(binomial = z$fits$binomial, poisson = x), "neg_log_score"), "identical splits|same response family")
+})
+
+test_that("ordinary binomial GLM scores preserve trial and frequency definitions", {
+  z <- cv_stage1_fixture(); f <- z$fixture
+  x <- cross_validate_glm(cbind(yes, no) ~ z * group + offset(log(exposure)), f$data, f$folds,
+    "binomial", weights = z$weights, keep_fits = TRUE)
+  expect_true(x$complete)
+  p <- x$predictions
+  expect_equal(cv_tab(list(native = x), "neg_log_score")$Score,
+    weighted.mean(-dbinom(p$observed, p$trials, p$prediction, log = TRUE), p$weight))
+  expect_equal(cv_tab(list(native = x), "brier")$Score,
+    sum(p$weight * (p$observed * (1 - p$prediction)^2 + (p$trials - p$observed) * p$prediction^2)) /
+      sum(p$weight * p$trials))
+  expect_true(select_cv(list(binomial = x), "AIC")$complete)
+  binary <- cross_validate_glm(I(binary) ~ z + group, f$data, f$folds, "binomial")
+  expect_true(binary$complete); expect_null(binary$fits)
+  # Zero-probability events remain infinite, rather than being clipped.
+  zero <- z$fits$poisson; zero$predictions$prediction[] <- 0
+  tab <- cv_tab(list(zero = zero, other = zero), "neg_log_score")
+  expect_true(all(is.infinite(tab$Score))); expect_true(all(is.na(tab$Delta)))
+  expect_equal(tab$Rank, c(1, 1))
+})
+
+test_that("grouped raster CV preserves row maps and native fixed-map predictions", {
+  z <- cv_stage1_fixture(); f <- z$fixture
+  expect_identical(z$planned_scale_fits, 24L)
+  references <- list(gaussian = z$fits$gaussian, poisson = z$fits$poisson, binomial = z$fits$binomial,
+    refit = z$refit, sq = z$sq, expow = z$other$expow)
+  for (name in names(z$grouped)) {
+    x <- z$grouped[[name]]; ref <- references[[name]]
+    expect_true(x$complete, info = paste(name, paste(unlist(x$errors), collapse = "; ")))
+    p <- ref$predictions[ref$predictions$fold == "a", , drop = FALSE]
+    expect_equal(x$predictions, p, ignore_attr = TRUE)
+    expect_equal(x$training$a$coefficients, ref$training$a$coefficients, tolerance = 0)
+    expect_equal(x$training$a$scale_est, ref$training$a$scale_est, tolerance = 0)
+    expect_equal(x$training$a$fitted_normalization, ref$training$a$fitted_normalization, tolerance = 0)
+    for (part in c("analysis", "assessment")) {
+      expect_identical(names(x$raster_groups$a[[part]]), f$folds$a[[part]])
+      expected <- stats::setNames(rep(c("mapA", "mapB"), length.out = nrow(f$data)), rownames(f$data))
+      expect_identical(x$raster_groups$a[[part]], expected[f$folds$a[[part]]])
+    }
+    expect_identical(x$fits$a$kernel_inputs$raster_group, x$raster_groups$a$analysis)
+    expect_identical(x$settings$parameter_uncertainty, "not_integrated")
+  }
+  x <- z$grouped$poisson
+  selected <- select_cv(list(grouped = x), "AIC")
+  expect_true(selected$complete)
+  expect_identical(selected$raster_groups, x$raster_groups)
+  expect_identical(selected$selection$candidate_settings$grouped, x$settings)
+  expect_identical(selected$settings$controls_from, "grouped")
+  expect_equal(selected$selection$tables$a$K, attr(logLik(x$fits$a$opt_mod), "df") + 1)
+})
+
+test_that("malformed grouped raster identities stop before scale fitting", {
+  f <- cv_stage1_inputs(); ids <- rownames(f$data)
+  inputs <- f$inputs
+  inputs$raster_group <- stats::setNames(rep(c("A", "B"), length.out = length(ids)), ids)
+  call <- function(x) cross_validate(continuous ~ hab + z, f$data, x, f$folds)
+  x <- inputs; names(x$raster_group) <- rev(ids)
+  expect_error(call(x), "raster_group.*align")
+  x <- inputs; x$raster_group[1] <- NA_character_
+  expect_error(call(x), "raster_group.*nonmissing")
+  x <- inputs; x$raster_group[1] <- ""
+  expect_error(call(x), "raster_group.*nonmissing")
+  x <- inputs; x$raster_group <- unname(x$raster_group)
+  expect_error(call(x), "raster_group.*align")
 })

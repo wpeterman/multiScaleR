@@ -1,0 +1,271 @@
+---
+title: "Cross-Validation and Model Selection"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Cross-Validation and Model Selection}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+library(multiScaleR)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+# Choose the prediction question first
+
+Cross-validation (CV) assesses predictions for observations excluded from model
+fitting. For scale-of-effect models, the exclusion must apply to ecological
+scales and learned predictor transformations as well as regression coefficients.
+Fitting scales on the full data before dividing rows into folds would use
+information from the assessment data.
+
+The fold design determines the prediction question. Holding out rows at random
+can assess new observations near the sampled locations. Holding out whole
+animals or sites assesses transfer to excluded sampling groups. Spatial blocks
+and training buffers assess predictions across a chosen geographic separation.
+None of these designs automatically establishes independence or calibration.
+Choose groups, block size, buffer, candidate models and scoring rules before
+examining the assessment outcomes.
+
+| Function | Use |
+|:--|:--|
+| `grouped_cv_folds()` | Keep whole sampling groups in one assessment fold |
+| `spatial_cv_folds()` | Keep whole projected grid blocks, optionally joined by groups |
+| `cross_validate()` | Refit spatial scales and GLM coefficients within each fold |
+| `cross_validate_glm()` | Fit ordinary GLM reference or null models within each fold |
+| `cv_tab()` | Compare pooled or per-fold held-out prediction scores |
+| `select_cv()` | Evaluate model selection using training-only AIC, AICc or BIC |
+
+# Keep dependent observations together
+
+Use the animal, site or other sampling unit that should not occur on both sides
+of a split. This small example has two observations per sampling group.
+
+```{r grouped-folds}
+ids <- paste0("record", seq_len(12))
+sampling_group <- rep(letters[1:6], each = 2)
+grouped <- grouped_cv_folds(sampling_group, k = 3, ids = ids)
+grouped
+grouped$fold1
+```
+
+Each group belongs to one assessment fold; the other groups form the analysis
+set. Assignment balances row counts using whole groups, largest first. It is
+deterministic and does not alter the random-number generator. If random folds
+are needed, supply a predeclared explicit list of analysis/assessment IDs to the
+CV functions. They also accept repeated assessment splits and training-buffer
+exclusions. Both vectors must be nonempty, disjoint character IDs within a split.
+
+Keeping a matched choice set together is necessary for step-selection designs,
+but fold construction alone does not supply conditional-logistic or amt scoring.
+The current scoring adapters support canonical Gaussian, Poisson and binomial
+GLMs. Mixed, GAM, unmarked, Bayesian and step-selection scoring require their own
+qualified predictive targets and adapters.
+
+# Use projected spatial blocks and a training buffer
+
+The bundled count example has 100 sampling locations. Assign stable row IDs to
+both the response data and the point object. The bundled locations are an
+unreferenced simulated grid. For this example, define its Cartesian distances
+in meters with an explicit local CRS. This is not a claim about real geographic
+locations. Real data need their actual projected CRS, with an explicit transform
+when necessary; never relabel longitude/latitude as linear coordinates. No
+full-data centering or scaling is performed below.
+
+```{r spatial-folds}
+data("landscape_counts")
+data("surv_pts")
+dat <- landscape_counts
+locations <- surv_pts
+stopifnot(is.na(sf::st_crs(locations)))
+local_crs <- paste0('LOCAL_CS["Simulated metre grid",LOCAL_DATUM["Local",0],',
+                    'UNIT["metre",1],AXIS["X",EAST],AXIS["Y",NORTH]]')
+sf::st_crs(locations) <- local_crs
+ids <- paste0("site", seq_len(nrow(dat)))
+rownames(dat) <- rownames(locations) <- ids
+xy <- sf::st_coordinates(locations)
+dat$east <- xy[, 1]
+
+# Distances use the projected CRS units. Inspect them before choosing distances.
+sf::st_crs(locations)$units_gdal
+folds <- spatial_cv_folds(locations, block_size = 1000, k = 3, buffer = 100)
+folds
+```
+
+An assessment fold can contain several disjoint blocks. The generator balances
+counts; it does not create contiguous regions. With a positive buffer, the
+training set excludes an entire spatial unit if any point in that unit lies
+within the requested distance of an assessment point. The buffer measures
+point-to-point separation, not distance to whole block boundaries.
+
+Inspect `attr(folds, "fold_info")$assignment` for row, block, unit and fold
+assignments and `$excluded` for training IDs removed per fold. For repeated
+sampling, pass `group = dat$animal` or another aligned group vector. Blocks
+connected by a shared group are joined, including transitive connections. If
+too few units remain for `k` folds, or buffering removes every training unit,
+the generator stops before model fitting. Coordinate tables require an explicit
+projected `crs`; geographic coordinates are rejected rather than interpreted as
+linear distances.
+
+# Compare predictions from the same assessment targets
+
+Start with inexpensive reference models. The trend below uses native `poly()`
+metadata learned from each training set. The null model uses the same rows,
+folds and Poisson observation definition.
+
+```{r reference-models}
+candidates <- list(
+  null = cross_validate_glm(counts ~ 1, dat, folds, family = "poisson",
+                            keep_fits = TRUE),
+  trend = cross_validate_glm(counts ~ poly(east, 2), dat, folds, family = "poisson",
+                             keep_fits = TRUE)
+)
+vapply(candidates, function(x) x$complete, logical(1))
+cv_tab(candidates, metric = "neg_log_score")
+cv_tab(candidates, metric = "rmse", by_fold = TRUE)
+```
+
+Lower scores are better. Negative log scores retain the Poisson count
+probability, including its constants. RMSE is the square root of pooled squared
+errors across assessment occurrences, not the average of fold RMSEs. If an
+observation is assessed repeatedly, every occurrence contributes to the pooled
+score. Frequency weights retain their replication meaning.
+
+Binomial input can be numeric/logical 0/1, a two-level factor, or
+`cbind(successes, failures)`. Binomial negative log scores compare count
+probabilities; Brier scores average squared error over individual trials and
+weight observations by frequency times trial count. A zero-trial row contributes
+no score. An observed event assigned zero probability produces an infinite log
+loss, which is retained without clipping.
+
+`cv_tab()` requires matching analysis and assessment IDs, observed responses,
+trials and frequency weights. It rejects incomplete candidates rather than
+dropping failed folds. Inspect `$errors`, `$warnings` and `$diagnostics` before
+interpreting scores. Completion means the requested calculations finished, not
+that numerical diagnostics or calibration passed. Scores add no complexity
+penalty and are not AIC values, Akaike weights or model probabilities. Variation
+across dependent folds is not an independent-observation standard error.
+
+# Evaluate a model-selection procedure within the folds
+
+Per-fold assessment ranks describe prediction performance. They must not choose
+the model whose predictions are then scored on those same observations.
+`select_cv()` instead uses the retained **training fits**, selecting by a
+predeclared AIC, AICc or BIC rule and then retrieving the chosen model's held-out
+predictions. No extra fitting is needed.
+
+```{r training-selection}
+selected <- select_cv(candidates, criterion = "AICc", ties = "first")
+selected$selection$chosen
+selected$selection$tables$fold1
+cv_tab(c(candidates, list(training_selected = selected)), metric = "neg_log_score")
+```
+
+The native training tables retain their original parameter counts. Estimated
+scales and shapes enter the existing multiScaleR penalty; fixed radii remain
+fixed. Native nuisance parameters and likelihood-comparability guards are
+unchanged. This example predeclares that exact criterion ties use the first
+listed model. The default `ties = "error"` retains an unresolved tie as a failed
+selection fold. Invalid or nonfinite training criteria are also retained as
+failures, leaving the procedure's pooled scores incomplete.
+
+The resulting score assesses this candidate set and selection rule. If pooled
+CV results are used to choose the candidate set, kernel, block size or selection
+rule itself, assess that final choice with an independent test set or a further
+outer validation layer. Neither `cv_tab()` nor `select_cv()` integrates parameter
+or selection uncertainty, supplies observation intervals or establishes
+calibration.
+
+# Add a model that estimates ecological scales
+
+Reuse the same explicit folds with raw-cell preparation. This workflow is not
+run during vignette builds because it adds a scale optimization for every fold.
+The test suite checks training-only scale refitting and score agreement with
+native GLMs. Choose the extraction domain and initial scales independently of
+assessment outcomes.
+
+```{r estimated-scales, eval=FALSE}
+land <- terra::rast(system.file("extdata", "landscape.tif", package = "multiScaleR"))
+# The example raster uses the same simulated grid and local distance declaration.
+terra::crs(land) <- sf::st_crs(locations)$wkt
+inputs <- kernel_prep(pts = locations, raster_stack = land,
+                      max_D = 1500, sigma = c(250, 500, 250),
+                      store_cell_data = TRUE)
+# Prepared and response rows must have exactly the same IDs and order.
+stopifnot(identical(rownames(inputs$kernel_dat), rownames(dat)))
+spatial <- cross_validate(counts ~ land1 + land2, dat, inputs, folds,
+                          family = "poisson", keep_fits = TRUE)
+models <- c(candidates, list(spatial = spatial))
+cv_tab(models, metric = "neg_log_score")
+selection <- select_cv(models, criterion = "AICc", ties = "first")
+```
+
+`cross_validate()` rebuilds spatial predictors inside every training set,
+estimates scales and coefficients there, and freezes its learned normalization
+and bin references for assessment prediction. It preserves existing starts,
+cold/limiting/curvature checks and metric/kernel guards. Do not supply full-data
+scale fits as substitutes for fold fits. Ordinary reference models use
+`cross_validate_glm()`; the spatial entry point still requires an optimized
+spatial predictor. Grouped fold generation is distinct from grouped raster
+preparation. The former defines sampling units for validation; the latter
+chooses a fixed covariate map for each row.
+
+## Use fixed maps for different raster groups
+
+Modern `kernel_prep_by_group()` inputs retain raw buffers and a named
+`raster_group` mapping. CV validates this mapping before fitting, subsets it
+with the buffers and records analysis/assessment assignments in `$raster_groups`.
+Training normalization and bin references still use training rows only.
+
+```{r grouped-raster-cv, eval=FALSE}
+# Both labels use the same simulated map here solely to illustrate alignment.
+# For real data, supply the appropriate maps with identical grids and layer names.
+maps <- list(map1 = land, map2 = land)
+map_id <- rep(c("map1", "map2"), length.out = nrow(locations))
+group_inputs <- kernel_prep_by_group(locations, maps, group = map_id,
+                                    max_D = 1500, store_cell_data = TRUE)
+grouped_cv <- cross_validate(counts ~ land1 + land2, dat, group_inputs, folds,
+                             family = "poisson")
+grouped_cv$raster_groups$fold1
+```
+
+Raster-map labels do not themselves introduce annual random effects, varying
+scales or extra fitted parameters. Explicit formula factors/interactions and
+estimated scales/shapes keep their native parameter penalties. A held-out factor
+level absent from training still produces the native prediction failure; CV does
+not replace it with a zero effect. Inspect the selected row/map records and
+`$selection$candidate_settings` when evaluating a training-selection procedure.
+`$settings$controls_from` identifies the first candidate whose control fields
+are inherited; candidate-specific controls remain in the selection record.
+
+## Retain cells intersecting the extraction buffer
+
+Native raster preparation records both cell dimensions. A cell can intersect
+the extraction buffer even when its center lies beyond the nominal radius.
+CV retains those values and fixes the bin domain using the requested radius
+plus half the pixel diagonal, rather than a maximum learned from held-out rows.
+Representative distances and normalization are still learned only from training
+rows. Geometry is frozen with the bin reference. Legacy saved inputs without
+cell geometry keep the original strict gate; prepare them again with the current
+constructor if that gate rejects their cell-center distances. Extraction,
+kernel/metric definitions and fitted parameter bounds are unchanged.
+
+# Keep outputs proportionate to the task
+
+Both CV functions default to `keep_fits = FALSE`, retaining compact scores,
+training summaries and diagnostics. Full fold fits are needed by `select_cv()`;
+request them only when evaluating a training-based selection procedure or
+inspecting fits. `select_cv()` returns compact output by default. Reuse the
+same prepared inputs and fold list across candidates, and avoid saving duplicate
+rasters or arrays of fit objects as intermediate checkpoints.
+
+For inference-target and interval distinctions, see
+`vignette("inference-contracts", package = "multiScaleR")`. For likelihood-based
+model comparison, see `?aic_tab` and `?bic_tab`. Function help for `?cross_validate`,
+`?spatial_cv_folds`, `?cv_tab` and `?select_cv` gives the complete input and
+result contracts.

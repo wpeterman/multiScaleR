@@ -41,6 +41,9 @@
 #'   \item{\code{binned}}{Pooled distance-bin summaries for kernel covariates,
 #'     or \code{NULL} when \code{bin = FALSE}. Each covariate has finite-value
 #'     sums and counts by point and distance bin.}
+#'   \item{\code{cell_size}}{Fixed x/y cell dimensions in map units, shared
+#'     by every map. CV derives its intersecting-cell center envelope from this
+#'     declared geometry, independently of assessment data.}
 #'   \item{\code{raster_group}}{Named character vector recording the map
 #'     assigned to each point, in input order.}
 #'   \item{\code{scl_params}}{Pooled means and standard deviations used to
@@ -218,6 +221,7 @@ kernel_prep_by_group <- function(pts, raster_stacks, group, max_D,
               n_covs = n_optimized, unit_conv = max_D,
               sigma = sigma / max_D, scale_vars = scale_vars,
               resolution = terra::res(ref)[1], n_cols = terra::ncol(ref),
+              cell_size = terra::res(ref),
               binned = binned, cell_data_stored = !drop_cells,
               scl_params = list(mean = attr(scaled, "scaled:center"),
                                 sd = attr(scaled, "scaled:scale")),

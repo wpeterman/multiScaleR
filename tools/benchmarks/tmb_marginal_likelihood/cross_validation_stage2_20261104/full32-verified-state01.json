@@ -1,0 +1,30 @@
+{
+  "accepted": true,
+  "verified_at": "2026-11-04T03:21:30.851177-05:00",
+  "verifier_sha256": "9da92f920ba28717dafbd2fabe58de2ea3c175e6dd6479f6c7387396eb64f569",
+  "configuration_sha256": "7cd0645bb9823d80fd7edca11f2e6bbab7282b252a5cc73074047622490b7a50",
+  "branch": "inference-dev",
+  "head": "f34f10daaf5d5b83ebeb2b59b2b3dea6ae966252",
+  "check_status": "OK",
+  "normal_vignette_enabled": true,
+  "full_validation": {
+    "failed": 0,
+    "warnings": 0,
+    "skips": 10,
+    "passed": 31917
+  },
+  "archive_sha256": "78abd17959096e03a67645efbfa4c05ca255b9dfab79b85e7a41875686d5975f",
+  "source_files": 460,
+  "source_archive_installed_tests_dependency_verified": true,
+  "all14scientific_markers_preserved": true,
+  "skip_identities_preserved": true,
+  "reviewed_ledger_deltas": {
+    "test-cross-validation.R": {
+      "passed": 76
+    }
+  },
+  "verified_owned_R_remaining": 0,
+  "private_admission_guards_preserved": true,
+  "timing_comparison_eligible": false,
+  "as_cran_incoming_status": "unresolved_external_metadata_timeouts_from_full67"
+}

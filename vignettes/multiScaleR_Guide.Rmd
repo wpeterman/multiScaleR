@@ -639,6 +639,37 @@ Model selection tables clearly show that the inclusion of scaled landscape varia
 
 The challenge of identifying 'significant' scale relationships was also noted by Lowe et al., and the R package `scalescape` has a bootstrap function to determine the significance of parameters within the regression model. Such procedures are not currently implemented in `multiScaleR`.
 
+## Cross-validation and training-based model selection
+
+For prediction assessment, use the same predeclared folds for every candidate.
+`grouped_cv_folds()` keeps whole animals, sites or other sampling units together.
+`spatial_cv_folds()` assigns projected grid blocks and can remove nearby training
+units with a distance buffer. Several disjoint blocks can share an assessment
+fold. Choose distances and the prediction target from the sampling design.
+
+`cross_validate()` estimates scales and GLM coefficients using only the training
+rows, then freezes their learned bins and normalization for assessment. Use
+`cross_validate_glm()` for ordinary GLM null or reference models on those folds.
+Modern grouped raster preparation keeps its fixed per-row map labels aligned
+within both parts of each split. Map groups select covariates; sampling groups
+define validation units. Neither label adds fitted parameters by itself.
+`cv_tab()` ranks pooled or per-fold held-out scores, checking identical targets,
+splits, trials and weights. Failed folds are retained and prevent pooled ranking.
+Predictive scores add no AIC penalty or Akaike weights.
+
+To assess a selection procedure, retain fold fits with `keep_fits = TRUE` and
+use `select_cv()` with a predeclared AIC, AICc or BIC rule. Selection uses each
+fold's training likelihood and native parameter counts, then scores that model's
+held-out predictions. Assessment ranks must not select the winner in the same
+fold. If pooled CV results tune the candidate set or selection rule, assess the
+final choice with an outer validation layer or independent test data.
+
+See `vignette("cross-validation", package = "multiScaleR")` for worked spatial,
+grouped and model-selection examples. The current scoring adapters cover
+Gaussian identity, Poisson log and binomial logit GLMs. Other model classes need
+separately qualified scoring adapters. Priors, numerical guards, uncertainty
+distinctions and native diagnostic requirements remain unchanged.
+
 # Optimization with `unmarked`
 
 Among the model classes that `multiScaleR` can be used to optimize are those from `unmarked`. We will use the simulation functions from the package to create data for this analysis. First, we will simulate and visualize raster surfaces.

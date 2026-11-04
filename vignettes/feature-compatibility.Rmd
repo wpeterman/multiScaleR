@@ -732,8 +732,17 @@ case are not refitted models or evidence of inferential calibration.
 `cross_validate()` provides training-only scale refitting and held-out scoring
 for Gaussian identity, Poisson log and binomial logit GLMs. It accepts explicit
 analysis/assessment row IDs, retains failures and uses frozen training bins and
-normalization. Cell-level inputs are required; lean-only and grouped preparation
-need additional adapters. Supported kernels and metrics follow the selected
+normalization. Cell-level inputs are required; lean-only preparation is rejected.
+Modern grouped raster inputs retain validated per-row fixed-map identities in
+each split; they do not introduce annual random effects or varying scales. Supported kernels and metrics follow the selected
 `profile_glm` or `refit` backend's existing guards. This stage does not add GAM,
 mixed-model, unmarked, step-selection or Bayesian scoring. See
 `vignette("inference-contracts", package = "multiScaleR")` for the workflow.
+
+`grouped_cv_folds()` and `spatial_cv_folds()` generate compatible whole-unit
+splits, with optional spatial training buffers and shared-group block joining.
+`cross_validate_glm()` supplies ordinary GLM reference models. `cv_tab()` ranks
+matching held-out scores; `select_cv()` evaluates training-only AIC/AICc/BIC
+selection with retained fold fits and original parameter counts. These helpers
+do not expand the supported scoring model classes or any private admission.
+Worked examples are in `vignette("cross-validation", package = "multiScaleR")`.

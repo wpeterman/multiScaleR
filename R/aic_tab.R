@@ -9,6 +9,8 @@
 }
 
 .msr_selection_model <- function(model) {
+  if (inherits(model, "multiScaleR_cv"))
+    stop("CV results contain held-out scores, not a maximized likelihood; use cv_tab() or select_cv() with retained training fits.", call. = FALSE)
   if (inherits(model, "multiScaleR_bayes"))
     stop("AIC/BIC require maximized likelihoods; Bayesian posterior fits need an appropriate posterior predictive comparison, not a posterior objective substituted for logLik.", call. = FALSE)
   if (inherits(model, "msr_spatial_scale_prototype"))

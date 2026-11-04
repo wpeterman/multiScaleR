@@ -1,7 +1,8 @@
 # Inference development
 
-Current source: version 0.7.14 explicit-fold GLM cross-validation and compatibility updates.
-Read `../publication_cv_20261103/RESUME.md`. Earlier receipts below
+Current checkout: validated grouped/spatial CV, training selection and native
+preparation geometry, prepared for the authorized version 0.7.15 publication.
+Read `../cross_validation_stage2_20261104/RESUME.md`. Earlier receipts below
 describe their own source epochs.
 
 Keep native refitting, analytic likelihood methods, marginal-likelihood research
@@ -156,3 +157,33 @@ and model-selection vignette integration. Preserve parameter counts, priors,
 diagnostics, uncertainty and every private guard. Continue curated-only source
 copies and compact checkpoints. Keep scientific failures and unique inputs.
 Only the present accepted batch is covered by the current commit/push request.
+
+## November 4 CV completion
+
+Published version 0.7.14 remains commit f34f10da. The current uncommitted CV
+batch passes a fresh normal vignette check, 31,917 exact-archive installed
+assertions (zero failure/warning, ten unchanged helper skips) and 2,991 installed
+compatibility assertions without errors/warnings/skips. All fourteen scientific
+markers and old ledger/skip identities remain. Applied35 binds the current
+460-file curated source and fourteen untouched legacy inputs to that evidence.
+
+Whole-unit grouped/spatial folds, optional buffers, canonical GLM references,
+guarded CV rankings and training-only native AIC/AICc/BIC selection are ready.
+Native fixed raster-group maps stay aligned; cell-size geometry supplies a fixed
+intersecting-cell bin envelope without clipping or assessment-derived bounds.
+Scoring beyond canonical GLMs and every private spatial/ML admission remain
+separately guarded. Priors, K, fixed references and uncertainty are unchanged.
+
+Retire36 removed only 48 hash-verified regenerable source object files; all code,
+DLLs, archives, inputs and failures remain. No numerical work is running. Do not
+replay closed producers or stage bulk evidence. A later explicit commit request
+requires one version bump and the usual review/metadata qualification.
+
+## CV publication and logoff
+
+Version 0.7.15 publishes the accepted CV batch. Only release metadata changed
+after the full32 check and 31,917 installed assertions. Read the CV checkpoint
+and NEXT_CV_COMPATIBILITY.md before resuming; all numerical work is stopped.
+Priorities are compact native training-criterion snapshots, conditional-choice
+survival/amt scoring, then family/GAM and mixed/unmarked target qualification.
+No new panel or fitting promotion is authorized merely by this note.

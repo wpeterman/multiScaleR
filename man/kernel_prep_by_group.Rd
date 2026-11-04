@@ -71,6 +71,9 @@ A \code{multiScaleR_data} list containing:
   \item{\code{binned}}{Pooled distance-bin summaries for kernel covariates,
     or \code{NULL} when \code{bin = FALSE}. Each covariate has finite-value
     sums and counts by point and distance bin.}
+  \item{\code{cell_size}}{Fixed x/y cell dimensions in map units, shared
+    by every map. CV derives its intersecting-cell center envelope from this
+    declared geometry, independently of assessment data.}
   \item{\code{raster_group}}{Named character vector recording the map
     assigned to each point, in input order.}
   \item{\code{scl_params}}{Pooled means and standard deviations used to

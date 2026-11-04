@@ -436,3 +436,22 @@ By default, results keep predictions, scores, fitted scales and compact
 diagnostics. Use `keep_fits = TRUE` only when you need full fold models in memory.
 Folds run sequentially with one fit worker, and no full-data fitted model is
 used as a warm start. See `?cross_validate` for all score and result fields.
+
+
+### Grouped/spatial folds and model selection
+
+Use `grouped_cv_folds()` to keep dependent sampling groups intact, or
+`spatial_cv_folds()` for projected grid blocks with optional whole-unit training
+buffers. Both return the explicit ID splits accepted by `cross_validate()`.
+Grouped raster preparation is a separate input contract: modern raw-cell
+inputs retain validated per-row map labels in each split. These fixed covariate
+maps add no random effects or parameters by themselves. Group generation does
+not qualify additional model classes for CV scoring.
+
+Ordinary reference GLMs use `cross_validate_glm()`. `cv_tab()` compares only
+complete results with matching targets, splits, observed responses, trials and
+weights. Per-fold assessment ranks describe predictions; they must not select
+that fold's model. `select_cv()` uses retained training fits and native AIC,
+AICc or BIC penalties, then scores the chosen model's held-out predictions.
+Neither helper adds parameter/selection integration, observation intervals or
+calibration claims. See `vignette("cross-validation", package = "multiScaleR")`.

@@ -27,18 +27,31 @@
   if (!is.numeric(nb) || length(nb) != 1L || !is.finite(nb) || nb < 2 || nb != floor(nb))
     stop("CV binning requires a valid prepared nbins value.", call. = FALSE)
   domain <- inputs$max_D / inputs$unit_conv
+  # Extraction selects intersecting cells, whose centers may exceed max_D.
+  # A fixed cell-diagonal envelope retains them without using assessment data.
+  cell_size <- inputs$cell_size
+  if (!is.null(cell_size)) {
+    if (!is.numeric(cell_size) || length(cell_size) != 2L ||
+        any(!is.finite(cell_size) | cell_size <= 0))
+      stop("CV cell_size must declare two finite positive grid dimensions.", call. = FALSE)
+    cell_size <- unname(as.numeric(cell_size))
+    half_diagonal <- (max(cell_size) / 2) * sqrt(sum((cell_size / max(cell_size))^2))
+    domain <- (inputs$max_D + half_diagonal) / inputs$unit_conv
+    if (!is.finite(domain) || domain <= 0)
+      stop("Invalid declared CV extraction geometry.", call. = FALSE)
+  }
   if (is.null(reference)) {
     breaks <- seq(0, domain * (1 + 1e-9), length.out = nb + 1L)
   } else {
     breaks <- reference$breaks
     if (length(breaks) != nb + 1L || any(!is.finite(breaks)) || any(diff(breaks) <= 0) ||
         length(reference$bin_rep) != nb || any(!is.finite(reference$bin_rep)) ||
-        !identical(reference$domain, domain))
+        !identical(reference$domain, domain) || !identical(reference$cell_size, cell_size))
       stop("Invalid frozen training bin reference.", call. = FALSE)
   }
   codes <- lapply(inputs$d_list, function(d) {
     if (any(!is.finite(d) | d < 0 | d > domain * (1 + 1e-9)))
-      stop("Prepared cell distances must lie inside the declared physical buffer.", call. = FALSE)
+      stop("Prepared cell distances must lie inside the declared extraction envelope; rebuild legacy inputs with kernel_prep() to record grid geometry.", call. = FALSE)
     .bincode(d, breaks, include.lowest = TRUE)
   })
   if (is.null(reference)) {
@@ -51,6 +64,7 @@
     empty <- !is.finite(rep)
     rep[empty] <- ((breaks[-1L] + breaks[-length(breaks)]) / 2)[empty]
     reference <- list(breaks = breaks, bin_rep = rep, domain = domain)
+    if (!is.null(cell_size)) reference$cell_size <- cell_size
   }
   vsum <- csum <- stats::setNames(vector("list", nrow(specs)), specs$covariate)
   for (j in seq_len(nrow(specs))) {
@@ -77,6 +91,7 @@
   out$kernel_dat <- inputs$kernel_dat[rows, covariates, drop = FALSE]
   out$d_list <- inputs$d_list[rows]
   out$raw_cov <- inputs$raw_cov[rows]
+  if (!is.null(inputs$raster_group)) out$raster_group <- inputs$raster_group[ids]
   names(out$d_list) <- names(out$raw_cov) <- ids
   specs <- inputs$scale_vars
   old_opt <- specs$covariate[specs$optimize]
@@ -173,7 +188,7 @@
 #'
 #' Refit ecological scales and GLM coefficients using only each training set,
 #' then score predictions for the explicitly held-out rows. A fold is one
-#' training and assessment split. This first stage supports ordinary Gaussian,
+#' training and assessment split. This function supports ordinary Gaussian,
 #' Poisson and binomial GLMs and runs folds sequentially.
 #'
 #' @param formula Two-sided GLM formula. The response is a data column or
@@ -189,7 +204,9 @@
 #'   \code{\link{kernel_prep}} with cell-level distances and source values
 #'   retained. Use \code{store_cell_data = TRUE}. Its buffer, initial scales,
 #'   metric definitions and other controls must be chosen independently of the
-#'   assessment outcomes. Lean-only and grouped preparation are not supported.
+#'   assessment outcomes. Modern \code{\link{kernel_prep_by_group}} inputs
+#'   are supported when their named \code{raster_group} map aligns with prepared
+#'   row IDs. Lean-only preparation is not supported.
 #' @param folds Uniquely named list of explicit splits. Each split contains
 #'   nonempty character vectors \code{analysis} and \code{assessment} of row
 #'   IDs. They must be disjoint within a split. Splits can omit rows for spatial
@@ -248,6 +265,11 @@
 #'       per fold. Failures are retained and never retried automatically.}
 #'     \item{\code{prediction_contracts}}{Existing prediction contracts per fold,
 #'       retaining the native conditioning and uncertainty distinctions.}
+#'     \item{\code{raster_groups}}{For grouped raster inputs, named fixed-map
+#'       labels for analysis/assessment IDs per fold, retained even on failure.
+#'       Otherwise \code{NULL}. These are input maps, not fitted random effects.}
+#'     \item{\code{targets}}{Compact used-row responses, trials and weights for
+#'       guarded comparison with \code{\link{cv_tab}}. Never used in fitting.}
 #'     \item{\code{fits}}{Full fold fits when \code{keep_fits = TRUE}; otherwise
 #'       \code{NULL}. These fits use only their own training data.}
 #'     \item{\code{complete}, \code{settings}, \code{call}}{Whether all planned
@@ -257,9 +279,20 @@
 #' @details
 #' Raw spatial buffers are reused without changing them. Initial spatial
 #' normalization and pooled representative bin distances are learned from the
-#' training rows only. The bin domain remains the predeclared physical buffer.
+#' training rows only. The bin domain is fixed from the declared buffer and,
+#' for modern preparation, the raster cell-size envelope. Intersecting cells
+#' can have centers beyond the nominal buffer; their values are retained.
+#' The geometric domain is independent of assessment data. Legacy stored inputs
+#' without cell geometry retain the original strict buffer-center gate; rebuild
+#' them with the current preparation function if it rejects their distances.
 #' Assessment values use the frozen training bins and normalization. Existing
 #' coefficient, scale, shape and numerical-diagnostic calculations are unchanged.
+#' Grouped raster maps select fixed source covariates by row. Their group map
+#' is validated before fitting and subset with the buffers. Scales and
+#' coefficients use the pooled training rows; assessment preprocessing remains
+#' frozen. Map labels do not introduce annual/random effects, extra fitted
+#' parameters or spatially varying scales. Explicit formula group effects keep
+#' their native fitting, parameter counts and new-level prediction guards.
 #'
 #' Negative log scores retain Poisson/binomial likelihood constants and average
 #' over positive-weight observations using frequency weights. Binomial Brier
@@ -277,7 +310,9 @@
 #' Read \code{complete} first. Inspect failed folds and original diagnostics
 #' before ranking models. Partial fold scores remain available for diagnosis,
 #' while an incomplete pooled summary stays \code{NA}. This stage does not
-#' generate random/spatial folds or score GAMs, mixed, unmarked or Bayesian fits.
+#' score GAMs, mixed, unmarked or Bayesian fits. See
+#' \code{\link{grouped_cv_folds}} and \code{\link{spatial_cv_folds}} for
+#' deterministic whole-group and spatial-grid fold construction.
 #' @examples
 #' # Explicit folds can be checked before any fitting is attempted.
 #' ids <- paste0("site", 1:6)
@@ -309,6 +344,14 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
       !.msr_valid_observation_ids(rownames(inputs$kernel_dat), nrow(inputs$kernel_dat)) ||
       !setequal(ids, rownames(inputs$kernel_dat)))
     stop("CV requires matching kernel_prep() row IDs and stored cell-level inputs; use store_cell_data = TRUE.", call. = FALSE)
+  if (!is.null(inputs$raster_group)) {
+    groups <- inputs$raster_group
+    if (!is.character(groups) || length(groups) != nrow(inputs$kernel_dat) ||
+        !identical(names(groups), rownames(inputs$kernel_dat)))
+      stop("raster_group must align exactly with prepared row IDs.", call. = FALSE)
+    if (anyNA(groups) || any(!nzchar(groups)))
+      stop("raster_group must contain nonmissing, nonempty fixed map labels.", call. = FALSE)
+  }
   variables <- all.vars(formula)
   spatial <- inputs$scale_vars$covariate
   covariates <- if ("." %in% variables) spatial else intersect(spatial, variables)
@@ -349,8 +392,11 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
   output <- list(predictions = list(), metrics = list(), fold_results = list(),
     training = list(), diagnostics = list(), warnings = list(), errors = list(),
     prediction_contracts = list(), fits = if (keep_fits) list() else NULL)
+  output$raster_groups <- if (is.null(inputs$raster_group)) NULL else list()
   for (name in names(folds)) {
     split <- folds[[name]]
+    if (!is.null(inputs$raster_group))
+      output$raster_groups[[name]] <- lapply(split, function(rows) inputs$raster_group[rows])
     ai <- match(split$analysis, ids); ti <- match(split$assessment, ids)
     pred <- data.frame(fold = name, row_id = split$assessment, observed = NA_real_, trials = NA_real_,
       prediction = NA_real_, weight = unname(weights[ti]), eligible = FALSE, stringsAsFactors = FALSE)
@@ -439,6 +485,7 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
     .msr_cv_metric(output$predictions, metric, family, output$complete, nrow(output$predictions))))
   output$folds <- folds
   output$assessment_counts <- stats::setNames(tabulate(match(output$predictions$row_id, ids), length(ids)), ids)
+  output$targets <- .msr_cv_targets(formula, data, family, weights, folds)
   output$settings <- list(family = family, link = family_object$link, backend = backend,
     metrics = metrics, optim_args = optim_args, glm_control = glm_control,
     normalization = "training_only", bin_reference = "training_only_declared_buffer_domain",
