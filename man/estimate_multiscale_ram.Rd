@@ -91,6 +91,10 @@ The estimate is advisory rather than exact. It is based on
 the size of stored R objects, not all transient allocations made by
 \code{exactextractr}, model refits, or BLAS/LAPACK.
 
+Successful hardware measurements are kept for the current R session. An
+unsuccessful RAM lookup is retried on later calls and does not supply a
+usable memory budget.
+
 The recommendation is intentionally conservative. Even on Unix-like systems
 where forking can share memory copy-on-write, worker counts are budgeted as
 though each worker may require its own copy of the optimization payload.

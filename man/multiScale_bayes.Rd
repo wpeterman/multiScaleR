@@ -72,8 +72,12 @@ cannot also predict spatial scales. Removed terms add no scale parameters.}
 
 \item{family}{Response family: \code{"nbinom2"} (default, log link),
 \code{"poisson"} (log), \code{"binomial"} (logit), or \code{"gaussian"}
-(identity). Binomial responses are binary or
-\code{cbind(successes, failures)}. NB2 variance is
+(identity). Use numeric \code{0}/\code{1} or logical
+\code{FALSE}/\code{TRUE} values for Bernoulli responses,
+a two-level factor with success in its second level, or
+\code{cbind(successes, failures)} for grouped binomial responses. Logical
+count columns represent zero/one counts and retain the same trial totals.
+The logit response prediction is a success probability. NB2 variance is
 \eqn{\mu + \mu^2/\theta}.}
 
 \item{row_id}{Optional name of a column in \code{data} containing prepared

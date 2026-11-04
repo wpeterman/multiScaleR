@@ -14,16 +14,35 @@
   NULL
 }
 
+# Native pcount retains raw counts in getY; recover the fitted visit mask.
+# Keep original row alignment, then apply the already stored omitted-site map.
+.msr_unmarked_pcount_response <- function(model, rows) {
+  native <- tryCatch({
+    recover <- utils::getFromNamespace("getDesign", "unmarked")
+    recover(model@data, model@formlist, na.rm = FALSE)
+  }, error = function(e) {
+    stop("Could not recover used pcount responses from native metadata: ",
+         conditionMessage(e), call. = FALSE)
+  })
+  if (!is.list(native) || !all(c("y", "removed.sites") %in% names(native)) ||
+      !is.matrix(native$y) || !identical(dim(native$y), dim(model@data@y)))
+    stop("Used pcount response layout does not match native input rows and visits.", call. = FALSE)
+  if (!identical(as.numeric(native$removed.sites), as.numeric(model@sitesRemoved)))
+    stop("Native and stored pcount retained-site metadata disagree.", call. = FALSE)
+  native$y[rows, , drop = FALSE]
+}
+
 .msr_selection_signature <- function(model) {
   model <- .analysis_model(model)
   frame <- .msr_selection_frame(model)
   unmarked <- methods::is(model, "unmarkedFit")
   if (unmarked) {
     response <- model@data@y
-    ids <- rownames(model@data@siteCovs)
-    rows <- setdiff(seq_len(nrow(response)), model@sitesRemoved)
-    response <- response[rows, , drop = FALSE]
-    ids <- ids[rows]
+    sites <- .msr_unmarked_observations(model)
+    ids <- sites$ids
+    rows <- sites$rows
+    response <- if (methods::is(model, "unmarkedFitPCount"))
+      .msr_unmarked_pcount_response(model, rows) else response[rows, , drop = FALSE]
     weights <- rep(1, length(rows))
     family <- "unmarked"
   } else {
@@ -55,6 +74,10 @@
   # same native likelihood constants. Preserve case replication separately.
   trials <- NULL
   if (identical(family, "binomial") && !is.null(frame)) {
+    # Normalize the comparison copy only; keep native response frames and weights.
+    if (is.logical(response) &&
+        (!is.object(response) || identical(class(response), "AsIs")))
+      storage.mode(response) <- "integer"
     if (is.factor(response)) response <- as.integer(response != levels(response)[1L])
     if (is.matrix(response) && ncol(response) == 2L) {
       trials <- rowSums(response)

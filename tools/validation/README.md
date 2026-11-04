@@ -46,6 +46,13 @@ Run `python -B tools/validation/test_phase_runner.py` for non-numerical runner
 contract tests. Historical benchmark scripts and failure records remain intact;
 the reusable runner replaces future script cloning.
 
+`python -B tools/validation/test_resource_control.py` exercises completed,
+running and unknown-inventory process lifecycles with PowerShell process mocks.
+It launches no R process. The controller records at least one actual inventory
+even when a short phase finishes before the first poll. Existing unknown-state,
+owned-process, resource and deadline guards remain in force. This change does
+not fill gaps in historical resource logs with invented observations.
+
 `package_batch.py <input.json>` prepares a new independent workspace from a
 source manifest, requires four stable disk samples above 30 GiB, and runs the
 normal vignette build, normal check and complete exact-archive installed suite.

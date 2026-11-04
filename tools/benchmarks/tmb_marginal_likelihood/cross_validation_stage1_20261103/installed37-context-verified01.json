@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "same_filter_and_pass_counts": true,
+  "original_source_warnings_retained": 2,
+  "installed_warnings": 0,
+  "new_CV_file_counts": {
+    "passed": 218,
+    "failed": 0,
+    "errors": 0,
+    "warnings": 0,
+    "skips": 0
+  },
+  "source_tests_and_numerical_tolerances_unchanged": true,
+  "verified_owned_R_remaining": 0
+}

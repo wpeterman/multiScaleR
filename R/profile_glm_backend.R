@@ -94,6 +94,9 @@
         stop("Grouped binomial responses must be integer success/failure counts.", call. = FALSE)
       y <- y[, 1L]
     } else {
+      # Keep the original frame intact; normalize only a scalar logical outcome.
+      if (is.logical(y) && is.null(dim(y)) &&
+          (!is.object(y) || identical(class(y), "AsIs"))) y <- as.integer(y)
       if (is.factor(y) && nlevels(y) == 2L) y <- as.numeric(y) - 1
       if (!is.numeric(y) || any(!y %in% c(0, 1)))
         stop("Use binary responses or cbind(successes, failures), not weighted proportions.",

@@ -65,6 +65,10 @@
 #' the size of stored R objects, not all transient allocations made by
 #' \code{exactextractr}, model refits, or BLAS/LAPACK.
 #'
+#' Successful hardware measurements are kept for the current R session. An
+#' unsuccessful RAM lookup is retried on later calls and does not supply a
+#' usable memory budget.
+#'
 #' The recommendation is intentionally conservative. Even on Unix-like systems
 #' where forking can share memory copy-on-write, worker counts are budgeted as
 #' though each worker may require its own copy of the optimization payload.
@@ -422,11 +426,13 @@ estimate_multiscale_ram <- function(kernel_inputs,
 
 .msr_total_ram_bytes <- function() {
   cached <- .msr_hw_cache[["total_ram_bytes"]]
-  if (!is.null(cached)) {
+  if (is.numeric(cached) && length(cached) == 1L && is.finite(cached) && cached > 0) {
     return(cached)
   }
   out <- .msr_total_ram_bytes_uncached()
-  .msr_hw_cache[["total_ram_bytes"]] <- out
+  # A transient discovery failure must not become a session-long hardware value.
+  if (is.numeric(out) && length(out) == 1L && is.finite(out) && out > 0)
+    .msr_hw_cache[["total_ram_bytes"]] <- out
   out
 }
 
@@ -435,12 +441,7 @@ estimate_multiscale_ram <- function(kernel_inputs,
   sysname <- Sys.info()[["sysname"]]
 
   if (identical(.Platform$OS.type, "windows")) {
-    out <- .msr_system_stdout(
-      "powershell",
-      c("-NoProfile", "-Command",
-        "[int64](Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory")
-    )
-    ram <- .msr_parse_first_numeric(out)
+    ram <- .msr_windows_total_ram_bytes()
     if (is.finite(ram)) {
       return(ram)
     }
@@ -463,6 +464,26 @@ estimate_multiscale_ram <- function(kernel_inputs,
     }
   }
 
+  NA_real_
+}
+
+
+# The direct .NET query avoids depending on a responsive CIM provider. Both
+# queries are bounded by .msr_system_stdout(); neither supplies a guessed total.
+.msr_windows_total_ram_bytes <- function() {
+  queries <- c(
+    paste("Add-Type -AssemblyName Microsoft.VisualBasic;",
+      "[Microsoft.VisualBasic.Devices.ComputerInfo]::new().TotalPhysicalMemory"),
+    "[int64](Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory")
+  for (query in queries) {
+    out <- .msr_system_stdout("powershell", c("-NoProfile", "-Command", query))
+    # Accept one positive numeric result, never digits embedded in diagnostics.
+    out <- trimws(out)
+    out <- out[grepl("^[0-9]+$", out)]
+    if (length(out) != 1L) next
+    ram <- .msr_parse_first_numeric(out)
+    if (is.finite(ram) && ram > 0) return(ram)
+  }
   NA_real_
 }
 

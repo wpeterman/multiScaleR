@@ -100,7 +100,9 @@ function Invoke-TaskPhase($Phase, $Executable, $Arguments, $Directory) {
   $taskIdentity = Get-CimInstance Win32_Process -Filter "ProcessId=$($taskRoot.Id)"
   Write-TaskJson ($taskIdentity | Select-Object ProcessId,ParentProcessId,CreationDate,ExecutablePath,CommandLine) (Join-Path $taskStudy "$Phase-process.json")
   $taskGood = $true
-  while (-not $taskRoot.HasExited) {
+  # Fast phases can finish before this first poll. Retain at least one actual
+  # inventory so their completion has the same resource/identity record.
+  do {
     $taskAll = @(Get-CimInstance Win32_Process -ErrorAction Stop)
     $taskIds = @($taskRoot.Id)
     do {
@@ -151,9 +153,10 @@ function Invoke-TaskPhase($Phase, $Executable, $Arguments, $Directory) {
       }
       break
     }
+    if ($taskRoot.HasExited) { break }
     Start-Sleep -Seconds 15
     $taskRoot.Refresh()
-  }
+  } while (-not $taskRoot.HasExited)
   $taskRoot.WaitForExit()
   Write-TaskJson @{operational_passed=$taskGood;exit_code=$taskRoot.ExitCode;
     elapsed_seconds=$taskClock.Elapsed.TotalSeconds;completed_at=(Get-Date -Format o)} (Join-Path $taskStudy "$Phase-exit.json")

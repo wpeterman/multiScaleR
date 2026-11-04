@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from package_batch import archive_tests, sha
+from verify_package_batch import prior_test_log
 
 
 class ArchiveTests(unittest.TestCase):
@@ -63,6 +64,15 @@ class ArchiveTests(unittest.TestCase):
         self.assertTrue(profile["full"]["normal_vignette_build"])
         self.assertEqual(profile["full"]["scientific_markers_required"], 14)
         self.assertEqual(profile["full"]["maximum_owned_socket_workers"], 2)
+
+    def test_parent_log_supports_named_and_reusable_batches(self):
+        for metadata, phase in (({"test_phase": "tests04"}, "tests04"),
+                                ({"tests_complete": True}, "installed01")):
+            with self.subTest(metadata=metadata):
+                (self.root / "complete01.json").write_text(json.dumps(metadata))
+                log = self.root / (phase + ".log")
+                log.write_text("retained test ledger", encoding="utf-8-sig")
+                self.assertEqual(prior_test_log(self.root), "retained test ledger")
 
 
 if __name__ == "__main__":

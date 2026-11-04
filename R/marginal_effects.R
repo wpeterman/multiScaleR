@@ -142,7 +142,10 @@
 #'
 #' Supplied \code{reference_data} is matched to retained fitted row IDs and
 #' checked against the evaluated training features, full native coefficient
-#' design or smooth basis, contrasts and formula offsets. Missing inputs,
+#' design or smooth basis, contrasts and formula offsets. Large exact finite
+#' comparisons avoid temporary comparison copies; any difference retains the
+#' complete original tolerance check. Native prediction batches remain intact.
+#' Missing inputs,
 #' nonfinite values, unknown levels and mismatches raise an error. Offsets
 #' supplied outside the formula and unsupported nested learned transformations
 #' are rejected. This verifies observable feature equivalence. It cannot prove

@@ -73,12 +73,29 @@ scale parameter. Fixed theta adds no parameter. The table's
 \code{likelihood_adjustments} attribute records native and used likelihoods
 and regression-model counts for affected input positions, before adding
 ecological scale or shape parameters to the table's K. Unknown inconsistencies raise an
-error. Fitted coefficients, covariance and diagnostics remain unchanged.
+error. For large case weights, verification checks native AIC arithmetic and
+a rescaled response-density comparison at the original tolerance. Reported
+likelihoods retain the original weights; counts and fitted objects are unchanged.
+An adjustment verified this way records its verification method.
+Fitted coefficients, covariance and diagnostics remain unchanged.
 For \code{unmarkedFit} models, native AIC and log-likelihood metadata
 determine the count, including detection coefficients, factor contrasts,
 mixture parameters, and estimated random-effect variances. Optimizer and
 TMB free-parameter metadata are checked for agreement when present. Latent
-random effects and the integration limit \code{K} are not counted.
+random effects and the integration limit \code{K} are not counted. A displayed
+fixed-coefficient count can therefore be smaller than the fitted count.
+Mixed \code{unmarked::pcount} models retain their native marginal likelihood.
+Comparisons recover actually used visits from the stored component formulas,
+including formula-specific missing observations and omitted sites. Equal raw
+count matrices and site totals alone do not establish comparability. Missing
+or inconsistent used-response metadata raises an error without raw-data fallback.
+Native site counts and original response-row identities are retained when
+no site covariates are supplied, including null and detection-only models.
+AICc and BIC use retained site rows, not visits or random-effect realizations.
+With repeated groups spanning rows, this convention does not establish a
+universally valid small-sample correction or effective independent sample size.
+Check native fit diagnostics and stability to the \code{pcount} integration
+limit; finite criteria and optimizer code zero do not certify fit quality.
 Missing or inconsistent parameter metadata and non-finite log-likelihoods
 raise an error instead of guessing from predictor names.
 Hard-radius metrics in native expow mixtures contribute their estimated
@@ -88,7 +105,10 @@ neither an estimated radius nor shape.
 When native metadata can be recovered, comparison also checks used row IDs,
 response values, binomial trials, likelihood weights, and the likelihood's
 response measure. Binomial counts and proportions with their trial weights
-are compared on the same count representation. Zero-weight GLM rows and
+are compared on the same count representation. Logical \code{FALSE}/\code{TRUE}
+binomial outcomes, including success/failure columns, compare as zero/one
+values when trial totals and likelihood weights agree. Original fitted
+responses, covariance and parameter counts are retained. Zero-weight GLM rows and
 removed unmarked sites are excluded from the used-observation count.
 For Cox and conditional-logistic fits, AICc and BIC use the event count
 reported by native \code{logLik} metadata. Each supported one-used-step

@@ -68,9 +68,60 @@ not add estimated parameters. Record native and used values in the table's
 `likelihood_adjustments` attribute. Other model counts and all fitted objects
 retain their existing definitions. Unknown discrepancies fail explicitly.
 
+The uncommitted weighted-NB batch covers known-scale legacy `mgcv::negbin`
+with explicit `scale = 1`, plus fixed/estimated-theta extended NB with zero
+and fractional case weights. These eight Gaussian-kernel fixtures retain the
+complete original reference rows, native covariance and observation counts.
+They do not reinterpret the legacy default estimated working scale. Large-weight
+rounding verification checks canonical native AIC arithmetic with explicit theta
+and rescaled density at the unchanged tolerance, reporting the original weighted
+target and actual count. Inconsistent getter/AIC state remains an error.
+
 Effect-curve verification keeps its complete native basis comparison and
-1e-10 tolerance. Verified matrices are released before link prediction.
-Blockwise comparison still requires separate equivalence and failure tests.
+1e-10 tolerance. Large exact finite ordinary numeric matches can avoid temporary
+comparison copies. Every difference, custom class or non-native comparison method
+retains original comparison behavior; no native prediction batch is split.
+Verified matrices are released before link prediction. Further blockwise basis
+construction still requires separate equivalence and failure tests.
+
+Numeric 0/1 Bernoulli responses use binomial/logit, with success probability on
+the response scale. Conditional GLM likelihood comparisons require the same
+selected predictors, rows, design, offset, encoding and nuisance conventions.
+Integrated random effects and Bayesian population priors retain their distinct
+targets. Logical FALSE/TRUE scalar outcomes and validated logical count columns now
+use the same zero/one likelihood target in profile and shared preparation.
+Native data/model-frame types, trial totals and priors are retained. Selection
+signatures compare supported logical outcomes as zero/one copies, preserving
+original fitted likelihoods, covariance and parameter penalties. Changed
+outcome/trial/frequency-weight targets still fail explicitly. Compare
+native covariance within the same response representation; equal likelihoods
+across encodings do not replace native IRLS covariance. Additional links
+and weighted-proportion admissions remain separate, explicit audits.
+
+Pcount model comparisons recover actual used visits from native component
+formulas, checking row layout and stored omitted-site metadata. Different
+missing visits are incompatible despite equal raw counts/site totals. Native
+marginal likelihoods and free variance/mixture penalties remain unchanged;
+realized latent effects are excluded. Site-row AICc/BIC conventions do not
+certify repeated-group small-sample assumptions, fit quality or truncation
+stability. Default siteCovs=NULL frame counts and identities are covered by full83:
+checked native numSites/sampleSize, original response IDs or original site
+positions, and validated omitted-site indices. Null abundance/detection-only
+models do not bypass pcount actual-visit checks. This shared ID/count repair
+does not qualify other unmarked classes' formula-specific visit masks.
+
+Stage1 cross_validate() refits GLM coefficients and scales on explicit training
+rows only. Representative distance bins and spatial/fixed prediction
+transforms are learned from training buffers and frozen for assessment.
+The predeclared physical buffer domain is unchanged. Whole planned
+assessment occurrences, count constants, frequency/trial distinctions and
+failed folds remain visible; any failed fold makes pooled scores NA.
+Gaussian identity, Poisson log and binomial logit scores are plug-in
+targets, not new uncertainty/calibration evidence. Existing backend
+starts/cold/curvature/admission gates apply. Raw cell inputs are required;
+new fold generators, additional model classes and predictive integration
+need separate qualification. CV selection performance needs outer
+validation or an independent test set. Full fold models are opt-in.
 
 ## Private inference gates
 
@@ -93,10 +144,15 @@ optimized one. Prove raster instrumentation preserves the unmodified public
 route, and retain warning identities, geometry, and missing-value positions.
 Build any new audit from the accepted release source and commit identity.
 
-Next inspect the legacy fixed-theta NB provider and weighted-likelihood
-bookkeeping before declaring a bounded software audit. Confirm its actual
-fitting and likelihood conventions first. Keep private fitting admissions and
-every scientific numerical gate unchanged.
+Logical/numeric binomial selection compatibility is covered by full81;
+mixed pcount actual-visit and default-frame contracts are covered by
+full82/full83. Next review native used-visit semantics of other unmarked
+classes with a declared zero-fit check, then trial/weight encoding against
+the native GLM provider. Keep frequency weights and grouped-binomial
+constants distinct.
+Derive native row-batch semantics before replacing full basis matrices with
+blocks. Keep private fitting admissions and every scientific numerical gate
+unchanged.
 
 Use focused regression tests and generated documentation, followed by a normal
 vignette-enabled package check and the complete installed suite from that exact
@@ -111,3 +167,13 @@ interpreters including drivers. Leave foreign work untouched. Keep compact
 atomic records, avoid full fit/chain/tape/array checkpoints, and omit build-ignored
 legacy example fits from temporary source copies. Publish only the reviewed
 package source, tests, documentation, and concise development guidance.
+
+## CV publication and next fold contracts
+
+Version 0.7.14 publishes explicit-fold canonical GLM CV with training-only
+scale/coefficient fitting and frozen training preprocessing. Future group or
+spatial generators must return the same disjoint analysis/assessment ID lists.
+CV score comparisons must match planned targets, splits, responses, trials
+and weights and retain failures. Predictive scores are not AIC weights or
+additional parameter penalties. Further model-class scoring requires separate
+predictive-target qualification; all existing private admission guards remain.

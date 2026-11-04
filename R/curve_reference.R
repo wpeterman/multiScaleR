@@ -1,3 +1,22 @@
+# Compare complete finite numeric inputs at the original tolerance. Large exact
+# matches avoid all.equal's temporary vector copies and masks. Custom classes
+# or comparison methods retain their original dispatch and failure behavior.
+.msr_curve_numeric_equivalent <- function(a, b) {
+  if (!is.numeric(a) || !is.numeric(b) || !identical(dim(a), dim(b)) ||
+      !all(is.finite(a)) || !all(is.finite(b))) return(FALSE)
+  if (length(a) >= 4096L && !is.object(a) && !is.object(b) &&
+      identical(a, b) && identical(all.equal, base::all.equal)) {
+    method <- NULL
+    for (kind in c(.class2(a), "default")) {
+      method <- utils::getS3method("all.equal", kind, optional = TRUE)
+      if (!is.null(method)) break
+    }
+    if (identical(method, base::all.equal.numeric) ||
+        identical(method, base::all.equal.default)) return(TRUE)
+  }
+  isTRUE(all.equal(a, b, tolerance = 1e-10, check.attributes = FALSE))
+}
+
 # A supplied raw reference verifies observable fitted features. It cannot prove
 # a unique inverse of a square, polynomial basis or another many-to-one map.
 .msr_curve_reference_context <- function(object, model, reference_data) {
@@ -98,9 +117,7 @@
         length(a) == length(b) && all(vapply(seq_along(a),
           function(i) equivalent(a[[i]], b[[i]]), logical(1))))
     if (is.numeric(a) || is.numeric(b))
-      return(is.numeric(a) && is.numeric(b) && identical(dim(a), dim(b)) &&
-        all(is.finite(a)) && all(is.finite(b)) &&
-        isTRUE(all.equal(a, b, tolerance = 1e-10, check.attributes = FALSE)))
+      return(.msr_curve_numeric_equivalent(a, b))
     if (is.factor(a) || is.factor(b))
       return(is.factor(a) && is.factor(b) && identical(as.character(a), as.character(b)) &&
         identical(levels(a), levels(b)) && identical(is.ordered(a), is.ordered(b)))

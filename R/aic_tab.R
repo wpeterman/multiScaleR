@@ -30,12 +30,33 @@
 }
 
 
+# Recover original site identities before dropping sites, including null models.
+.msr_unmarked_observations <- function(model) {
+  n <- unmarked::numSites(model@data)
+  used <- unmarked::sampleSize(model)
+  valid_n <- function(x) is.numeric(x) && length(x) == 1L && is.finite(x) &&
+    x >= 0 && x <= .Machine$integer.max && x == floor(x)
+  if (!valid_n(n) || !valid_n(used) || used > n)
+    stop("Invalid native unmarked site-count metadata.", call. = FALSE)
+  omitted <- model@sitesRemoved
+  if (!is.numeric(omitted) || anyNA(omitted) || any(!is.finite(omitted)) ||
+      any(omitted != floor(omitted) | omitted < 1 | omitted > n) || anyDuplicated(omitted))
+    stop("Invalid native unmarked omitted-site metadata.", call. = FALSE)
+  rows <- setdiff(seq_len(n), omitted)
+  if (length(rows) != used)
+    stop("Native unmarked retained-site count disagrees with omitted-site metadata.", call. = FALSE)
+  ids <- rownames(model@data@siteCovs)
+  if (!.msr_valid_observation_ids(ids, n)) ids <- rownames(unmarked::getY(model@data))
+  if (!.msr_valid_observation_ids(ids, n)) ids <- as.character(seq_len(n))
+  list(rows = rows, ids = as.character(ids[rows]))
+}
+
+
 .msr_model_nobs <- function(model) {
   analysis_mod <- .analysis_model(model)
 
-  if (any(grepl("^unmarked", class(analysis_mod)))) {
-    return(dim(analysis_mod@data@siteCovs)[1] - length(analysis_mod@sitesRemoved))
-  }
+  if (methods::is(analysis_mod, "unmarkedFit"))
+    return(as.integer(length(.msr_unmarked_observations(analysis_mod)$rows)))
 
   if (inherits(analysis_mod, "glm")) return(as.integer(stats::nobs(analysis_mod)))
 
@@ -231,16 +252,8 @@
   analysis_mod <- .analysis_model(model)
   mod_n <- .msr_model_nobs(model)
 
-  if (any(grepl("^unmarked", class(analysis_mod)))) {
-    dat <- analysis_mod@data@siteCovs
-    if (length(analysis_mod@sitesRemoved))
-      dat <- dat[-analysis_mod@sitesRemoved, , drop = FALSE]
-    ids <- row.names(dat)
-    if (.msr_valid_observation_ids(ids, mod_n)) {
-      return(as.character(ids))
-    }
-    return(as.character(seq_len(mod_n)))
-  }
+  if (methods::is(analysis_mod, "unmarkedFit"))
+    return(.msr_unmarked_observations(analysis_mod)$ids)
 
   frame <- .msr_selection_frame(analysis_mod)
   if (!is.null(frame)) {
@@ -367,12 +380,29 @@
 #' \code{likelihood_adjustments} attribute records native and used likelihoods
 #' and regression-model counts for affected input positions, before adding
 #' ecological scale or shape parameters to the table's K. Unknown inconsistencies raise an
-#' error. Fitted coefficients, covariance and diagnostics remain unchanged.
+#' error. For large case weights, verification checks native AIC arithmetic and
+#' a rescaled response-density comparison at the original tolerance. Reported
+#' likelihoods retain the original weights; counts and fitted objects are unchanged.
+#' An adjustment verified this way records its verification method.
+#' Fitted coefficients, covariance and diagnostics remain unchanged.
 #' For \code{unmarkedFit} models, native AIC and log-likelihood metadata
 #' determine the count, including detection coefficients, factor contrasts,
 #' mixture parameters, and estimated random-effect variances. Optimizer and
 #' TMB free-parameter metadata are checked for agreement when present. Latent
-#' random effects and the integration limit \code{K} are not counted.
+#' random effects and the integration limit \code{K} are not counted. A displayed
+#' fixed-coefficient count can therefore be smaller than the fitted count.
+#' Mixed \code{unmarked::pcount} models retain their native marginal likelihood.
+#' Comparisons recover actually used visits from the stored component formulas,
+#' including formula-specific missing observations and omitted sites. Equal raw
+#' count matrices and site totals alone do not establish comparability. Missing
+#' or inconsistent used-response metadata raises an error without raw-data fallback.
+#' Native site counts and original response-row identities are retained when
+#' no site covariates are supplied, including null and detection-only models.
+#' AICc and BIC use retained site rows, not visits or random-effect realizations.
+#' With repeated groups spanning rows, this convention does not establish a
+#' universally valid small-sample correction or effective independent sample size.
+#' Check native fit diagnostics and stability to the \code{pcount} integration
+#' limit; finite criteria and optimizer code zero do not certify fit quality.
 #' Missing or inconsistent parameter metadata and non-finite log-likelihoods
 #' raise an error instead of guessing from predictor names.
 #' Hard-radius metrics in native expow mixtures contribute their estimated
@@ -382,7 +412,10 @@
 #' When native metadata can be recovered, comparison also checks used row IDs,
 #' response values, binomial trials, likelihood weights, and the likelihood's
 #' response measure. Binomial counts and proportions with their trial weights
-#' are compared on the same count representation. Zero-weight GLM rows and
+#' are compared on the same count representation. Logical \code{FALSE}/\code{TRUE}
+#' binomial outcomes, including success/failure columns, compare as zero/one
+#' values when trial totals and likelihood weights agree. Original fitted
+#' responses, covariance and parameter counts are retained. Zero-weight GLM rows and
 #' removed unmarked sites are excluded from the used-observation count.
 #' For Cox and conditional-logistic fits, AICc and BIC use the event count
 #' reported by native \code{logLik} metadata. Each supported one-used-step
@@ -552,10 +585,15 @@ aic_tab <- function(mod_list,
 #' while excluding a nonexistent extra scale parameter.
 #' spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
 #' components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
-#' for its restricted-likelihood interpretation.
+#' for its restricted-likelihood interpretation. Mixed \code{unmarked::pcount}
+#' models use the same actual-visit checks and retained-site-row convention
+#' described there, including frames with no site covariates. Repeated-group
+#' sampling assumptions still need justification.
 #'
 #' The same recoverable response, row, weight, ML/REML, and partial-likelihood
-#' checks apply. Inapplicable hard-radius shape positions are excluded.
+#' checks apply. Logical and numeric binomial outcomes use the same checked
+#' zero/one comparison described in \code{\link{aic_tab}}. Inapplicable
+#' hard-radius shape positions are excluded.
 #' Bayesian posterior fits are rejected; the name BIC does not make a posterior
 #' target a sampling likelihood.
 #' Private spatial prototypes are also rejected; conditional response densities

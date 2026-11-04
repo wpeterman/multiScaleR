@@ -702,3 +702,38 @@ counts, and nuisance counts. These recorded regression counts precede any
 selected ecological scales and applicable shapes added to the table's `K`.
 A fixed radius contributes no fitted parameter. A selected hard cutoff still
 counts once even though its Hessian radius SE is unavailable.
+
+
+### Case weights and the legacy NB family
+
+Native BAM case-weight checks include zero and fractional prior weights.
+The fitted covariance and native observation count are retained. Zero-weight
+rows remain part of the declared preparation and its frozen reference
+normalization; they do not supply likelihood information. Prediction SEs still
+condition on selected ecological scales and native nuisance estimates.
+
+For the legacy `mgcv::negbin(theta)` family, supply `scale = 1` explicitly when
+you want the checked known-scale NB target. The BAM default may estimate a
+working scale for this family. That default is a different native convention;
+the adapter does not silently replace it. Known fixed theta and known unit
+scale add no fitted parameters. The legacy provider keeps its native dispatch.
+
+With very large weights, subtracting two large log-likelihoods can obscure a
+one-unit bookkeeping discrepancy. Verification then checks the original native
+AIC arithmetic and compares rescaled response densities at the same tolerance.
+Rescaling is used only for verification. Reported likelihoods use the original
+weights, with the same parameter counts and covariance. An affected adjustment
+records `verification = "native_aic_and_rescaled_density"`. Altered metadata
+continues to produce an error. Arithmetic copies used to test this rounding
+case are not refitted models or evidence of inferential calibration.
+
+## Explicit-fold GLM validation
+
+`cross_validate()` provides training-only scale refitting and held-out scoring
+for Gaussian identity, Poisson log and binomial logit GLMs. It accepts explicit
+analysis/assessment row IDs, retains failures and uses frozen training bins and
+normalization. Cell-level inputs are required; lean-only and grouped preparation
+need additional adapters. Supported kernels and metrics follow the selected
+`profile_glm` or `refit` backend's existing guards. This stage does not add GAM,
+mixed-model, unmarked, step-selection or Bayesian scoring. See
+`vignette("inference-contracts", package = "multiScaleR")` for the workflow.

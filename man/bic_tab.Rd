@@ -58,10 +58,15 @@ The same checked negative-binomial BAM adjustment and
 while excluding a nonexistent extra scale parameter.
 spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
 components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
-for its restricted-likelihood interpretation.
+for its restricted-likelihood interpretation. Mixed \code{unmarked::pcount}
+models use the same actual-visit checks and retained-site-row convention
+described there, including frames with no site covariates. Repeated-group
+sampling assumptions still need justification.
 
 The same recoverable response, row, weight, ML/REML, and partial-likelihood
-checks apply. Inapplicable hard-radius shape positions are excluded.
+checks apply. Logical and numeric binomial outcomes use the same checked
+zero/one comparison described in \code{\link{aic_tab}}. Inapplicable
+hard-radius shape positions are excluded.
 Bayesian posterior fits are rejected; the name BIC does not make a posterior
 target a sampling likelihood.
 Private spatial prototypes are also rejected; conditional response densities

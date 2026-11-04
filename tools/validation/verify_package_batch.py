@@ -26,6 +26,14 @@ def skipped(text):
     return "\n".join(records)
 
 
+def prior_test_log(parent):
+    """Read named historical phases or the reusable batch's installed suite."""
+    parent = Path(parent)
+    previous = read(parent / "complete01.json")
+    phase = previous.get("test_phase", "installed01")
+    return (parent / (phase + ".log")).read_text(encoding="utf-8-sig")
+
+
 def run(path):
     config = read(path)
     repo, output = Path(config["repo"]), Path(config["output"])
@@ -60,8 +68,7 @@ def run(path):
     values = re.findall(r"\[ FAIL (\d+) \| WARN (\d+) \| SKIP (\d+) \| PASS (\d+) \]", log)[-1]
     counts = dict(zip(("failed", "warnings", "skips", "passed"), map(int, values)))
     assert counts["failed"] == counts["warnings"] == 0
-    previous = read(parent / "complete01.json")
-    previous_log = (parent / (previous["test_phase"] + ".log")).read_text(encoding="utf-8-sig")
+    previous_log = prior_test_log(parent)
     assert skipped(log) == skipped(previous_log)
     prior = read(config["parent_ledger"])
     current = read(output / "test-counts01.json")

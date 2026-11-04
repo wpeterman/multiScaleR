@@ -36,7 +36,8 @@
       !length(y) || length(mu) != length(y) || length(weights) != length(y) ||
       any(y < 0) || any(y != floor(y)) || any(mu <= 0) || any(weights < 0) || !any(weights > 0)) fail()
   used <- weights > 0
-  direct <- sum(weights[used] * stats::dnbinom(y[used], size = theta, mu = mu[used], log = TRUE))
+  density <- stats::dnbinom(y[used], size = theta, mu = mu[used], log = TRUE)
+  direct <- sum(weights[used] * density)
   native <- stats::logLik(model); native_k <- attr(native, "df")
   edf <- model[["edf2", exact = TRUE]]
   if (is.null(edf)) edf <- model[["edf", exact = TRUE]]
@@ -50,12 +51,42 @@
   delta_count <- as.numeric(native_k) - count
   if (close(delta_likelihood, 0) && close(delta_count, 0))
     return(list(loglik = as.numeric(native), K = as.numeric(native_k), adjustment = NULL))
-  if (!isTRUE(model[["scale.estimated", exact = TRUE]]) ||
-      !close(delta_likelihood, 1) || !close(delta_count, 1)) fail()
-  list(loglik = direct, K = count, adjustment = list(
-    method = "verified_native_nb_unit_scale", native_logLik = as.numeric(native),
+  scale_flag <- isTRUE(model[["scale.estimated", exact = TRUE]])
+  roundoff_verified <- FALSE
+  if (!scale_flag || !close(delta_likelihood, 1) || !close(delta_count, 1)) {
+    # Subtracting large weighted likelihoods can erase a one-unit offset.
+    # Keep the original comparison tolerance, and verify the provider's AIC
+    # arithmetic separately from the stable normalized density calculation.
+    if (!((scale_flag && close(delta_count, 1)) ||
+          (!scale_flag && close(delta_count, 0))) || max(weights) <= 1) fail()
+    raw_edf <- model[["edf", exact = TRUE]]
+    native_aic <- model[["aic", exact = TRUE]]
+    if (!scalar_column(raw_edf) || length(raw_edf) != length(stats::coef(model)) ||
+        !is.numeric(native_aic) || length(native_aic) != 1L || !is.finite(native_aic)) fail()
+    # Evaluate verified native code with explicit theta and base arithmetic.
+    # Separate family closures can otherwise retain inconsistent theta state.
+    theta_raw <- family$getTheta(FALSE)
+    if (!is.numeric(theta_raw) || length(theta_raw) != 1L || !is.finite(theta_raw) ||
+        !identical(as.numeric(exp(theta_raw)), as.numeric(theta))) fail()
+    canonical_aic <- native_family$aic
+    environment(canonical_aic) <- baseenv()
+    response_aic <- canonical_aic(y = y, mu = mu, theta = theta_raw, wt = weights, dev = 0)
+    expected_aic <- response_aic + 2 * sum(raw_edf)
+    expected_loglik <- sum(raw_edf) + as.numeric(scale_flag) - expected_aic / 2
+    rescaled <- weights[used] / max(weights)
+    response_scaled <- -canonical_aic(y = y[used], mu = mu[used], theta = theta_raw, wt = rescaled, dev = 0) / 2
+    if (!is.finite(expected_aic) || !is.finite(response_scaled) ||
+        !close(native_aic, expected_aic) || !close(native, expected_loglik) ||
+        !close(response_scaled, sum(rescaled * density))) fail()
+    if (!scale_flag)
+      return(list(loglik = as.numeric(native), K = as.numeric(native_k), adjustment = NULL))
+    roundoff_verified <- TRUE
+  }
+  adjustment <- list(method = "verified_native_nb_unit_scale", native_logLik = as.numeric(native),
     logLik = direct, native_K = as.numeric(native_k), K = count,
-    estimated_theta_parameters = n_theta, estimated_scale_parameters = 0L))
+    estimated_theta_parameters = n_theta, estimated_scale_parameters = 0L)
+  if (roundoff_verified) adjustment$verification <- "native_aic_and_rescaled_density"
+  list(loglik = direct, K = count, adjustment = adjustment)
 }
 
 .msr_selection_adjustments <- function(context) {

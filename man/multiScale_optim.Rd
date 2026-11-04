@@ -400,8 +400,12 @@ and zero inflation are unsupported. Put offsets in the formula with
 The retained model-frame rows define the fitting sample. Their row names
 must match unique prepared point IDs; preserve these through subsetting.
 Kernel means and standard deviations use only these rows. No observations
-are dropped during optimization. Binomial responses must be binary or
-\code{cbind(successes, failures)} with positive trial totals. Positive integer
+are dropped during optimization. Binomial logit responses may be numeric
+\code{0}/\code{1} or logical \code{FALSE}/\code{TRUE} Bernoulli observations,
+a two-level factor with success
+in its second level, or \code{cbind(successes, failures)} with positive trial
+totals. Logical count columns represent zero/one counts without changing
+trial totals. Response predictions are success probabilities. Positive integer
 frequency weights are supported for count and binomial models; Gaussian
 weights must all equal one. Proportion responses and precision weights are
 unsupported.

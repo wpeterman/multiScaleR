@@ -23,6 +23,7 @@ test_that("expected public helpers remain exported", {
     "aic_tab",
     "bic_tab",
     "check_bayes_setup",
+    "cross_validate",
     "diagnose_bayes_probabilities",
     "diagnose_bayes_scales",
     "diagnostics",

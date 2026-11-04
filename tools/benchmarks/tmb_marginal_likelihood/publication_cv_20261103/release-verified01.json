@@ -1,0 +1,29 @@
+{
+  "version": "0.7.14",
+  "check_status": "OK",
+  "normal_vignette_enabled": true,
+  "metadata_only_changes": [
+    "DESCRIPTION",
+    "NEWS"
+  ],
+  "code_man_tests_src_vignettes_identical_to_full86": true,
+  "exact_archive_tests_identical": true,
+  "full_suite": {
+    "failed": 0,
+    "warnings": 0,
+    "skips": 10,
+    "passed": 31545
+  },
+  "full_suite_source_epoch": "full86/0.7.13; identical code/tests, DESCRIPTION and NEWS metadata changed",
+  "installed_focused": {
+    "passed": 2566,
+    "failed": 0,
+    "errors": 0,
+    "warnings": 0,
+    "skips": 0
+  },
+  "archive_sha256": "2a5c70426c94cb8448b78260883682269a691fc1dea93b29ed63dc42a209f5ea",
+  "all14scientific_markers_preserved": true,
+  "verified_owned_R_remaining": 0,
+  "timing_comparison_eligible": false
+}

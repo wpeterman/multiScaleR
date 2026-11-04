@@ -1,3 +1,22 @@
+multiScaleR 0.7.14
+* Retry unsuccessful RAM discovery and use a direct Windows physical-memory query with the existing CIM fallback. Memory admission limits are unchanged.
+* Add explicit-fold GLM cross-validation with training-only scale fitting,
+  frozen training bins/transforms, compact scores and retained fold failures.
+* Retain native unmarked site counts and observation identities for null
+  and detection-only models that supply no site covariates.
+* Check actual used pcount visits before AIC/BIC comparison, retaining
+  native mixed-model likelihoods, parameter counts and diagnostics.
+* Compare equivalent logical and numeric binomial outcomes in AIC/BIC,
+  preserving trial/weight checks, native fits and parameter penalties.
+* Support logical binomial responses in analytic and shared Bayesian/likelihood
+  preparation, preserving counts, priors, diagnostics and uncertainty contracts.
+* Reduce temporary allocation for exact finite reference-basis comparisons,
+  retaining complete native batches, tolerance fallbacks and custom dispatch.
+* Clarify Bernoulli 0/1 input and GLM comparison boundaries across inference targets.
+* Verify large-weight NB BAM bookkeeping without cancellation, retaining the
+  original tolerance, weighted likelihood, nuisance counts and diagnostic guards.
+* Cover known-scale legacy NB and zero/fractional case-weight compatibility.
+
 multiScaleR 0.7.13
 * Extend Gamma and negative-binomial BAM point, snapshot, map, effect-curve
   and model-selection regression coverage with native targets and diagnostics.

@@ -118,6 +118,9 @@
       trials <- rowSums(y)
       y <- y[, 1L]
     } else if (is.factor(y) && nlevels(y) == 2L) y <- as.numeric(y) - 1
+    # A validated logical count column has the same zero/one target as integers.
+    if (is.logical(y) && is.null(dim(y)) &&
+        (!is.object(y) || identical(class(y), "AsIs"))) y <- as.integer(y)
     if (any(trials < 1) || any(!y %in% 0:1) && all(trials == 1))
       stop("Use binary responses or cbind(successes, failures).", call. = FALSE)
   }
