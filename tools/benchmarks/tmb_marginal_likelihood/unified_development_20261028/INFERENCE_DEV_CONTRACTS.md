@@ -193,10 +193,33 @@ cells remain, and no held-out maximum selects the domain. Legacy unknown grid
 geometry keeps its strict old gate. Freeze geometry with training bin references.
 
 cv_tab matches splits/outcomes/trials/weights and ranks compatible held-out
-losses without penalties or Akaike weights. select_cv uses only retained native
-training fits and their full K/likelihood guards. Preserve exact ties/failures,
+losses without penalties or Akaike weights. select_cv uses native training fits
+or opt-in keep_selection records captured from those actual fits. Both retain
+full K/likelihood guards; when both are supplied they must agree exactly. Compact
+records cannot reconstruct full models, and extraction failures stay failures. Preserve exact ties/failures,
 selected row/map records, candidate settings and the inherited-controls label.
 Point scoring does not integrate parameter/selection uncertainty, add intervals
-or establish calibration. Matched-set, mixed, GAM, unmarked and Bayesian scoring
-need separate target qualification; never substitute zero random effects for
-integration or posterior objectives for maximized likelihoods.
+or establish calibration. Complete-set conditional-choice CV is separately
+qualified by cross_validate_clogit: one used alternative, whole sets, stable
+set-level log loss, native partial methods/event nobs and full native/ecological
+K. Version2 choice records retain every alternative and set identity and cannot
+mix with canonical GLM records. Native penalty metadata and training identity are
+checked before prediction independently of retained outputs. The CV-only null
+subclass verifies the native scalar; other Cox objects remain unchanged. Weights,
+penalized/robust terms, multiple-case sets and generic censored survival remain
+outside this target. Mixed, GAM, unmarked and Bayesian scoring need separate
+qualification. Never substitute zero random effects for integration or posterior
+objectives for maximized likelihoods. Read ../cv_choice_20261104/RESUME.md.
+
+## CV release 0.7.16
+
+Ordinary/spatial NB2 and Gamma CV freeze training nuisance parameters and use
+normalized held-out densities. Known nuisance parameters add zero to K;
+estimated ones add one, alongside native regression rank and optimized scales,
+shapes or radii. Native positive-weight nobs and coefficient-SE conventions
+remain. Gamma density dispersion follows the native AIC convention or an
+explicit normalized known-dispersion family. Selected folds retain actual
+family/nuisance/control metadata. Density measures and conditional-choice
+targets remain separate. No parameter/selection integration, observation
+interval or calibration claim is added. Future learned-transform, GAM, mixed,
+unmarked and Bayesian CV expansion requires independent target qualification.

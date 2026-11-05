@@ -8,11 +8,14 @@ cross_validate_glm(
   formula,
   data,
   folds,
-  family = c("gaussian", "poisson", "binomial"),
+  family = c("gaussian", "poisson", "binomial", "nbinom2", "Gamma"),
   weights = NULL,
   glm_control = stats::glm.control(),
   metrics = NULL,
-  keep_fits = FALSE
+  keep_fits = FALSE,
+  keep_selection = FALSE,
+  theta = NULL,
+  dispersion = NULL
 )
 }
 \arguments{
@@ -32,9 +35,11 @@ buffers and can repeat assessment rows across splits. Keep dependent sites,
 animals or other sampling groups together when defining the splits.}
 
 \item{family}{Character response family: \code{"gaussian"} uses the identity
-link, \code{"poisson"} the log link, and \code{"binomial"} the logit link.
-The default is \code{"gaussian"}. Other families, links and quasi-likelihood
-targets require separately qualified scoring adapters.}
+link, \code{"poisson"}, \code{"nbinom2"} and \code{"Gamma"} use log links,
+and \code{"binomial"} uses the logit link. Lowercase \code{"gamma"} is an
+alias. NB2 means variance equals mean plus mean squared divided by theta;
+Gamma variance equals dispersion times mean squared. The default is
+\code{"gaussian"}. Other links and quasi-likelihood targets are unqualified.}
 
 \item{weights}{Optional nonnegative integer frequency weights, one per data
 row in its supplied order. Names, when present, must match that order.
@@ -47,18 +52,38 @@ are not accepted. A backend may impose stricter native weight requirements.}
 \item{metrics}{Optional character vector of score names. Defaults are
 \code{c("rmse", "mae")} for Gaussian, \code{c("rmse", "mae",
 "neg_log_score", "deviance")} for Poisson, and
-\code{c("neg_log_score", "brier")} for binomial. Lower values are better.}
+\code{c("neg_log_score", "brier")} for binomial. NB2/Gamma default to
+\code{c("rmse", "mae", "neg_log_score")}. Their nuisance-dependent
+deviances are not comparison metrics. Lower values are better.}
 
 \item{keep_fits}{Logical. Default \code{FALSE} keeps compact predictions,
 scales and diagnostics. Set \code{TRUE} to retain full fold models in memory
 for inspection; this can use substantially more memory.}
+
+\item{keep_selection}{Logical. Default \code{FALSE} does not retain native
+training-selection records. Set \code{TRUE} to use \code{\link{select_cv}}
+without keeping full fits. Records are captured from each actual training
+fit and add no model fitting or diagnostic eligibility.}
+
+\item{theta}{Optional finite positive NB2 size fixed before CV, or \code{NULL}
+(default) to estimate it separately in each training set. Fixed theta adds
+no nuisance parameter to K and requires \code{backend = "refit"} for scales.
+Do not choose theta from assessment outcomes. Other families reject it.}
+
+\item{dispersion}{Optional finite positive Gamma dispersion fixed before CV,
+or \code{NULL} (default) for the native training Gamma AIC convention,
+deviance divided by the sum of frequency weights. Fixed dispersion adds
+no nuisance parameter to K. It is supplied to a scoped known-dispersion
+family before fitting, with its normalized density and native coefficient
+SE convention. Other families reject it.}
 }
 \value{
 A \code{multiScaleR_cv} object as described in
   \code{\link{cross_validate}}, with backend \code{"glm"}, no estimated
   spatial scales, and ordinary GLM fits when \code{keep_fits = TRUE}.
   Compact \code{targets} metadata records used row IDs, observed outcomes,
-  trials and frequency weights for guarded model comparison.
+  trials and frequency weights for guarded model comparison. Optional
+  \code{selection_records} have the same contract as \code{cross_validate()}.
 }
 \description{
 Fit a GLM using only each fold's analysis rows, then score its held-out
@@ -66,11 +91,21 @@ response predictions. This provides null and nonspatial reference models for
 the same folds used to validate estimated ecological scales.
 }
 \details{
-This adapter supports the same canonical families, outcome and
+This adapter supports the same qualified GLM families, outcome and
   frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
   interactions, offsets and learned \code{poly()} terms use native GLM
   machinery. All learned preprocessing must occur within the training fit;
   do not supply predictors standardized with assessment data.
+
+NB2 uses \code{MASS::glm.nb()} when theta is estimated and
+  \code{glm(family = MASS::negative.binomial(theta))} when it is fixed.
+  Gamma retains its native deviance-based AIC scale when dispersion is
+  estimated. Known Gamma dispersion uses the normalized fixed-scale family
+  constructed before fitting. Coefficients and native coefficient SEs are
+  retained; density dispersion is not a replacement for the SE convention.
+  Nuisance parameters and supported training transformations are frozen
+  before assessment prediction. See \code{cross_validate()} for their counts,
+  support, compact metadata and uncertainty distinctions.
 
 No ecological scale is estimated here. Use \code{cross_validate()} for
   training-only spatial scale refitting. Predictions use fitted parameters;

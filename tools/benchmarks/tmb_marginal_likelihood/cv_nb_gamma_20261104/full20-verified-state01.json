@@ -1,0 +1,30 @@
+{
+  "accepted": true,
+  "verified_at": "2026-11-05T01:11:58.306596-05:00",
+  "verifier_sha256": "9da92f920ba28717dafbd2fabe58de2ea3c175e6dd6479f6c7387396eb64f569",
+  "configuration_sha256": "2ceef4e2295502981a73953f886e3925a0be09ebb06969a8e1404546630228ad",
+  "branch": "inference-dev",
+  "head": "e54cff6d20c90c41e97d82b035c5e2c5241ab57c",
+  "check_status": "OK",
+  "normal_vignette_enabled": true,
+  "full_validation": {
+    "failed": 0,
+    "warnings": 0,
+    "skips": 10,
+    "passed": 34928
+  },
+  "archive_sha256": "62eaf30c0ebc6f7ed2a07fe1ee9c3e042e92d65d502ec9dac04517bab2ef112a",
+  "source_files": 472,
+  "source_archive_installed_tests_dependency_verified": true,
+  "all14scientific_markers_preserved": true,
+  "skip_identities_preserved": true,
+  "reviewed_ledger_deltas": {
+    "test-cv-distribution-spatial.R": {
+      "passed": 67
+    }
+  },
+  "verified_owned_R_remaining": 0,
+  "private_admission_guards_preserved": true,
+  "timing_comparison_eligible": false,
+  "as_cran_incoming_status": "unresolved_external_metadata_timeouts_from_full67"
+}

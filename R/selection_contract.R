@@ -134,7 +134,11 @@
 
 .msr_assert_selection_targets <- function(models) {
   if (length(models) < 2L) return(invisible(NULL))
-  signatures <- lapply(models, .msr_selection_signature)
+  .msr_assert_selection_signatures(lapply(models, .msr_selection_signature))
+}
+
+# Shared by native fits and compact records captured from those same fits.
+.msr_assert_selection_signatures <- function(signatures) {
   available <- Filter(Negate(is.null), signatures)
   if (length(available) < 2L) return(invisible(NULL))
   ref <- available[[1L]]

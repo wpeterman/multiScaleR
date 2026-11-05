@@ -1,9 +1,13 @@
 # Inference development
 
-Current checkout: validated grouped/spatial CV, training selection and native
-preparation geometry, prepared for the authorized version 0.7.15 publication.
-Read `../cross_validation_stage2_20261104/RESUME.md`. Earlier receipts below
-describe their own source epochs.
+Current release: version 0.7.16 with compact native CV selection records,
+complete-set conditional-choice CV and NB2/Gamma GLM CV. Read
+`../publication_cv_20261105/RESUME.md`. The fresh versioned normal vignette check
+is OK and 3,601 exact-archive installed CV assertions pass. Unchanged numerical
+code/tests retain full20's 34,928 full passes, ten identical helper skips and
+all fourteen scientific markers. This is explicit source-equivalent full
+coverage for the metadata-only version bump. Next: qualify training-only learned
+formula preprocessing. Earlier receipts retain their own source epochs.
 
 Keep native refitting, analytic likelihood methods, marginal-likelihood research
 and Bayesian development on inference-dev. Version 0.7.13 contains the accepted
@@ -187,3 +191,31 @@ and NEXT_CV_COMPATIBILITY.md before resuming; all numerical work is stopped.
 Priorities are compact native training-criterion snapshots, conditional-choice
 survival/amt scoring, then family/GAM and mixed/unmarked target qualification.
 No new panel or fitting promotion is authorized merely by this note.
+
+
+## November 5 NB2/Gamma CV
+
+Current local inference-dev remains e54cff6d/version0.7.15 with no new commit.
+The uncommitted canonical/choice CV work and NB2/Gamma integration are preserved.
+Read cv_nb_gamma_20261104/RESUME.md, REPORT.md and final26.json for the latest
+472-file source/application identity. Final normal vignette check isOK;
+complete exact-archive installed tests pass34,928 with0 fail/warn,
+10 identical helper skips and all14 original scientific markers. Seventeen
+spatial compatibility cases retain native radius SE/K, priors, diagnostics,
+fixed references and uncertainty distinctions. No private fitting promotion.
+Only verified owned temporary object files were removed; no owned numerical
+work remains. NEXT_CV_COMPATIBILITY.md records the still-unqualified preprocessing/
+GAM/mixed/unmarked/Bayesian CV targets. Do not replay closed producers or commit
+without new explicit authority.
+
+## Version 0.7.16 CV publication
+
+The authorized accumulated CV release preserves native parameter counts,
+coefficient SEs, priors, reference transforms, diagnostic/admission gates and
+uncertainty distinctions. NB2/Gamma fit nuisance parameters only within analysis
+folds; conditional choice keeps complete sets and native event counts. Compact
+native records support AIC/AICc/BIC without full fit checkpoints. All four kernel
+routes and fixed-radius SE/K rules have deterministic compatibility coverage.
+The next formula-preprocessing audit is a separate uncommitted batch. Keep
+research artifacts, archives, unique inputs and failures local and unstaged.
+No master merge or private fitting promotion is authorized.

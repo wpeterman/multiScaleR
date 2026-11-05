@@ -657,7 +657,8 @@ define validation units. Neither label adds fitted parameters by itself.
 splits, trials and weights. Failed folds are retained and prevent pooled ranking.
 Predictive scores add no AIC penalty or Akaike weights.
 
-To assess a selection procedure, retain fold fits with `keep_fits = TRUE` and
+To assess a selection procedure, request compact native training records with
+`keep_selection = TRUE` (or full models with `keep_fits = TRUE`) and
 use `select_cv()` with a predeclared AIC, AICc or BIC rule. Selection uses each
 fold's training likelihood and native parameter counts, then scores that model's
 held-out predictions. Assessment ranks must not select the winner in the same
@@ -666,7 +667,15 @@ final choice with an outer validation layer or independent test data.
 
 See `vignette("cross-validation", package = "multiScaleR")` for worked spatial,
 grouped and model-selection examples. The current scoring adapters cover
-Gaussian identity, Poisson log and binomial logit GLMs. Other model classes need
+Gaussian identity, Poisson/NB2 log, binomial logit and Gamma log GLMs. NB2 theta
+and Gamma dispersion are trained within each fold and frozen for assessment;
+native coefficient SE conventions and nuisance/scale penalties remain separate.
+Gamma and fixed-theta NB2 use native refitting. `cross_validate_clogit()`
+adds the separate conditional-choice target for complete one-used-step sets,
+with optional training-only spatial refitting. Its negative log scores average
+over choice sets, and training selection retains native event counts. Keep
+every set together in each split; use whole animals when that is the transfer
+question. Generic censored survival and other model classes need
 separately qualified scoring adapters. Priors, numerical guards, uncertainty
 distinctions and native diagnostic requirements remain unchanged.
 

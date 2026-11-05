@@ -1,3 +1,15 @@
+multiScaleR 0.7.16
+* Add NB2/Gamma CV with training-only nuisance parameters, normalized log scores,
+  native fixed/estimated penalties and compact cross-family training selection.
+* Preserve native coefficient SE conventions and guard unsupported analytic
+  Gamma/fixed-theta routes; document frozen nuisance and observation targets.
+* Add conditional-choice CV with complete matched sets, stable log scores,
+  native event-based model selection and compact training records.
+* Qualify null conditional-choice likelihoods against the retained native scalar;
+  preserve existing Cox methods, numerical admission and uncertainty contracts.
+* Add optional compact native CV selection records, preserving training-only
+  AIC/AICc/BIC choices, parameter counts and diagnostic/likelihood guards.
+
 multiScaleR 0.7.15
 * Retain intersecting raster cells in CV bins using fixed pixel geometry; preserve
   native extraction, parameter bounds, likelihoods and numerical guards.

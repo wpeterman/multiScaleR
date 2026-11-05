@@ -61,11 +61,10 @@ are needed, supply a predeclared explicit list of analysis/assessment IDs to the
 CV functions. They also accept repeated assessment splits and training-buffer
 exclusions. Both vectors must be nonempty, disjoint character IDs within a split.
 
-Keeping a matched choice set together is necessary for step-selection designs,
-but fold construction alone does not supply conditional-logistic or amt scoring.
-The current scoring adapters support canonical Gaussian, Poisson and binomial
-GLMs. Mixed, GAM, unmarked, Bayesian and step-selection scoring require their own
-qualified predictive targets and adapters.
+The GLM scoring adapters support Gaussian, Poisson, binomial, NB2 and Gamma
+targets. Complete matched choice sets use the separate conditional-choice
+adapter described below. Mixed, GAM, unmarked and Bayesian scoring require
+their own qualified predictive targets and adapters.
 
 # Use projected spatial blocks and a training buffer
 
@@ -121,9 +120,9 @@ folds and Poisson observation definition.
 ```{r reference-models}
 candidates <- list(
   null = cross_validate_glm(counts ~ 1, dat, folds, family = "poisson",
-                            keep_fits = TRUE),
+                            keep_selection = TRUE),
   trend = cross_validate_glm(counts ~ poly(east, 2), dat, folds, family = "poisson",
-                             keep_fits = TRUE)
+                             keep_selection = TRUE)
 )
 vapply(candidates, function(x) x$complete, logical(1))
 cv_tab(candidates, metric = "neg_log_score")
@@ -151,11 +150,121 @@ that numerical diagnostics or calibration passed. Scores add no complexity
 penalty and are not AIC values, Akaike weights or model probabilities. Variation
 across dependent folds is not an independent-observation standard error.
 
+# Validate overdispersed counts and positive responses
+
+NB2 models allow count variance to exceed the mean. Their variance is
+`mu + mu^2/theta`, where `mu` is the expected count and smaller `theta` means
+greater extra variation. Gamma models describe strictly positive continuous
+responses, with variance `dispersion * mu^2`. Both adapters use log links, so
+`exp(coefficient)` is the multiplicative mean change for a one-unit predictor
+change, conditional on the other model terms.
+
+This deterministic example illustrates count-distribution comparison without
+adding a spatial optimization or a simulation study.
+
+```{r nb-reference-cv}
+if (requireNamespace("MASS", quietly = TRUE)) {
+  i <- 1:96
+  count_dat <- data.frame(
+    y = rep(c(0, 1, 0, 2, 9, 0, 1, 5, 0, 2, 14, 1), 8),
+    x = sin(i * .73), group = factor(rep(letters[1:3], 32))
+  )
+  count_folds <- grouped_cv_folds(rep(letters[1:12], each = 8), k = 3)
+  common_scores <- c("rmse", "mae", "neg_log_score")
+  count_models <- list(
+    poisson = cross_validate_glm(y ~ x + group, count_dat, count_folds,
+      family = "poisson", metrics = common_scores, keep_selection = TRUE),
+    nb = cross_validate_glm(y ~ x + group, count_dat, count_folds,
+      family = "nbinom2", metrics = common_scores, keep_selection = TRUE)
+  )
+  cv_tab(count_models, metric = "neg_log_score")
+  count_selected <- select_cv(count_models, criterion = "AIC", ties = "first")
+  count_selected$selection$chosen
+  lapply(count_selected$settings$fold_settings, `[[`, "family")
+}
+```
+
+**How to read these results:** NB2 and Poisson log scores use the same observed
+integer counts and retain every probability constant. Their ranking compares
+the complete count distributions, including the NB2 theta estimated within
+each training fold. Training AIC counts estimated theta once, together with
+the native regression rank and any estimated ecological scales/shapes. A theta
+fixed before CV adds no nuisance parameter. Each selected fold keeps its actual
+family and nuisance metadata, so a Poisson winner has no invented NB2 theta.
+Native convergence or theta-estimation warnings retain failed folds; do not
+drop them to obtain a ranking. The exact Poisson limit follows the original
+`joint_nb2` boundary gate and flag, rather than replacing theta with a large
+finite number.
+Joint-NB2 initializes coefficients with a native fixed-size GLM at `theta = 1`,
+then estimates dispersion with the existing joint engine and its boundary
+checks. This avoids requiring finite-theta alternation before the exact boundary
+can be assessed. The initializer's size is neither a fixed fitted theta nor a prior.
+
+Gamma CV freezes a different nuisance parameter. The next example uses positive
+responses and a log-link Gamma mean.
+
+```{r gamma-reference-cv}
+i <- 1:96
+positive_dat <- data.frame(
+  y = exp(.2 + .35 * sin(i * .73)) * rep(c(.3, .6, 1.1, 2.4, .8, 1.8, .4, 1.6), 12),
+  x = sin(i * .73)
+)
+positive_folds <- grouped_cv_folds(rep(letters[1:12], each = 8), k = 3)
+gamma_cv <- cross_validate_glm(y ~ x, positive_dat, positive_folds,
+                              family = "Gamma", keep_selection = TRUE)
+gamma_cv$summary
+lapply(gamma_cv$distribution, function(x) x[c("dispersion", "estimated", "convention")])
+```
+
+**How to read these results:** `dispersion` is the training deviance divided by
+the training sum of case frequencies, matching native Gamma AIC. It is frozen
+for held-out Gamma densities. Native coefficient SEs use their original Pearson
+dispersion convention and can therefore use a different number. CV preserves
+both roles; density dispersion does not replace coefficient uncertainty.
+
+Use `theta = 3` or `dispersion = 0.4` only if that parameter is known or fixed
+independently of assessment outcomes. Known Gamma dispersion uses its declared
+normalized density from the start of fitting. Merely setting a native Gamma
+family's dispersion field would change its parameter count while leaving its
+AIC function's deviance estimate in place. The CV adapter avoids that mismatch
+without changing global GLM methods or existing fitted objects.
+
+Both families require integer nonnegative frequency weights. Native nobs is
+the number of positive-weight training rows, not the sum of their frequencies.
+Gamma outcomes must remain strictly positive and NB2 counts nonnegative
+integers, including zero-weight rows. Their default scores are RMSE, MAE and
+negative log score. Deviance is not offered as a comparison loss because its
+saturated-density constants change with the nuisance parameter. RMSE/MAE can
+compare compatible conditional means across families; density scores and
+information criteria require the same continuous or discrete observation
+measure. Gaussian density scoring is not qualified here.
+
+For spatial fits, estimated NB2 supports `profile_glm`, `joint_nb2` and `refit`.
+Gamma and fixed-theta NB2 require `refit`, which is selected when their backend
+argument is omitted. Explicit incompatible choices stop before fitting.
+Existing kernel/metric and numerical guards remain in force. Mean and supported
+weighted-SQ predictors use the same frozen training normalization and reference
+contract as the other GLMs.
+
+```{r nb-gamma-spatial-cv, eval=FALSE}
+# Use the same raw-cell inputs and predeclared folds as the other candidates.
+nb_spatial <- cross_validate(counts ~ land1 + land2, dat, inputs, folds,
+  family = "nbinom2", keep_selection = TRUE)
+# For a separate positive-response data set, Gamma uses native refitting.
+gamma_spatial <- cross_validate(positive ~ habitat + group, positive_observations,
+  positive_inputs, positive_splits, family = "Gamma", backend = "refit",
+  keep_selection = TRUE)
+```
+
+These scores condition on fitted mean and nuisance parameters. They integrate
+neither parameter nor selection uncertainty, provide no observation intervals
+and establish no calibration claim. Existing priors and diagnostics are unchanged.
+
 # Evaluate a model-selection procedure within the folds
 
 Per-fold assessment ranks describe prediction performance. They must not choose
 the model whose predictions are then scored on those same observations.
-`select_cv()` instead uses the retained **training fits**, selecting by a
+`select_cv()` instead uses native **training likelihoods**, selecting by a
 predeclared AIC, AICc or BIC rule and then retrieving the chosen model's held-out
 predictions. No extra fitting is needed.
 
@@ -199,7 +308,7 @@ inputs <- kernel_prep(pts = locations, raster_stack = land,
 # Prepared and response rows must have exactly the same IDs and order.
 stopifnot(identical(rownames(inputs$kernel_dat), rownames(dat)))
 spatial <- cross_validate(counts ~ land1 + land2, dat, inputs, folds,
-                          family = "poisson", keep_fits = TRUE)
+                          family = "poisson", keep_selection = TRUE)
 models <- c(candidates, list(spatial = spatial))
 cv_tab(models, metric = "neg_log_score")
 selection <- select_cv(models, criterion = "AICc", ties = "first")
@@ -255,12 +364,114 @@ cell geometry keep the original strict gate; prepare them again with the current
 constructor if that gate rejects their cell-center distances. Extraction,
 kernel/metric definitions and fitted parameter bounds are unchanged.
 
+# Validate step selection within complete choice sets
+
+A step-selection model predicts which alternative is used within a defined
+choice set. Those probabilities differ from independent Bernoulli occurrence
+probabilities and from unnormalized relative selection scores. Use
+`cross_validate_clogit()` for one used alternative and at least one available
+alternative per set. Keep all alternatives together in every split.
+
+The following deterministic example illustrates the software workflow. It is
+not a movement-data study or an assessment of animal-level transfer.
+
+```{r conditional-choice-cv}
+if (requireNamespace("survival", quietly = TRUE)) {
+  i <- 1:72
+  set <- (i - 1L) %/% 3L
+  choices <- data.frame(
+    used = as.numeric((i - 1L) %% 3L == set %% 3L),
+    step = set + 1L, habitat = sin(i * 1.7), effort = 1 + (i %% 4) / 10
+  )
+  # Hold out entire choice sets, including the used and available alternatives.
+  choice_folds <- grouped_cv_folds(choices$step, k = 3)
+  choice_models <- list(
+    null = cross_validate_clogit(used ~ strata(step), choices, choice_folds,
+                                 keep_selection = TRUE),
+    habitat = cross_validate_clogit(
+      used ~ habitat + offset(log(effort)) + strata(step),
+      choices, choice_folds, keep_selection = TRUE
+    )
+  )
+  cv_tab(choice_models, metric = "neg_log_score")
+  choice_selection <- select_cv(choice_models, criterion = "AICc", ties = "first")
+  choice_selection$selection$chosen
+  choice_selection$selection$tables$fold1
+  choice_selection$summary
+}
+```
+
+**How to read these results:** Each loss is the negative natural logarithm of
+the used alternative's probability among its complete set. Lower scores are
+better. The average and assessment counts refer to choice sets; every alternative
+remains in `$predictions`, and `$summary$n_alternatives` reports their count.
+Log scores are calculated in log space, so a tiny displayed probability that
+rounds to zero does not create a false infinite loss. Losses that exceed the
+numeric range remain infinite and are never clipped.
+
+The null model has no estimated response coefficients. CV validates survival's
+stored scalar null likelihood against the complete-set offset likelihood before
+using it for training selection. Missing or inconsistent metadata remains a
+failure. Other native Cox objects and methods are unchanged. The native training
+table uses one event per analysis set for AICc/BIC and counts all estimated
+response coefficients and ecological scale/shape parameters. It does not use
+the number of available alternatives as the event count.
+
+The example validates transfer to other choice sets under this split plan. For
+transfer to new animals, construct folds from the animal IDs instead. If step
+labels repeat across animals, first create a globally unique choice ID, such as
+`interaction(animal, step, drop = TRUE)`, and use that column in `strata()`.
+For spatial blocks, supply choice IDs or whole-animal IDs as the grouping
+constraint so alternatives cannot cross split boundaries. The CV validator
+rejects incomplete sets before any fitting.
+
+To estimate ecological scales within those same folds, supply raw-cell
+`kernel_inputs` and choose `backend = "conditional_logit"` or `"refit"`.
+Existing kernel/metric admission, independent starts, cold/native checks and
+curvature rules remain. Initial and fitted normalization and representative
+bin distances use analysis rows only. Assessment predictors use those frozen
+references, including when their distances enter different training bins.
+Prepared raster-map groups remain fixed covariate inputs and add no annual or
+random effects by themselves.
+
+Fixed factors, interactions, offsets and supported saved polynomial/spline
+terms use native training metadata. Dot formulas expand declared column names
+without learning assessment transformations. Exclude the set ID as an ordinary
+predictor, for example `used ~ . - step + strata(step)`; coefficients for
+predictors constant within every set are not identified. Retain native alias
+and convergence failures instead of silently dropping terms or alternatives.
+
+Use the same declared exact, Efron or Breslow method across candidates. This
+adapter accepts unweighted, unpenalized one-case sets. Robust clustering,
+frailty/special Cox terms and generic censored survival prediction need their
+own scoring targets. `cv_tab()` keeps conditional choice separate from GLM
+scores. As with the GLM workflow, inspect original diagnostics, retain failures
+and use outer assessment if these results tune the candidate set or selection
+rule. These point scores integrate no parameter/selection uncertainty and
+provide no observation intervals or calibration certificate.
+
 # Keep outputs proportionate to the task
 
-Both CV functions default to `keep_fits = FALSE`, retaining compact scores,
-training summaries and diagnostics. Full fold fits are needed by `select_cv()`;
-request them only when evaluating a training-based selection procedure or
-inspecting fits. `select_cv()` returns compact output by default. Reuse the
+Both CV functions default to `keep_fits = FALSE` and `keep_selection = FALSE`,
+retaining scores, training summaries and diagnostics. For training-based model
+selection, use `keep_selection = TRUE`. Each `$selection_records` entry captures
+the actual training fit's native log likelihood, full parameter count, effective
+likelihood rows, outcomes/trials/frequencies, formula text, controls and original
+diagnostics. It stores no fitted model, design matrix, raw raster or formula
+environment. Records are smaller than full fits, but their row metadata still
+grows with the number of observations and folds.
+
+`select_cv()` checks those records against the split and target identities and
+uses the same likelihood-comparability guards and criterion table constructors.
+If you retain both records and full fits, they must agree exactly. A metadata
+failure is retained as a selection failure and does not erase a candidate's
+otherwise valid held-out predictions. Records do not change diagnostic eligibility.
+
+Use `keep_fits = TRUE` when you need to inspect native fits or return selected
+fits with `select_cv(..., keep_fits = TRUE)`. Records cannot reconstruct full
+models. Older CV results with retained fits still work; older score-only results
+need a new run with `keep_selection = TRUE` before training-based selection.
+`select_cv()` returns compact output by default. Reuse the
 same prepared inputs and fold list across candidates, and avoid saving duplicate
 rasters or arrays of fit objects as intermediate checkpoints.
 

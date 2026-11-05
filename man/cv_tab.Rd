@@ -8,7 +8,9 @@ cv_tab(mod_list, metric, by_fold = FALSE)
 }
 \arguments{
 \item{mod_list}{Uniquely named list of complete \code{multiScaleR_cv} results.
-Use identical explicit folds and response/weight definitions for every model.}
+Use identical explicit folds and response/weight definitions for every model.
+Complete \code{\link{cross_validate_clogit}} results compare only with the
+same conditional-choice target, complete sets and native partial method.}
 
 \item{metric}{One recorded score, selected explicitly: \code{"rmse"},
 \code{"mae"}, \code{"neg_log_score"}, \code{"deviance"} or \code{"brier"}.}
@@ -33,8 +35,15 @@ preserving frequency weights and binomial trial definitions.
 Incomplete candidates are rejected as a group; no failed model or
   fold is silently removed. Comparisons match analysis/assessment IDs and all
   used responses, trials and frequency weights. RMSE/MAE can compare qualified
-  conditional-mean predictions across Gaussian and Poisson families. Other
-  scores require the same family/link. Binomial negative log scores refer to
+  conditional-mean predictions across qualified Gaussian, Poisson, NB2 and
+  Gamma targets on the same observations. NB2 and Poisson log scores can
+  compare their count distributions. Continuous/discrete density scores
+  cannot be mixed, and Gaussian density scores remain unqualified. Gamma
+  density comparisons preserve positive-response and training-dispersion
+  guards. Other canonical scores retain their family/link requirements. Conditional-choice comparisons use
+  \code{neg_log_score} only, per held-out set, preserving every alternative
+  and its membership. They cannot be mixed with Bernoulli/GLM targets.
+  Binomial negative log scores refer to
   count probabilities; Brier scores average over individual trials.
 
 There is no added complexity penalty, Akaike weight or model probability.

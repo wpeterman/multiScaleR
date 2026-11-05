@@ -49,7 +49,7 @@ cv_stage1_fixture <- function() {
                       family = "gaussian", backend = "profile_glm", weights = NULL, keep_fits = TRUE) {
         planned <<- planned + length(folds); stopifnot(planned <= 24L)
         cross_validate(formula, data, inputs, folds, family = family, backend = backend,
-          weights = weights, keep_fits = keep_fits)
+          weights = weights, keep_fits = keep_fits, keep_selection = TRUE)
       }
       formulas <- list(gaussian = continuous ~ hab * group + poly(z, 2) + offset(log(exposure)),
         poisson = count ~ hab + I(z^2) + group + offset(log(exposure)),
@@ -285,7 +285,7 @@ test_that("invalid fold and model contracts fail before any scale fit", {
   lean <- f$inputs; lean$d_list <- lean$raw_cov <- NULL
   expect_error(call(inputs = lean), "store_cell_data")
   expect_error(call(weights = rep(.5, 72L)), "integer frequencies")
-  expect_error(call(family = "Gamma"), "arg")
+  expect_error(call(family = "inverse.gaussian"), "arg")
   expect_error(call(metrics = "brier"), "supported for this family")
   expect_error(call(glm_control = list(unknown = 1)), "glm.control")
   expect_error(cross_validate(continuous ~ hab + absent, f$data, f$inputs, f$folds), "every formula variable")
@@ -453,4 +453,33 @@ test_that("malformed grouped raster identities stop before scale fitting", {
   expect_error(call(x), "raster_group.*nonmissing")
   x <- inputs; x$raster_group <- unname(x$raster_group)
   expect_error(call(x), "raster_group.*align")
+})
+
+test_that("compact native selection preserves ecological penalties and diagnostics", {
+  z <- cv_stage1_fixture()
+  cases <- c(z$fits, list(refit = z$refit, sq = z$sq, multiple = z$multiple), z$other, z$grouped)
+  for (x in cases) {
+    expect_true(x$complete)
+    compact <- x; compact$fits <- NULL
+    for (criterion in c("AIC", "AICc", "BIC")) {
+      native <- select_cv(list(candidate = x), criterion)
+      small <- select_cv(list(candidate = compact), criterion)
+      expect_identical(small$selection$tables, native$selection$tables)
+      expect_identical(small$selection$chosen, native$selection$chosen)
+      expect_identical(small$predictions, native$predictions)
+      expect_identical(small$summary, native$summary)
+      expect_identical(small$diagnostics, native$diagnostics)
+      expect_identical(small$warnings, native$warnings)
+      expect_identical(small$prediction_contracts, native$prediction_contracts)
+    }
+    for (name in names(x$folds)) {
+      d <- x$selection_records[[name]]$data
+      expect_equal(d$K, .msr_selection_parameter_count(x$fits[[name]]))
+      expect_equal(d$native_K, attr(logLik(x$fits[[name]]$opt_mod), "df"))
+      expect_equal(d$K, d$native_K + d$ecological_K)
+    }
+  }
+  expect_identical(z$planned_scale_fits, 24L)
+  expect_false(z$failed$complete)
+  expect_error(select_cv(list(failed = z$failed)), "complete")
 })

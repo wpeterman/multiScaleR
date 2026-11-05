@@ -119,6 +119,7 @@
 # Restrict outcomes to an explicit recorded observation definition. Predictor
 # equations remain native GLM formulas, including learned poly/spline metadata.
 .msr_cv_outcome <- function(formula, data, family) {
+  if (.msr_cv_distribution_family(family)) return(.msr_cv_distribution_outcome(formula, data, family))
   expr <- formula[[2L]]
   while (is.call(expr) && identical(expr[[1L]], as.name("I"))) expr <- expr[[2L]]
   simple <- is.symbol(expr) || (is.call(expr) && identical(expr[[1L]], as.name("cbind")) &&
@@ -151,6 +152,9 @@
 }
 
 .msr_cv_score <- function(predictions, family, metrics) {
+  if (identical(family, "conditional_choice")) return(.msr_choice_score(predictions, metrics))
+  if (.msr_cv_distribution_family(family) || "distribution_family" %in% names(predictions))
+    return(.msr_cv_distribution_score(predictions, metrics))
   y <- predictions$observed; mu <- predictions$prediction
   n <- predictions$trials; w <- predictions$weight
   if (any(!is.finite(mu)) || (family == "binomial" && any(mu < 0 | mu > 1)) ||
@@ -172,6 +176,7 @@
 }
 
 .msr_cv_metric <- function(predictions, metric, family, complete, expected) {
+  if (identical(family, "conditional_choice")) return(.msr_choice_metric(predictions, complete))
   keep <- predictions$eligible & !is.na(predictions[[metric]])
   w <- predictions$weight[keep]
   if (metric == "brier") w <- w * predictions$trials[keep]
@@ -189,7 +194,7 @@
 #' Refit ecological scales and GLM coefficients using only each training set,
 #' then score predictions for the explicitly held-out rows. A fold is one
 #' training and assessment split. This function supports ordinary Gaussian,
-#' Poisson and binomial GLMs and runs folds sequentially.
+#' Poisson, binomial, NB2 and Gamma GLMs and runs folds sequentially.
 #'
 #' @param formula Two-sided GLM formula. The response is a data column or
 #'   \code{cbind(successes, failures)}. An \code{I()} wrapper is also accepted.
@@ -213,12 +218,17 @@
 #'   buffers and can repeat assessment rows across splits. Keep dependent sites,
 #'   animals or other sampling groups together when defining the splits.
 #' @param family Character response family: \code{"gaussian"} uses the identity
-#'   link, \code{"poisson"} the log link, and \code{"binomial"} the logit link.
-#'   The default is \code{"gaussian"}. Other families, links and quasi-likelihood
-#'   targets require separately qualified scoring adapters.
-#' @param backend Scale-fitting backend, \code{"profile_glm"} (default) or
-#'   \code{"refit"}, passed to \code{\link{multiScale_optim}}. Its existing
-#'   starts, convergence, curvature and kernel/metric guards remain in force.
+#'   link, \code{"poisson"}, \code{"nbinom2"} and \code{"Gamma"} use log links,
+#'   and \code{"binomial"} uses the logit link. Lowercase \code{"gamma"} is an
+#'   alias. NB2 means variance equals mean plus mean squared divided by theta;
+#'   Gamma variance equals dispersion times mean squared. The default is
+#'   \code{"gaussian"}. Other links and quasi-likelihood targets are unqualified.
+#' @param backend Scale-fitting backend passed to \code{\link{multiScale_optim}}.
+#'   \code{"profile_glm"} remains the default, except that Gamma and fixed-theta
+#'   NB2 default to their required native \code{"refit"} route. Estimated NB2
+#'   also supports \code{"joint_nb2"}. Explicit incompatible backends are
+#'   rejected. Existing starts, convergence, cold/limiting, curvature and
+#'   kernel/metric guards remain in force.
 #' @param weights Optional nonnegative integer frequency weights, one per data
 #'   row in its supplied order. Names, when present, must match that order.
 #'   Gaussian weights must all equal one. Binomial trials belong in the
@@ -234,11 +244,28 @@
 #' @param metrics Optional character vector of score names. Defaults are
 #'   \code{c("rmse", "mae")} for Gaussian, \code{c("rmse", "mae",
 #'   "neg_log_score", "deviance")} for Poisson, and
-#'   \code{c("neg_log_score", "brier")} for binomial. Lower values are better.
+#'   \code{c("neg_log_score", "brier")} for binomial. NB2/Gamma default to
+#'   \code{c("rmse", "mae", "neg_log_score")}. Their nuisance-dependent
+#'   deviances are not comparison metrics. Lower values are better.
 #' @param keep_fits Logical. Default \code{FALSE} keeps compact predictions,
 #'   scales and diagnostics. Set \code{TRUE} to retain full fold models in memory
 #'   for inspection; this can use substantially more memory.
-#' @return An object of class \code{multiScaleR_cv}, a list containing:
+#' @param keep_selection Logical. Default \code{FALSE} does not retain native
+#'   training-selection records. Set \code{TRUE} to use \code{\link{select_cv}}
+#'   without keeping full fits. Records are captured from each actual training
+#'   fit and add no model fitting or diagnostic eligibility.
+#' @param theta Optional finite positive NB2 size fixed before CV, or \code{NULL}
+#'   (default) to estimate it separately in each training set. Fixed theta adds
+#'   no nuisance parameter to K and requires \code{backend = "refit"} for scales.
+#'   Do not choose theta from assessment outcomes. Other families reject it.
+#' @param dispersion Optional finite positive Gamma dispersion fixed before CV,
+#'   or \code{NULL} (default) for the native training Gamma AIC convention,
+#'   deviance divided by the sum of frequency weights. Fixed dispersion adds
+#'   no nuisance parameter to K. It is supplied to a scoped known-dispersion
+#'   family before fitting, with its normalized density and native coefficient
+#'   SE convention. Other families reject it.
+#' @return An object of class \code{multiScaleR_cv}, additionally inheriting
+#'   \code{multiScaleR_distribution_cv} for NB2/Gamma, a list containing:
 #'   \describe{
 #'     \item{\code{summary}}{Pooled scores with columns \code{metric},
 #'       \code{estimate}, scoring \code{unit}, planned \code{n_assessment},
@@ -250,7 +277,14 @@
 #'       failed folds: \code{fold}, \code{row_id}, \code{observed} response/count,
 #'       \code{trials}, response-scale \code{prediction}, frequency \code{weight},
 #'       \code{eligible} scoring flag and requested score columns. The \code{rmse}
-#'       column stores squared errors. Failed predictions/scores are \code{NA}.}
+#'       column stores squared errors. Failed predictions/scores are \code{NA}.
+#'       NB2/Gamma add \code{distribution_family}, frozen training \code{theta}
+#'       or \code{dispersion}, and the existing joint-NB2 \code{poisson_limit}
+#'       flag. Inapplicable nuisance columns are \code{NA}.}
+#'     \item{\code{distribution}}{NB2/Gamma training distribution metadata per
+#'       fold: family, theta/dispersion, estimated/fixed convention, Poisson-limit
+#'       flag, native rank/K, log likelihood, effective nobs, deviance and weight
+#'       total. A failed training distribution may leave an element \code{NULL}.}
 #'     \item{\code{fold_results}}{Per-fold \code{fold}, \code{n_analysis},
 #'       \code{n_assessment} and \code{status} (\code{"scored"} or \code{"failed"}).}
 #'     \item{\code{folds}, \code{assessment_counts}}{The explicit split plan and
@@ -270,6 +304,19 @@
 #'       Otherwise \code{NULL}. These are input maps, not fitted random effects.}
 #'     \item{\code{targets}}{Compact used-row responses, trials and weights for
 #'       guarded comparison with \code{\link{cv_tab}}. Never used in fitting.}
+#'     \item{\code{selection_records}}{Native training likelihood, complete
+#'       parameter counts, effective row IDs, outcomes/trials/frequencies, formula
+#'       text, controls, diagnostics and metadata failures when
+#'       \code{keep_selection = TRUE}; otherwise \code{NULL}. These compact records
+#'       support \code{\link{select_cv}} without full fold models. Each record has
+#'       \code{version}, \code{controls}, \code{diagnostics}, metadata \code{warnings},
+#'       \code{data} and, on extraction failure, an \code{error} message.
+#'       Successful \code{data} contains \code{logLik} on the natural-log scale;
+#'       \code{native_K}, \code{ecological_K} and their total \code{K}; effective
+#'       \code{nobs} and \code{observation_ids}; analysis-row \code{targets};
+#'       \code{response_layout}, native likelihood \code{signature}, \code{formula}
+#'       text, \code{family} and \code{link}. These are provenance from the fit;
+#'       preserve them unchanged. Records cannot reconstruct native models.}
 #'     \item{\code{fits}}{Full fold fits when \code{keep_fits = TRUE}; otherwise
 #'       \code{NULL}. These fits use only their own training data.}
 #'     \item{\code{complete}, \code{settings}, \code{call}}{Whether all planned
@@ -313,6 +360,23 @@
 #' score GAMs, mixed, unmarked or Bayesian fits. See
 #' \code{\link{grouped_cv_folds}} and \code{\link{spatial_cv_folds}} for
 #' deterministic whole-group and spatial-grid fold construction.
+#' NB2 and Gamma held-out negative log scores use complete normalized densities
+#' with nuisance parameters learned only from analysis rows. Gamma uses its
+#' native AIC deviance scale when dispersion is estimated; this differs from
+#' the Pearson scale used for native coefficient SEs. Fixed Gamma constructs
+#' its declared density before fitting, rather than setting only a native
+#' dispersion field that would leave Gamma's AIC estimator inconsistent.
+#' Estimated nuisance parameters each add one to native K; known ones add zero.
+#' Native nobs counts positive-weight rows, not the sum of frequency weights.
+#' NB2 counts must be nonnegative integers and Gamma outcomes strictly positive,
+#' including zero-weight rows. Native theta/convergence warnings retain failed
+#' folds. No score integrates parameter uncertainty or supplies observation
+#' intervals. The exact Poisson limit is available only when the original
+#' joint-NB2 fit verifies and flags it; no large finite theta substitutes for it.
+#' Joint-NB2 initializes coefficients with a native fixed-size GLM (theta = 1),
+#' then estimates dispersion through the original joint engine and boundary
+#' checks. The initializer's fixed size is not a fixed fitted theta or a prior.
+#'
 #' @examples
 #' # Explicit folds can be checked before any fitting is attempted.
 #' ids <- paste0("site", 1:6)
@@ -323,12 +387,23 @@
 #'   \code{\link{prepare_prediction}}, \code{\link{aic_tab}}
 #' @export
 cross_validate <- function(formula, data, kernel_inputs, folds,
-    family = c("gaussian", "poisson", "binomial"),
-    backend = c("profile_glm", "refit"), weights = NULL,
+    family = c("gaussian", "poisson", "binomial", "nbinom2", "Gamma"),
+    backend = c("profile_glm", "refit", "joint_nb2"), weights = NULL,
     optim_args = list(), glm_control = stats::glm.control(), metrics = NULL,
-    keep_fits = FALSE) {
-  family <- match.arg(family); backend <- match.arg(backend)
+    keep_fits = FALSE, keep_selection = FALSE, theta = NULL, dispersion = NULL) {
+  if (identical(family, "gamma")) family <- "Gamma"
+  family <- match.arg(family)
+  if (.msr_cv_distribution_family(family)) {
+    selected_backend <- if (missing(backend) && (family == "Gamma" || !is.null(theta))) "refit" else match.arg(backend)
+    out <- .msr_cv_distribution(formula, data, folds, family, weights, glm_control, metrics,
+      keep_fits, keep_selection, theta, dispersion, kernel_inputs, selected_backend, optim_args)
+    out$call <- match.call(); return(out)
+  }
+  if (!is.null(theta) || !is.null(dispersion)) stop("theta/dispersion controls apply only to NB2/Gamma CV.", call. = FALSE)
+  backend <- match.arg(backend)
+  if (backend == "joint_nb2") stop("joint_nb2 CV requires family = 'nbinom2'.", call. = FALSE)
   validate_scalar_logical(keep_fits, "keep_fits")
+  validate_scalar_logical(keep_selection, "keep_selection")
   if (!inherits(formula, "formula") || length(formula) != 3L)
     stop("formula must be a two-sided GLM formula.", call. = FALSE)
   if (!is.data.frame(data) || !nrow(data) || anyDuplicated(names(data)))
@@ -391,7 +466,8 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
   family_object <- switch(family, gaussian = stats::gaussian(), poisson = stats::poisson(), binomial = stats::binomial())
   output <- list(predictions = list(), metrics = list(), fold_results = list(),
     training = list(), diagnostics = list(), warnings = list(), errors = list(),
-    prediction_contracts = list(), fits = if (keep_fits) list() else NULL)
+    prediction_contracts = list(), fits = if (keep_fits) list() else NULL,
+    selection_records = if (keep_selection) list() else NULL)
   output$raster_groups <- if (is.null(inputs$raster_group)) NULL else list()
   for (name in names(folds)) {
     split <- folds[[name]]
@@ -474,6 +550,9 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
       initial_glm = if (is.null(initial)) NULL else initial[c("converged", "boundary", "iter")],
       fitted_glm = if (is.null(fit)) NULL else fit$opt_mod[c("converged", "boundary", "iter")],
       scale = if (is.null(fit)) NULL else fit$diagnostics))
+    if (keep_selection) output$selection_records[name] <- list(.msr_cv_selection_record(fit,
+      output$diagnostics[[name]], .msr_cv_selection_controls(list(backend = backend,
+        optim_args = optim_args, glm_control = glm_control))))
     if (keep_fits) output$fits[name] <- list(fit)
   }
   for (item in c("predictions", "metrics", "fold_results")) {

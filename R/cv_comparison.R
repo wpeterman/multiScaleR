@@ -20,7 +20,7 @@
     .msr_cv_metric(output$predictions, metric, family, output$complete, nrow(output$predictions))))
   output$folds <- folds
   output$assessment_counts <- stats::setNames(tabulate(match(output$predictions$row_id, ids), length(ids)), ids)
-  class(output) <- "multiScaleR_cv"
+  class(output) <- if (identical(family, "conditional_choice")) c("multiScaleR_choice_cv", "multiScaleR_cv") else "multiScaleR_cv"
   output
 }
 
@@ -38,12 +38,23 @@
 #'   \code{\link{cross_validate}}, with backend \code{"glm"}, no estimated
 #'   spatial scales, and ordinary GLM fits when \code{keep_fits = TRUE}.
 #'   Compact \code{targets} metadata records used row IDs, observed outcomes,
-#'   trials and frequency weights for guarded model comparison.
-#' @details This adapter supports the same canonical families, outcome and
+#'   trials and frequency weights for guarded model comparison. Optional
+#'   \code{selection_records} have the same contract as \code{cross_validate()}.
+#' @details This adapter supports the same qualified GLM families, outcome and
 #'   frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
 #'   interactions, offsets and learned \code{poly()} terms use native GLM
 #'   machinery. All learned preprocessing must occur within the training fit;
 #'   do not supply predictors standardized with assessment data.
+#'
+#' NB2 uses \code{MASS::glm.nb()} when theta is estimated and
+#'   \code{glm(family = MASS::negative.binomial(theta))} when it is fixed.
+#'   Gamma retains its native deviance-based AIC scale when dispersion is
+#'   estimated. Known Gamma dispersion uses the normalized fixed-scale family
+#'   constructed before fitting. Coefficients and native coefficient SEs are
+#'   retained; density dispersion is not a replacement for the SE convention.
+#'   Nuisance parameters and supported training transformations are frozen
+#'   before assessment prediction. See \code{cross_validate()} for their counts,
+#'   support, compact metadata and uncertainty distinctions.
 #'
 #' No ecological scale is estimated here. Use \code{cross_validate()} for
 #'   training-only spatial scale refitting. Predictions use fitted parameters;
@@ -59,10 +70,19 @@
 #'   \code{\link{select_cv}}
 #' @export
 cross_validate_glm <- function(formula, data, folds,
-    family = c("gaussian", "poisson", "binomial"), weights = NULL,
-    glm_control = stats::glm.control(), metrics = NULL, keep_fits = FALSE) {
+    family = c("gaussian", "poisson", "binomial", "nbinom2", "Gamma"), weights = NULL,
+    glm_control = stats::glm.control(), metrics = NULL, keep_fits = FALSE,
+    keep_selection = FALSE, theta = NULL, dispersion = NULL) {
+  if (identical(family, "gamma")) family <- "Gamma"
   family <- match.arg(family)
+  if (.msr_cv_distribution_family(family)) {
+    out <- .msr_cv_distribution(formula, data, folds, family, weights, glm_control, metrics,
+      keep_fits, keep_selection, theta, dispersion)
+    out$call <- match.call(); return(out)
+  }
+  if (!is.null(theta) || !is.null(dispersion)) stop("theta/dispersion controls apply only to NB2/Gamma CV.", call. = FALSE)
   validate_scalar_logical(keep_fits, "keep_fits")
+  validate_scalar_logical(keep_selection, "keep_selection")
   if (!inherits(formula, "formula") || length(formula) != 3L ||
       !is.data.frame(data) || !nrow(data) || anyDuplicated(names(data)) ||
       length(setdiff(all.vars(formula), c(names(data), "."))))
@@ -88,7 +108,8 @@ cross_validate_glm <- function(formula, data, folds,
   fam <- switch(family, gaussian = stats::gaussian(), poisson = stats::poisson(), binomial = stats::binomial())
   output <- list(predictions = list(), metrics = list(), fold_results = list(), training = list(),
     diagnostics = list(), warnings = list(), errors = list(), prediction_contracts = list(),
-    fits = if (keep_fits) list() else NULL)
+    fits = if (keep_fits) list() else NULL,
+    selection_records = if (keep_selection) list() else NULL)
   for (name in names(folds)) {
     split <- folds[[name]]; ai <- match(split$analysis, ids); ti <- match(split$assessment, ids)
     pred <- data.frame(fold = name, row_id = split$assessment, observed = NA_real_, trials = NA_real_,
@@ -131,6 +152,8 @@ cross_validate_glm <- function(formula, data, folds,
       population = "fixed_at_estimate", kernel = "not_applicable",
       conditioning = "training_fit_and_fixed_prediction_rows",
       omitted = "parameter_uncertainty", fixed_inputs = TRUE))
+    if (keep_selection) output$selection_records[name] <- list(.msr_cv_selection_record(fit,
+      output$diagnostics[[name]], .msr_cv_selection_controls(list(backend = "glm", glm_control = glm_control))))
     if (keep_fits) output$fits[name] <- list(fit)
   }
   output <- .msr_cv_finish(output, folds, ids, family, metrics)
@@ -149,6 +172,10 @@ cross_validate_glm <- function(formula, data, folds,
   if (!is.list(mod_list) || !length(mod_list) || is.null(names(mod_list)) ||
       anyNA(names(mod_list)) || any(!nzchar(names(mod_list))) || anyDuplicated(names(mod_list)))
     stop("mod_list must be a nonempty, uniquely named list of CV results.", call. = FALSE)
+  if (any(vapply(mod_list, inherits, logical(1), "multiScaleR_choice_cv")))
+    return(.msr_choice_comparison(mod_list, metric))
+  if (any(vapply(mod_list, inherits, logical(1), "multiScaleR_distribution_cv")))
+    return(.msr_cv_distribution_comparison(mod_list, metric))
   signatures <- lapply(mod_list, function(x) {
     if (!inherits(x, "multiScaleR_cv") || !isTRUE(x$complete) ||
         !is.data.frame(x$fold_results) || any(x$fold_results$status != "scored"))
@@ -222,6 +249,8 @@ cross_validate_glm <- function(formula, data, folds,
 #'
 #' @param mod_list Uniquely named list of complete \code{multiScaleR_cv} results.
 #'   Use identical explicit folds and response/weight definitions for every model.
+#'   Complete \code{\link{cross_validate_clogit}} results compare only with the
+#'   same conditional-choice target, complete sets and native partial method.
 #' @param metric One recorded score, selected explicitly: \code{"rmse"},
 #'   \code{"mae"}, \code{"neg_log_score"}, \code{"deviance"} or \code{"brier"}.
 #' @param by_fold Logical. Default \code{FALSE} compares pooled scores.
@@ -235,8 +264,15 @@ cross_validate_glm <- function(formula, data, folds,
 #' @details Incomplete candidates are rejected as a group; no failed model or
 #'   fold is silently removed. Comparisons match analysis/assessment IDs and all
 #'   used responses, trials and frequency weights. RMSE/MAE can compare qualified
-#'   conditional-mean predictions across Gaussian and Poisson families. Other
-#'   scores require the same family/link. Binomial negative log scores refer to
+#'   conditional-mean predictions across qualified Gaussian, Poisson, NB2 and
+#'   Gamma targets on the same observations. NB2 and Poisson log scores can
+#'   compare their count distributions. Continuous/discrete density scores
+#'   cannot be mixed, and Gaussian density scores remain unqualified. Gamma
+#'   density comparisons preserve positive-response and training-dispersion
+#'   guards. Other canonical scores retain their family/link requirements. Conditional-choice comparisons use
+#'   \code{neg_log_score} only, per held-out set, preserving every alternative
+#'   and its membership. They cannot be mixed with Bernoulli/GLM targets.
+#'   Binomial negative log scores refer to
 #'   count probabilities; Brier scores average over individual trials.
 #'
 #' There is no added complexity penalty, Akaike weight or model probability.
@@ -285,7 +321,9 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
   out
 }
 
-.msr_cv_training_identity <- function(fit, split, targets, family) {
+.msr_cv_training_identity <- function(fit, split, targets, family, method = NULL) {
+  if (identical(family, "conditional_choice")) return(.msr_choice_identity(fit, split, targets, method))
+  if (.msr_cv_distribution_family(family)) return(.msr_cv_distribution_training_identity(fit, split, targets, family))
   model <- if (inherits(fit, "multiScaleR")) fit$opt_mod else fit
   if (!inherits(model, "glm") || !is.data.frame(model$model) ||
       !identical(rownames(model$model), split$analysis))
@@ -325,14 +363,34 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
 #'   parameter penalties, and \code{candidate_settings} with each candidate's
 #'   controls. Shared output settings inherit the first candidate, identified
 #'   by \code{settings$controls_from}; use \code{candidate_settings} for the
-#'   complete procedure. Selected \code{raster_groups} are retained when present.
+#'   complete procedure. NB2/Gamma procedures also retain the actual selected
+#'   \code{settings$fold_settings} and \code{distribution} metadata per fold,
+#'   including when a Poisson or Gaussian reference wins. Selected
+#'   \code{raster_groups} are retained when present.
 #'   Candidate warnings/diagnostics and selection failures
 #'   are retained. Failed selection makes pooled scores \code{NA}.
-#' @details Inputs must retain their fold fits via \code{keep_fits = TRUE},
-#'   share family/link, targets and splits, and record the same scoring metrics.
+#' @details Inputs must retain native training-selection records via
+#'   \code{keep_selection = TRUE} or full fold fits via \code{keep_fits = TRUE},
+#'   share compatible likelihood targets and splits, and record the same scoring
+#'   metrics. NB2/Poisson candidates may share a count target. Gamma/Gaussian
+#'   candidates may share a continuous target using RMSE/MAE. Density scores
+#'   cannot compare different observation measures. Other canonical family/link
+#'   and conditional-choice guards are unchanged.
 #'   Analysis-row identities and response/weight definitions are checked against
-#'   each retained GLM. Native likelihood comparability, parameter counts and
-#'   numerical guards remain unchanged. Invalid inputs are rejected; criterion
+#'   each retained GLM or record. Compact records store native log likelihood,
+#'   native and ecological parameter counts, effective row IDs, outcomes, trials,
+#'   frequencies, formula text, controls and diagnostics. NB2/Gamma records also
+#'   preserve estimated/fixed nuisance metadata and native nuisance counts.
+#'   They retain no model
+#'   environment, design matrix or raw raster. If both representations are
+#'   retained, they must agree exactly. Record-only selection uses the same
+#'   likelihood-signature guards and information-criterion table constructors.
+#'   Selection records cannot reconstruct fits requested by \code{keep_fits}.
+#'   Metadata failures remain selection failures without discarding scored folds.
+#'   Conditional-choice records retain event-based nobs and native
+#'   partial-method/stratum signatures. Alternative counts do not substitute
+#'   for native events in AICc/BIC. Native likelihood comparability, parameter
+#'   counts and numerical guards remain unchanged. Invalid inputs are rejected; criterion
 #'   failures, nonfinite criteria and unresolved ties are retained per fold.
 #'
 #' Assessment outcomes and CV scores never choose the winner inside a fold.
@@ -343,8 +401,8 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
 #' @examples
 #' dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
 #' folds <- grouped_cv_folds(rep(letters[1:4], each = 2), k = 2)
-#' candidates <- list(null = cross_validate_glm(y ~ 1, dat, folds, "poisson", keep_fits = TRUE),
-#'                    trend = cross_validate_glm(y ~ x, dat, folds, "poisson", keep_fits = TRUE))
+#' candidates <- list(null = cross_validate_glm(y ~ 1, dat, folds, "poisson", keep_selection = TRUE),
+#'                    trend = cross_validate_glm(y ~ x, dat, folds, "poisson", keep_selection = TRUE))
 #' selected <- select_cv(candidates, criterion = "AIC", ties = "first")
 #' selected$selection$chosen
 #' @seealso \code{\link{cv_tab}}, \code{\link{cross_validate}},
@@ -356,14 +414,43 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
   validate_scalar_logical(keep_fits, "keep_fits")
   signature <- .msr_cv_comparison(mod_list)
   first <- mod_list[[1L]]; metrics <- first$settings$metrics; folds <- first$folds
-  for (x in mod_list) {
-    if (!setequal(metrics, x$settings$metrics) || is.null(x$fits) || !setequal(names(x$fits), names(folds)))
-      stop("Candidate results must share metrics and retain every training fit: use keep_fits = TRUE.", call. = FALSE)
-    for (name in names(folds)) .msr_cv_training_identity(x$fits[[name]], x$folds[[name]], signature$targets, x$settings$family)
-  }
+  choice <- inherits(first, "multiScaleR_choice_cv")
+  distribution <- any(vapply(mod_list, inherits, logical(1), "multiScaleR_distribution_cv"))
+  all_fits <- all(vapply(mod_list, function(x) !is.null(x$fits), logical(1)))
+  records <- lapply(mod_list, function(x) {
+    has_fits <- !is.null(x$fits) && setequal(names(x$fits), names(folds))
+    has_records <- !is.null(x$selection_records) && setequal(names(x$selection_records), names(folds))
+    if (!is.null(x$fits) && !has_fits)
+      stop("Retain every training fit when supplying fits.", call. = FALSE)
+    if (!is.null(x$selection_records) && !has_records)
+      stop("Retain every training selection record when supplying records.", call. = FALSE)
+    if (!setequal(metrics, x$settings$metrics) || (!has_fits && !has_records))
+      stop("Candidate results must share metrics and retain every training fit or selection record: use keep_fits = TRUE or keep_selection = TRUE.", call. = FALSE)
+    if (keep_fits && !has_fits)
+      stop("Selected full fits require keep_fits = TRUE in every candidate; selection records cannot reconstruct fits.", call. = FALSE)
+    out <- stats::setNames(vector("list", length(folds)), names(folds))
+    for (name in names(folds)) {
+      fold_settings <- .msr_cv_fold_settings(x, name)
+      if (has_fits) .msr_cv_training_identity(x$fits[[name]], x$folds[[name]], signature$targets, fold_settings$family, fold_settings$method)
+      native <- if (has_fits && (has_records || !all_fits)) {
+        if (choice) .msr_choice_record(x$fits[[name]], x$diagnostics[[name]], .msr_cv_selection_controls(fold_settings),
+          x$folds[[name]], signature$targets) else
+          .msr_cv_selection_record(x$fits[[name]], x$diagnostics[[name]], .msr_cv_selection_controls(fold_settings))
+      } else NULL
+      if (has_records) {
+        .msr_cv_record_identity(x$selection_records[[name]], x, name, signature$targets)
+        if (has_fits && !identical(x$selection_records[[name]], native))
+          stop("Selection records disagree with their retained native training fits; rerun CV.", call. = FALSE)
+      }
+      out[name] <- list(if (has_records) x$selection_records[[name]] else native)
+    }
+    out
+  })
   output <- list(predictions = list(), metrics = list(), fold_results = list(), training = list(),
     diagnostics = list(), warnings = list(), errors = list(), prediction_contracts = list(),
     fits = if (keep_fits) list() else NULL)
+  if (distribution) output$distribution <- list()
+  selected_settings <- list()
   selection <- list(criterion = criterion, ties = ties, candidates = names(mod_list),
     candidate_settings = lapply(mod_list, `[[`, "settings"),
     chosen = stats::setNames(rep(NA_character_, length(folds)), names(folds)), tables = list(),
@@ -371,9 +458,13 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
   for (name in names(folds)) {
     messages <- character(); winner <- NA_character_
     error <- tryCatch(withCallingHandlers({
-      models <- lapply(mod_list, function(x) x$fits[[name]])
-      tab <- if (criterion == "BIC") bic_tab(models, mod_names = names(mod_list), verbose = FALSE) else
-        aic_tab(models, AICc = criterion == "AICc", mod_names = names(mod_list), verbose = FALSE)
+      if (all_fits) {
+        models <- lapply(mod_list, function(x) x$fits[[name]])
+        tab <- if (criterion == "BIC") bic_tab(models, mod_names = names(mod_list), verbose = FALSE) else
+          aic_tab(models, AICc = criterion == "AICc", mod_names = names(mod_list), verbose = FALSE)
+      } else {
+        tab <- .msr_cv_record_table(lapply(records, `[[`, name), criterion, names(mod_list))
+      }
       selection$tables[[name]] <- tab
       values <- stats::setNames(tab[[criterion]], tab$Modnames)[names(mod_list)]
       if (length(values) != length(mod_list) || any(!is.finite(values)))
@@ -386,10 +477,11 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
       error = function(e) list(stage = "training_selection", message = conditionMessage(e)))
     selection$chosen[name] <- winner
     x <- if (is.null(error)) mod_list[[winner]] else first
-    pred <- x$predictions[x$predictions$fold == name, , drop = FALSE]
-    if (is.null(error)) pred <- .msr_cv_score(pred, x$settings$family, metrics)
+    pred <- if (distribution) .msr_cv_distribution_rows(x, name) else x$predictions[x$predictions$fold == name, , drop = FALSE]
+    if (is.null(error)) pred <- .msr_cv_score(pred, .msr_cv_fold_settings(x, name)$family, metrics)
     if (!is.null(error)) {
       pred$prediction <- NA_real_; pred$eligible <- FALSE
+      if (choice) pred$linear_predictor <- pred$log_probability <- NA_real_
       for (metric in metrics) pred[[metric]] <- NA_real_
     }
     output$predictions[[name]] <- pred
@@ -403,6 +495,10 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
       for (item in c("training", "diagnostics", "prediction_contracts")) output[[item]][name] <- x[[item]][name]
       if (!is.null(x$raster_groups)) output$raster_groups[name] <- x$raster_groups[name]
       if (keep_fits) output$fits[name] <- x$fits[name]
+      if (distribution) {
+        output$distribution[name] <- list(.msr_cv_distribution_metadata(x, name))
+        selected_settings[name] <- list(.msr_cv_fold_settings(x, name))
+      }
     }
   }
   output <- .msr_cv_finish(output, folds, names(first$assessment_counts), first$settings$family, metrics)
@@ -411,6 +507,10 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
   output$settings$backend <- "training_selection"
   output$settings$controls_from <- names(mod_list)[1L]
   output$settings$selection_uncertainty <- "not_integrated"
+  if (distribution) {
+    output$settings$fold_settings <- selected_settings
+    class(output) <- c("multiScaleR_distribution_cv", "multiScaleR_cv")
+  }
   output$call <- match.call()
   output
 }

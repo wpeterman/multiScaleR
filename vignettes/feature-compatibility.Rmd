@@ -730,13 +730,20 @@ case are not refitted models or evidence of inferential calibration.
 ## Explicit-fold GLM validation
 
 `cross_validate()` provides training-only scale refitting and held-out scoring
-for Gaussian identity, Poisson log and binomial logit GLMs. It accepts explicit
+for Gaussian identity, Poisson/NB2 log, binomial logit and Gamma log GLMs.
+Gamma and fixed-theta NB2 require native `refit`; estimated NB2 supports
+`profile_glm`, `joint_nb2` and `refit`. It accepts explicit
 analysis/assessment row IDs, retains failures and uses frozen training bins and
 normalization. Cell-level inputs are required; lean-only preparation is rejected.
 Modern grouped raster inputs retain validated per-row fixed-map identities in
 each split; they do not introduce annual random effects or varying scales. Supported kernels and metrics follow the selected
-`profile_glm` or `refit` backend's existing guards. This stage does not add GAM,
-mixed-model, unmarked, step-selection or Bayesian scoring. See
+backend's existing guards. Training-only theta/Gamma dispersion and normalized
+log scores preserve fixed/estimated nuisance counts and native coefficient SE
+conventions. NB2/Poisson count comparisons and Gamma continuous comparisons
+retain likelihood-measure guards. Selected folds record their actual family and
+nuisance parameters. This GLM route does not add
+GAM, mixed-model, unmarked or Bayesian scoring. The separate conditional-choice
+route is described below. See
 `vignette("inference-contracts", package = "multiScaleR")` for the workflow.
 
 `grouped_cv_folds()` and `spatial_cv_folds()` generate compatible whole-unit
@@ -746,3 +753,23 @@ matching held-out scores; `select_cv()` evaluates training-only AIC/AICc/BIC
 selection with retained fold fits and original parameter counts. These helpers
 do not expand the supported scoring model classes or any private admission.
 Worked examples are in `vignette("cross-validation", package = "multiScaleR")`.
+
+For memory-efficient training selection, request `keep_selection = TRUE` in
+each CV call. Compact records retain native likelihoods, complete parameter
+counts, training identities, controls and diagnostics. Full models remain
+optional via `keep_fits = TRUE`. Record-based selection retains the existing
+comparability, failure and uncertainty contracts; it does not qualify additional
+model classes for CV scoring.
+
+`cross_validate_clogit()` qualifies a separate conditional-choice CV target for
+complete one-used-step sets, with native references or supported scalar spatial
+backends. Every set stays wholly in training, assessment or exclusions. Scores
+average natural-log choice loss over sets while retaining all alternatives.
+Native exact/Efron/Breslow methods, event-based nobs and complete K remain in
+training selection, including compact choice records. Generic censored Cox,
+case weights, robust/penalized terms and other model-class scoring still need
+their own qualification. The CV-only null likelihood adapter checks survival's
+stored scalar against the complete-set offset likelihood; it does not change
+other native Cox objects. Priors, numerical gates, private admission, conditional
+SEs and uncertainty distinctions remain unchanged. See
+`vignette("cross-validation", package = "multiScaleR")` for a worked example.

@@ -13,7 +13,9 @@ select_cv(
 }
 \arguments{
 \item{mod_list}{Uniquely named list of complete \code{multiScaleR_cv} results.
-Use identical explicit folds and response/weight definitions for every model.}
+Use identical explicit folds and response/weight definitions for every model.
+Complete \code{\link{cross_validate_clogit}} results compare only with the
+same conditional-choice target, complete sets and native partial method.}
 
 \item{criterion}{Predeclared training criterion: \code{"AICc"} (default),
 \code{"AIC"} or \code{"BIC"}, calculated with existing
@@ -33,7 +35,10 @@ A \code{multiScaleR_cv} result for the selection procedure, with
   parameter penalties, and \code{candidate_settings} with each candidate's
   controls. Shared output settings inherit the first candidate, identified
   by \code{settings$controls_from}; use \code{candidate_settings} for the
-  complete procedure. Selected \code{raster_groups} are retained when present.
+  complete procedure. NB2/Gamma procedures also retain the actual selected
+  \code{settings$fold_settings} and \code{distribution} metadata per fold,
+  including when a Poisson or Gaussian reference wins. Selected
+  \code{raster_groups} are retained when present.
   Candidate warnings/diagnostics and selection failures
   are retained. Failed selection makes pooled scores \code{NA}.
 }
@@ -42,11 +47,28 @@ Select a candidate using each fold's training likelihood, then evaluate its
 already recorded held-out predictions. No additional model fits are run.
 }
 \details{
-Inputs must retain their fold fits via \code{keep_fits = TRUE},
-  share family/link, targets and splits, and record the same scoring metrics.
+Inputs must retain native training-selection records via
+  \code{keep_selection = TRUE} or full fold fits via \code{keep_fits = TRUE},
+  share compatible likelihood targets and splits, and record the same scoring
+  metrics. NB2/Poisson candidates may share a count target. Gamma/Gaussian
+  candidates may share a continuous target using RMSE/MAE. Density scores
+  cannot compare different observation measures. Other canonical family/link
+  and conditional-choice guards are unchanged.
   Analysis-row identities and response/weight definitions are checked against
-  each retained GLM. Native likelihood comparability, parameter counts and
-  numerical guards remain unchanged. Invalid inputs are rejected; criterion
+  each retained GLM or record. Compact records store native log likelihood,
+  native and ecological parameter counts, effective row IDs, outcomes, trials,
+  frequencies, formula text, controls and diagnostics. NB2/Gamma records also
+  preserve estimated/fixed nuisance metadata and native nuisance counts.
+  They retain no model
+  environment, design matrix or raw raster. If both representations are
+  retained, they must agree exactly. Record-only selection uses the same
+  likelihood-signature guards and information-criterion table constructors.
+  Selection records cannot reconstruct fits requested by \code{keep_fits}.
+  Metadata failures remain selection failures without discarding scored folds.
+  Conditional-choice records retain event-based nobs and native
+  partial-method/stratum signatures. Alternative counts do not substitute
+  for native events in AICc/BIC. Native likelihood comparability, parameter
+  counts and numerical guards remain unchanged. Invalid inputs are rejected; criterion
   failures, nonfinite criteria and unresolved ties are retained per fold.
 
 Assessment outcomes and CV scores never choose the winner inside a fold.
@@ -58,8 +80,8 @@ Assessment outcomes and CV scores never choose the winner inside a fold.
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
 folds <- grouped_cv_folds(rep(letters[1:4], each = 2), k = 2)
-candidates <- list(null = cross_validate_glm(y ~ 1, dat, folds, "poisson", keep_fits = TRUE),
-                   trend = cross_validate_glm(y ~ x, dat, folds, "poisson", keep_fits = TRUE))
+candidates <- list(null = cross_validate_glm(y ~ 1, dat, folds, "poisson", keep_selection = TRUE),
+                   trend = cross_validate_glm(y ~ x, dat, folds, "poisson", keep_selection = TRUE))
 selected <- select_cv(candidates, criterion = "AIC", ties = "first")
 selected$selection$chosen
 }
