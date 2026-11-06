@@ -303,7 +303,8 @@
   if (!is.null(newdata)) args$newdata <- newdata
   predictor <- if (unmarked) {
     if (is.null(unmarked_predictor))
-      .msr_unmarked_prediction_function(model, re.form = dots[["re.form"]]) else unmarked_predictor
+      .msr_unmarked_prediction_function(model, re.form = dots[["re.form"]],
+        component = if (is.data.frame(newdata)) type else NULL) else unmarked_predictor
   } else if (inherits(model, "gam"))
     .msr_predict_gam else stats::predict
   if (!unmarked) args$se.fit <- se.fit

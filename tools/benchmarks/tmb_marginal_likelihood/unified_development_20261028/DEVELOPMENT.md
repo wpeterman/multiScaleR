@@ -1,3 +1,55 @@
+# Version0.7.18 publication and conditional random-design follow-up
+
+The November6 user explicitly authorizes committing/pushing the accepted
+component-specific unmarked batch, then proceeding with conditional learned
+random-design metadata. Version0.7.18 changes only release metadata after the
+fresh full19 normal vignette check and38,093installed passes/0fail/0warn/10same
+skips. Focused1,343passed; all14 original numerical markers and old cases remain.
+No public/conditional learned-random admission expands in this release.
+
+User logoff remains13:45 Eastern November6. The following development must be a
+new isolated bounded batch, preserving original training learner constants,
+full fitted Z/group-coordinate order, covariance, full K/likelihood/diagnostics,
+priors, fixed references and uncertainty distinctions. Keep current guards until
+focused and fresh complete package/archive validation qualify an adapter. No
+new study, seed search or automatic commit of that follow-up. Historical entries
+below record previous source/authorization states and remain preserved.
+
+# Component-specific unmarked prediction contexts validated, uncommitted
+
+November6: accepted ucomponent_20261106/full19 is applied on inference-dev,
+HEAD90ac419d/version0.7.17. All484 curated root files match the checked source.
+Fresh normal vignette-enabled check StatusOK; complete exact-archive installed
+suite38,093passed/0failures/0warnings/10unchanged helper skips; all14 original
+numerical markers and old ledgers retained, with235trained-prediction additions.
+Focused1,343passed without failures/errors/warnings/skips; help regenerated.
+
+Ordinary unmarked state/detection tables, snapshots, raster chunks and effect
+curves prepare only the requested original training basis. Native frame and
+omitted-data routes still qualify both designs for missing-row removal. Nuisance
+and unknown types retain the original full-context guard/provider route. Native
+ZIP means/psi covariance, full model K, likelihood, priors, diagnostics, fixed
+references, coefficient uncertainty and every private guard are unchanged.
+Requested conditional learned random slopes remain guarded; detection support
+for a separate component does not qualify those slopes or latent-model CV.
+
+No stage/commit/version bump/push/merge. All owned R work is complete; foreign
+RStudio is untouched. Only48 exactly identified regenerable compiler objects
+were retired (31,203,676logical bytes); source/DLLs/archives/failures remain.
+The earlier full11 installed suite was deliberately interrupted for the nuisance
+fallback correction, with its completed check/source/archive/partial log and
+zero-owned failure seal retained. The accepted full19 was a fresh complete gate.
+
+Read ../ucomponent_20261106/RESUME.md and
+../continuation_20261030/NEXT_SUPPORTED_COMPATIBILITY_20261106.md next. Prioritize
+original conditional random-design metadata, then proper joint-density/fold
+qualification for latent CV. Private no-year/weighted-SQ scientific prerequisites
+remain distinct and guarded. AS-CRAN incoming external metadata timeouts from
+full67 remain unresolved; this normal check is not a submission-readiness claim.
+The user window ends13:45 Eastern November6; no new future work window implied.
+
+Earlier publication and numerical checkpoints follow as historical records.
+
 # Version 0.7.17 publication and next session
 
 The November 6 user request authorizes committing and pushing the validated

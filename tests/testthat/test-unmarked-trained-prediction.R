@@ -553,3 +553,140 @@ test_that("unqualified native subclasses keep their original metadata", {
     expect_identical(.msr_native_active_metadata(model), model)
   }
 })
+
+
+# Reuse the same eight deterministic software fits; no additional fit sites.
+test_that("requested unmarked point contexts ignore unrelated component metadata", {
+  f <- unmarked_trained_fixture()
+  open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
+  for (name in names(f$fits)) for (type in c("state", "det")) {
+    model <- f$fits[[name]]
+    rows <- model@data@siteCovs[f$rows, , drop = FALSE]
+    expected <- unmarked_trained_reference(model, type, rows)
+    unrelated <- if (type == "state") "temperature" else c("habitat", "effort")
+    reduced <- model
+    for (variable in unrelated) reduced@data@siteCovs[[variable]] <- NULL
+    keep <- if (type == "state") c("habitat", "effort", "Year",
+      if (unmarked:::has_random(model@formlist$state)) "site") else c("temperature", "Year")
+    rows <- rows[keep]
+    before <- list(opt = reduced@opt, estimates = reduced@estimates,
+      nll = reduced@negLogLike, AIC = reduced@AIC, K = .msr_parameter_count(reduced),
+      data = reduced@data, TMB_par = reduced@TMB$par)
+    scoped <- .msr_unmarked_prediction_function(reduced, component = type)
+    expect_equal(scoped(reduced, type, rows), expected, tolerance = 1e-10)
+    object <- structure(list(opt_mod = reduced), class = "multiScaleR")
+    point <- .msr_native_prediction_rows(object, rows, type, TRUE)
+    expect_equal(as.data.frame(point), expected, tolerance = 1e-10, ignore_attr = TRUE)
+    contract <- attr(point, "prediction_contract")
+    expect_identical(list(component = contract$component,
+      intervals = contract$uncertainty$intervals, noise = contract$uncertainty$observation_noise,
+      kernel = contract$uncertainty$kernel_parameters, eligible = contract$metadata_establishes_eligibility),
+      list(component = type, intervals = "native_conditional_confidence", noise = FALSE,
+        kernel = "fixed_at_estimate", eligible = FALSE))
+    snap <- prepare_prediction(object, rows, component = type)
+    expect_equal(predict(unserialize(serialize(snap, NULL))), expected, tolerance = 1e-10)
+    thin <- list(object = list(opt_mod = reduced), type = type, se.fit = TRUE,
+      native_args = list(), logical_names = character(), unmarked_predictor = scoped)
+    chunks <- rbind(.msr_native_raster_eval(thin, rows[1:3, , drop = FALSE]),
+      .msr_native_raster_eval(thin, rows[4:7, , drop = FALSE]))
+    expect_equal(as.matrix(chunks), as.matrix(expected), tolerance = 1e-10, ignore_attr = TRUE)
+    curve_object <- structure(list(opt_mod = model,
+      scl_params = list(mean = c(habitat = 0), sd = c(habitat = 1))), class = "multiScaleR")
+    expected_curves <- plot_marginal_effects(curve_object, type = type, length.out = 5L)
+    curve_object$opt_mod <- reduced
+    curves <- plot_marginal_effects(curve_object, type = type, length.out = 5L)
+    expect_identical(names(curves), names(expected_curves))
+    expect_identical(attr(curves, "prediction_contract"), attr(expected_curves, "prediction_contract"))
+    for (variable in names(curves))
+      expect_equal(curves[[variable]]$data, expected_curves[[variable]]$data, tolerance = 1e-10)
+    # Native frame removal still requires both components, even for one output.
+    expect_error(.msr_unmarked_prediction_function(reduced), "Original unmarked covariates")
+    expect_error(prepare_prediction(object, model@data, component = type), "Original unmarked covariates")
+    expect_error(scoped(reduced, type, model@data), "explicit data-frame")
+    expect_error(scoped(reduced, if (type == "state") "det" else "state", rows), "prepared type")
+    expect_identical(list(opt = reduced@opt, estimates = reduced@estimates,
+      nll = reduced@negLogLike, AIC = reduced@AIC, K = .msr_parameter_count(reduced),
+      data = reduced@data, TMB_par = reduced@TMB$par), before)
+  }
+})
+
+test_that("unmarked requested components keep their own guards and native ZIP target", {
+  f <- unmarked_trained_fixture()
+  for (name in names(f$fits)) {
+    model <- f$fits[[name]]
+    rows <- model@data@siteCovs[f$rows, , drop = FALSE]
+    for (type in c("state", "det")) {
+      required <- if (type == "state") "habitat" else "temperature"
+      changed <- model
+      changed@data@siteCovs[[required]][1L] <- changed@data@siteCovs[[required]][1L] + .1
+      expect_error(.msr_unmarked_prediction_function(changed, component = type), "do not match")
+      changed@data@siteCovs[[required]] <- NULL
+      expect_error(.msr_unmarked_prediction_function(changed, component = type), "Original unmarked covariates")
+      scoped <- .msr_unmarked_prediction_function(model, component = type)
+      absent <- rows; absent[[required]] <- NULL
+      expect_error(scoped(model, type, absent), "explicitly contain")
+    }
+    expect_error(.msr_unmarked_prediction_function(model, component = c("state", "det")), "one native")
+    if (name == "ZIP") {
+      # Retain both the native overall mean and its psi variance contribution.
+      scoped <- .msr_unmarked_prediction_function(model, component = "state")
+      for (response in c(FALSE, TRUE)) for (level in c(.8, .95))
+        expect_equal(scoped(model, "state", rows, backTransform = response, level = level),
+          unmarked_trained_reference(model, "state", rows, backTransform = response, level = level),
+          tolerance = 1e-10)
+      nuisance <- .msr_unmarked_prediction_function(model, component = "psi")
+      expect_equal(nuisance(model, "state", rows),
+        unmarked_trained_reference(model, "state", rows), tolerance = 1e-10)
+      # Nuisance requests retain the original full-context admission boundary.
+      reduced <- model; reduced@data@siteCovs$temperature <- NULL
+      expect_error(.msr_unmarked_prediction_function(reduced, component = "psi"), "Original unmarked covariates")
+      reduced <- model
+      reduced@formlist$state <- ~I(base::scale(habitat)^2) + Year + (scale(effort) | site)
+      expect_error(.msr_unmarked_prediction_function(reduced, component = "psi"), "Learned random-effect")
+    }
+  }
+})
+
+test_that("unrelated learned random slopes do not block conditional detection", {
+  f <- unmarked_zero_slope_fixture()
+  rows <- unmarked_trained_fixture()$rows
+  for (model in f$fits) {
+    data <- model@data@siteCovs[rows, , drop = FALSE]
+    expected <- unmarked_trained_reference(model, "det", data)
+    reduced <- model
+    for (variable in c("wind", "site", "habitat", "effort")) reduced@data@siteCovs[[variable]] <- NULL
+    data <- data[c("temperature", "Year")]
+    scoped <- .msr_unmarked_prediction_function(reduced, component = "det")
+    expect_equal(scoped(reduced, "det", data), expected, tolerance = 1e-10)
+    object <- structure(list(opt_mod = reduced), class = "multiScaleR")
+    point <- .msr_native_prediction_rows(object, data, "det", TRUE)
+    expect_equal(as.data.frame(point), expected, tolerance = 1e-10, ignore_attr = TRUE)
+    expect_identical(attr(point, "prediction_contract")$integration$random_effects, "native_method")
+    expect_error(.msr_unmarked_prediction_function(reduced, component = "state"), "Learned random-effect")
+    expect_error(.msr_unmarked_prediction_function(reduced), "Learned random-effect")
+    expect_error(prepare_prediction(object, model@data, component = "det"), "Learned random-effect")
+    zero <- .msr_unmarked_prediction_function(reduced, re.form = NA, component = "det")
+    expect_error(zero(reduced, "det", data, re.form = NULL), "cannot supply conditional")
+    expect_identical(list(opt = reduced@opt, estimates = reduced@estimates,
+      nll = reduced@negLogLike, AIC = reduced@AIC, K = .msr_parameter_count(reduced), par = reduced@TMB$par),
+      list(opt = model@opt, estimates = model@estimates, nll = model@negLogLike,
+        AIC = model@AIC, K = .msr_parameter_count(model), par = model@TMB$par))
+  }
+})
+
+test_that("one requested unmarked basis is reused across prediction chunks", {
+  f <- unmarked_trained_fixture(); model <- f$fits$P
+  rows <- model@data@siteCovs[f$rows, , drop = FALSE]
+  original <- .msr_unmarked_prediction_basis; calls <- character()
+  local_mocked_bindings(.msr_unmarked_prediction_basis = function(object, type, verify_random = TRUE) {
+    calls <<- c(calls, type)
+    original(object, type, verify_random)
+  }, .package = "multiScaleR")
+  scoped <- .msr_unmarked_prediction_function(model, component = "det")
+  expected <- unmarked_trained_reference(model, "det", rows)
+  actual <- rbind(scoped(model, "det", rows[1:3, , drop = FALSE]),
+    scoped(model, "det", rows[4:7, , drop = FALSE]))
+  rownames(actual) <- NULL
+  expect_equal(actual, expected, tolerance = 1e-10)
+  expect_identical(calls, "det")
+})

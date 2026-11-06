@@ -136,33 +136,43 @@
   eval(call("function", formals(method), body(method)), env)
 }
 
-.msr_unmarked_prediction_function <- function(object, re.form = NULL) {
+.msr_unmarked_prediction_function <- function(object, re.form = NULL, component = NULL) {
   native <- unmarked::predict
   if (!class(object)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount")) return(native)
+  if (!is.null(component) && (!is.character(component) || length(component) != 1L ||
+      is.na(component) || !nzchar(component)))
+    stop("component must name one native prediction type.", call. = FALSE)
+  # Data-frame callers know their target. Full contexts remain necessary for
+  # native frame missing-row removal, which evaluates both regression designs.
+  # Nuisance and unknown native types keep the original full-context guards.
+  # Only the two qualified regression outputs admit component scoping.
+  if (!is.null(component) && !component %in% c("state", "det")) component <- NULL
+  components <- if (is.null(component)) c("state", "det") else component
   ns <- asNamespace("unmarked")
   formulas <- object@formlist
   zero_context <- !is.null(re.form)
   default_re_form <- re.form
-  if (!all(vapply(formulas[c("state", "det")], inherits, logical(1), "formula"))) return(native)
-  for (formula in formulas[c("state", "det")]) {
+  if (!all(vapply(formulas[components], inherits, logical(1), "formula"))) return(native)
+  for (formula in formulas[components]) {
     labels <- attr(stats::terms(formula), "term.labels")
     random <- vapply(lapply(labels, str2lang), .msr_marginal_random_call, logical(1))
     if (!zero_context && any(random) && .msr_needs_nested_metadata(stats::terms(stats::reformulate(
         labels[random], env = environment(formula)))))
       stop("Learned random-effect transformations need precomputed original training predictors; trained random-design metadata are unavailable.", call. = FALSE)
   }
-  raw <- lapply(c("state", "det"), function(type) get("get_covariates", ns)(object, type))
-  needed <- any(vapply(formulas[c("state", "det")], function(f)
+  raw <- stats::setNames(lapply(components, function(type)
+    get("get_covariates", ns)(object, type)), components)
+  needed <- any(vapply(formulas[components], function(f)
     .msr_needs_nested_metadata(stats::terms(f)) || get("has_random", ns)(f), logical(1))) ||
     any(vapply(seq_along(raw), function(i) {
-      variables <- .msr_marginal_variables(formulas[[c("state", "det")[i]]], offsets = TRUE)
+      variables <- .msr_marginal_variables(formulas[[components[i]]], offsets = TRUE)
       if ("." %in% variables) variables <- names(raw[[i]])
       columns <- intersect(names(raw[[i]]), variables)
       any(vapply(raw[[i]][columns], is.factor, logical(1)))
     }, logical(1)))
   if (!needed) return(native)
-  bases <- stats::setNames(lapply(c("state", "det"), function(type)
-    .msr_unmarked_prediction_basis(object, type, verify_random = !zero_context)), c("state", "det"))
+  bases <- stats::setNames(lapply(components, function(type)
+    .msr_unmarked_prediction_basis(object, type, verify_random = !zero_context)), components)
   generic <- methods::getGeneric("predict_internal", where = ns)
   selected <- methods::selectMethod("predict_internal", class(object)[1L], fdef = generic)
   common <- methods::selectMethod("predict_internal", "unmarkedFit", fdef = generic)
@@ -170,6 +180,8 @@
     stop("This unmarked prediction method needs its own trained-design adapter.", call. = FALSE)
   function(object, type, newdata = NULL, backTransform = TRUE, na.rm = TRUE,
       appendData = FALSE, level = 0.95, re.form = default_re_form, ...) {
+    if (!is.null(component) && (!identical(type, component) || !is.data.frame(newdata)))
+      stop("This component-specific context requires explicit data-frame rows for its prepared type; use a full context for native frames or another component.", call. = FALSE)
     if (zero_context && is.null(re.form))
       stop("This zero-effect prediction context cannot supply conditional random effects; prepare a conditional context with its original random-design metadata.", call. = FALSE)
     # Nonregression nuisance components keep their provider's original route.
@@ -201,7 +213,7 @@
       get_design <- .msr_unmarked_local_method(design, list(
         get_Z = function(formula, covs) {
           name <- attr(formula, ".msr_prediction_component")
-          original <- raw[[match(name, c("state", "det"))]]
+          original <- raw[[name]]
           .msr_unmarked_random_design(formulas[[name]], original, covs, re.form)
         },
         get_model_matrix = function(formula, covs) fixed(formula, covs)$X,

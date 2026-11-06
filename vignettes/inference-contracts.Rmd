@@ -593,3 +593,30 @@ Ordinary unmarked curve lists carry a `prediction_contract` recording zero
 random effects, no random-effect integration and native confidence limits
 conditional on the selected ecological scales. This metadata does not establish
 fit eligibility or interval calibration.
+
+
+### Component-specific unmarked prediction preparation
+
+For ordinary occupancy and `pcount` fits, explicit prediction tables prepare
+only the requested state or detection component's original training metadata.
+Prepared table outputs, raster chunks and effect curves use that same checked
+basis. For example, conditional detection predictions can be evaluated without
+reconstructing an unrelated learned abundance random slope. The requested
+component still needs every fixed transformation, offset, contrast and, for
+conditional predictions, its own original random design. These checks are not
+relaxed when another component is unused.
+
+A native `unmarkedFrame` input has a different dependency. Its missing-row
+removal uses both regression designs before selecting the prediction component.
+Frame inputs and predictions with omitted `newdata` therefore retain both
+components' preparation and validation. This preserves native site and survey
+row handling. Spatial input preparation retains its existing source and
+normalization requirements.
+
+ZIP state predictions remain overall expected abundance. They retain the native
+zero-inflation estimate and its contribution to uncertainty, even though they
+do not need the detection design for an explicit prediction table. Component
+selection does not reduce the fitted model's parameter count, alter its
+likelihood or diagnostics, integrate random effects, or include uncertainty in
+the selected spatial scales. A component mean or confidence limit still does
+not define the joint held-out density needed for N-mixture cross-validation.

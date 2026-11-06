@@ -173,7 +173,11 @@ fitted factor contrasts and native component covariance. Missing contrasts
 can be recovered from unambiguous original main-factor columns; other missing
 coding requires explicit training contrasts. Preparation verifies
 the fixed designs and offsets against the retained native fit and reuses
-this metadata for the requested output. Keep the original covariates and
+this metadata for the requested output. Explicit data-frame rows prepare
+only the requested regression component; native frame inputs or omitted
+newdata retain both components for native missing-row removal. ZIP outputs
+retain their native zero-inflation estimate and uncertainty, and all outputs
+retain full model parameter counts and diagnostics. Keep the original covariates and
 fitted designs. Frame subsets retain original known-group columns.
 Conditional learned random-effect terms require precomputed training
 predictors. Zero-effect contexts need only their fixed design and offsets,

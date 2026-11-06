@@ -36,7 +36,8 @@
     types <- if (is.null(component)) c("response", "link") else component
   }
   unmarked_predictor <- if (kind == "unmarked")
-    .msr_unmarked_prediction_function(model, re.form = native_args[["re.form"]]) else NULL
+    .msr_unmarked_prediction_function(model, re.form = native_args[["re.form"]],
+      component = if (is.data.frame(nd)) component else NULL) else NULL
   capture <- function(args) {
     warnings <- character()
     # unmarked exports an S4 generic distinct from stats' S3 generic.

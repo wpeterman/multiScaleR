@@ -134,7 +134,7 @@
   thin <- list(object = list(opt_mod = model), type = type, se.fit = se.fit,
     native_args = dots, logical_names = logical_names,
     unmarked_predictor = if (methods::is(model, "unmarkedFit"))
-      .msr_unmarked_prediction_function(model, re.form = dots[["re.form"]]) else NULL)
+      .msr_unmarked_prediction_function(model, re.form = dots[["re.form"]], component = type) else NULL)
   if (.msr_analytic_backend(object)) {
     if (length(dots)) stop("Native controls are unsupported for analytic raster prediction.", call. = FALSE)
     if (!is.null(type) && !type %in% c("response", "link"))

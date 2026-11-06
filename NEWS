@@ -1,3 +1,9 @@
+multiScaleR 0.7.18
+* Prepare ordinary unmarked state and detection metadata by requested component
+  for explicit prediction tables, raster chunks and effect curves.
+* Preserve both-component native frame row removal, ZIP targets and covariance,
+  full parameter counts, conditional guards and uncertainty distinctions.
+
 multiScaleR 0.7.17
 * Preserve trained scaling, polynomial and spline transformations inside nested
   expressions and offsets across native, Bayesian and private predictions.

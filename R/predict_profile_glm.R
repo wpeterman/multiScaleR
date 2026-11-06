@@ -276,6 +276,14 @@
 #' contrasts. Native observation rows, missing-site handling,
 #' covariance, confidence levels and derived ZIP abundance remain native.
 #' Point, prepared and raster predictions use the same checked transformations.
+#' For explicit data-frame rows, ordinary unmarked predictions prepare only the
+#' requested state or detection component's training metadata. Raster chunks and
+#' effect curves reuse that component's checked basis. Unrelated component
+#' metadata is not evaluated. Native frame inputs or omitted newdata retain both
+#' components because native missing-row removal depends on both designs.
+#' Derived ZIP means and confidence limits still use native zero-inflation
+#' estimates and covariance. Full model parameter counts and diagnostics are
+#' unchanged, even when a prediction uses only one regression component.
 #' Known-group columns retain their original order for frame subsets.
 #' Conditional predictions with learned random-effect terms need precomputed
 #' original training predictors. Zero-effect requests do not evaluate those

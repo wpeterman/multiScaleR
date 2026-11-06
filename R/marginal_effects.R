@@ -129,7 +129,10 @@
 #' curves use the same checked native prediction target as point rows, prepared
 #' outputs and raster chunks. ZIP curves retain the overall expected abundance,
 #' including structural zeros, rather than substituting conditional abundance.
-#' Native coefficient covariance and confidence bounds are retained.
+#' Native coefficient covariance and confidence bounds are retained. Ordinary
+#' state and detection curves prepare only their own original training basis;
+#' unrelated component metadata is not required. This does not remove native
+#' ZIP target dependencies or change full model parameter counts or diagnostics.
 #' Detection curves use the original observation-row covariates for trained
 #' transformations and confidence limits. State curves use original site rows.
 #' Detection is conditional on occupancy for \code{occu}; for \code{pcount},
@@ -356,7 +359,7 @@ plot_marginal_effects <- function(x,
     # Ordinary native curves use the same checked target as points and maps.
     # Zero effects need no new random slopes, groups or random-design mapping.
     native_curve <- if (ordinary_unmarked_curve)
-      .msr_unmarked_prediction_function(mod, re.form = NA) else NULL
+      .msr_unmarked_prediction_function(mod, re.form = NA, component = type) else NULL
     basis <- if (is.null(native_curve)) .msr_unmarked_curve_basis(active_terms, dat) else NULL
     plot_list <- lapply(c_vars, function(v) {
       values <- dat[[v]]
