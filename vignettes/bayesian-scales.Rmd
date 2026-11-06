@@ -136,8 +136,13 @@ For example, `habitat * year` estimates separate habitat associations by year;
 it does not introduce a year effect into the spatial-scale formula. An
 interaction among two optimized predictors still has one scale model for each
 predictor. The expanded response coefficients retain the documented normal
-prior in the native factor/contrast basis. Fixed polynomial and spline bases
-retain their training metadata during prediction. Kernel-only scalar
+prior in the native factor/contrast basis. Fixed scaling, polynomial and spline
+bases retain their training definitions inside nested expressions such as
+`I(scale(temp))` and transformed offsets. Single rows, batches and coefficient
+effect curves use those same constants. Older fits require reconstruction from
+their original stored training data that reproduces the retained formula values.
+Namespace-qualify custom functions that reuse these learner names, or precompute
+their predictors. Kernel-only scalar
 expressions, such as `I(habitat^2)`, use the same fixed reference transformation
 and original coefficient priors in their native basis. These expressions act
 after kernel extraction and standardization. Learned dynamic bases, fixed-data

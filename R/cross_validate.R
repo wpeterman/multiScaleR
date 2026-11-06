@@ -341,6 +341,24 @@
 #' parameters or spatially varying scales. Explicit formula group effects keep
 #' their native fitting, parameter counts and new-level prediction guards.
 #'
+#' Supported learned formula transformations keep analysis-row constants for
+#' assessment prediction. These include bare or namespaced \code{scale()},
+#' \code{poly()}, \code{splines::ns()} and \code{splines::bs()}, including calls
+#' inside arithmetic, \code{I()}, pointwise functions and offsets. Spatial fits
+#' use their final fitted training predictors, not initial-scale values. Original
+#' formulas, coefficients, coefficient SEs, likelihoods, K and numerical guards
+#' are unchanged. Retained fits carry the same repaired prediction terms.
+#' Predeclared numeric transform arguments remain fixed, and native abbreviated
+#' scale arguments keep their meanings. Formula variables must still be supplied
+#' explicitly; this does not permit formula-environment predictor fallback.
+#' Recovery evaluates only these known learners with numeric inputs and supported
+#' pointwise arguments; arbitrary user functions are not re-executed to infer
+#' preprocessing. Other learned operations, such as \code{mean(x)} inside a
+#' formula or a custom transformation, need an explicit recipe trained within
+#' each analysis split and applied unchanged to its assessment rows. Unsupported
+#' arguments to a known learner produce a retained fold failure. Existing backend
+#' restrictions on expressions involving optimized spatial predictors still apply.
+#'
 #' Negative log scores retain Poisson/binomial likelihood constants and average
 #' over positive-weight observations using frequency weights. Binomial Brier
 #' scores average squared prediction errors across trials, weighted by frequency
@@ -515,6 +533,7 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
       if (!isTRUE(fit$opt_mod$converged) || !identical(as.integer(fit$optim_results$convergence), 0L))
         stop("Training GLM or scale optimizer did not converge.", call. = FALSE)
       stage <- "prediction"
+      fit <- .msr_cv_prediction_metadata(fit, training_data, train)
       assess <- .msr_cv_inputs(inputs, split$assessment, covariates,
         if (is.null(train$binned)) NULL else train$binned$cv_reference)
       raw_assess <- .msr_cv_initial_values(assess)

@@ -113,6 +113,15 @@ about sampling their effects or fixing their deviations at zero.
 }
 \details{
 Fitting standardization, fixed-effect bases and contrasts are reused.
+  Fixed covariate learners \code{scale()}, \code{poly()}, \code{splines::ns()}
+  and \code{splines::bs()} retain their training definitions inside ordinary
+  expressions such as \code{I(scale(temp))} and transformed offsets. The same
+  constants apply to single rows, batches and coefficient effect curves.
+  For older fits, reconstructed calls must reproduce the retained training
+  formula values using original stored data; otherwise prediction stops.
+  Namespace-qualify custom functions with these learner names, or precompute
+  their predictors. Existing dynamic-kernel expression restrictions apply.
+
   Prediction does not refit the model, learn a new scale reference or condition
   on response values in \code{newdata}. An unseen fixed year factor remains an
   error, even when random-effect sampling is enabled. A hierarchical response

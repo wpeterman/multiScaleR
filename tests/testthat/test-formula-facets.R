@@ -82,6 +82,9 @@ test_that("expanded NB2 designs preserve every serial and caller-worker start", 
   serial <- fit(control)
   pool <- parallel::makePSOCKcluster(1)
   on.exit(parallel::stopCluster(pool), add = TRUE)
+  # Caller-owned workers must use the controller's exact development/installed
+  # package, preserving the strict worker-code guard and every original start.
+  cluster_prep(f$model, pool)
   control$worker_pool <- pool
   parallel <- fit(control)
   a <- serial$profile_fit$start_results; b <- parallel$profile_fit$start_results

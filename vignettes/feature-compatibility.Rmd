@@ -28,6 +28,25 @@ counts do not provide evidence of scale recovery, ecological effects, or
 interval coverage. Optimization and posterior fitting examples are not run
 during the vignette build.
 
+Native LM, GLM and time-fixed unpenalized Cox predictions use the original
+fitted terms to resolve formula shortcuts such as `~ .`. New data columns do
+not change that design. Variables removed with `-` are excluded from prediction
+inputs and effect panels; active interactions and offsets retain their inputs.
+Original transformation metadata, factor coding, coefficient covariance and
+parameter counts are retained. The installed unmarked provider rejects dot
+formulas during fitting, so use explicit component formulas for those models.
+
+For ordinary `occu()` and `pcount()` fits, `plot_marginal_effects(type = "det")`
+shows the native conditional detection probability using original observation
+covariates. For `occu()`, detection conditions on occupancy; for `pcount()`, it is
+the per-individual survey detection probability. `type = "state"` shows the state component; `"lambda"` is a plotting
+alias for that component in these ordinary classes. ZIP state curves retain
+overall expected abundance. These curves set random effects to zero and retain
+native confidence limits conditional on the selected spatial scales. Their
+response scale is retained for both `link` settings. Keep the original fixed
+covariates and transformation metadata; unused random-only inputs are not needed
+for a zero-effect curve. Conditional predictions retain their original guards.
+
 ## Choose features and a fitting method
 
 `kernel_var()` estimates the distance scale of an environmental mean.
@@ -412,8 +431,9 @@ silently replace a native random-effect declaration or alter the fitted target.
 For supported ordinary unmarked occupancy and count curves, a learned fixed
 basis such as `poly(temperature, 2)` or `scale(temperature)` retains its training
 prediction call, including the equivalent `stats::poly()` and `base::scale()`
-forms. The plotting grid does not recenter, rescale, or refit that
-basis. Curves use native coefficient covariance and inverse links, with random
+forms. Supported standard learners inside `I()` and transformed formula
+offsets use the original raw site covariates before site removal. The plotting
+grid does not recenter, rescale, or refit that basis. Curves use native coefficient covariance and inverse links, with random
 effects set to zero; they remain conditional on the fitted spatial scales.
 
 
@@ -444,12 +464,62 @@ blocks and effect curves when the original raw curve variables are available.
 A single new value or a constant raster does not define a new standard deviation.
 The native coefficients, covariance, fitted likelihood and diagnostics stay fixed.
 
+Standard scaling, polynomial and spline calls also retain their original
+training constants inside nested expressions and formula offsets. Recovery
+requires one unambiguous standard learner's attributes in each evaluated
+predictor. Missing attributes or multiple learners sharing one column need
+precomputed training predictors or complete saved prediction calls. Scaling
+arguments retain their original order and abbreviations. A complete saved
+numeric call does not require a frame merely to resolve those arguments.
+Custom functions are not substituted with standard learners.
+
+For ordinary unmarked occupancy and `pcount` state/detection predictions,
+point rows, prepared outputs and raster chunks use the original raw training
+transformations. Supported fixed scaling, polynomial and spline calls retain
+those constants inside nested expressions and offsets. Training reconstruction
+must match the retained fitted design and offsets. Keep the original covariates
+and design; this comparison cannot authenticate edits that leave the evaluated
+training design unchanged. Other unmarked classes retain their native requirements.
+
+Factor contrasts, site removal and observation layout follow the native fit.
+If native row removal discarded contrast metadata, unambiguous original
+columns for factor main effects recover its coding exactly. Other missing coding needs explicit
+saved training contrasts.
+Frame subsets retain the original known-group columns; zero-effect requests
+can omit random-only grouping inputs.
+Native component dispatch preserves detection, occupancy and count meanings,
+including ZIP abundance. Metadata are checked once per preparation or map call,
+and the native predictor retains its bounded covariance chunks. Confidence
+limits and SEs condition on the selected ecological scales and add no observation
+noise. Any non-NULL unmarked `re.form` sets random effects to zero, rather than
+selecting a subset or integrating over their distribution. Conditional learned random-effect
+transformations need precomputed original training predictors; zero-effect
+requests do not evaluate unused random terms.
+
 Full analytic fits saved before this repair can recover prediction metadata
 from their retained evaluated native frame. Numerical-only snapshots have no
 such frame, so prepare them again from the full fit. This recovery does not
 supply missing raw variables for a curve, change a prior, add joint scale
 uncertainty or qualify a new model component. Unsupported native GAM layouts
 that require a metadata change remain explicitly guarded pending component tests.
+
+Ordinary unmarked occupancy and `pcount` effect curves use the same checked
+native target as point and raster predictions. This includes the overall ZIP
+abundance mean and its native confidence bounds. Curves set random effects to
+zero. This is neither an average over their distribution nor a future-count
+interval, and the selected ecological scales remain fixed.
+
+A zero-effect request needs its original fixed design and offsets. It does not
+evaluate unused learned random slopes or require new random-only covariates.
+Conditional-effect requests retain their original random-design checks. A
+prepared zero-effect context cannot subsequently supply conditional effects.
+Ordinary native S4 control abbreviations follow exact-first argument matching
+before policy and provenance are recorded, including `re.f = NA`.
+
+Ordinary unmarked curve lists carry a `prediction_contract` recording zero
+random effects, no random-effect integration and native confidence limits
+conditional on the selected ecological scales. This metadata does not establish
+fit eligibility or interval calibration.
 
 ## GAMs with multiple linear predictors
 
@@ -534,7 +604,7 @@ remain unchanged. Curves remain conditional on the fitted ecological scales.
 Unmarked and Bayesian curves retain their existing structured-data and
 posterior-reference requirements. External call offsets, unsupported native
 structures, matrix-valued raw curve inputs and nested learned transformations
-without fixed prediction metadata remain guarded. A supplied raw data frame
+without recoverable original training metadata remain guarded. A supplied raw data frame
 does not remove those requirements.
 
 Conditional-logistic Cox curves default to log relative risk. Their

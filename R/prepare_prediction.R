@@ -63,9 +63,24 @@
 #'   Analytic GLM/NB2, conditional-logistic, and joint mixed snapshots also
 #'   support this verification, with their existing strict row-ID rules.
 #' @details
+#' The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
+#' \code{MASS::glm.nb}, \code{coxph} and \code{clogit} structures. Other native
+#' subclasses retain their existing provider path.
+#'
+#' Ordinary native LM, GLM and time-fixed unpenalized Cox snapshots
+#'   use the original fitted terms for dot shortcuts and active variables.
+#'   Removed variables do not add prediction inputs or parameters. Their
+#'   original coefficient covariance and kernel-conditional uncertainty remain
+#'   unchanged. New data columns never enter the fitted design.
+#'
 #' The snapshot binds coefficients, covariance, spatial scales, training
 #' standardization, row order, and any choice sets to the supplied model and
 #' inputs. It does not retain raw spatial buffers or the fitted native model.
+#' Supported native and analytic models retain trained standard scaling,
+#' polynomial and spline calls inside nested expressions and formula offsets.
+#' Native recovery needs one unambiguous learner's attributes per evaluated
+#' predictor. Missing or ambiguous metadata raises an error rather than
+#' learning a transformation from prediction rows.
 #' Later changes to the original model or data do not update the snapshot.
 #' Call \code{prepare_prediction()} again after changing the model, locations,
 #' choice sets, metric definitions, or distance units. New data cannot be
@@ -89,9 +104,20 @@
 #' be omitted when the native provider permits zero-effect predictions. Native glmmTMB \code{re.form = NA}
 #' sets random effects to zero and does not integrate over their distribution.
 #'
-#' For unmarked without \code{kernel_inputs}, \code{newdata} is passed unchanged
-#' to native prediction. Supply spatial covariates on the fitted standardized
-#' scale. With \code{kernel_inputs}, supply explicit \code{join_by} keys and
+#' For unmarked without \code{kernel_inputs}, supply native prediction rows
+#' with spatial covariates on the fitted standardized scale. Ordinary occupancy
+#' and pcount state/detection terms use original raw training transformations,
+#' fitted factor contrasts and native component covariance. Missing contrasts
+#' can be recovered from unambiguous original main-factor columns; other missing
+#' coding requires explicit training contrasts. Preparation verifies
+#' the fixed designs and offsets against the retained native fit and reuses
+#' this metadata for the requested output. Keep the original covariates and
+#' fitted designs. Frame subsets retain original known-group columns.
+#' Conditional learned random-effect terms require precomputed training
+#' predictors. Zero-effect contexts need only their fixed design and offsets,
+#' and reject a later conditional-effect request. Ordinary native S4 control
+#' abbreviations use the provider's exact-first matching. Any non-NULL native \code{re.form} sets effects to zero;
+#' this is not partial-effect selection or integration. With \code{kernel_inputs}, supply explicit \code{join_by} keys and
 #' native prediction rows. \code{\link{prepare_unmarked_data}} computes spatial
 #' columns and applies training standardization without changing native
 #' observation/year ordering or nonspatial factor/offset inputs. Spatial

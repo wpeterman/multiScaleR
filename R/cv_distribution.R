@@ -164,6 +164,7 @@
       .msr_cv_distribution_training_identity(fit, split, targets, family)
       nuisance <- .msr_cv_distribution_parameters(fit, distribution)
       stage <- "prediction"
+      fit <- .msr_cv_prediction_metadata(fit, training, if (is.null(inputs)) NULL else train)
       if (is.null(inputs)) {
         pred$prediction <- as.numeric(stats::predict(.msr_native_fixed_metadata(fit), newdata = assessment, type = "response"))
       } else {

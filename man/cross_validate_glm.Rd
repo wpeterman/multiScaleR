@@ -93,9 +93,12 @@ the same folds used to validate estimated ecological scales.
 \details{
 This adapter supports the same qualified GLM families, outcome and
   frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
-  interactions, offsets and learned \code{poly()} terms use native GLM
-  machinery. All learned preprocessing must occur within the training fit;
-  do not supply predictors standardized with assessment data.
+  interactions and offsets use native GLM machinery. Supported saved
+  \code{scale()}, \code{poly()}, natural-spline and B-spline transformations
+  use training constants even inside expressions and offsets. See
+  \code{cross_validate()} for supported inputs and custom-recipe limitations.
+  All learned preprocessing must occur within the training fit; do not supply
+  predictors standardized with assessment data.
 
 NB2 uses \code{MASS::glm.nb()} when theta is estimated and
   \code{glm(family = MASS::negative.binomial(theta))} when it is fixed.

@@ -1,15 +1,24 @@
 # Resolve native R argument abbreviations before policy/data checks, using the
-# same exact-first matching as the eventual S3 method. Values are never evaluated.
+# same exact-first matching as the underlying method. Values are never evaluated.
 .msr_native_control_names <- function(model, controls, newdata = TRUE) {
-  if (!length(controls) || is.null(model) || methods::is(model, "unmarkedFit"))
-    return(controls)
+  if (!length(controls) || is.null(model)) return(controls)
   method <- NULL
-  kinds <- class(model)
-  if (isS4(model)) kinds <- unique(c(kinds, methods::extends(class(model))))
-  for (kind in kinds) {
-    method <- utils::getS3method("predict", kind, optional = TRUE,
-      envir = asNamespace("stats"))
-    if (!is.null(method)) break
+  unmarked <- methods::is(model, "unmarkedFit")
+  if (unmarked) {
+    if (!class(model)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount")) return(controls)
+    ns <- asNamespace("unmarked")
+    selected <- methods::selectMethod("predict_internal", class(model)[1L],
+      fdef = methods::getGeneric("predict_internal", where = ns))
+    # Match the real S4 .local signature, without evaluating its arguments.
+    method <- .msr_unmarked_local_method(selected, list())
+  } else {
+    kinds <- class(model)
+    if (isS4(model)) kinds <- unique(c(kinds, methods::extends(class(model))))
+    for (kind in kinds) {
+      method <- utils::getS3method("predict", kind, optional = TRUE,
+        envir = asNamespace("stats"))
+      if (!is.null(method)) break
+    }
   }
   if (is.null(method)) return(controls)
   if (inherits(model, "bam") && requireNamespace("mgcv", quietly = TRUE) &&
@@ -22,7 +31,7 @@
     added <- delegated[setdiff(names(delegated), names(signature))]
     formals(method) <- c(signature[names(signature) != "..."], added, signature["..."])
   }
-  fixed <- c("object", "type", "se.fit", if (newdata) "newdata")
+  fixed <- c("object", "type", if (!unmarked) "se.fit", if (newdata) "newdata")
   tokens <- paste0(".msr_native_control_", seq_along(controls))
   values <- stats::setNames(lapply(tokens, as.name), names(controls))
   call <- as.call(c(list(as.name(".native_predict")),
@@ -40,6 +49,8 @@
 # Recognize documented zero-effect controls without comparing formula environments.
 # This describes conditioning at zero, never integration over random effects.
 .msr_native_zero_random_effects <- function(model, controls, kind = NULL) {
+  if (methods::is(model, "unmarkedFit") || identical(kind, "unmarked"))
+    return(!is.null(controls[["re.form"]]))
   if (inherits(model, "lme") || identical(kind, "lme")) {
     level <- controls[["level"]]
     return(is.numeric(level) && length(level) == 1L && !is.na(level) && level == 0)
@@ -231,8 +242,10 @@
 }
 
 # Shared native target for prepared point rows and checked raster chunks.
-.msr_native_prediction_rows <- function(object, newdata, type, se.fit, dots = list()) {
-  model <- .msr_native_fixed_metadata(.analysis_model(object$opt_mod))
+.msr_native_prediction_rows <- function(object, newdata, type, se.fit, dots = list(),
+    unmarked_predictor = NULL) {
+  model <- .msr_native_active_metadata(
+    .msr_native_fixed_metadata(.analysis_model(object$opt_mod), nested = TRUE))
   unmarked <- methods::is(model, "unmarkedFit")
   dots <- .msr_native_control_names(model, dots, newdata = !is.null(newdata))
   # A survival linear predictor or risk is not a within-choice-set probability.
@@ -256,6 +269,14 @@
     } else if (inherits(model, "gam") && is.list(model$pterms) &&
         !inherits(model$pterms, "terms")) {
       required <- .model_predictors(model)
+    } else if (class(model)[1L] %in% c("lm", "glm", "negbin", "coxph", "clogit")) {
+      # Native fitted terms define dot expansion and the retained frame inputs.
+      tt <- stats::terms(model)
+      variables <- as.list(attr(tt, "variables"))[-1L]
+      if (attr(tt, "response") > 0L) variables <- variables[-attr(tt, "response")]
+      required <- unique(unlist(lapply(variables, all.vars), use.names = FALSE))
+      if (inherits(model, "coxph") && type %in% c("expected", "survival"))
+        required <- union(required, all.vars(stats::formula(model)[[2L]]))
     } else {
       formula <- stats::formula(model)
       required <- union(.model_predictors(model),
@@ -280,7 +301,10 @@
   }
   args <- c(list(object = model, type = type), dots)
   if (!is.null(newdata)) args$newdata <- newdata
-  predictor <- if (unmarked) unmarked::predict else if (inherits(model, "gam"))
+  predictor <- if (unmarked) {
+    if (is.null(unmarked_predictor))
+      .msr_unmarked_prediction_function(model, re.form = dots[["re.form"]]) else unmarked_predictor
+  } else if (inherits(model, "gam"))
     .msr_predict_gam else stats::predict
   if (!unmarked) args$se.fit <- se.fit
   value <- do.call(predictor, args)

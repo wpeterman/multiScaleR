@@ -1,3 +1,19 @@
+multiScaleR 0.7.17
+* Preserve trained scaling, polynomial and spline transformations inside nested
+  expressions and offsets across native, Bayesian and private predictions.
+* Keep CV transformations on final training-fold predictors for GLM, NB2/Gamma,
+  weighted-SQ and complete-set conditional-choice models.
+* Use original fitted terms for ordinary LM, GLM and time-fixed Cox predictions
+  and effect curves, including dot shortcuts, exclusions and active offsets.
+* Align ordinary unmarked point, prepared, raster and effect-curve predictions
+  with original transformations, contrasts, native covariance and ZIP means.
+* Add ordinary unmarked detection curves and a lambda/state plotting alias;
+  preserve conditional versus zero-effect controls and uncertainty distinctions.
+* Add guarded private fixed-state likelihood snapshots with checked training
+  inputs and explicit latent coordinates, without extending fit or SE admission.
+* Retain native parameter counts, coefficient SEs, priors, diagnostics and guards,
+  with regression tests and updated prediction and CV documentation.
+
 multiScaleR 0.7.16
 * Add NB2/Gamma CV with training-only nuisance parameters, normalized log scores,
   native fixed/estimated penalties and compact cross-family training selection.

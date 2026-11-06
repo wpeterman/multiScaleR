@@ -48,7 +48,8 @@
       type = if (is.null(model$type)) "response" else model$type,
       se.fit = model$se.fit, uncertainty = "conditional")
   } else value <- .msr_native_prediction_rows(model$object, data, model$type,
-                                              model$se.fit, model$native_args)
+                                              model$se.fit, model$native_args,
+                                              model$unmarked_predictor)
   if (is.list(value) && !is.data.frame(value) && !is.null(value$fit))
     value <- data.frame(fit = value$fit, se.fit = value$se.fit)
   # Terra dispatches its writer on result class. Provider matrix subclasses
@@ -131,7 +132,9 @@
   logical_names <- if (is.null(frame)) character() else
     names(frame)[vapply(frame, is.logical, logical(1))]
   thin <- list(object = list(opt_mod = model), type = type, se.fit = se.fit,
-    native_args = dots, logical_names = logical_names)
+    native_args = dots, logical_names = logical_names,
+    unmarked_predictor = if (methods::is(model, "unmarkedFit"))
+      .msr_unmarked_prediction_function(model, re.form = dots[["re.form"]]) else NULL)
   if (.msr_analytic_backend(object)) {
     if (length(dots)) stop("Native controls are unsupported for analytic raster prediction.", call. = FALSE)
     if (!is.null(type) && !type %in% c("response", "link"))
@@ -142,7 +145,7 @@
       opt_mod = list(family = object$opt_mod$family),
       profile_fit = list(contract = list(covariates = contract$covariates)),
       kernel_inputs = list(kernel = object$kernel_inputs$kernel)), class = "multiScaleR_prediction")
-    thin$analytic <- list(contract = list(terms = contract$terms, xlevels = contract$xlevels,
+    thin$analytic <- list(contract = list(terms = .msr_profile_prediction_terms(object), xlevels = contract$xlevels,
       contrasts = contract$contrasts,
       columns = if (is.null(contract$objective$response_design))
         c(contract$fixed_columns, contract$covariates) else

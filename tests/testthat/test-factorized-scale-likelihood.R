@@ -136,6 +136,15 @@ test_that("factorized fitting preserves exact reduced models and rejects coupled
   expect_equal(fit$annual$conditional_mean_log,fit$annual$log_estimate)
   expect_length(fit$attempts,2L)
   expect_true(all(vapply(fit$attempts,`[[`,TRUE,"eligible")))
+  # Reuse the existing exact zero-SD fit and retain its unavailable intervals.
+  saved <- serialize(fit, NULL)
+  snapshot <- .msr_likelihood_prepare_prediction(fit)
+  expect_equal(as.numeric(.msr_likelihood_predict(snapshot)),
+    unname(.msr_bayes_components(s, fit$parameters)$eta), tolerance = 1e-10)
+  expect_identical(snapshot$provenance$origin, "numerically_admitted_private_fit_conditional_state")
+  expect_identical(serialize(fit, NULL), saved)
+  expect_false(fit$uncertainty$available)
+  expect_error(.msr_likelihood_predict(snapshot, interval = "confidence"), "no parameter/latent SEs")
   coupled <- multiScaleR:::.msr_marginal_prepare(count~habitat+(1|site),f$inputs,f$data,
     list(habitat=~1+(1|year)),"gaussian","key",200)
   expect_error(multiScaleR:::.msr_factorized_adfun(coupled),"coupling")

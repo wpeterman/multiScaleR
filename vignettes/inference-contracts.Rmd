@@ -28,6 +28,25 @@ Bayesian scales. The example here reads the same bundled artificial annual data
 and stored NUTS fit used in the Bayesian guides. It does not fit a model or run a
 sampler.
 
+Native LM, GLM and time-fixed unpenalized Cox predictions use the original
+fitted terms to resolve formula shortcuts such as `~ .`. New data columns do
+not change that design. Variables removed with `-` are excluded from prediction
+inputs and effect panels; active interactions and offsets retain their inputs.
+Original transformation metadata, factor coding, coefficient covariance and
+parameter counts are retained. The installed unmarked provider rejects dot
+formulas during fitting, so use explicit component formulas for those models.
+
+For ordinary `occu()` and `pcount()` fits, `plot_marginal_effects(type = "det")`
+shows the native conditional detection probability using original observation
+covariates. For `occu()`, detection conditions on occupancy; for `pcount()`, it is
+the per-individual survey detection probability. `type = "state"` shows the state component; `"lambda"` is a plotting
+alias for that component in these ordinary classes. ZIP state curves retain
+overall expected abundance. These curves set random effects to zero and retain
+native confidence limits conditional on the selected spatial scales. Their
+response scale is retained for both `link` settings. Keep the original fixed
+covariates and transformation metadata; unused random-only inputs are not needed
+for a zero-effect curve. Conditional predictions retain their original guards.
+
 ## Separate the target from the computation
 
 A likelihood describes the observed responses as a function of model parameters.
@@ -487,3 +506,90 @@ stored scalar against the complete-set offset likelihood; it does not change
 other native Cox objects. Priors, numerical gates, private admission, conditional
 SEs and uncertainty distinctions remain unchanged. See
 `vignette("cross-validation", package = "multiScaleR")` for a worked example.
+
+# Private likelihood prediction components
+
+The private marginal and factorized likelihood prototypes have conditional point
+snapshot components. They evaluate an explicit population and realized-effect
+state at training or new locations, then reuse the computed link, expected
+response and ecological-scale outputs. New locations require the original
+prepared training inputs, so their bin values, counts, distances, source
+declarations and retained normalization can be checked. Snapshots keep computed
+outputs and compact provenance instead of a fitted model or AD tape.
+
+These components do not widen public fitting admission. Fitted adapters require
+the original successful numerical diagnostics, selected eligible start and
+zero-SD reduction. Integrated effects omitted by a factorized fit require explicit
+reconstructed coordinates. An omitted effect cannot silently become zero.
+Explicit zero-effect policies describe a reference prediction. The output does
+not integrate population-parameter uncertainty, conditional latent variation,
+new-group variation or observation noise, and supplies no SE or interval.
+Numerical prediction validity does not establish uncertainty calibration.
+
+
+Supported fixed scaling, polynomial and spline transformations retain training
+constants inside nested expressions and transformed offsets. Bayesian response,
+scale and coefficient-curve prediction and private likelihood point components
+share this preparation. Older retained fits require reconstruction that matches
+their original evaluated training expressions. Prediction stops when that check
+cannot be completed. Fitting designs, offsets, priors, parameter counts and
+uncertainty targets retain their original meaning.
+
+Supported native LM/GLM, GAM, lme4, glmmTMB and time-fixed, unpenalized Cox
+predictions also recover a single standard learner inside an evaluated
+predictor or formula offset. The retained training column must identify its
+original center, spread, polynomial coefficients or spline knots. Missing
+attributes or multiple learners sharing one column require precomputed
+training predictors or complete saved prediction calls. Point predictions,
+fixed-row snapshots and raster chunks share these training definitions.
+Their native coefficient SEs still condition on the selected spatial scales.
+
+Ordinary unmarked `pcount` and `occu` effect curves instead freeze each learner
+from the original raw site covariates before site removal. This supports
+nested bases without reconstructing raw inputs from evaluated columns.
+The curves retain the native state or abundance target and coefficient
+uncertainty. Other prediction components keep their existing requirements.
+
+
+For ordinary unmarked occupancy and `pcount` state/detection predictions,
+point rows, prepared outputs and raster chunks use the original raw training
+transformations. Supported fixed scaling, polynomial and spline calls retain
+those constants inside nested expressions and offsets. Training reconstruction
+must match the retained fitted design and offsets. Keep the original covariates
+and design; this comparison cannot authenticate edits that leave the evaluated
+training design unchanged. Other unmarked classes retain their native requirements.
+
+Factor contrasts, site removal and observation layout follow the native fit.
+If native row removal discarded contrast metadata, unambiguous original
+columns for factor main effects recover its coding exactly. Other missing coding needs explicit
+saved training contrasts.
+Frame subsets retain the original known-group columns; zero-effect requests
+can omit random-only grouping inputs.
+Native component dispatch preserves detection, occupancy and count meanings,
+including ZIP abundance. Metadata are checked once per preparation or map call,
+and the native predictor retains its bounded covariance chunks. Confidence
+limits and SEs condition on the selected ecological scales and add no observation
+noise. Any non-NULL unmarked `re.form` sets random effects to zero, rather than
+selecting a subset or integrating over their distribution. Conditional learned random-effect
+transformations need precomputed original training predictors; zero-effect
+requests do not evaluate unused random terms.
+
+
+Ordinary unmarked occupancy and `pcount` effect curves use the same checked
+native target as point and raster predictions. This includes the overall ZIP
+abundance mean and its native confidence bounds. Curves set random effects to
+zero. This is neither an average over their distribution nor a future-count
+interval, and the selected ecological scales remain fixed.
+
+A zero-effect request needs its original fixed design and offsets. It does not
+evaluate unused learned random slopes or require new random-only covariates.
+Conditional-effect requests retain their original random-design checks. A
+prepared zero-effect context cannot subsequently supply conditional effects.
+Ordinary native S4 control abbreviations follow exact-first argument matching
+before policy and provenance are recorded, including `re.f = NA`.
+
+
+Ordinary unmarked curve lists carry a `prediction_contract` recording zero
+random effects, no random-effect integration and native confidence limits
+conditional on the selected ecological scales. This metadata does not establish
+fit eligibility or interval calibration.

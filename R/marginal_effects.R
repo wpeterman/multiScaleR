@@ -18,8 +18,11 @@
 #'   Default: \code{"Estimated response"}.
 #' @param length.out Positive integer. Number of equally spaced points at which
 #'   to evaluate the marginal effect curve for each covariate. Default: \code{100}.
-#' @param type Character. Prediction type for \code{unmarked} models. One of
-#'   \code{"state"} (default) or \code{"lambda"}. Ignored for non-unmarked
+#' @param type Character. Prediction type for \code{unmarked} models.
+#'   \code{"state"} is the default. Ordinary \code{occu} and \code{pcount}
+#'   fits also accept \code{"det"} for native conditional detection probability;
+#'   \code{"lambda"} is a plotting alias for their state component. Other
+#'   classes retain their native state or lambda type. Ignored for non-unmarked
 #'   models.
 #' @param link Logical. If \code{TRUE}, predictions are passed through the
 #'   model's inverse link function before plotting (i.e., plotted on the
@@ -31,6 +34,7 @@
 #'   scale. Default: \code{FALSE}. For a multi-component GAM, \code{FALSE}
 #'   selects native link-scale output and \code{TRUE} selects native
 #'   response-scale output; \code{component} chooses the column.
+#'   Unmarked curves retain the native response scale for both settings.
 #' @param draws For Bayesian fits, a positive number of stored draws to select
 #'   evenly across the retained sample, or explicit draw indices. The default
 #'   \code{NULL} uses at most 1000 evenly spaced draws. Ignored for frequentist
@@ -62,12 +66,22 @@
 #'       interval (when available from the model's \code{predict} method).
 #'       Bayesian curves show posterior medians and central 95\% credible
 #'       intervals, with the retained draw indices and prediction contract
-#'       attached to the returned list.
+#'       attached to the returned list. Ordinary unmarked curves also attach
+#'       their native prediction contract, including zero-effect conditioning
+#'       and kernel-conditional confidence limits.
 #'     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
 #'       terms that involve the covariate.
 #'   }
 #'
 #' @details
+#' The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
+#' \code{MASS::glm.nb}, \code{coxph} and \code{clogit} structures. Other native
+#' subclasses retain their existing provider path.
+#'
+#' Ordinary native LM, GLM and time-fixed unpenalized Cox curves use fitted
+#' terms to expand dot shortcuts, retain active offset covariates and annotate
+#' interactions. Removed terms do not add panels or prediction inputs.
+#'
 #' Marginal effects are computed by constructing a \code{newdata} data frame
 #' where the focal covariate sweeps from its minimum to maximum observed value
 #' and all other predictors are held at their sample mean. For kernel-scaled
@@ -111,11 +125,21 @@
 #' conditional predictions at the stated covariate values, not averages over
 #' years, sites, or the random-effect distribution. Confidence intervals are
 #' conditional on the fitted spatial scale.
-#' Explicit nondefault factor contrasts and learned fixed bases in ordinary
-#' \code{pcount} (Poisson or negative-binomial) and \code{occu} fits use
-#' \code{unmarked::linearComb()} and \code{unmarked::backTransform()} to preserve
-#' the fitted coefficient basis and link. Learned prediction calls are trained
-#' once on retained site covariates and held fixed across plotting grids.
+#' Ordinary \code{pcount} (Poisson, negative-binomial or ZIP) and \code{occu}
+#' curves use the same checked native prediction target as point rows, prepared
+#' outputs and raster chunks. ZIP curves retain the overall expected abundance,
+#' including structural zeros, rather than substituting conditional abundance.
+#' Native coefficient covariance and confidence bounds are retained.
+#' Detection curves use the original observation-row covariates for trained
+#' transformations and confidence limits. State curves use original site rows.
+#' Detection is conditional on occupancy for \code{occu}; for \code{pcount},
+#' it is the per-individual survey detection probability. Fixed
+#' scaling, polynomial and spline calls and transformed offsets use original
+#' raw covariates before site removal. The plotting grid never relearns them.
+#' Factor coding uses retained or unambiguously recoverable original metadata.
+#' Zero-effect curves need only the checked fixed design and offsets; unused
+#' learned random slopes or new grouping variables are not evaluated. Conditional
+#' random-effect predictions retain their original random-design requirements.
 #' Other unmarked classes requiring that fallback stop rather than return a
 #' different basis or derived-state prediction. Active terms select panels:
 #' removed terms and random-only groups are excluded, while admitted quoted
@@ -148,7 +172,10 @@
 #' Missing inputs,
 #' nonfinite values, unknown levels and mismatches raise an error. Offsets
 #' supplied outside the formula and unsupported nested learned transformations
-#' are rejected. This verifies observable feature equivalence. It cannot prove
+#' are rejected. Supported native nested calls use a single standard learner's
+#' original retained attributes. Ambiguous or missing metadata needs
+#' precomputed training predictors or complete saved prediction calls.
+#' This verifies observable feature equivalence. It cannot prove
 #' unique original raw values from a square, polynomial or other many-to-one
 #' transformation, and it does not refit the model. Cox strata and cluster-only
 #' inputs use their first observed reference value in other panels, preserving
@@ -248,7 +275,8 @@ plot_marginal_effects <- function(x,
   }
 
   mod <- x$opt_mod
-  analysis_mod <- .msr_native_fixed_metadata(.analysis_model(mod))
+  analysis_mod <- .msr_native_active_metadata(
+    .msr_native_fixed_metadata(.analysis_model(mod), nested = TRUE))
   scl <- x$scl_params
   native_gam_components <- inherits(analysis_mod, "gam") &&
     is.list(analysis_mod$pterms) && !inherits(analysis_mod$pterms, "terms")
@@ -280,24 +308,35 @@ plot_marginal_effects <- function(x,
   inter_terms <- character(0)
   inter_vars  <- character(0)
 
+  ordinary_unmarked_curve <- methods::is(mod, "unmarkedFit") &&
+    class(mod)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount")
   # Extract variables from fitted model
   if (any(grepl("^unmarked", class(mod)))) {
-    if(is.null(type) || !type %in% c("lambda", "state")){
+    allowed <- if (ordinary_unmarked_curve) c("lambda", "state", "det") else c("lambda", "state")
+    if (is.null(type) || !type %in% allowed) {
+      if (ordinary_unmarked_curve)
+        stop("`type` must be specified as 'state', 'lambda', or 'det'.")
       stop("`type` must be specified as either 'lambda' or 'state'.")
     }
-
+    # Keep the documented plotting alias; ordinary providers name it state.
+    if (ordinary_unmarked_curve && identical(type, "lambda")) type <- "state"
     component <- .msr_unmarked_marginal_formula(mod, type)
-    dat <- unmarked::siteCovs(unmarked::getData(mod))
+    dat <- if (ordinary_unmarked_curve)
+      get("get_covariates", asNamespace("unmarked"))(mod, type) else
+        unmarked::siteCovs(unmarked::getData(mod))
     active_terms <- stats::terms(component, data = dat)
     vars <- .msr_marginal_variables(active_terms, offsets = TRUE)
     c_vars <- .msr_marginal_variables(active_terms, offsets = FALSE)
-    # Native model.frame can still evaluate variables removed by '-'. Supply
-    # their original context without adding them or random groups as panels.
-    frame_variables <- as.list(attr(active_terms, "variables"))[-1L]
-    vars <- unique(c(vars, unlist(lapply(frame_variables, all.vars), use.names = FALSE)))
+    # Legacy class paths may evaluate inactive frame context. The checked
+    # ordinary zero-effect predictor uses only its active fixed design/offsets.
+    if (!ordinary_unmarked_curve) {
+      frame_variables <- as.list(attr(active_terms, "variables"))[-1L]
+      vars <- unique(c(vars, unlist(lapply(frame_variables, all.vars), use.names = FALSE)))
+    }
     missing_vars <- setdiff(vars, names(dat))
     if (length(missing_vars)) {
-      stop("Could not recover site covariates for marginal effects: ",
+      stop("Could not recover ", if (ordinary_unmarked_curve && type == "det") "observation" else "site",
+           " covariates for marginal effects: ",
            paste(missing_vars, collapse = ", "), call. = FALSE)
     }
 
@@ -314,8 +353,11 @@ plot_marginal_effects <- function(x,
       attr(values, "contrasts") <- NULL
       !isTRUE(all.equal(fitted, stats::contrasts(values)))
     }, logical(1)))
-    # Freeze learned fixed prediction calls once on the native training rows.
-    basis <- .msr_unmarked_curve_basis(active_terms, dat)
+    # Ordinary native curves use the same checked target as points and maps.
+    # Zero effects need no new random slopes, groups or random-design mapping.
+    native_curve <- if (ordinary_unmarked_curve)
+      .msr_unmarked_prediction_function(mod, re.form = NA) else NULL
+    basis <- if (is.null(native_curve)) .msr_unmarked_curve_basis(active_terms, dat) else NULL
     plot_list <- lapply(c_vars, function(v) {
       values <- dat[[v]]
       if (all(is.na(values))) {
@@ -340,15 +382,16 @@ plot_marginal_effects <- function(x,
       }), stringsAsFactors = FALSE, check.names = FALSE)
       newdata[[v]] <- x_seq
 
-      # unmarked's data-frame prediction path drops explicit contrasts in
-      # model.frame(xlev = ...). Use its public linear-combination interface
-      # for supported custom designs; otherwise native prediction is unchanged.
+      # Keep original factor attributes for the legacy class fallback. The
+      # ordinary predictor applies its independently checked training coding.
       for (factor_var in factor_vars) {
         attr(newdata[[factor_var]], "contrasts") <-
           if (custom_contrasts) attr(dat[[factor_var]], "contrasts") else NULL
       }
       preds <- tryCatch(
-        if (custom_contrasts || basis$learned) {
+        if (!is.null(native_curve)) {
+          native_curve(mod, type = type, newdata = newdata, re.form = NA)
+        } else if (custom_contrasts || basis$learned) {
           .msr_unmarked_contrast_prediction(mod, basis$terms, newdata, type)
         } else {
           unmarked::predict(mod, newdata = newdata, type = type, re.form = NA)
@@ -376,6 +419,8 @@ plot_marginal_effects <- function(x,
       if (!native_mixed_response && !native_gam_components &&
           !inherits(analysis_mod, "zeroinfl")) link_inverse(analysis_mod) else NULL
     curve_predictor <- if (inherits(analysis_mod, "gam")) .msr_predict_gam else predict
+    native_fixed_terms <- if (class(analysis_mod)[1L] %in%
+        c("lm", "glm", "negbin", "coxph", "clogit")) stats::terms(analysis_mod) else NULL
     cox_groups <- if (inherits(analysis_mod, "coxph"))
       .msr_cox_curve_conditioning(stats::terms(analysis_mod)) else
         list(inputs = character(), fixed_panel_inputs = character())
@@ -394,7 +439,7 @@ plot_marginal_effects <- function(x,
         unlist(lapply(expressions, all.vars), use.names = FALSE)
       }), use.names = FALSE))
       vars <- union(vars, context)
-    } else if (inherits(analysis_mod, c("glm", "lm"))) {
+    } else if (!is.null(native_fixed_terms) || inherits(analysis_mod, c("glm", "lm"))) {
       # Native terms retain active variables and quoted names without a
       # provider's optional name-sanitizing interpretation.
       vars <- .msr_active_formula_variables(stats::terms(analysis_mod))
@@ -411,7 +456,8 @@ plot_marginal_effects <- function(x,
     offset_vars <- tryCatch(insight::find_offset(analysis_mod), error = function(e) NULL)
     if (!native_gam_components && length(offset_vars) > 0) {
       term_vars <- tryCatch({
-        labels <- attr(stats::terms(formula(analysis_mod)), "term.labels")
+        labels <- attr(if (is.null(native_fixed_terms)) stats::terms(formula(analysis_mod)) else
+          native_fixed_terms, "term.labels")
         if (length(labels)) all.vars(stats::reformulate(labels)) else character(0)
       }, error = function(e) character(0))
       c_vars <- setdiff(c_vars, setdiff(offset_vars, term_vars))
@@ -454,7 +500,8 @@ plot_marginal_effects <- function(x,
     # so no special prediction logic is needed. Detection is used only for plot
     # annotations and the interaction warning below.
     curve_terms <- if (native_gam_components) lapply(forms, stats::terms) else
-      list(tryCatch(stats::terms(formula(analysis_mod)), error = function(e) NULL))
+      list(tryCatch(if (is.null(native_fixed_terms)) stats::terms(formula(analysis_mod)) else
+        native_fixed_terms, error = function(e) NULL))
     fterms <- unlist(lapply(curve_terms, attr, "term.labels"), use.names = FALSE)
     term_order <- unlist(lapply(curve_terms, attr, "order"), use.names = FALSE)
     unique_terms <- !duplicated(fterms)
@@ -663,9 +710,13 @@ plot_marginal_effects <- function(x,
       theme_cowplot()
     if (all(is.na(df$lwr)) && all(is.na(df$upr)))
       p <- p + labs(caption = paste(c(
-        if (native_mixed_response || inherits(analysis_mod, "HLfit"))
+        if (ordinary_unmarked_curve || native_mixed_response || inherits(analysis_mod, "HLfit"))
           "Random effects are set to zero, not integrated.",
         "Confidence limits unavailable; point predictions condition on spatial scales."), collapse = " "))
+    else if (ordinary_unmarked_curve)
+      p <- p + labs(caption = paste(
+        "Random effects are set to zero, not integrated.",
+        "Native component confidence limits condition on the selected spatial scales."))
     else if (native_mixed_response)
       p <- p + labs(caption = paste(
         "Random effects are set to zero, not integrated.",
@@ -715,6 +766,9 @@ plot_marginal_effects <- function(x,
     contract$native_output <- list(type = if (link) "response" else "link", column = component)
     attr(gg_list, "prediction_contract") <- contract
   }
+  if (ordinary_unmarked_curve)
+    attr(gg_list, "prediction_contract") <- .msr_native_prediction_contract(x,
+      "unmarked", type, list(re.form = NA), se.fit = TRUE)
   invisible(gg_list)
 }
 
@@ -791,6 +845,7 @@ plot_marginal_effects <- function(x,
   frame <- stats::model.frame(form, data, na.action = stats::na.pass,
     drop.unused.levels = FALSE)
   fixed <- .msr_fixed_prediction_terms(attr(frame, "terms"), frame)
+  fixed <- .msr_cv_prediction_terms(fixed, data)
   list(terms = fixed,
     learned = !identical(attr(fixed, "predvars"), attr(fixed, "variables")))
 }

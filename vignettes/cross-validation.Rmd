@@ -111,6 +111,34 @@ the generator stops before model fitting. Coordinate tables require an explicit
 projected `crs`; geographic coordinates are rejected rather than interpreted as
 linear distances.
 
+# Keep learned formula transformations within each training split
+
+The CV adapters save training constants for `scale()`, `poly()`, `splines::ns()`
+and `splines::bs()`, using bare or namespaced calls. This also covers nested
+expressions such as `I(base::scale(z)^2)` and `offset(base::scale(z))`. The center
+and spread, polynomial coefficients, spline knots and boundary knots come from
+the analysis rows. Predicting one assessment row alone or together with other
+rows uses those same constants. Avoid standardizing the full data beforehand.
+Predeclared numeric transformation arguments remain fixed. Saved calls preserve
+native abbreviated scale arguments, including an uncentered transform. Formula
+variables must still be supplied explicitly; environment fallback is not added.
+
+For spatial CV, these constants use the final training predictors at the fitted
+ecological scale. Initial-scale predictors and assessment buffers cannot set
+them. Native formulas, coefficient estimates and SEs, likelihoods, parameter
+counts, optimizer diagnostics and uncertainty targets stay unchanged. This
+prediction repair also applies to retained fold fits and complete-set choice CV.
+It does not widen a backend's admitted spatial expressions or fitting methods.
+
+Automatic recovery is limited to these known learners with numeric inputs and
+supported pointwise arguments, such as `scale(log(x))`. It does not infer how a
+custom function learns from data or re-execute arbitrary functions to obtain
+metadata. For other learned operations, including a formula containing
+`mean(x)`, train an explicit preprocessing recipe within each analysis split
+and apply its saved constants to the assessment rows. Unsupported arguments to
+a known learner leave a failed fold with its original error. Check `complete`
+and `errors` before comparing candidates.
+
 # Compare predictions from the same assessment targets
 
 Start with inexpensive reference models. The trend below uses native `poly()`

@@ -106,7 +106,7 @@ test_that("raw curve references reject row, feature, contrast and offset changes
   missing_frame <- model; missing_frame$model <- NULL
   expect_error(.msr_curve_reference_context(object, missing_frame, reference), "retained evaluated")
   nested <- lm(y ~ mean + I(scale(z)^2), data = dat)
-  expect_error(.msr_curve_reference_context(object, nested, reference), "nested learned")
+  expect_true(.msr_curve_reference_context(object, nested, reference)$contract$fitted_feature_equivalence)
   explicit <- lm(y ~ mean + I(scale(z, center = 0, scale = 2)^2), data = dat)
   expect_true(.msr_curve_reference_context(object, explicit, reference)$contract$fitted_feature_equivalence)
   expect_error(plot_marginal_effects(object, reference_data = reference, component = 1), "only to multi-component")

@@ -24,6 +24,15 @@
     error = function(e) character()
   )
 
+  if (class(model)[1L] %in% c("lm", "glm", "negbin", "coxph", "clogit")) {
+    # Native terms decide membership; retain the existing recognized order so
+    # predictor discovery does not reorder established spatial parameter blocks.
+    tt <- tryCatch(stats::terms(model), error = function(e) NULL)
+    if (inherits(tt, "terms")) {
+      active <- .msr_active_formula_variables(tt)
+      return(unique(c(intersect(vars, active), setdiff(active, vars))))
+    }
+  }
   if (length(vars) > 0) {
     return(vars)
   }

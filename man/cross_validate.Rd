@@ -196,6 +196,24 @@ frozen. Map labels do not introduce annual/random effects, extra fitted
 parameters or spatially varying scales. Explicit formula group effects keep
 their native fitting, parameter counts and new-level prediction guards.
 
+Supported learned formula transformations keep analysis-row constants for
+assessment prediction. These include bare or namespaced \code{scale()},
+\code{poly()}, \code{splines::ns()} and \code{splines::bs()}, including calls
+inside arithmetic, \code{I()}, pointwise functions and offsets. Spatial fits
+use their final fitted training predictors, not initial-scale values. Original
+formulas, coefficients, coefficient SEs, likelihoods, K and numerical guards
+are unchanged. Retained fits carry the same repaired prediction terms.
+Predeclared numeric transform arguments remain fixed, and native abbreviated
+scale arguments keep their meanings. Formula variables must still be supplied
+explicitly; this does not permit formula-environment predictor fallback.
+Recovery evaluates only these known learners with numeric inputs and supported
+pointwise arguments; arbitrary user functions are not re-executed to infer
+preprocessing. Other learned operations, such as \code{mean(x)} inside a
+formula or a custom transformation, need an explicit recipe trained within
+each analysis split and applied unchanged to its assessment rows. Unsupported
+arguments to a known learner produce a retained fold failure. Existing backend
+restrictions on expressions involving optimized spatial predictors still apply.
+
 Negative log scores retain Poisson/binomial likelihood constants and average
 over positive-weight observations using frequency weights. Binomial Brier
 scores average squared prediction errors across trials, weighted by frequency

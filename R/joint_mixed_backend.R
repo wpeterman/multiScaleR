@@ -131,7 +131,7 @@
     stop("se.fit must be one logical value.", call. = FALSE)
   newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
   newdata <- .msr_mixed_prediction_data(object, newdata, kernel_inputs)
-  do.call(stats::predict, c(list(object = .msr_native_fixed_metadata(object$opt_mod), newdata = newdata,
+  do.call(stats::predict, c(list(object = .msr_native_fixed_metadata(object$opt_mod, nested = TRUE), newdata = newdata,
     type = type, se.fit = se.fit), dots))
 }
 

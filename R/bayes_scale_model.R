@@ -43,7 +43,10 @@
     .msr_response_active_terms(stats::terms(fixed, data = data)) else fixed
   frame <- stats::model.frame(evaluated, data, na.action = stats::na.fail,
                               drop.unused.levels = TRUE)
-  attr(frame, "terms") <- .msr_fixed_prediction_terms(stats::terms(frame), frame)
+  # Freeze nested learners while raw training inputs and trusted bindings exist.
+  # Fitting values and labels stay native; prediction calls gain constants only.
+  attr(frame, "terms") <- .msr_cv_prediction_terms(
+    .msr_fixed_prediction_terms(stats::terms(frame), frame), data, qualify = TRUE)
   random <- lapply(groups, function(g) {
     v <- data[[g]]
     if (!is.atomic(v) || !is.null(dim(v)) || anyNA(v) || any(!nzchar(as.character(v))))

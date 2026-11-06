@@ -3,7 +3,7 @@
 .msr_prepare_native_prediction <- function(object, newdata, kernel_inputs,
     max_bytes, component, native_args, join_by = NULL, include_fixed = FALSE) {
   kind <- if (identical(object$backend, "joint_mixed")) "glmmTMB" else "unmarked"
-  if (kind == "glmmTMB" && is.list(native_args) &&
+  if (kind %in% c("glmmTMB", "unmarked") && is.list(native_args) &&
       (!length(native_args) || (!is.null(names(native_args)) &&
         !anyNA(names(native_args)) && all(nzchar(names(native_args))) &&
         !anyDuplicated(names(native_args)) &&
@@ -30,15 +30,17 @@
       stop("include_fixed requires explicit kernel_inputs and newdata.", call. = FALSE)
     types <- component
   } else {
-    model <- .msr_native_fixed_metadata(object$opt_mod)
+    model <- .msr_native_fixed_metadata(object$opt_mod, nested = TRUE)
     newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
     nd <- .msr_mixed_prediction_data(object, newdata, kernel_inputs)
     types <- if (is.null(component)) c("response", "link") else component
   }
+  unmarked_predictor <- if (kind == "unmarked")
+    .msr_unmarked_prediction_function(model, re.form = native_args[["re.form"]]) else NULL
   capture <- function(args) {
     warnings <- character()
     # unmarked exports an S4 generic distinct from stats' S3 generic.
-    predictor <- if (kind == "unmarked") unmarked::predict else stats::predict
+    predictor <- if (kind == "unmarked") unmarked_predictor else stats::predict
     value <- withCallingHandlers(do.call(predictor, args), warning = function(w)
       warnings <<- c(warnings, conditionMessage(w)))
     list(value = value, warnings = warnings)

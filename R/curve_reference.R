@@ -29,7 +29,7 @@
   if (.row_names_info(reference_data, 1L) <= 0L ||
       anyNA(row.names(reference_data)) || anyDuplicated(row.names(reference_data)))
     stop("reference_data requires unique explicit fitted row IDs as row names.", call. = FALSE)
-  model <- .msr_native_fixed_metadata(model)
+  model <- .msr_native_fixed_metadata(model, nested = TRUE)
   frame <- model$model
   original <- attr(frame, "terms")
   if (!is.data.frame(frame) || !inherits(original, "terms") || !nrow(frame))

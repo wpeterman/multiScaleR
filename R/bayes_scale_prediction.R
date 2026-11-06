@@ -17,7 +17,52 @@
   list(xlevels = levels, contrasts = contrasts)
 }
 
-.msr_bayes_prediction_matrix <- function(model, data, training, response = FALSE) {
+# Reconstruct old nested learner calls only from verified original observations.
+# A numeric match is a compatibility check, not proof of an arbitrary custom
+# function's scientific provenance. New preparation freezes trusted calls early.
+.msr_bayes_prediction_terms <- function(model, training_data = NULL) {
+  tt <- model$terms
+  attr(tt, ".Environment") <- asNamespace("stats")
+  original <- attr(tt, "predvars")
+  if (is.null(original)) original <- attr(tt, "variables")
+  frozen <- tryCatch(.msr_cv_prediction_terms(tt,
+    if (is.null(training_data)) list() else training_data, allow_learning = !is.null(training_data)), error = function(e)
+      stop("Cannot reconstruct prediction metadata from original training data: ",
+        conditionMessage(e), call. = FALSE))
+  prediction <- attr(frozen, "predvars")
+  if (!is.null(training_data) && !identical(prediction, original)) {
+    frame <- model$frame
+    if (!is.data.frame(training_data) || !is.data.frame(frame) ||
+        nrow(training_data) != nrow(frame) || length(prediction) != length(original) ||
+        length(prediction)-1L != ncol(frame))
+      stop("Prediction reconstruction requires the original aligned training data and frame.", call. = FALSE)
+    for (j in seq_len(ncol(frame))) if (!identical(prediction[[j+1L]], original[[j+1L]])) {
+      value <- tryCatch(eval(prediction[[j+1L]], training_data, asNamespace("stats")),
+        error = function(e) stop("Cannot verify the original training prediction expression: ",
+          conditionMessage(e), call. = FALSE))
+      if (!identical(dim(value), dim(frame[[j]])) ||
+          !isTRUE(all.equal(value, frame[[j]], tolerance = 1e-12)))
+        stop("Reconstructed prediction expressions do not reproduce the retained training frame.", call. = FALSE)
+    }
+  }
+  .msr_cv_prediction_terms(frozen, if (is.null(training_data)) list() else training_data, qualify = TRUE, allow_learning = FALSE)
+}
+
+# Dynamic expression frames can retain their original normalized kernel columns
+# separately. They are preparation references, not values at a fitted new scale.
+.msr_bayes_training_prediction_data <- function(spec) {
+  data <- spec$data
+  kernel <- spec$response_design$reference_kernel
+  if (!is.null(kernel)) {
+    if (!is.matrix(kernel) || nrow(kernel) != nrow(data) ||
+        !identical(colnames(kernel), spec$covariates))
+      stop("Original training kernel references are not aligned with retained data.", call. = FALSE)
+    data[spec$covariates] <- as.data.frame(kernel)
+  }
+  data
+}
+
+.msr_bayes_prediction_matrix <- function(model, data, training, response = FALSE, training_data = NULL) {
   info <- model$prediction
   if (is.null(info)) {
     # Older compact fits have no prediction metadata. Accept reconstruction
@@ -31,7 +76,8 @@
       stop("Cannot reconstruct this saved fit's contrast coding. Use its original contrast settings or refit with prediction metadata.", call. = FALSE)
     info <- .msr_bayes_design_info(model$frame, original, response)
   }
-  tt <- if (response) stats::delete.response(model$terms) else model$terms
+  tt <- .msr_bayes_prediction_terms(model, training_data)
+  if (response) tt <- stats::delete.response(tt)
   # Fitting strips caller environments to avoid serializing whole workspaces.
   # Base/stats transforms and namespace-qualified functions remain available.
   attr(tt, ".Environment") <- asNamespace("stats")
@@ -76,7 +122,7 @@
   count <- 0L; metadata <- .msr_bayes_empty_new_groups(); flags <- list()
   for (nm in spec$covariates) {
     sm <- spec$scales[[nm]]
-    sm$X <- .msr_bayes_prediction_matrix(sm, data, sm$X)$X
+    sm$X <- .msr_bayes_prediction_matrix(sm, data, sm$X, training_data = spec$data)$X
     new_rows <- rep(FALSE, nrow(data))
     if (include) for (k in seq_along(sm$random)) {
       mapped <- .msr_bayes_prediction_group(sm$random[[k]], data, policy,
@@ -194,7 +240,8 @@
   for (nm in spec$covariates) model_data[[nm]] <- 0
   training <- if (is.null(spec$response_design)) spec$X_fixed else
     spec$response_design$multipliers
-  fixed <- .msr_bayes_prediction_matrix(spec$response, model_data, training, TRUE)
+  fixed <- .msr_bayes_prediction_matrix(spec$response, model_data, training, TRUE,
+    .msr_bayes_training_prediction_data(spec))
   if (is.null(spec$response_design)) spec$X_fixed <- fixed$X else {
     tt <- stats::delete.response(spec$response$terms)
     spec$response_design <- .msr_compile_response_design(tt, fixed$frame,

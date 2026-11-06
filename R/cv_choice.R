@@ -221,6 +221,9 @@ logLik.msr_cv_choice_null <- function(object, ...) {
 #'   assessment transformations. Exclude the set ID as an ordinary predictor,
 #'   for example \code{case_ ~ . - choice_id + strata(choice_id)}. Predictors
 #'   constant within every set have no identified conditional coefficient.
+#'   The supported training-only transformations described in
+#'   \code{\link{cross_validate}} also apply inside choice expressions and offsets.
+#'   Their saved constants do not introduce stratum effects or change event K.
 #'   Point scores do not integrate parameter/selection uncertainty, provide
 #'   observation intervals or establish calibration. This adapter does not
 #'   promote guarded spatial-scale or Bayesian methods.
@@ -313,6 +316,7 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
       stage <- "training_identity"
       .msr_choice_identity(fit, split, specification$targets, method)
       stage <- "prediction"
+      fit <- .msr_cv_prediction_metadata(fit, training, if (is.null(inputs)) NULL else train)
       if (is.null(inputs)) pred$linear_predictor <- .msr_choice_lp(fit, assessment) else {
         assess <- .msr_cv_inputs(inputs, split$assessment, covariates, if (is.null(train$binned)) NULL else train$binned$cv_reference)
         raw <- .msr_cv_initial_values(assess)

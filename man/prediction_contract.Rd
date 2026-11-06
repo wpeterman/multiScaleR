@@ -54,6 +54,14 @@ the same complete joint vector. Their intervals summarize the contrasts,
 rather than differences between marginal interval endpoints. Observation
 noise is omitted and calibration remains unestablished.
 
+Unmarked treats any non-NULL \code{re.form} as zero random effects.
+The contract records zero deviations and no integration for that request,
+including formula controls that other providers use for partial selection.
+Ordinary native S4 control abbreviations are resolved before this policy is
+recorded. Zero-effect contexts do not evaluate unused random transformations
+or add latent variation; conditional requests still need their original
+random-design metadata.
+
 Native point and raster contracts record \code{uncertainty$standard_errors}
 as \code{"provided"} or \code{"not_requested"}, and separately retain
 \code{se.fit_requested}. Provider controls such as glmmTMB's \code{cov.fit}

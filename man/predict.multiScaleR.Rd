@@ -60,9 +60,15 @@ models. For refit points, also accepts \code{join_by} and
 \code{include_fixed} for verified spatial preparation. Use a named
 \code{native_args} list for controls that share a wrapper argument name,
 such as \code{native_args = list(level = 0)} for nlme population predictions.
-Native S3 argument abbreviations are resolved before row and uncertainty
+Native S3 and ordinary unmarked S4 argument abbreviations are resolved
+before row and uncertainty
 checks using the provider's exact-first argument matching. They cannot
 replace the wrapper's verified prediction inputs or bypass its guards.
+Ordinary LM, GLM and time-fixed unpenalized Cox predictions use their
+original fitted terms for dot shortcuts and active formula inputs. Variables
+removed with minus terms do not need prediction columns. Original learned
+transformations, factor coding, offsets, coefficients and covariance are
+retained in a local prediction context.
 Zero-effect predictions may omit random-only grouping or slope inputs,
 while all fixed predictors and offsets remain required. Setting effects
 to zero does not integrate over their distribution. For lme4 partial
@@ -89,6 +95,10 @@ Predict the expected response, with optional uncertainty from
   joint estimation of regression coefficients and spatial kernel parameters.
 }
 \details{
+The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
+\code{MASS::glm.nb}, \code{coxph} and \code{clogit} structures. Other native
+subclasses retain their existing provider path.
+
 For \code{conditional_logit}, \code{type = "response"} returns probabilities
 normalized within each supplied choice set, not occurrence probabilities or
 a utilization distribution. \code{type = "link"} returns the uncentered
@@ -158,7 +168,8 @@ preparation. See \code{\link{prepare_unmarked_data}} for the key and fixed
 normalization requirements. Standard errors require
 \code{uncertainty = "conditional"} and native support. Unsupported native
 SE requests raise an error. Wrapper confidence intervals are unavailable.
-Fixed qualified \code{base::scale()} and \code{stats::poly()} calls use
+Standard \code{scale()}, \code{poly()}, \code{splines::ns()} and
+\code{splines::bs()} calls, including namespace-qualified calls, use
 their retained training transformation for supported LM/GLM, GAM, lme4,
 glmmTMB and time-fixed, unpenalized native Cox predictions. GAMs with multiple linear predictors retain each
 component's terms, coefficient spans and native output columns. Response
@@ -167,8 +178,32 @@ columns keep the fitted family's meaning; for example, the second
 and multinomial response columns are category probabilities. New rows do not relearn the center or
 spread. Recovery requires an aligned evaluated training frame. Legacy full
 analytic fits can recover this metadata; numerical-only snapshots must be
-prepared again. Nested learned calls and unsupported native structures
-require separate preparation. Native GAM term selection, exclusions and
+prepared again. Nested expressions and transformed offsets recover one
+standard learner per evaluated predictor from its original retained
+attributes. Missing or ambiguous attributes, multiple learners in one
+predictor, and unsupported transformations require precomputed training
+predictors or complete saved prediction calls. New prediction rows never
+supply the training constants. Scaling arguments retain their original
+order and standard abbreviations. Custom functions retain their own semantics.
+Ordinary unmarked occupancy and pcount state/detection predictions freeze
+supported fixed scaling, polynomial and spline terms from original raw
+covariates before site removal, including nested calls and formula offsets.
+Keep those original covariates and the fitted designs. Reconstructed designs
+and offsets must match the native fit before new rows are evaluated. This
+check preserves the fitted target; it does not authenticate edited raw data.
+Factor contrasts use retained metadata or exactly recoverable original
+columns for factor main effects. More ambiguous missing coding needs explicit saved training
+contrasts. Native observation rows, missing-site handling,
+covariance, confidence levels and derived ZIP abundance remain native.
+Point, prepared and raster predictions use the same checked transformations.
+Known-group columns retain their original order for frame subsets.
+Conditional predictions with learned random-effect terms need precomputed
+original training predictors. Zero-effect requests do not evaluate those
+unused terms or require new random-only grouping or slope inputs.
+Unmarked treats every non-NULL \code{re.form} as zero random effects;
+these controls do not select partial effects or integrate over them.
+Other unmarked classes retain their provider's prediction requirements.
+Native GAM term selection, exclusions and
 smoothing-parameter covariance requests retain their native behavior;
 none includes uncertainty in the selected spatial scales.
 Package predictions from the native mgcv GAM method retain saved factor

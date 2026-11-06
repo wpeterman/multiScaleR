@@ -52,7 +52,8 @@
     nd <- as.data.frame(lapply(defaults, function(x) rep(x, length(grid))),
                          stringsAsFactors = FALSE, check.names = FALSE)
     nd[[nm]] <- grid
-    design <- .msr_bayes_prediction_matrix(spec$response, nd, training, response = TRUE)
+    design <- .msr_bayes_prediction_matrix(spec$response, nd, training, response = TRUE,
+      training_data = reference)
     offset <- stats::model.offset(design$frame)
     if (is.null(offset)) offset <- rep(0, length(grid))
     eta <- sweep(design$X %*% t(beta), 1L, offset, "+")

@@ -29,7 +29,12 @@
 #'   \code{"log"} returns natural log distances in those map units.
 #' @param seed Optional positive integer seed for new effects. Supplying it
 #'   restores the caller's random-number state, including on failure.
-#' @details Summary tables have a \code{prediction_contract} attribute describing
+#' @details Supported fixed scale-formula learners retain their training
+#'   constants inside nested expressions, including \code{I(scale(temp))} and
+#'   polynomial or spline bases. Older retained fits require verified recovery
+#'   from original training data. Single rows and batches use the same basis.
+#'
+#'   Summary tables have a \code{prediction_contract} attribute describing
 #'   their posterior target, included scale effects, and uncertainty. Setting
 #'   effects to zero remains a reference calculation rather than integration
 #'   over group variation. Metadata does not establish diagnostic eligibility

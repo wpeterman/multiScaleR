@@ -192,6 +192,26 @@ test_that("the private fitter recovers a positive year SD with shared site effec
   expect_gt(unname(fit$group_sd["scale"]), .2)
   expect_lt(sqrt(mean((fit$annual$log_estimate - truth)^2)), .1)
   expect_false(fit$uncertainty$available)
+  # Reuse this existing admitted fit; no additional optimizer call.
+  saved <- serialize(fit, NULL)
+  snapshot <- .msr_likelihood_prepare_prediction(fit, newdata = f$data,
+    kernel_inputs = f$inputs, training_inputs = f$inputs)
+  expected <- .msr_bayes_components(s, fit$parameters)$eta
+  expect_equal(as.numeric(.msr_likelihood_predict(snapshot)), unname(expected), tolerance = 1e-10)
+  expect_identical(snapshot$prediction_contract$expected_response$diagnostics_status, "passed")
+  expect_false(snapshot$prediction_contract$expected_response$metadata_establishes_eligibility)
+  expect_identical(serialize(fit, NULL), saved)
+  coordinates <- setNames(fit$parameters$scale_z, s$scales$habitat$random[[1]]$levels)
+  named <- .msr_likelihood_prepare_prediction(fit, newdata = f$data,
+    kernel_inputs = f$inputs, training_inputs = f$inputs,
+    scale_effects = rev(coordinates))
+  expect_identical(named$expected_response, snapshot$expected_response)
+  expect_identical(named$prediction_contract$expected_response$effects$coordinate_origin$scale, "explicit_named_coordinates")
+  expect_error(.msr_likelihood_predict(snapshot, se.fit = TRUE), "no parameter/latent SEs")
+  failed <- fit; failed$diagnostics$passed <- FALSE
+  expect_error(.msr_likelihood_prepare_prediction(failed), "original fit must pass")
+  altered <- fit; altered$parameters$beta[1] <- altered$parameters$beta[1]+1
+  expect_error(.msr_likelihood_prepare_prediction(altered), "selected eligible start")
 })
 
 test_that("the private fitter retains zero-SD fits without claiming calibrated intervals", {
@@ -216,6 +236,11 @@ test_that("the private fitter retains zero-SD fits without claiming calibrated i
   expect_false(fit$uncertainty$available)
   expect_true(all(!fit$annual$interval_available))
   expect_equal(length(unique(fit$annual$estimate)), 1L)
+  reduced <- .msr_marginal_reduce(s, "scale")
+  snapshot <- .msr_likelihood_prepare_prediction(fit)
+  expect_equal(as.numeric(.msr_likelihood_predict(snapshot)),
+    unname(.msr_bayes_components(reduced, fit$parameters)$eta), tolerance = 1e-10)
+  expect_identical(snapshot$prediction_contract$kernel_scale$effects$scale, "no_active_scale_effects")
   repeat_fit <- multiScaleR:::.msr_marginal_fit(s, list(starts = 2L))
   expect_true(repeat_fit$diagnostics$passed)
   expect_equal(fit$log_likelihood, repeat_fit$log_likelihood, tolerance = 1e-5)

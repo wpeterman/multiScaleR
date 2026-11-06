@@ -42,9 +42,12 @@
 #'   \code{selection_records} have the same contract as \code{cross_validate()}.
 #' @details This adapter supports the same qualified GLM families, outcome and
 #'   frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
-#'   interactions, offsets and learned \code{poly()} terms use native GLM
-#'   machinery. All learned preprocessing must occur within the training fit;
-#'   do not supply predictors standardized with assessment data.
+#'   interactions and offsets use native GLM machinery. Supported saved
+#'   \code{scale()}, \code{poly()}, natural-spline and B-spline transformations
+#'   use training constants even inside expressions and offsets. See
+#'   \code{cross_validate()} for supported inputs and custom-recipe limitations.
+#'   All learned preprocessing must occur within the training fit; do not supply
+#'   predictors standardized with assessment data.
 #'
 #' NB2 uses \code{MASS::glm.nb()} when theta is estimated and
 #'   \code{glm(family = MASS::negative.binomial(theta))} when it is fixed.
@@ -129,6 +132,7 @@ cross_validate_glm <- function(formula, data, folds,
       if (is.factor(stats::model.response(fit$model)) && length(unique(stats::model.response(fit$model))) != 2L)
         stop("A training binomial factor must contain both declared response levels.", call. = FALSE)
       stage <- "prediction"
+      fit <- .msr_cv_prediction_metadata(fit, data[ai, , drop = FALSE])
       pred$prediction <- as.numeric(stats::predict(fit, newdata = data[ti, , drop = FALSE], type = "response"))
       stage <- "scoring"
       pred <- .msr_cv_score(pred, family, metrics)
