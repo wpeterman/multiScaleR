@@ -75,7 +75,9 @@ the joint identifiability checks. Point distances remain available.
 For \code{conditional_logit}, point distances remain available but scale
 uncertainty has not been calibrated, so distance confidence limits are missing.
 Native-refit point distances remain available when a scale SE is non-finite;
-their Wald limits are then missing. A hard-radius metric reports its radius
+their Wald limits are then missing. At a smooth refit optimization bound,
+the entire active outer Wald block is withheld; explicitly marked profile
+limits remain available. A hard-radius metric reports its radius
 directly and has no kernel shape, including in an expow mixture. A fitted
 \code{kernel = "fixed"} likewise reports its cutoff radius, with no
 Hessian-based interval. Stored profile limits are retained. Native

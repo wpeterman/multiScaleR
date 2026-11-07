@@ -38,6 +38,10 @@
 #'   \item{diagnostics_status}{The existing fit status when available. It can be
 #'     \code{"passed"}, \code{"failed"}, or \code{"unavailable"}. Joint covariance
 #'     availability is separate from this status.}
+#'   \item{kernel_support}{Native predictions retain any recoverable refit
+#'     optimization-bound table and existing extraction-window diagnostic.
+#'     These flags qualify the selected kernel and do not add kernel uncertainty,
+#'     alter conditional coefficient SEs or establish prediction eligibility.}
 #'   \item{metadata_establishes_eligibility}{Always \code{FALSE}. Read the original
 #'     fit diagnostics before interpreting predictions.}
 #'   \item{target_population}{Specified prediction rows, or specified location
@@ -255,6 +259,7 @@ NULL
 # Describe native components without changing their numerical values. Raw
 # native snapshots keep their original attributes and store contracts separately.
 .msr_native_prediction_contract <- function(object, kind, type, native_args, se.fit = NULL, output = NULL) {
+  object <- .msr_refit_bound_view(object)
   model <- .analysis_model(object$opt_mod)
   zero <- .msr_native_zero_random_effects(model, native_args, kind)
   selected <- .msr_native_selected_random_effects(model, native_args, kind)
@@ -279,6 +284,9 @@ NULL
     intervals = if (kind == "unmarked") "native_conditional_confidence" else "conditional_standard_errors_only",
     omitted = c("kernel_parameter_uncertainty", "observation_noise"),
     fixed_inputs = TRUE, component = type)
+  out$kernel_support <- list(optimization_bounds = object$diagnostics$refit_hessian$bounds,
+    extraction_window = object$diagnostics$max_distance,
+    establishes_eligibility = FALSE)
   if (selected) out$effects$selection <- paste(deparse(native_args[["re.form"]]), collapse = " ")
   if (inherits(model, "gam") || identical(kind, "gam")) {
     if (is.list(model$pterms) && !inherits(model$pterms, "terms")) {

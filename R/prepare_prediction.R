@@ -63,6 +63,14 @@
 #'   Analytic GLM/NB2, conditional-logistic, and joint mixed snapshots also
 #'   support this verification, with their existing strict row-ID rules.
 #' @details
+#' Native GDR models with active formula offsets or TMB zero inflation are
+#' rejected before fitting, model selection or prediction. In the audited
+#' unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+#' TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+#' require separate provider qualification; multiScaleR does not remove offsets,
+#' switch engines, alter parameter counts or substitute uncertainty estimates.
+#' Offset-free C ZIP models retain their native likelihood and parameter count.
+#'
 #' The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
 #' \code{MASS::glm.nb}, \code{coxph} and \code{clogit} structures. Other native
 #' subclasses retain their existing provider path.

@@ -40,6 +40,7 @@ scale_ci_table <- function(object,
     }
     return(tab)
   }
+  object <- .msr_refit_bound_view(object)
   tab <- ci_func(object$scale_est,
                  df = df,
                  min_D = min_D,

@@ -252,6 +252,17 @@ refits the model, using \code{optim} (or \code{optimParallel} for parallel
 execution) with the L-BFGS-B algorithm.
 }
 \details{
+For the default refit backend, a smooth kernel or shape parameter within
+\code{1e-5} on the log scale of an optimization bound invalidates the
+unconstrained joint outer Wald approximation. Its smooth kernel SEs and
+Wald limits are withheld. The raw Hessian, original curvature status and
+parameter-bound table remain in \code{diagnostics$refit_hessian}. A zero
+lower bound is flagged only when reached. This numerical flag does not
+establish identifiability or provide a calibrated interval. Explicit profile
+limits retain their existing interpretation. Native coefficient covariance
+still conditions on the selected kernels; likelihoods and parameter counts
+are unchanged. Hard-radius uncertainty follows its separate profile contract.
+
 \strong{Opt-in analytic GLM contracts}
 
 The opt-in \code{backend = "conditional_logit"} uses the exact finite-choice-set
@@ -470,6 +481,24 @@ surface metrics, and all estimated fixed-kernel radii, omit Hessian SEs
 and Wald limits. The raw optimizer Hessian remains available for
 compatibility and diagnostics; it is not inverted for those radii. Use
 \code{summary(x, profile = TRUE)} for profile-likelihood intervals.
+
+Use \code{\link{make_gdr_refitter}} as an opt-in native C callback when
+independent coefficient starts and retained audits are needed. It freezes
+evaluated original settings and restores the final native SE request.
+
+Only active GDR component formulas identify spatial predictors. Availability
+is inactive for one primary period, and the distance formula is inactive for
+a uniform key. Optimized static site names must not also occur in native
+yearly or observation covariate tables; use distinct names for distinct inputs.
+Dot formulas use the original component's available training-column names.
+
+Native GDR models with active formula offsets or TMB zero inflation are
+rejected before fitting, model selection or prediction. In the audited
+unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+require separate provider qualification; multiScaleR does not remove offsets,
+switch engines, alter parameter counts or substitute uncertainty estimates.
+Offset-free C ZIP models retain their native likelihood and parameter count.
 
 \strong{Binned acceleration}
 

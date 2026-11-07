@@ -2,7 +2,9 @@
 # version number while containing different solvers. No files are written.
 .msr_joint_pool_signature <- function() {
   ns <- asNamespace("multiScaleR")
-  nms <- sort(ls(ns, all.names = TRUE))
+  # Controller and workers can have different LC_COLLATE settings. Compare
+  # exactly the same function identities in a deterministic byte ordering.
+  nms <- sort(ls(ns, all.names = TRUE, sorted = FALSE), method = "radix")
   nms <- nms[startsWith(nms, ".msr_")]
   nms <- nms[vapply(nms, function(n) is.function(get(n, ns)), logical(1))]
   vapply(nms, function(n) paste(deparse(get(n, ns)), collapse = "\n"), character(1))

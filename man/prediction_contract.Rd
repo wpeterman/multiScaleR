@@ -41,6 +41,10 @@ The fields describe the calculation:
   \item{diagnostics_status}{The existing fit status when available. It can be
     \code{"passed"}, \code{"failed"}, or \code{"unavailable"}. Joint covariance
     availability is separate from this status.}
+  \item{kernel_support}{Native predictions retain any recoverable refit
+    optimization-bound table and existing extraction-window diagnostic.
+    These flags qualify the selected kernel and do not add kernel uncertainty,
+    alter conditional coefficient SEs or establish prediction eligibility.}
   \item{metadata_establishes_eligibility}{Always \code{FALSE}. Read the original
     fit diagnostics before interpreting predictions.}
   \item{target_population}{Specified prediction rows, or specified location

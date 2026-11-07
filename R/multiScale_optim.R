@@ -548,6 +548,17 @@
 #'     \code{FALSE}; \code{next_run} and \code{opt_context} are \code{NULL}.}
 #' }
 #' @details
+#' For the default refit backend, a smooth kernel or shape parameter within
+#' \code{1e-5} on the log scale of an optimization bound invalidates the
+#' unconstrained joint outer Wald approximation. Its smooth kernel SEs and
+#' Wald limits are withheld. The raw Hessian, original curvature status and
+#' parameter-bound table remain in \code{diagnostics$refit_hessian}. A zero
+#' lower bound is flagged only when reached. This numerical flag does not
+#' establish identifiability or provide a calibrated interval. Explicit profile
+#' limits retain their existing interpretation. Native coefficient covariance
+#' still conditions on the selected kernels; likelihoods and parameter counts
+#' are unchanged. Hard-radius uncertainty follows its separate profile contract.
+#'
 #' \strong{Opt-in analytic GLM contracts}
 #'
 #' The opt-in \code{backend = "conditional_logit"} uses the exact finite-choice-set
@@ -766,6 +777,24 @@
 #' and Wald limits. The raw optimizer Hessian remains available for
 #' compatibility and diagnostics; it is not inverted for those radii. Use
 #' \code{summary(x, profile = TRUE)} for profile-likelihood intervals.
+#'
+#' Use \code{\link{make_gdr_refitter}} as an opt-in native C callback when
+#' independent coefficient starts and retained audits are needed. It freezes
+#' evaluated original settings and restores the final native SE request.
+#'
+#' Only active GDR component formulas identify spatial predictors. Availability
+#' is inactive for one primary period, and the distance formula is inactive for
+#' a uniform key. Optimized static site names must not also occur in native
+#' yearly or observation covariate tables; use distinct names for distinct inputs.
+#' Dot formulas use the original component's available training-column names.
+#'
+#' Native GDR models with active formula offsets or TMB zero inflation are
+#' rejected before fitting, model selection or prediction. In the audited
+#' unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+#' TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+#' require separate provider qualification; multiScaleR does not remove offsets,
+#' switch engines, alter parameter counts or substitute uncertainty estimates.
+#' Offset-free C ZIP models retain their native likelihood and parameter count.
 #'
 #' \strong{Binned acceleration}
 #'
@@ -1367,6 +1396,12 @@ multiScale_optim <- function(fitted_mod,
     uncertainty <- .msr_refit_hessian_se(opt_results$hessian_unscale, active,
       c(rep(kernel_inputs$unit_conv, n_covs),
         if (kernel_inputs$kernel == "expow") rep(1, n_covs)))
+    bounds <- .msr_refit_bounds(opt_results$par, lwr, uppr, active,
+      c(rep(kernel_inputs$unit_conv, n_covs),
+        if (kernel_inputs$kernel == "expow") rep(1, n_covs)),
+      c(paste0("sigma:", r_vars),
+        if (kernel_inputs$kernel == "expow") paste0("shape:", r_vars)))
+    uncertainty <- .msr_refit_bound_uncertainty(uncertainty, bounds)
     res <- uncertainty$SE
 
     scale_est <- data.frame(Mean = opt_results$par_unscale[1:n_covs],
@@ -1424,6 +1459,7 @@ multiScale_optim <- function(fitted_mod,
                 call = match.call())
 
     out$diagnostics$refit_hessian <- uncertainty$diagnostic
+    if (isTRUE(verbose)) .msr_print_refit_bounds(out$diagnostics)
     class(out) <- 'multiScaleR'
 
     # Keep the existing warning threshold independent of distance reporting.

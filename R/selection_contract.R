@@ -34,6 +34,7 @@
 
 .msr_selection_signature <- function(model) {
   model <- .analysis_model(model)
+  gdr <- NULL
   frame <- .msr_selection_frame(model)
   unmarked <- methods::is(model, "unmarkedFit")
   if (unmarked) {
@@ -41,7 +42,10 @@
     sites <- .msr_unmarked_observations(model)
     ids <- sites$ids
     rows <- sites$rows
-    response <- if (methods::is(model, "unmarkedFitPCount"))
+    if (methods::is(model, "unmarkedFitGDR")) {
+      gdr <- .msr_gdr_selection_data(model, rows)
+      response <- gdr$response
+    } else response <- if (methods::is(model, "unmarkedFitPCount"))
       .msr_unmarked_pcount_response(model, rows) else response[rows, , drop = FALSE]
     weights <- rep(1, length(rows))
     family <- "unmarked"
@@ -122,7 +126,7 @@
         grepl("Negative Binomial|nbinom", family)) "discrete" else
     if (tolower(family) %in% c("gaussian", "gamma", "inverse.gaussian", "beta", "betar"))
       "continuous" else "unknown"
-  list(response = response, weights = unname(weights[order]), measure = measure,
+  value <- list(response = response, weights = unname(weights[order]), measure = measure,
     trials = if (is.null(trials)) NULL else unname(trials[order]), reml = reml,
     design = if (is.null(design)) NULL else design[match(sort(ids), rownames(design)), , drop = FALSE],
     partial_method = if (partial) model$method else NULL,
@@ -130,6 +134,8 @@
       groups <- as.character(interaction(strata[order, , drop = FALSE], drop = TRUE))
       match(groups, unique(groups))
     })
+  if (!is.null(gdr)) value$gdr_protocol <- gdr$protocol
+  value
 }
 
 .msr_assert_selection_targets <- function(models) {
@@ -142,8 +148,25 @@
   available <- Filter(Negate(is.null), signatures)
   if (length(available) < 2L) return(invisible(NULL))
   ref <- available[[1L]]
+  # Normalize only a local comparison copy, including stored older signatures.
+  # Retain original signature formats and all actual native units/coordinates.
+  gdr_protocol <- function(value) {
+    if (is.null(value)) return(NULL)
+    units <- value$distance_units
+    if (length(units) != 1L || is.na(units) || !units %in% c("m", "km"))
+      stop("GDR distance units are not qualified for model comparison.", call. = FALSE)
+    breaks <- value$distance_breaks
+    if (!is.numeric(breaks) || !is.null(dim(breaks)) || length(breaks) < 2L || anyNA(breaks))
+      stop("GDR distance bins are not qualified for model comparison.", call. = FALSE)
+    value$distance_breaks <- as.numeric(breaks) * if (units == "m") 1 else 1000
+    value$distance_units <- "m"
+    value
+  }
+  ref_gdr <- gdr_protocol(ref$gdr_protocol)
   equal <- function(x, y) isTRUE(all.equal(x, y, tolerance = 0, check.attributes = FALSE))
   for (other in available[-1L]) {
+    if (!equal(ref_gdr, gdr_protocol(other$gdr_protocol)))
+      stop("Models have different GDR observation protocols or paired-history layouts; their likelihoods are not comparable.", call. = FALSE)
     if (!equal(ref$response, other$response))
       stop("Models have different retained response values or response layouts; their likelihoods are not comparable.", call. = FALSE)
     if (!equal(ref$weights, other$weights))

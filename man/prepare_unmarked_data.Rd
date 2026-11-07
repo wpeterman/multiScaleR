@@ -55,6 +55,20 @@ Calculate optimized spatial predictors at new sites and insert
   model's covariate scale.
 }
 \details{
+Only active GDR component formulas identify spatial predictors. Availability
+is inactive for one primary period, and the distance formula is inactive for
+a uniform key. Optimized static site names must not also occur in native
+yearly or observation covariate tables; use distinct names for distinct inputs.
+Dot formulas use the original component's available training-column names.
+
+Native GDR models with active formula offsets or TMB zero inflation are
+rejected before fitting, model selection or prediction. In the audited
+unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+require separate provider qualification; multiScaleR does not remove offsets,
+switch engines, alter parameter counts or substitute uncertainty estimates.
+Offset-free C ZIP models retain their native likelihood and parameter count.
+
 This function prepares data only. Pass its result to
 \code{unmarked::predict(object$opt_mod, type = ..., newdata = ...)}, or supply
 the same inputs and keys to \code{\link{prepare_prediction}} to retain a

@@ -21,6 +21,7 @@ test_that("simulation helpers return expected structures", {
 test_that("expected public helpers remain exported", {
   expected_exports <- c(
     "aic_tab",
+    "audit_gdr_integration",
     "bic_tab",
     "check_bayes_setup",
     "cross_validate",
@@ -39,6 +40,7 @@ test_that("expected public helpers remain exported", {
     "kernel_prep_by_group",
     "kernel_scale.raster",
     "kernel_var",
+    "make_gdr_refitter",
     "landscape_var",
     "msr_vars",
     "multiScale_bayes",
@@ -47,16 +49,21 @@ test_that("expected public helpers remain exported", {
     "plot_marginal_effects",
     "posterior_scales",
     "predict_scales",
+    "prepare_gdr_histories",
+    "prepare_gdr_intervals",
     "prepare_prediction",
     "prepare_unmarked_data",
     "prepare_unmarked_data",
     "profile_sigma",
     "scale_inference",
+    "score_simulation",
     "sim_dat",
+    "sim_dat_gdr",
     "sim_dat_unmarked",
     "sim_rast",
     "simulate_bayes_prior",
-    "surface_var"
+    "surface_var",
+    "validate_unmarked_data"
   )
 
   expect_setequal(getNamespaceExports("multiScaleR"), expected_exports)

@@ -51,6 +51,7 @@ the \code{AICcmodavg} package. BIC penalizes model complexity more heavily
 than AIC as sample size grows, and is often preferred when the goal is
 identifying the single best-supported model rather than model averaging.
 Sigma (and shape for \code{"expow"}) is counted in K.
+The GDR offset and TMB ZIP restrictions in \code{\link{aic_tab}} also apply.
 Fitted parameter counts and log-likelihood validation follow
 \code{\link{aic_tab}}, including all estimated components of unmarked models.
 The same checked negative-binomial BAM adjustment and

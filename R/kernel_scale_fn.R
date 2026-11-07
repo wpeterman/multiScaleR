@@ -54,6 +54,7 @@
 # unmarked fits differ in whether they retain one formula or a list of
 # component formulas. Only variables in the fitted formulas can be optimized.
 .unmarked_model_formulas <- function(model) {
+  if (methods::is(model, "unmarkedFitGDR")) return(.msr_gdr_active_formulas(model))
   collect_formulas <- function(x) {
     if (inherits(x, "formula")) return(list(x))
     if (is.list(x)) return(do.call(c, lapply(x, collect_formulas)))
@@ -72,6 +73,7 @@
 }
 
 .unmarked_model_predictors <- function(model) {
+  if (methods::is(model, "unmarkedFitGDR")) return(.msr_gdr_model_predictors(model))
   unique(unlist(lapply(.unmarked_model_formulas(model), all.vars), use.names = FALSE))
 }
 
@@ -513,6 +515,7 @@ kernel_scale_fn <- function(par,
         as.data.frame(scl_df[opt_context$unmarked_site_idx, , drop = FALSE])
       .refit_model(mod, data = umf, opt_context = opt_context)
     }, error = function(e) {
+      if (inherits(e, "msr_gdr_audit_error")) stop(e)
       refit_error <<- conditionMessage(e)
       NULL
     })
@@ -526,6 +529,7 @@ kernel_scale_fn <- function(par,
       dat[opt_context$covs] <- as.data.frame(scl_df_dat)
       .refit_model(mod, data = dat, opt_context = opt_context)
     }, error = function(e) {
+      if (inherits(e, "msr_gdr_audit_error")) stop(e)
       refit_error <<- conditionMessage(e)
       NULL
     })
@@ -629,6 +633,7 @@ build_opt_context <- function(fitted_mod,
                               d_list = NULL) {
   mod <- fitted_mod
   analysis_mod <- .analysis_model(mod)
+  .msr_gdr_native_guard(analysis_mod)
   cov_names <- .msr_optimized_covariates(scale_vars, cov_df = cov_df)
 
   if(any(class(mod) == 'gls')){
@@ -707,6 +712,7 @@ build_opt_context <- function(fitted_mod,
   complete_idx <- complete_cases$complete_idx
 
   if(mod_class == 'unmarked'){
+    .msr_gdr_spatial_guard(mod, covs)
     umf_template <- mod@data
     missing_site_covs <- setdiff(covs, names(umf_template@siteCovs))
     if (length(missing_site_covs) > 0L) {

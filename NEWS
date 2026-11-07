@@ -1,3 +1,35 @@
+multiScaleR 0.7.19
+
+* Preserve linked first encounters before radius filtering, original histories
+  and exclusion reasons; distinguish incomplete and unsurveyed event responses.
+* Compare equivalent native GDR meter/kilometer geometry in canonical units.
+
+* Audit native C GDR integration at the actual stored coefficients, separating
+  latent-cutoff loss from native distance arithmetic and analytic integration.
+
+* Prepare native GDR interval predictors by explicit event keys, retaining
+  histories, covariate attributes, original protocol and the alignment map.
+
+* Withhold joint outer-refit kernel Wald inference at active optimization bounds,
+  retaining curvature, coefficient covariance, penalties and prediction flags.
+
+* Worker code checks now use locale-independent ordering while retaining every function identity and stale-worker rejection.
+* Add opt-in audited native C GDR coefficient refits with frozen settings,
+  independent cold starts, per-attempt records and original final uncertainty.
+* Include native mixture codes in default model labels and exclude formula
+  responses from GDR spatial-predictor discovery.
+* Use the already installed digest dependency for SHA256 input fingerprints
+  in memory, avoiding temporary input-array files.
+* Compare both GDR histories and stored survey protocols; use only active
+  component formulas and reject shadowed optimized site columns.
+* Reject unqualified native GDR active offsets and TMB ZIP targets before
+  fitting, likelihood selection or prediction; retain valid native penalties.
+* Keep simulation, audit and score displays compact while retaining complete records.
+* Audit explicit survey identities, paired GDR margins, units and effort without
+  changing records; retain truth in single-primary Poisson half-normal simulation.
+* Score named simulation targets on the response scale with explicit failed-fit
+  denominators, interval eligibility and unidentified-scale distinctions.
+
 multiScaleR 0.7.18
 * Prepare ordinary unmarked state and detection metadata by requested component
   for explicit prediction tables, raster chunks and effect curves.

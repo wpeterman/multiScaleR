@@ -1,0 +1,397 @@
+---
+title: "Survey Audits and Simulation Truth for Distance-Removal Models"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Survey Audits and Simulation Truth for Distance-Removal Models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(multiScaleR)
+```
+
+Distance-removal models account for birds missed because of their distance
+from the observer and their availability for detection during removal intervals.
+The distance and removal tables describe the same detected birds. Matching their
+totals checks one part of the data, but it cannot establish which records belong
+to a survey. This guide shows how to audit explicit survey identities, retain
+simulation truth, and score estimates on their intended scale. For ecological
+kernel preparation, start with `vignette("quickstart", package = "multiScaleR")`.
+
+# Retain survey events and physical sites
+
+A physical site can be visited more than once. Each visit needs its own event
+identifier, while the physical-site identifier remains available for grouped
+validation or repeated-site interpretation. An arbitrary CSV row number cannot
+establish that a bird record and a zero-detection record belong to the same event.
+Resolve those identities when constructing the frame from original histories.
+
+The synthetic example has four independent survey events, including two visits
+to site A. Densities depend on an already prepared habitat covariate. Years are
+retained explicitly; this example does not substitute one year's landscape for
+another. The literal category `"None"` is a valid covariate value.
+
+```{r simulate-events}
+sites <- data.frame(
+  event = factor(c("A-2007", "A-2011", "B-2007", "C-2011")),
+  site = factor(c("A", "A", "B", "C")),
+  year = c(2007, 2011, 2007, 2011),
+  habitat = c(-0.6, 0.2, 0.7, -0.1),
+  condition = factor(c("None", "wind", "None", "None"))
+)
+beta <- c(intercept = log(200), habitat = 0.5)
+density <- exp(beta["intercept"] + beta["habitat"] * sites$habitat)
+simulation <- sim_dat_gdr(
+  density = density, distance_scale = 40, removal = 0.3,
+  dist_breaks = c(0, 25, 75), interval_lengths = c(1, 2, 1),
+  interval_units = "minutes", site_covs = sites,
+  event_keys = sites[c("event", "site")], seed = 24,
+  provenance = list(lambdaformula = ~habitat, coefficients = beta,
+                    ecological_kernel_scale_m = 300)
+)
+audit <- validate_unmarked_data(
+  simulation$observed, simulation$event_keys, event_id = "event",
+  site_id = "site", interval_units = "minutes", effort = rep(4, 4),
+  expected_event_keys = sites[c("event", "site")]
+)
+audit$valid
+audit$findings
+```
+
+`valid = TRUE` means that no audit errors were found. Review warnings as well.
+The independent expected mapping checks order against the intended survey list.
+When no independent mapping or shared covariate keys are available, unique keys
+alone cannot prove alignment. The audit leaves the frame and key table intact.
+
+To see how a split event is reported, assign the same original event identifier
+to two frame rows. Their distance and removal totals still agree, but the event
+mapping is invalid.
+
+```{r split-event}
+split_keys <- simulation$event_keys
+split_keys$event[2] <- split_keys$event[1]
+split_audit <- validate_unmarked_data(
+  simulation$observed, split_keys, "event", "site", "minutes", rep(4, 4)
+)
+split_audit$findings[c("severity", "code", ".event", "event")]
+```
+
+Fully missing paired histories differ from observed zeros. Supply positive effort
+for surveyed events and zero effort for unsurveyed events. The latter require
+missing counts. Partly missing margins need review because their totals cannot
+be checked reliably. The package does not choose a truncation rule for a bird
+first detected outside the survey radius and later inside it.
+
+# Read the generating truth
+
+```{r truth}
+simulation
+simulation$truth
+simulation$design[c("density_units", "area_km2", "interval_units")]
+```
+
+Expected density is in birds per square kilometer. Expected circle abundance
+is density multiplied by the survey area, here `pi * 0.075^2` square kilometers.
+Realized abundance is a Poisson draw and can differ from its expectation.
+Observed counts are further reduced by the distance and removal processes.
+
+Printing the simulation shows a compact summary. It leaves the native frame
+and all truth values available in the object. Audit and score displays show at
+most ten records; their complete tables remain in `$findings`, `$summary`, and
+`$attempts`. This keeps large simulation studies from filling the console.
+
+| Quantity | Output | Interpretation |
+|:--|:--|:--|
+| Expected density | `truth$expected_density` | Bird density before imperfect detection |
+| Expected abundance | `truth$expected_abundance` | Expected birds inside the survey circle |
+| Realized abundance | `truth$realized_abundance` | Simulated birds present inside the circle |
+| Expected observations | `truth$expected_observed` | Expected count after both detection processes |
+| Ecological scale | `design$provenance$ecological_kernel_scale_m` | Scale used to prepare a habitat predictor |
+| Distance scale | `design$distance_scale` | Half-normal distance-detection standard deviation |
+
+Truth stays separate from the observed frame, so it need not leak into fitted
+covariates or exported observations. The initial simulator covers single-primary
+Poisson surveys with a half-normal distance key and equal or unequal integer
+removal durations. It assumes closure inside the radius. Repeated-primary,
+negative-binomial, zero-inflated, movement, and random-detection designs need
+separate simulation qualification.
+
+# Score the intended response quantity
+
+A density coefficient estimated on the log scale must be exponentiated before
+it is compared with response-scale density truth. Transform interval endpoints
+as well. Coefficient positions are not a safe way to select targets when model
+formulas have different numbers of terms.
+
+```{r score}
+attempts <- data.frame(
+  replicate = 1:4, target = "density", units = "birds/km2", truth = 200,
+  estimate = c(log(180), log(200), log(220), NA),
+  lower = c(log(150), log(170), log(185), NA),
+  upper = c(log(215), log(235), log(260), NA),
+  eligible = c(TRUE, TRUE, TRUE, FALSE),
+  reason = c("", "", "", "native_hessian_failure")
+)
+scores <- score_simulation(attempts, input_scale = "log", level = 0.95)
+scores$summary
+scores$attempts[c("replicate", "score_eligible", "score_reason", "interval_status")]
+```
+
+All four attempts remain visible. Bias, RMSE, and variation condition on the three
+eligible point estimates. Interval coverage uses eligible finite intervals and
+reports its own denominator. These intervals are supplied examples; the helper
+does not construct or validate a 95% procedure. Retain original convergence,
+Hessian, boundary, and other diagnostic gates when defining eligibility.
+
+Relative bias is undefined at zero truth. CV is undefined at zero mean or with
+fewer than two eligible attempts. Set `identified = FALSE` when scoring ecological
+scales under a zero habitat effect: an optimizer can return a scale even though
+the generating effect does not identify one.
+
+# Keep first encounters and later histories linked
+
+Resolve each individual's first encounter across all original distance bands
+before applying the survey radius. A first record outside 75 m followed by a
+near record remains outside the primary 75 m response. The later near mark
+does not move that individual into the circle's first-detection count.
+
+`prepare_gdr_histories()` takes original event/individual keys and an explicit
+column map for a binary source matrix. It retains every source cell, including
+outside-radius and malformed later marks, together with the reason each record
+is retained or held for review.
+
+```{r linked-history-preparation}
+# Source cells include the original outside-radius distance band.
+source_map <- expand.grid(interval = 1:2, distance_bin = 1:3)
+source_map$column <- paste0("cell", 1:6)
+source_histories <- matrix(0, 2, 6,
+  dimnames = list(NULL, source_map$column))
+source_histories[1, c(5, 2)] <- 1 # Outside first, then near.
+source_histories[2, 1] <- 1
+source_histories[2, 2] <- 2       # Malformed later mark, retained for review.
+linked <- prepare_gdr_histories(source_histories,
+  history_keys = data.frame(survey = c("a", "a"), bird = c("one", "two")),
+  event_keys = data.frame(survey = c("a", "b", "c")), event_id = "survey",
+  individual_id = "bird", cell_map = source_map,
+  dist_breaks = c(0, 25, 75, Inf), radius = 75,
+  interval_lengths = c(75, 75), interval_units = "seconds", units_in = "m",
+  surveyed = c(TRUE, TRUE, FALSE))
+linked$first
+linked$events
+linked$yDistance
+linked$yRemoval
+```
+
+The second individual's valid first encounter contributes to both native
+margins. Its malformed later mark remains visible and excludes that row from
+the complete-history subset. Event b is a completed survey with zero records;
+event c was not surveyed, so its response is missing. If an earlier or first
+mark makes a first encounter unresolved, the helper marks that event's entire
+aggregate response as missing. It retains the known partial count in `events`
+and the original source rows so an incomplete count cannot pass as an observed
+zero or a complete margin.
+
+`first_cells` has distance-major, then interval columns described by
+`native_cells`. Its two sums equal `yDistance` and `yRemoval`. An optional
+single-primary native frame can be checked against both margins, interval
+exposures and finite physical geometry before fitting. Equivalent meter and
+kilometer geometry is compared in meters; input data and units are preserved.
+
+Paired first cells, native two margins and complete linked histories are
+different responses. Their likelihood constants and conditioning differ.
+The helper does not authorize comparing their objectives in one AIC table.
+Five within-count bands also do not constitute five independent primary visits.
+
+Better description of recorded histories does not by itself identify birds
+that never produce an eligible record. Multiplying all observable probabilities
+by `1 - w` and expected abundance by `1 / (1 - w)` preserves the observed
+Poisson or NB thinning distribution. A positive Hessian or finite optimizer
+bound cannot resolve that exact equivalence. Keep target-population assumptions,
+observation-process checks and any external calibration explicit when reporting
+density; conditional recorded-count prediction is a different validation target.
+
+
+# Add observation-interval predictors
+
+An observer or first-band effect belongs in the native observation table when
+it varies among removal intervals. Site covariates and primary-survey covariates
+have different row layouts. `prepare_gdr_intervals()` matches explicit event
+keys and interval indices, then records the permutation into native order.
+It adds new observation columns to a copy of the frame. It does not overwrite
+existing observation fields or alter response histories, effort or durations.
+
+```{r native-interval-preparation}
+interval_frame <- unmarked::unmarkedFrameGDR(
+  yDistance = matrix(c(1, 0, 0, 1), 2, byrow = TRUE),
+  yRemoval = matrix(c(1, 0, 0, 0, 1, 0), 2, byrow = TRUE),
+  siteCovs = data.frame(site = factor(c("A", "B"))),
+  dist.breaks = c(0, 25, 75), unitsIn = "m",
+  period.lengths = c(1, 1, 1))
+interval_keys <- data.frame(site = c("A", "B"), survey = c("s1", "s2"))
+# These input rows are deliberately out of native order.
+interval_rows <- data.frame(survey = rep(c("s2", "s1"), each = 3),
+  interval = rep(c(3, 1, 2), 2),
+  observer = factor(c("Ann", "Ann", "Bob", "Bob", "Ann", "Ann")))
+intervals <- prepare_gdr_intervals(interval_frame, interval_keys, "survey",
+  interval_rows, interval_units = "minutes", site_id = "site")
+intervals$alignment
+unmarked::obsCovs(intervals$data)
+```
+
+The index is retained as an observation predictor, so a justified native
+removal formula can use `~ I(interval == 1)`, `~ factor(interval)`, or an
+interaction with an observer covariate. These examples illustrate data layout;
+two events do not establish that a removal model is identifiable. Native fitting
+and `aic_tab()` retain the parameters implied by the actual component formulas.
+Preparation does not qualify an ignored offset, conditional-random prediction,
+another likelihood, or a density correction.
+
+For equal unit intervals, an initial encounter probability pi followed by
+activation probability b gives the simple Markov first-time law regardless of
+persistence after an encounter. The existing native first-band interface can
+represent that law. First times alone cannot estimate persistence or justify a
+clock-response interpretation. Use linked complete histories when studying
+re-detections, and qualify assumptions about unrecorded individuals before
+interpreting corrected density. Unequal native durations retain per-unit
+probability meanings; this helper labels their units without converting them.
+
+
+# Audit integration at the refitted coefficients
+
+An original fit can pass a latent-count cutoff check while a resampled or
+scale-refitted fit fails it. `audit_gdr_integration()` evaluates the stored
+coefficients without optimizing them. For a qualified single-primary native
+C Poisson or NB fit, request an explicit cutoff ladder and inspect the original
+cutoff alongside the additional evaluations.
+
+```{r native-integration-audit, eval=FALSE}
+# native_fit is the fitted model being assessed, with its original data/design.
+integration <- audit_gdr_integration(native_fit, cutoffs = c(80, 160, 400))
+integration$stored_point
+integration$cutoffs
+integration$references
+integration$distance
+```
+
+`truncation_loss` compares each finite-cutoff negative log likelihood with an
+infinite-sum observed law using the same native distance bins. A failing loss
+is a numerical integration finding, even when local convergence and Hessian
+checks look satisfactory. The helper records the requested evaluations and
+their failures. It leaves the fitted cutoff and all coefficients unchanged;
+it does not select a replacement fit or change an optimization target.
+
+The separate distance comparison uses stable analytic annulus integrals.
+Native unmarked 1.5.2 exponential bins use 100 trapezoids per bin, while native
+half-normal arithmetic can lose precision near the uniform limit. Differences
+between those bins and the stable analytic reference are distinct from finite
+latent-count truncation. Invalid native probabilities remain failed records.
+Increasing the cutoff cannot repair a different distance-integration target.
+
+This audit covers complete single-primary fixed-effect C models with Poisson
+or NB abundance and half-normal, exponential or uniform point-transect keys.
+Other engines, random effects, missing histories and multiple primaries need
+separate qualification. Numerical agreement does not establish population
+density identification, biological fit or valid uncertainty. Native coefficient
+intervals still condition on the selected ecological scales, and all parameter
+penalties and existing fitting guards remain in place.
+
+
+# Native fitting and remaining integration gates
+
+Use `unmarked::gdistremoval()` for native fitting and its component-specific
+prediction methods. Data and recovery checks do not replace that likelihood or
+admit a new fitting backend. Check the provider's likelihood before using a fit
+for ecological-scale optimization, information criteria, or mapping.
+
+multiScaleR rejects two unqualified GDR combinations. In an installed unmarked
+1.5.2 fixed-point audit, TMB ZIP likelihoods ignored the zero-inflation coefficient
+and instead used probability 0.5. The C engine's abundance, distance, and removal
+offsets did not change its likelihood. Active availability offsets are also held
+pending provider qualification. These restrictions apply to scale refitting,
+AIC/BIC, spatial-data preparation, prediction snapshots, maps, and effect curves.
+An availability formula is inactive for one primary period; a distance formula is
+inactive for a uniform distance key. Actual R offset terms are distinguished
+from ordinary expressions such as `I(offset(x))`.
+
+An offset-free C ZIP model keeps its native likelihood and all fitted parameters.
+It is not a fallback for a random-effects model, which requires the TMB engine.
+Do not drop an intended offset, change its penalty, or switch engines simply to
+bypass a restriction. A different provider version needs new qualification.
+The native ZIP ancillary back-transformation in the audited version returned
+odds rather than probability, so its native ZIP simulation path is not qualified
+here. `sim_dat_gdr()` remains restricted to Poisson observations.
+
+Native TMB fits request `sdreport()` even when a caller requests `se = FALSE`.
+That setting therefore does not establish a faster Hessian-free TMB refit.
+Preserve final covariance diagnostics and distinguish native optimizer starts
+from the ecological-scale optimizer's starts.
+ Native optimizer convergence,
+finite Hessian uncertainty, and robustness to declared starts are separate checks.
+Keep the same survey definitions and native integration cutoff K when comparing
+starts within an ecological-scale optimization. Study K sensitivity separately.
+
+GDR information criteria compare both response histories and the stored survey
+protocol, including primary-period layout, distance bins and units, and removal
+durations. Equal distance/removal totals do not establish comparable data.
+Use the explicit event audit before comparing fits. Native frames do not retain
+a removal-time unit label, so matching stored numbers alone cannot verify that
+one analysis used minutes and another used seconds. Keep units and event
+definitions consistent, and assess integration cutoff K separately.
+
+Only active component formulas identify ecological spatial scales. A one-primary
+model does not estimate availability, and a uniform key does not estimate a
+distance scale. Variables occurring only in those inactive formulas are excluded
+from spatial-variable discovery. Optimized static site predictors also need
+distinct names from yearly and observation predictors. This prevents a repeated
+native table from shadowing the site values being updated. Dot formulas expand
+against the original active component's training-column names; transformations,
+factor names and interaction inputs are identified through R's formula terms.
+
+For density maps, specify density units and the surveyed area, and distinguish
+expected ecological density from observed counts. In a zero-inflated model,
+the count-component intensity differs from the unconditional expected density.
+Conditional coefficient uncertainty also differs from uncertainty that includes
+estimated ecological scales. Neither a profile curve nor a coefficient-only
+interval automatically provides scale-inclusive coverage.
+
+An opt-in C coefficient refitter is available through `make_gdr_refitter()`.
+Create it for the original native model, provide explicit named cold coefficient
+starts, and keep its audit directory. It retains evaluated optimizer settings
+and cutoff K, skips intermediate coefficient Hessians, and restores the original
+SE request for the final model. Each request, completed attempt and final outcome
+has an atomic compact RDS record. Higher likelihoods with failed convergence or
+unusable final covariance remain failures rather than being replaced silently.
+Input fingerprints are computed in memory; raw data and candidate-model arrays
+are not checkpointed. These native coefficient intervals remain conditional on
+the selected ecological scales. Native mixture codes also distinguish default
+AIC/BIC labels without changing their parameter penalties.
+
+A smooth ecological-scale estimate at a search bound does not support an
+ordinary outer Wald interval, even if its Hessian is positive. The refit backend
+stores the bound and original curvature diagnostics and withholds its joint
+smooth-kernel Wald block. Coefficient SEs still condition on the selected scales,
+and parameter penalties are retained. Explicit profiles can describe likelihood
+support, but a bound-limited profile does not resolve the missing tail. Native
+prediction contracts retain both bound and extraction-window flags.
+
+Complete GDR component prediction contexts,
+paired-process cross-validation, and scale-inclusive bootstrap intervals remain
+separate integration gates. Existing GLM CV and NB2 scale-inference restrictions
+remain in force. See `vignette("cross-validation", package = "multiScaleR")` for
+the currently supported CV targets, and `vignette("inference-contracts",
+package = "multiScaleR")` for uncertainty distinctions.
+
+| Function | Purpose |
+|:--|:--|
+| `audit_gdr_integration()` | Separate native finite-K loss from distance integration |
+| `prepare_gdr_histories()` | Retain linked records and derive first encounters before radius filtering |
+| `prepare_gdr_intervals()` | Align keyed observation-interval predictors |
+| `validate_unmarked_data()` | Audit event identities, layout, paired counts, protocol, and effort |
+| `sim_dat_gdr()` | Return single-primary observed margins and separate generating truth |
+| `score_simulation()` | Score named response-scale targets while retaining failed attempts |

@@ -4,7 +4,15 @@
   if (is.character(family) && length(family) == 1L) return(family)
   if (inherits(model, c("lm", "gls", "lme"))) return("gaussian")
   if (inherits(model, "coxph")) return("partial likelihood")
-  if (methods::is(model, "unmarkedFit")) return(class(model)[1L])
+  if (methods::is(model, "unmarkedFit")) {
+    label <- class(model)[1L]
+    if ("mixture" %in% methods::slotNames(model)) {
+      mixture <- methods::slot(model, "mixture")
+      if (is.character(mixture) && length(mixture) == 1L && !is.na(mixture))
+        label <- paste0(label, " (mixture=", mixture, ")")
+    }
+    return(label)
+  }
   "unknown"
 }
 
@@ -85,6 +93,7 @@
 
 .msr_model_loglik <- function(model) {
   analysis_mod <- .analysis_model(.msr_selection_model(model))
+  .msr_gdr_native_guard(analysis_mod)
   checked <- .msr_bam_nb_selection(analysis_mod)
   if (!is.null(checked)) return(checked$loglik)
   value <- tryCatch(
@@ -363,6 +372,27 @@
 #' @export
 #'
 #' @details
+#' Native unmarked labels retain their model class and, where present, mixture
+#' code, so Poisson, NB and ZIP alternatives have distinct default labels. This
+#' does not substitute a GLM family or change any fitted parameter penalty.
+#'
+#' GDR comparisons check both distance and removal histories and their stored
+#' survey protocol, including primary layout, distance bins/units and removal
+#' durations. Equal paired totals are insufficient. Equivalent meter/kilometer
+#' distance geometry is converted to meters in the comparison copy; fitted
+#' objects and native units are unchanged. Harmonize time units and event
+#' definitions before comparison; a native frame does not store
+#' a removal-time unit label. Mixture and distance-key alternatives may share
+#' the same observed target. Check integration-cutoff sensitivity separately.
+#'
+#' Native GDR models with active formula offsets or TMB zero inflation are
+#' rejected before fitting, model selection or prediction. In the audited
+#' unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+#' TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+#' require separate provider qualification; multiScaleR does not remove offsets,
+#' switch engines, alter parameter counts or substitute uncertainty estimates.
+#' Offset-free C ZIP models retain their native likelihood and parameter count.
+#'
 #' The table is constructed using \code{\link[AICcmodavg]{aictabCustom}} from
 #' the \code{AICcmodavg} package. For \code{multiScaleR} objects, the optimized
 #' (refitted) model stored in \code{opt_mod} is used for log-likelihood and
@@ -580,6 +610,7 @@ aic_tab <- function(mod_list,
 #' than AIC as sample size grows, and is often preferred when the goal is
 #' identifying the single best-supported model rather than model averaging.
 #' Sigma (and shape for \code{"expow"}) is counted in K.
+#' The GDR offset and TMB ZIP restrictions in \code{\link{aic_tab}} also apply.
 #' Fitted parameter counts and log-likelihood validation follow
 #' \code{\link{aic_tab}}, including all estimated components of unmarked models.
 #' The same checked negative-binomial BAM adjustment and

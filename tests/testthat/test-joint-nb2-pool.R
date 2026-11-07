@@ -10,9 +10,18 @@ test_that("reusable workers preserve all starts, predictions and uncertainty", {
   skip_on_cran()
   joint_nb2_fit <- function(f, ...) suppressWarnings(multiScale_optim(f$model, f$inputs, backend = "joint_nb2", n_cores = 1, verbose = FALSE, ...))
   f <- profile_glm_fixture(n = 100)
+  # Offset belongs to stats. Retain its lookup while avoiding a transient
+  # pkgload/test-helper environment in the RDS checks, and verify new rows.
+  native_link <- stats::predict(f$model, newdata = f$data, type = "link")
+  environment(f$model$formula) <- asNamespace("stats")
+  attr(f$model$terms, ".Environment") <- asNamespace("stats")
+  attr(attr(f$model$model, "terms"), ".Environment") <- asNamespace("stats")
+  expect_identical(stats::predict(f$model, newdata = f$data, type = "link"), native_link)
   pool <- parallel::makePSOCKcluster(2)
   on.exit(parallel::stopCluster(pool), add = TRUE)
-  # Test installed code, as workers must use the same build as the controller.
+  # Caller-owned workers must use the controller's exact source or installed
+  # build. Keep the strict signature and intentional stale-worker checks.
+  cluster_prep(f$model, pool)
   bootstrap <- function(paths) {
     .libPaths(paths)
     f <- get0(".msr_joint_pool_signature", asNamespace("multiScaleR"), inherits = FALSE)
@@ -55,3 +64,14 @@ test_that("reusable workers preserve all starts, predictions and uncertainty", {
   expect_length(parallel::clusterCall(pool, Sys.getpid), 2)
 })
 
+
+test_that("worker signatures are independent of session collation", {
+  original <- Sys.getlocale("LC_COLLATE")
+  on.exit(invisible(Sys.setlocale("LC_COLLATE", original)), add = TRUE)
+  invisible(Sys.setlocale("LC_COLLATE", "C"))
+  byte_locale <- .msr_joint_pool_signature()
+  invisible(Sys.setlocale("LC_COLLATE", ""))
+  system_locale <- .msr_joint_pool_signature()
+  expect_identical(names(byte_locale), sort(names(byte_locale), method = "radix"))
+  expect_identical(system_locale, byte_locale)
+})

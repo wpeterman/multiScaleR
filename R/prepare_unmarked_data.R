@@ -29,6 +29,20 @@
 #'   values and standardization match the fitted static site covariates. Missing
 #'   or inconsistent training information raises an error.
 #' @details
+#' Only active GDR component formulas identify spatial predictors. Availability
+#' is inactive for one primary period, and the distance formula is inactive for
+#' a uniform key. Optimized static site names must not also occur in native
+#' yearly or observation covariate tables; use distinct names for distinct inputs.
+#' Dot formulas use the original component's available training-column names.
+#'
+#' Native GDR models with active formula offsets or TMB zero inflation are
+#' rejected before fitting, model selection or prediction. In the audited
+#' unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+#' TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+#' require separate provider qualification; multiScaleR does not remove offsets,
+#' switch engines, alter parameter counts or substitute uncertainty estimates.
+#' Offset-free C ZIP models retain their native likelihood and parameter count.
+#'
 #' This function prepares data only. Pass its result to
 #' \code{unmarked::predict(object$opt_mod, type = ..., newdata = ...)}, or supply
 #' the same inputs and keys to \code{\link{prepare_prediction}} to retain a
@@ -94,11 +108,13 @@ prepare_unmarked_data <- function(object, newdata, kernel_inputs, join_by,
   if (!inherits(object, "multiScaleR") ||
       !methods::is(object$opt_mod, "unmarkedFit"))
     stop("object must contain a fitted native unmarked model.", call. = FALSE)
+  .msr_gdr_native_guard(object$opt_mod)
   if (!is.data.frame(newdata) || !nrow(newdata) || anyDuplicated(names(newdata)))
     stop("newdata must be a nonempty data frame with unique column names.", call. = FALSE)
   if (missing(join_by) || is.null(join_by))
     stop("Supply explicit join_by keys in prepared spatial site order.", call. = FALSE)
   covs <- intersect(rownames(object$scale_est), .unmarked_model_predictors(object$opt_mod))
+  .msr_gdr_spatial_guard(object$opt_mod, covs)
   spatial <- .msr_refit_spatial_values(object, kernel_inputs, covs)
   if (any(covs %in% names(join_by)))
     stop("join_by key columns cannot be spatial predictors.", call. = FALSE)

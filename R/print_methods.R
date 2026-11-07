@@ -123,6 +123,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
     cat("Hessian standard errors are omitted; use `summary(x, profile = TRUE)` ")
     cat("for profile-likelihood limits.\n")
   }
+  .msr_print_refit_bounds(x$diagnostics)
   scale_ci_method <- attr(x$opt_scale, "interval_method")
   if (!is.null(scale_ci_method) && any(grepl("^profile", scale_ci_method))) {
     cat("\nProfile-likelihood confidence limits were used for `sigma` where available;\n")
@@ -276,6 +277,7 @@ summary.multiScaleR <- function(object, profile = FALSE,
   if (!is.logical(profile) || length(profile) != 1L || is.na(profile)) {
     stop("`profile` must be TRUE or FALSE.")
   }
+  object <- .msr_refit_bound_view(object)
   if (identical(object$backend, "conditional_logit"))
     object$opt_mod <- .analysis_model(object$opt_mod)
 
@@ -396,10 +398,12 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
   hard_radius <- intersect(rownames(x$scale_est),
                            .msr_hard_radius_covariates(x$kernel_inputs$scale_vars,
                              x$kernel_inputs$kernel, rownames(x$scale_est)))
-  display_scale <- x$scale_est
+  display_fit <- .msr_refit_bound_view(x)
+  display_scale <- display_fit$scale_est
   if (length(hard_radius)) display_scale[hard_radius, "SE"] <- NA_real_
   cat("\n\n***** Optimized Scale of Effect *****\n\n")
   print(display_scale)
+  .msr_print_refit_bounds(display_fit$diagnostics)
   if (length(hard_radius)) {
     cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "),
         ". Use `summary(x, profile = TRUE)` for radius intervals.\n", sep = "")
@@ -407,7 +411,7 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
 
   if(x$kernel_inputs$kernel == 'expow'){
     cat("\n\n***** Optimized Kernel Shape Parameter *****\n\n")
-    print(x$shape_est)
+    print(display_fit$shape_est)
   }
 
   display_distance <- kernel_dist(x, prob = prob, dimension = "1d")
@@ -502,4 +506,14 @@ print.multiScaleR_data <- function(x, ...){
   cat("\nUnit Conversion:\n")
   cat(x$unit_conv)
   invisible(x)
+}
+
+# Print only on explicit reporting, or when the fit's verbose switch permits it.
+.msr_print_refit_bounds <- function(diagnostics) {
+  if (isTRUE(diagnostics$refit_hessian$bounds$active_boundary)) {
+    cat("\nA smooth kernel parameter reaches an optimization bound. ")
+    cat("Outer Wald SEs and limits are withheld.\n")
+    cat("Coefficient uncertainty still conditions on the selected kernels.\n")
+  }
+  invisible(NULL)
 }

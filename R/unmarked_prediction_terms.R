@@ -137,6 +137,7 @@
 }
 
 .msr_unmarked_prediction_function <- function(object, re.form = NULL, component = NULL) {
+  .msr_gdr_native_guard(object)
   native <- unmarked::predict
   if (!class(object)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount")) return(native)
   if (!is.null(component) && (!is.character(component) || length(component) != 1L ||

@@ -54,6 +54,27 @@ objects and plain model objects (e.g., \code{glm}) are supported, allowing
 comparison of scale-optimized models against fixed-scale alternatives.
 }
 \details{
+Native unmarked labels retain their model class and, where present, mixture
+code, so Poisson, NB and ZIP alternatives have distinct default labels. This
+does not substitute a GLM family or change any fitted parameter penalty.
+
+GDR comparisons check both distance and removal histories and their stored
+survey protocol, including primary layout, distance bins/units and removal
+durations. Equal paired totals are insufficient. Equivalent meter/kilometer
+distance geometry is converted to meters in the comparison copy; fitted
+objects and native units are unchanged. Harmonize time units and event
+definitions before comparison; a native frame does not store
+a removal-time unit label. Mixture and distance-key alternatives may share
+the same observed target. Check integration-cutoff sensitivity separately.
+
+Native GDR models with active formula offsets or TMB zero inflation are
+rejected before fitting, model selection or prediction. In the audited
+unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+require separate provider qualification; multiScaleR does not remove offsets,
+switch engines, alter parameter counts or substitute uncertainty estimates.
+Offset-free C ZIP models retain their native likelihood and parameter count.
+
 The table is constructed using \code{\link[AICcmodavg]{aictabCustom}} from
 the \code{AICcmodavg} package. For \code{multiScaleR} objects, the optimized
 (refitted) model stored in \code{opt_mod} is used for log-likelihood and

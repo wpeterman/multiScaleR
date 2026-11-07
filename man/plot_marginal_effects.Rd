@@ -144,6 +144,14 @@ state-effect panels.
 Numeric predictors not optimized by \code{multiScale_optim()} retain their
 original units and are held at their sample mean in other panels.
 
+Native GDR models with active formula offsets or TMB zero inflation are
+rejected before fitting, model selection or prediction. In the audited
+unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
+TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
+require separate provider qualification; multiScaleR does not remove offsets,
+switch engines, alter parameter counts or substitute uncertainty estimates.
+Offset-free C ZIP models retain their native likelihood and parameter count.
+
 For \code{unmarked} random-effects models, prediction uses
 \code{re.form = NA}, which sets random effects to zero. These curves are
 conditional predictions at the stated covariate values, not averages over

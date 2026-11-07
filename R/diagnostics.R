@@ -36,6 +36,15 @@
 #'     \code{triggered} is \code{TRUE}
 #'     when the fitted model uses fewer observations. Candidate scales that
 #'     change the initial model's sample are rejected during optimization.}
+#'   \item{\code{refit_hessian}}{For the default refit backend, retains
+#'     the outer curvature status and active smooth-parameter mask. A bound table
+#'     records estimates, lower/upper bounds in reporting units, and bound flags.
+#'     If any active parameter is within \code{1e-5} log units of a positive
+#'     bound, joint outer Wald SEs are withheld. A zero lower bound is flagged
+#'     only when reached. The original curvature status is retained separately.
+#'     This is a numerical support flag, not a test of identification or a
+#'     calibrated confidence limit. Native coefficient covariance and parameter
+#'     counts are unchanged.}
 #'   \item{\code{profile_glm}}{Present for both opt-in analytic GLM backends.
 #'     Includes \code{uncertainty_available}, explanatory \code{reasons},
 #'     \code{weak_identifiability}, \code{boundary}, \code{condition_number},
@@ -49,7 +58,7 @@
 #' @details
 #' These diagnostics are evaluated automatically at the end of
 #' \code{\link{multiScale_optim}}. Console warnings are printed when any
-#' diagnostic is triggered. \code{diagnostics()} provides programmatic access
+#' diagnostic is triggered and \code{verbose = TRUE}. \code{diagnostics()} provides programmatic access
 #' to the same information without re-running the model.
 #' These stored diagnostics retain the historical 1D 90\% distance and
 #' threshold, independently of the new 2D reporting default in plots and
