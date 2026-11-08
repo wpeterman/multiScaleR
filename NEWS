@@ -1,3 +1,8 @@
+multiScaleR 0.7.22
+
+* Bind native C refit audits to original data, designs and evaluated settings;
+  retain numeric optimizer metadata and pre-constructor attempt requests.
+
 multiScaleR 0.7.21
 
 * Inspect stored native GDR constructor starts with reversible block/position

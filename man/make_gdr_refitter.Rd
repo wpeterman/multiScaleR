@@ -20,8 +20,10 @@ Provide independent starts distinct from the fitted coefficients. These
 are coefficient starts, not ecological kernel scales or native cutoff K.}
 
 \item{audit_dir}{A new directory, or an existing empty directory, for compact
-audit records. Each refit writes atomic request, attempt and summary RDS
-files with all attempted starts and diagnostics. Raw input data, models and likelihood environments
+audit records. Each refit writes atomic request, validated-input, attempt
+and summary RDS files with all attempted starts and diagnostics. An attempt
+request is written before entering the native constructor; an interrupted
+request is retained without inventing a completion. Raw input data, models and likelihood environments
 are hashed in memory or omitted; they are not checkpointed. Keep this
 directory to inspect failures, including scalar objective failures.}
 
@@ -34,6 +36,12 @@ A function accepting \code{model}, \code{data} and \code{context},
   suitable for \code{refit_fn} in \code{\link{multiScale_optim}}. It returns
   one native fitted model with a compact \code{msr_gdr_refit_audit} attribute.
   Failed calls raise a condition carrying their audit record and its path.
+  The audit adds `contract_sha256`, identifying the original `contract.rds`,
+  and `input_context_sha256`, binding the actual input data/design hashes and
+  authorized spatial columns to that contract. Attempt records retain these
+  identities, their request/completion paths and the native optimizer's
+  `par`, `value`, `counts`, `convergence` and `message` when supplied. Values
+  stay on native link scales; failed/nonfinite diagnostics remain visible.
 }
 \description{
 Retain a small declared set of coefficient starts while
@@ -68,6 +76,16 @@ a zero-iteration evaluation is not accepted as a converged refit.
 
 Audit input fingerprints use SHA256 in memory through digest. The records
 contain coefficient vectors and summaries, not candidate-model arrays.
+The contract retains original data and evaluated-design fingerprints,
+numeric constructor-coordinate metadata and the original optimizer summary.
+Its SHA256 covers the entire contract before its own fingerprint is added,
+including evaluated settings and native provider identity. This is stronger
+than the coordinate-only fingerprint from `gdr_start_values()`. Caller
+provenance is recorded as supplied; it is not independently verified.
+Input-design fingerprints identify the actual permitted spatial update.
+None of these records restores an executable objective or evaluates a new
+coefficient score. Existing fitting, curvature and uncertainty gates still
+apply, and no Hessians, raw data or design matrices are checkpointed.
 Restored callbacks verify their adapter and native function identities.
 Native R and DLL files are hashed once again in each new worker process;
 a changed provider fails before fitting and leaves an audit record.

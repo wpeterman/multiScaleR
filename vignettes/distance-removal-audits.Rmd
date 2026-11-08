@@ -413,6 +413,21 @@ covariance is evaluated by this inspector. In the inspected native TMB path,
 top-level controls and `se = FALSE` do not provide a likelihood-only fit.
 
 An opt-in C coefficient refitter is available through `make_gdr_refitter()`.
+Its `contract.rds` binds numeric starts to the original data/design fingerprints,
+evaluated settings, standard-error request and native provider identity. Every
+refit records the actual permitted input design and a contract-linked input
+fingerprint. These hashes identify the retained inputs; supplied provenance
+still needs independent verification.
+
+Each native attempt writes a request before entering the constructor and a
+separate completion afterward. A request without a completion documents an
+unfinished attempt. Retain it. Completed records include the optimizer's numeric
+coordinates, objective, evaluation counts, convergence code and message when
+available, including failed diagnostics. The records do not contain raw data,
+design matrices, Hessians or executable objectives. A saved record cannot replace
+fresh native construction, independent starts or the original final uncertainty
+checks. No new coefficient score is evaluated by checkpointing.
+
 Create it for the original native model, provide explicit named cold coefficient
 starts, and keep its audit directory. It retains evaluated optimizer settings
 and cutoff K, skips intermediate coefficient Hessians, and restores the original

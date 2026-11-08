@@ -57,7 +57,8 @@
 
 .msr_gdr_adapter_identity <- function() {
   functions <- c("make_gdr_refitter", ".msr_gdr_C_settings", ".msr_gdr_variance_status",
-    ".msr_gdr_atomic_audit", ".msr_gdr_hash", ".msr_gdr_design_hash", ".msr_gdr_adapter_identity")
+    ".msr_gdr_atomic_audit", ".msr_gdr_hash", ".msr_gdr_design_hash", ".msr_gdr_adapter_identity",
+    ".msr_gdr_optimizer_checkpoint", "gdr_start_values", ".msr_gdr_exact_start_map")
   .msr_gdr_hash(lapply(functions, function(name) {
     fun <- get(name, envir = environment(.msr_gdr_adapter_identity), inherits = FALSE)
     list(name = name, formals = deparse(formals(fun)), body = deparse(body(fun)))
@@ -81,6 +82,25 @@
     "available" else "unusable", hessian_status = check$diagnostic$status,
     native_component_covariance_finite_positive = all(native),
     uncertainty = "native_coefficients_conditional_on_spatial_scales")
+}
+
+# Retain only native optim's small numeric/character fields, including failures.
+# A checkpoint is evidence of an attempt, never a new fit-eligibility decision.
+.msr_gdr_optimizer_checkpoint <- function(optimizer) {
+  if (!is.list(optimizer) || is.object(optimizer) || is.null(names(optimizer)) ||
+      anyNA(names(optimizer)) || anyDuplicated(names(optimizer)) ||
+      !all(c("par", "value", "convergence") %in% names(optimizer)))
+    stop("Native optimizer checkpoint metadata is incomplete.", call. = FALSE)
+  out <- optimizer[intersect(c("par", "value", "counts", "convergence", "message"), names(optimizer))]
+  plain <- function(x) is.null(x) || (!is.object(x) && is.null(dim(x)) &&
+    all(names(attributes(x)) %in% "names"))
+  if (!all(vapply(out, plain, logical(1))) || !is.numeric(out$par) ||
+      !length(out$par) || !is.numeric(out$value) || length(out$value) != 1L ||
+      !is.numeric(out$convergence) || length(out$convergence) != 1L ||
+      (!is.null(out$counts) && (!is.numeric(out$counts) || length(out$counts) > 64L)) ||
+      (!is.null(out$message) && (!is.character(out$message) || length(out$message) != 1L)))
+    stop("Native optimizer checkpoints require plain numeric vectors and a scalar message.", call. = FALSE)
+  out
 }
 
 .msr_gdr_atomic_audit <- function(value, path) {
@@ -113,8 +133,10 @@
 #'   Provide independent starts distinct from the fitted coefficients. These
 #'   are coefficient starts, not ecological kernel scales or native cutoff K.
 #' @param audit_dir A new directory, or an existing empty directory, for compact
-#'   audit records. Each refit writes atomic request, attempt and summary RDS
-#'   files with all attempted starts and diagnostics. Raw input data, models and likelihood environments
+#'   audit records. Each refit writes atomic request, validated-input, attempt
+#'   and summary RDS files with all attempted starts and diagnostics. An attempt
+#'   request is written before entering the native constructor; an interrupted
+#'   request is retained without inventing a completion. Raw input data, models and likelihood environments
 #'   are hashed in memory or omitted; they are not checkpointed. Keep this
 #'   directory to inspect failures, including scalar objective failures.
 #' @param provenance Optional named list of caller-supplied source, data or
@@ -124,6 +146,12 @@
 #'   suitable for \code{refit_fn} in \code{\link{multiScale_optim}}. It returns
 #'   one native fitted model with a compact \code{msr_gdr_refit_audit} attribute.
 #'   Failed calls raise a condition carrying their audit record and its path.
+#'   The audit adds `contract_sha256`, identifying the original `contract.rds`,
+#'   and `input_context_sha256`, binding the actual input data/design hashes and
+#'   authorized spatial columns to that contract. Attempt records retain these
+#'   identities, their request/completion paths and the native optimizer's
+#'   `par`, `value`, `counts`, `convergence` and `message` when supplied. Values
+#'   stay on native link scales; failed/nonfinite diagnostics remain visible.
 #' @details
 #' The factory binds to the supplied original model. The callback permits only
 #' updates to static spatial columns named by \code{context$covs}. All other
@@ -151,6 +179,16 @@
 #'
 #' Audit input fingerprints use SHA256 in memory through digest. The records
 #' contain coefficient vectors and summaries, not candidate-model arrays.
+#' The contract retains original data and evaluated-design fingerprints,
+#' numeric constructor-coordinate metadata and the original optimizer summary.
+#' Its SHA256 covers the entire contract before its own fingerprint is added,
+#' including evaluated settings and native provider identity. This is stronger
+#' than the coordinate-only fingerprint from `gdr_start_values()`. Caller
+#' provenance is recorded as supplied; it is not independently verified.
+#' Input-design fingerprints identify the actual permitted spatial update.
+#' None of these records restores an executable objective or evaluates a new
+#' coefficient score. Existing fitting, curvature and uncertainty gates still
+#' apply, and no Hessians, raw data or design matrices are checkpointed.
 #' Restored callbacks verify their adapter and native function identities.
 #' Native R and DLL files are hashed once again in each new worker process;
 #' a changed provider fails before fitting and leaves an audit record.
@@ -243,8 +281,15 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
   header <- list(schema = 1L, original_model_sha256 = original_key, provider = source,
     metadata = metadata, formulas = lapply(formulas, deparse), controls = settings,
     cold_starts = cold_starts, original_coefficients = coefficients,
-    provenance = provenance, models_or_data_checkpointed = FALSE)
-  .msr_gdr_atomic_audit(header, file.path(audit_dir, "contract.rds"))
+    provenance = provenance, models_or_data_checkpointed = FALSE,
+    original_data_sha256 = .msr_gdr_hash(original_data), original_design_sha256 = design_hash,
+    original_coordinates = gdr_start_values(model),
+    original_optimizer = .msr_gdr_optimizer_checkpoint(model@opt))
+  contract_sha256 <- .msr_gdr_hash(header)
+  header$contract_sha256 <- contract_sha256
+  contract_file <- file.path(audit_dir, "contract.rds")
+  .msr_gdr_atomic_audit(header, contract_file)
+  contract_file_sha256 <- digest::digest(file = contract_file, algo = "sha256")
   rm(model)
   counter <- new.env(parent = emptyenv())
   counter$n <- 0L
@@ -256,7 +301,10 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
     audit <- list(schema = 1L, original_model_sha256 = original_key, provider = source,
       metadata = metadata, provenance = provenance, attempts = list(), selected = NULL,
       final_SE_requested = settings$se, objective_only = NULL,
-      parameter_count = length(coefficients), input_sha256 = NULL, status = "started")
+      parameter_count = length(coefficients), input_sha256 = NULL, status = "started",
+      contract_sha256 = contract_sha256, contract_file = contract_file,
+      contract_file_sha256 = contract_file_sha256,
+      input_design_sha256 = NULL, input_context_sha256 = NULL)
     fail <- function(message) {
       audit$status <- "failed"
       audit$error <- message
@@ -317,15 +365,36 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
         stop("A refit changed histories, protocol, yearly/observation data or frame layout.")
       if (!identical(.msr_gdr_design_hash(original_data, formulas), design_hash))
         stop("The original training transformations changed after the refitter was created.")
+      if (!identical(settings, header$controls) || !identical(metadata, header$metadata) ||
+          !identical(lapply(formulas, deparse), header$formulas) ||
+          !identical(cold_starts, header$cold_starts) ||
+          !identical(coefficients, header$original_coefficients) ||
+          !identical(source, header$provider) || !identical(provenance, header$provenance) ||
+          !identical(.msr_gdr_hash(original_data), header$original_data_sha256) ||
+          !identical(design_hash, header$original_design_sha256) ||
+          !file.exists(contract_file) ||
+          !identical(digest::digest(file = contract_file, algo = "sha256"), contract_file_sha256))
+        stop("The retained GDR contract or evaluated settings changed; create a new refitter.")
       audit$input_sha256 <- .msr_gdr_hash(data)
       audit$spatial_columns <- covs
+      audit$input_design_sha256 <- .msr_gdr_design_hash(data, formulas)
+      audit$input_context_sha256 <- .msr_gdr_hash(list(contract_sha256 = contract_sha256,
+        input_sha256 = audit$input_sha256, input_design_sha256 = audit$input_design_sha256,
+        spatial_columns = covs))
+      .msr_gdr_atomic_audit(audit, sub("[.]rds$", "-input.rds", path))
     }, error = function(e) fail(conditionMessage(e)))
 
     run <- function(start, name, se) {
       record <- list(name = name, start = start, SE_requested = se, warnings = character(),
         error = NULL, converged = FALSE, logLik = NA_real_, coefficients = NULL,
         gradient = NULL, gradient_status = "not_provided_by_native_optimizer",
-        covariance = list(requested = se, status = "unavailable"), eligible = FALSE)
+        covariance = list(requested = se, status = "unavailable"), eligible = FALSE,
+        contract_sha256 = contract_sha256, contract_file = contract_file,
+        input_context_sha256 = audit$input_context_sha256, input_sha256 = audit$input_sha256,
+        input_design_sha256 = audit$input_design_sha256, optimizer = NULL, status = "started")
+      record$audit_file <- sub("[.]rds$", paste0("-attempt-", length(audit$attempts) + 1L, ".rds"), path)
+      record$request_file <- sub("[.]rds$", "-request.rds", record$audit_file)
+      .msr_gdr_atomic_audit(record, record$request_file)
       fit <- tryCatch(withCallingHandlers({
         args <- c(list(lambdaformula = formulas$lambda, phiformula = formulas$phi,
           distanceformula = formulas$dist, removalformula = formulas$rem, data = data,
@@ -333,6 +402,7 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
           mixture = metadata$mixture, K = metadata$K, starts = unname(start),
           method = settings$method, se = se, engine = "C", threads = settings$threads), settings$dots)
         value <- do.call(unmarked::gdistremoval, args)
+        record$optimizer <- .msr_gdr_optimizer_checkpoint(value@opt)
         if (!identical(names(unmarked::coef(value)), coefficient_names) ||
             .msr_parameter_count(value) != length(coefficients) ||
             !identical(as.numeric(value@K), as.numeric(metadata$K)) || !is.null(value@TMB))
@@ -349,7 +419,7 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
         error = function(e) { record$error <<- conditionMessage(e); NULL })
       record$eligible <- !is.null(fit) && is.finite(record$logLik) && record$converged &&
         !length(record$warnings) && (!se || identical(record$covariance$status, "available"))
-      record$audit_file <- sub("[.]rds$", paste0("-attempt-", length(audit$attempts) + 1L, ".rds"), path)
+      record$status <- if (is.null(record$error)) "returned" else "failed"
       .msr_gdr_atomic_audit(record, record$audit_file)
       list(fit = fit, record = record)
     }
