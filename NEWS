@@ -1,3 +1,8 @@
+multiScaleR 0.7.20
+
+* Expand explicitly selected native GDR site and survey covariates into
+  removal intervals, retaining source aliases, factors and keyed alignment.
+
 multiScaleR 0.7.19
 
 * Preserve linked first encounters before radius filtering, original histories

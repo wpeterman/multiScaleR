@@ -244,6 +244,33 @@ intervals$alignment
 unmarked::obsCovs(intervals$data)
 ```
 
+When an observer and habitat predictor are constant within a survey, repeat
+both into the observation table before constructing a removal random term.
+The native random-term model frame also evaluates fixed predictors there.
+`expand_gdr_intervals()` performs that expansion in the checked native order.
+Select each source field explicitly and use aliases for distinct component roles.
+
+```{r native-interval-expansion}
+expansion_frame <- interval_frame
+unmarked::siteCovs(expansion_frame) <- data.frame(
+  site = factor(c("A", "B")), forest = c(.2, .8),
+  Observer = factor(c("Ann", "Bob")))
+expanded <- expand_gdr_intervals(expansion_frame, interval_keys, "survey",
+  interval_units = "minutes", site_id = "site",
+  site_covariates = c(rem_forest = "forest", rem_observer = "Observer"))
+unmarked::obsCovs(expanded$data)
+expanded$protocol$expanded_covariates
+```
+
+The table now contains every field needed by a removal formula such as
+`~ rem_forest + I(interval == 1) + (1 | rem_observer)`. Static fields repeat
+across a site's surveys; `yearly_covariates` repeats native primary-survey
+fields only within their own survey. Factor levels, contrasts, matrix fields
+and missing predictors remain intact. An alias is a copy of the values at
+preparation, so later scale updates do not automatically update that copy.
+The guard against a shadowed optimized site name still applies. These data
+checks do not establish latent-model convergence, covariance or identification.
+
 The index is retained as an observation predictor, so a justified native
 removal formula can use `~ I(interval == 1)`, `~ factor(interval)`, or an
 interaction with an observer covariate. These examples illustrate data layout;
@@ -392,6 +419,7 @@ package = "multiScaleR")` for uncertainty distinctions.
 | `audit_gdr_integration()` | Separate native finite-K loss from distance integration |
 | `prepare_gdr_histories()` | Retain linked records and derive first encounters before radius filtering |
 | `prepare_gdr_intervals()` | Align keyed observation-interval predictors |
+| `expand_gdr_intervals()` | Repeat selected site/survey fields with explicit component aliases |
 | `validate_unmarked_data()` | Audit event identities, layout, paired counts, protocol, and effort |
 | `sim_dat_gdr()` | Return single-primary observed margins and separate generating truth |
 | `score_simulation()` | Score named response-scale targets while retaining failed attempts |
