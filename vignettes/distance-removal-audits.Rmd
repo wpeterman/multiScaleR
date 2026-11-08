@@ -387,6 +387,31 @@ Conditional coefficient uncertainty also differs from uncertainty that includes
 estimated ecological scales. Neither a profile curve nor a coefficient-only
 interval automatically provides scale-inclusive coverage.
 
+## Retain numeric constructor starts
+
+`gdr_start_values()` reads the stored fixed optimizer values and original
+constructor order. Native TMB input order can differ from fitted order, including
+the position of dispersion and log-SD blocks. The returned map identifies the
+component and within-component position of every coordinate; repeated labels
+are not used to guess a match. Latent random modes stay separate.
+
+```{r native-start-metadata, eval=FALSE}
+# native_fit is an existing user-owned unmarkedFitGDR.
+start_record <- gdr_start_values(native_fit)
+start_record$map
+constructor_starts <- start_record$starts
+```
+
+The plain numeric/list record can be saved without a model or executable tape.
+Its fingerprint describes coordinate metadata, not the full data, likelihood
+or prediction context. Restore an objective only from its original data,
+transformations, formulas and evaluated controls, with all original checks.
+The stored convergence code and objective retain their original meaning; finite
+starts do not establish convergence, covariance or identification. The coordinate
+count does not replace the native AIC penalty. No likelihood, score, Hessian or
+covariance is evaluated by this inspector. In the inspected native TMB path,
+top-level controls and `se = FALSE` do not provide a likelihood-only fit.
+
 An opt-in C coefficient refitter is available through `make_gdr_refitter()`.
 Create it for the original native model, provide explicit named cold coefficient
 starts, and keep its audit directory. It retains evaluated optimizer settings
@@ -420,6 +445,7 @@ package = "multiScaleR")` for uncertainty distinctions.
 | `prepare_gdr_histories()` | Retain linked records and derive first encounters before radius filtering |
 | `prepare_gdr_intervals()` | Align keyed observation-interval predictors |
 | `expand_gdr_intervals()` | Repeat selected site/survey fields with explicit component aliases |
+| `gdr_start_values()` | Retain numeric constructor starts and reversible coordinate metadata |
 | `validate_unmarked_data()` | Audit event identities, layout, paired counts, protocol, and effort |
 | `sim_dat_gdr()` | Return single-primary observed margins and separate generating truth |
 | `score_simulation()` | Score named response-scale targets while retaining failed attempts |

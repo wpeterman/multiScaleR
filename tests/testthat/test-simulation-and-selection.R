@@ -52,6 +52,7 @@ test_that("expected public helpers remain exported", {
     "prepare_gdr_histories",
     "prepare_gdr_intervals",
     "expand_gdr_intervals",
+    "gdr_start_values",
     "prepare_prediction",
     "prepare_unmarked_data",
     "prepare_unmarked_data",
