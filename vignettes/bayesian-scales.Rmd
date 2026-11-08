@@ -145,7 +145,12 @@ Namespace-qualify custom functions that reuse these learner names, or precompute
 their predictors. Kernel-only scalar
 expressions, such as `I(habitat^2)`, use the same fixed reference transformation
 and original coefficient priors in their native basis. These expressions act
-after kernel extraction and standardization. Learned dynamic bases, fixed-data
+after kernel extraction and standardization. Cubic `splines::ns()` and
+`splines::bs()` terms can also act on changing habitat when you supply literal
+fixed knots and boundaries, with distinct strictly interior knots. All basis
+columns share the original source scale and retain their native coefficient
+priors. Adaptive `df` recipes, other degrees and repeated/boundary knots remain
+guarded; see `vignette("feature-compatibility", package = "multiScaleR")`. Fixed-data
 inputs within a dynamic expression, arbitrary or nondifferentiable functions,
 and kernel offsets remain guarded. Preparation checks the complete model before
 optional sampling software is needed.

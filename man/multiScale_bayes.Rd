@@ -40,7 +40,7 @@ enter native R crossings, nesting, and factor interactions, such as
 formula offsets, and additive random intercepts such as \code{(1 | site)}
 are supported. Kernel-only scalar arithmetic and supported smooth base
 functions retain the native coefficient basis. Fixed inputs within a
-dynamic expression, learned dynamic bases, arbitrary or nondifferentiable
+dynamic expression, adaptive dynamic bases, arbitrary or nondifferentiable
 functions, and kernel-valued offsets remain guarded.}
 
 \item{inputs}{Prepared inputs from \code{\link{kernel_prep}} or
@@ -435,7 +435,23 @@ smooth base functions, use the same fixed reference transformation and
 native coefficient basis as other response terms. Priors retain their
 original normalized factors in that basis. These expressions act on the
 standardized kernel predictor, not on raster cells before smoothing.
-Learned dynamic bases, fixed-data inputs inside a dynamic expression,
+Cubic \code{splines::ns()} and \code{splines::bs()} response terms also
+support changing kernel values when you supply literal fixed \code{knots}
+and two increasing \code{Boundary.knots}. All basis columns share the
+ecological scale of their original source, including factor interactions.
+Knots are in the standardized predictor's units after its frozen reference
+transformation. To specify raw-cover knots, subtract the retained reference
+center and divide by its SD for both knots and boundaries, then insert those
+literal values in the formula. Never learn them from prediction batches.
+Basis values and complete kernel derivatives update at each
+candidate scale. The knots, native coefficient basis and priors stay fixed.
+Only cubic bases with distinct strictly interior knots are supported here.
+Adaptive \code{df} recipes, repeated/boundary knots and other degrees require
+the native-refit backend. Natural-spline tails are linear on the linear
+predictor scale. These are unpenalized fixed-complexity bases, with neither
+smoothing-variance uncertainty nor a monotonicity constraint.
+
+Adaptive dynamic bases, fixed-data inputs inside a dynamic expression,
 arbitrary or nondifferentiable functions, and kernel offsets remain
 unsupported. Nonfinite expression domains are errors; values are not clipped.
 }

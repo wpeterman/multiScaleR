@@ -581,7 +581,7 @@
 #' New predictions require these columns explicitly unless
 #' \code{include_fixed = TRUE} verifies and reuses their original normalization.
 #' Optimization of hard-radius
-#' landscape/surface metrics, learned dynamic bases, arbitrary or
+#' landscape/surface metrics, adaptive dynamic bases, arbitrary or
 #' nondifferentiable functions, fixed context inside a dynamic expression, and
 #' kernel-dependent offsets remain unsupported. Kernel-only scalar arithmetic
 #' and supported smooth base functions use the shared response contract.
@@ -698,7 +698,25 @@
 #' \code{sqrt}, \code{sin}, \code{cos}, and \code{tan}, retain their native
 #' coefficient basis and analytic derivatives. Their inputs must be optimized
 #' kernel values or literal constants. Nonfinite domains are errors.
-#' Fixed inputs within a dynamic expression, learned dynamic bases,
+#' Cubic \code{splines::ns()} and \code{splines::bs()} response terms also
+#' support changing kernel values when you supply literal fixed \code{knots}
+#' and two increasing \code{Boundary.knots}. All basis columns share the
+#' ecological scale of their original source, including factor interactions.
+#' Knots are in the modeled predictor's units. Analytic GLM, conditional-logistic
+#' and joint mixed searches retain their candidate-specific standardization and
+#' its derivatives. Fixed standardized knots are not fixed raw-cover thresholds.
+#' Bayesian targets retain their frozen reference transformation. With a fixed
+#' reference, convert raw knots and boundaries using its center and SD before
+#' inserting literal values into the formula. Basis values and complete kernel
+#' derivatives update at each
+#' candidate scale. The knots, native coefficient basis and priors stay fixed.
+#' Only cubic bases with distinct strictly interior knots are supported here.
+#' Adaptive \code{df} recipes, repeated/boundary knots and other degrees require
+#' the native-refit backend. Natural-spline tails are linear on the linear
+#' predictor scale. These are unpenalized fixed-complexity bases, with neither
+#' smoothing-variance uncertainty nor a monotonicity constraint.
+#'
+#' Fixed inputs within a dynamic expression, adaptive dynamic bases,
 #' nondifferentiable or arbitrary functions, kernel-dependent offsets,
 #' hard-radius metrics, random effects,
 #' and zero inflation are unsupported. Put offsets in the formula with

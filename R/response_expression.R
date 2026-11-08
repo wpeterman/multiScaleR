@@ -1,6 +1,8 @@
 # Restricted pointwise kernel expressions. Native formula expansion and learned
 # fixed bases stay in model.matrix; no caller data or function is captured here.
 .msr_kernel_expression <- function(expression, covariates, context) {
+  if (!is.null(.msr_spline_call(expression)))
+    return(.msr_fixed_spline_program(expression, covariates, context))
   unary <- c("I", "(", "exp", "log", "sqrt", "sin", "cos", "tan")
   binary <- c("+", "-", "*", "/", "^")
   nodes <- 0L
@@ -61,16 +63,27 @@
     stop("Dynamic expressions require the ordered kernel rows and columns.")
   input <- if (is.list(kernel)) kernel else
     lapply(seq_len(design$q), function(j) kernel[, j])
-  lapply(design$expression_programs, function(program) {
+  values <- lapply(design$expression_programs, function(program) {
     value <- program$value(input)
+    if (!is.null(program$basis_recipe)) {
+      if (!is.list(value) || length(value) != program$width ||
+          any(lengths(value) != design$n)) stop("Dynamic spline changed its row/column layout.")
+      return(value)
+    }
     if (length(value) == 1L && design$n != 1L) value <- rep(value, design$n)
     if (length(value) != design$n) stop("Dynamic expression changed the response row count.")
     value
   })
+  if (is.null(design$expression_leaf_program)) return(values)
+  unlist(lapply(seq_along(values), function(j)
+    if (is.null(design$expression_programs[[j]]$basis_recipe)) list(values[[j]]) else values[[j]]),
+    recursive = FALSE, use.names = FALSE)
 }
 
 .msr_response_expression_sensitivity <- function(design, kernel, beta) {
   values <- .msr_response_expression_values(design, kernel)
+  if (!is.null(design$expression_leaf_program))
+    return(.msr_response_spline_sensitivity(design, kernel, beta, values))
   input <- lapply(seq_len(design$q), function(j) kernel[, j])
   out <- matrix(0, design$n, design$q,
     dimnames = list(rownames(design$multipliers), design$covariates))
@@ -106,6 +119,26 @@
 
 # Refresh every evaluated expression without guessing raw kernels from powers.
 .msr_response_update_frame <- function(design, frame, kernel) {
+  if (!is.null(design$expression_leaf_program)) {
+    values <- .msr_response_expression_values(design, kernel)
+    for (j in seq_along(design$expression_programs)) {
+      name <- design$expression_frame_columns[j]
+      if (!name %in% names(frame)) stop("Missing evaluated dynamic expression column.")
+      columns <- which(design$expression_leaf_program == j)
+      value <- if (is.null(design$expression_programs[[j]]$basis_recipe)) values[[columns]] else
+        do.call(cbind, values[columns])
+      if (is.matrix(value)) {
+        if (!identical(dim(frame[[name]]), dim(value))) stop("Dynamic spline frame layout changed.")
+        frame[[name]][] <- value # Keep native ns/bs recipe and column attributes.
+      } else frame[[name]] <- if (inherits(frame[[name]], "AsIs")) I(value) else value
+      if (any(!is.finite(frame[[name]]))) stop("Dynamic expression has nonfinite values.")
+    }
+    for (j in seq_along(design$covariates)) {
+      name <- design$kernel_frame_columns[j]
+      if (!is.na(name) && name %in% names(frame)) frame[[name]] <- kernel[, j]
+    }
+    return(frame)
+  }
   values <- .msr_response_expression_values(design, kernel)
   for (j in seq_along(values)) {
     name <- design$expression_frame_columns[j]
@@ -123,6 +156,10 @@
 }
 
 .msr_compile_expression_design <- function(terms, frame, covariates, columns, contrasts) {
+  variables <- as.list(attr(terms, "variables"))[-1L]
+  if (any(vapply(variables, function(ex) !is.null(.msr_spline_call(ex)) &&
+      length(intersect(all.vars(ex), covariates)) > 0L, logical(1))))
+    return(.msr_compile_spline_design(terms, frame, covariates, columns, contrasts))
   variables <- as.list(attr(terms, "variables"))[-1L]
   dependent <- lapply(variables, function(ex) intersect(all.vars(ex), covariates))
   factors <- attr(terms, "factors")

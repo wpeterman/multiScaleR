@@ -1,3 +1,14 @@
+multiScaleR 0.7.23
+
+* Recompute fixed-knot cubic spline response bases and complete kernel
+  derivatives during analytic scale searches, retaining native recipes.
+
+* Bind native exponential response-field maps to verified projected
+  coordinates, shared groups, serial batches and memory budgets.
+
+* Identify native response spatial fields in prediction contracts; verify
+  exponential-field refits, point predictions, SEs and likelihood penalties.
+
 multiScaleR 0.7.22
 
 * Bind native C refit audits to original data, designs and evaluated settings;

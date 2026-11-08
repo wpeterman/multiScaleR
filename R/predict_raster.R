@@ -23,6 +23,7 @@
 }
 
 .msr_native_raster_eval <- function(model, data) {
+  if (!is.null(model$field_geometry)) return(.msr_response_field_raster_eval(model, data))
   for (nm in intersect(model$logical_names, names(data))) {
     if (any(!is.na(data[[nm]]) & !data[[nm]] %in% c(0, 1)))
       stop("A logical raster predictor must encode FALSE/TRUE as 0/1.", call. = FALSE)
@@ -99,8 +100,10 @@
   if (is.null(raster_args)) raster_args <- list()
   if (!is.list(raster_args) || (length(raster_args) &&
       (is.null(names(raster_args)) || anyDuplicated(names(raster_args)) ||
-       any(!names(raster_args) %in% c("filename", "overwrite", "wopt", "const", "cores", "na.rm")))))
+       any(!names(raster_args) %in% c("filename", "overwrite", "wopt", "const", "cores", "na.rm", "field_geometry")))))
     stop("raster_args must uniquely name supported terra prediction controls.", call. = FALSE)
+  field_geometry <- raster_args$field_geometry
+  raster_args$field_geometry <- NULL
   if (!is.null(raster_args$const) &&
       length(intersect(names(raster_args$const), names(raster))))
     stop("Raster const inputs must add variables; set existing predictor scenarios with site_values.",
@@ -154,6 +157,12 @@
     thin$object <- NULL
   }
   cores <- if (is.null(raster_args$cores)) 1L else raster_args$cores
+  if (!is.null(field_geometry)) {
+    if (!is.null(type) && !type %in% c("response", "link", "conditional"))
+      stop("Coordinate-aware field maps require response, link or conditional predictions.", call. = FALSE)
+    .msr_response_field_preflight(field_geometry, object, raster, cores, raster_args$const)
+    thin$field_geometry <- field_geometry
+  }
   owned_cluster <- NULL
   if (is.numeric(cores)) {
     validate_scalar_numeric(cores, "raster_args$cores", integerish = TRUE, positive = TRUE)
@@ -168,8 +177,25 @@
     }
   }
   if (is.null(raster_args$na.rm)) raster_args$na.rm <- TRUE
-  output <- do.call(terra::predict, c(list(object = raster, model = thin,
+  raster_function <- if (is.null(field_geometry)) terra::predict else terra::interpolate
+  if (!is.null(field_geometry)) {
+    raster_args$xyNames <- c(".msr_field_x", ".msr_field_y")
+    # Declare the native column count even when terra's probe row is all NA.
+    thin$field_constants <- raster_args$const
+    thin$field_na_rm <- raster_args$na.rm
+    scenarios <- if (is.null(raster_args$const)) 1L else nrow(raster_args$const)
+    raster_args$const <- NULL
+    raster_args$index <- seq_len((if (se.fit) 2L else 1L) * scenarios)
+    if (length(scenarios) != 1L || scenarios < 1L)
+      stop("Field const scenarios require a data frame with at least one row.", call. = FALSE)
+    if (is.null(raster_args$wopt)) raster_args$wopt <- list()
+    if (is.null(raster_args$wopt$names))
+      raster_args$wopt$names <- make.names(rep(if (se.fit) c("fit", "se.fit") else "fit",
+        scenarios), unique = TRUE)
+  }
+  output <- do.call(raster_function, c(list(object = raster, model = thin,
     fun = .msr_native_raster_eval), raster_args))
+  if (!is.null(field_geometry)) names(output) <- raster_args$wopt$names
   attr(output, "prediction_contract") <- .msr_native_prediction_contract(object,
     if (methods::is(model, "unmarkedFit")) "unmarked" else class(model)[1L],
     if (is.null(type)) if (inherits(model, "coxph")) "lp" else "response" else
@@ -184,6 +210,15 @@
       omitted = c("kernel_parameter_uncertainty", "observation_noise"), fixed_inputs = TRUE)
   attr(output, "prediction_contract") <- .msr_returned_prediction_uncertainty(
     attr(output, "prediction_contract"), se.fit)
+  if (!is.null(field_geometry)) {
+    contract <- attr(output, "prediction_contract")
+    contract$response_spatial_field$geometry <- c(field_geometry[c("crs", "units",
+      "position", "group", "group_value", "batch_size", "max_memory_mb",
+      "reference_sha256", "binding_sha256")],
+      list(coordinate_source = "projected_raster_cell_centers", serial_native_batches = TRUE,
+        working_memory_estimate_is_hard_cap = FALSE))
+    attr(output, "prediction_contract") <- contract
+  }
   attr(output, "projection_contract") <- descriptor
   output
 }

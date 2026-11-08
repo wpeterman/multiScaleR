@@ -544,6 +544,82 @@ training predictors or complete saved prediction calls. Point predictions,
 fixed-row snapshots and raster chunks share these training definitions.
 Their native coefficient SEs still condition on the selected spatial scales.
 
+## A spatial field in the response model
+
+A native glmmTMB response field adds correlated variation to the response's
+linear predictor. It does not make the ecological kernel scale vary by location.
+Native refitting can retain this covariance while kernel predictors change.
+The initial conformance checks cover one shared exponential field, Gaussian or
+log-Poisson responses, and selected fixed ecological scales with no year term.
+They verify adapter behavior, not recovery, calibrated uncertainty or general
+spatial model selection performance. The `joint_mixed` backend retains its
+independent-random-intercept guard and does not admit these fields.
+
+```{r native-response-field, eval=FALSE}
+# Use projected coordinates in a common physical unit.
+dat$field_pos <- glmmTMB::numFactor(dat$x_m, dat$y_m)
+dat$field_group <- factor(rep("shared", nrow(dat)))
+native <- glmmTMB::glmmTMB(
+  y ~ habitat + exp(field_pos + 0 | field_group), data = dat, family = poisson())
+fit <- multiScale_optim(native, inputs, backend = "refit")
+# newdat must contain its own matching coordinate factors and group labels.
+pred <- predict(fit, newdat, new_inputs, allow.new.levels = TRUE,
+  se.fit = TRUE, uncertainty = "conditional")
+attr(pred, "prediction_contract")$response_spatial_field
+```
+
+The contract names the response covariance, coordinate inputs, field replication
+and covariance-parameter count. Units are not guessed from factor labels.
+glmmTMB's likelihood degrees of freedom count the fitted covariance parameters. The realized field values are not added as separate likelihood parameters.
+multiScaleR also counts its fitted ecological kernel parameters. A field's
+correlation range and an ecological scale have different interpretations.
+
+Native point predictions and prepared fixed-row snapshots preserve their
+mean-prediction SEs, conditional on the selected ecological scales. Setting
+`re.form = NA` supplies a zero-deviation reference rather than integrating over
+the field. Observation noise and ecological-scale uncertainty remain separate.
+For predictions at new field locations, construct new coordinate factors with
+the same projected units and prepare matching kernel inputs at those locations.
+A raster's constant site scenario does not supply a spatial field at every cell.
+For a full-field raster, verify the original fitting coordinates explicitly:
+
+```{r response-field-map, eval=FALSE}
+# xy has one projected coordinate pair per retained native fitting row.
+geometry <- response_field_geometry(fit, xy, crs = terra::crs(source_raster),
+  batch_size = 64, max_memory_mb = 512)
+layers <- kernel_scale.raster(source_raster, multiScaleR = fit,
+  scale_center = TRUE, match_buffer = TRUE,
+  site_values = list(field_pos = as.character(dat$field_pos[1]),
+    field_group = "shared"))
+map <- predict(fit, layers, se.fit = TRUE, uncertainty = "conditional",
+  native_args = list(allow.new.levels = TRUE),
+  raster_args = list(field_geometry = geometry))
+terra::plot(map)  # Native expected-response mean and conditional mean SE
+```
+
+New positions require the explicit `allow.new.levels = TRUE` control shown
+above. The adapter fails clearly before a new-position batch enters native
+prediction if that control is missing or false. Other native warnings remain
+visible. Each cell supplies its own projected position rather than repeating the selected
+position scenario. The shared group must match the original field. Coordinate
+order, factor encoding and units are checked against retained native rows. The declared CRS must describe those original coordinates. No coordinates are
+silently rescaled or transformed. Only two-dimensional projected horizontal
+CRSs are accepted, including when reloading a descriptor. Geocentric,
+vertical and compound definitions must be replaced explicitly with the
+intended map CRS before fitting. Fit and requested SE bands remain present
+when some or all cells have missing predictors. A different CRS, edited fitting context or
+changed descriptor fails before prediction. Recreate the descriptor after an
+intentional change.
+
+Native calls use serial sub-batches. A conservative dense-array estimate must
+fit the declared MiB budget before field expansion. This guards a planned working
+set, not an operating-system memory cap or an exact accounting of native tapes.
+Smaller batches reduce expansion but repeat preparation. The initial map adapter
+qualifies one shared exponential Gaussian or log-Poisson field. Correlated joint
+scale fitting, cross-row raster covariance and spatial mixed-model CV remain
+separate gates. The checked layout is glmmTMB1.1.14. Gaussian
+and Matern covariance layout witnesses are not fitted-model qualification.
+
 Ordinary unmarked `pcount` and `occu` effect curves instead freeze each learner
 from the original raw site covariates before site removal. This supports
 nested bases without reconstructing raw inputs from evaluated columns.

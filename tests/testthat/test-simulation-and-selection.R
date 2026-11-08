@@ -57,6 +57,7 @@ test_that("expected public helpers remain exported", {
     "prepare_unmarked_data",
     "prepare_unmarked_data",
     "profile_sigma",
+    "response_field_geometry",
     "scale_inference",
     "score_simulation",
     "sim_dat",

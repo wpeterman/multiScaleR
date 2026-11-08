@@ -265,6 +265,23 @@
 #' predictors or complete saved prediction calls. New prediction rows never
 #' supply the training constants. Scaling arguments retain their original
 #' order and standard abbreviations. Custom functions retain their own semantics.
+#' Native glmmTMB exponential response fields retain their provider prediction
+#' and mean-prediction SEs through the refit adapter at selected kernel scales.
+#' Gaussian and log-Poisson conformance checks use one shared projected field
+#' without a year effect. Supply the native coordinate factor and grouping
+#' columns explicitly, including newly constructed \code{glmmTMB::numFactor()}
+#' positions and \code{allow.new.levels = TRUE} when appropriate. A response
+#' field's covariance range differs from the ecological kernel scale.
+#' \code{re.form = NA} sets response random effects to zero; it does not
+#' integrate over their distribution. SEs retain the native method's meaning
+#' and remain conditional on selected ecological scales. Fixed-row snapshots
+#' keep those outputs and their response-field contracts, without a model.
+#' These conformance checks do not qualify scale recovery, interval coverage
+#' or a spatial field in the \code{joint_mixed} likelihood. A full spatial
+#' raster needs matching field coordinates per cell; a constant site scenario
+#' does not provide them. Use explicit native point rows or a checked
+#' \code{\link{response_field_geometry}} descriptor for coordinate-aware maps.
+#'
 #' Ordinary unmarked occupancy and pcount state/detection predictions freeze
 #' supported fixed scaling, polynomial and spline terms from original raw
 #' covariates before site removal, including nested calls and formula offsets.
@@ -370,7 +387,14 @@
 #' maps require \code{type = "link"} or \code{"risk"}, since choice
 #' probabilities need complete point choice sets. Supply native controls in
 #' \code{native_args}. The \code{raster_args} list accepts \code{filename},
-#' \code{overwrite}, \code{wopt}, \code{const}, \code{cores}, and \code{na.rm}.
+#' \code{overwrite}, \code{wopt}, \code{const}, \code{cores}, \code{na.rm},
+#' and \code{field_geometry}. The latter takes a checked
+#' \code{response_field_geometry()} descriptor for one shared exponential
+#' response field. It requires a matching projected CRS, uses cell-center
+#' coordinates and one worker, and gates serial native batch expansion against
+#' an explicit working-memory budget. New positions require an explicit
+#' \code{allow.new.levels = TRUE} in \code{native_args}. Native SEs and zero-field references
+#' keep their point-prediction meanings. No joint raster covariance is added.
 #' Internally created worker clusters are stopped on exit. Rasterization,
 #' distance binning, and partial source coverage remain separate approximation
 #' choices. A single selected-scale raster is not a Bayesian posterior map.

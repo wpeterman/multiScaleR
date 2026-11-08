@@ -76,7 +76,7 @@ The analytic rows include `profile_glm`, `joint_nb2`, `conditional_logit`, and
 crossing and nesting terms involving numeric kernel predictors, including
 factor interactions. Native terms and fitted contrasts define the columns.
 Kernel-only scalar arithmetic and supported smooth base functions retain their
-native coefficient basis. Learned dynamic bases, fixed context within a dynamic
+native coefficient basis. Adaptive dynamic bases, fixed context within a dynamic
 expression, arbitrary or nondifferentiable functions, and kernel offsets remain
 guarded.
 Bayesian preparation, targets, prediction, conditional coefficient proposals,
@@ -91,6 +91,49 @@ Exponential-power means are supported by the profile GLM/NB2 machinery;
 the conditional-logistic, joint mixed, and Bayesian adapters require Gaussian or exponential
 kernels. Analytic and Bayesian kernel means require distance bins. Weighted SQ
 also needs retained raw cells, matching source definitions, and explicit row IDs.
+
+
+### Fixed-knot spline responses during a scale search
+
+You can model a curved habitat response while estimating the habitat kernel
+scale with a cubic natural or B-spline. Supply explicit physical knots and
+boundaries. For example, the following response term has three natural-spline
+columns that all share the single ecological scale of `habitat`:
+
+```{r fixed-spline-formula}
+habitat_response <- count ~ splines::ns(habitat, knots = c(-0.4, 0.6),
+  Boundary.knots = c(-5, 5)) * year
+```
+
+Knots are in the modeled habitat predictor's units. The analytic GLM,
+conditional-logistic and joint mixed methods retain their existing candidate-
+specific centering and SD, including complete derivatives of that standardization.
+A fixed standardized knot in these methods is not a fixed raw-cover threshold.
+Bayesian targets retain their frozen reference transformation. With a fixed
+reference, convert raw knots and boundaries by subtracting its retained center
+and dividing by its SD before inserting literal values in the formula. Choose
+knots using substantive knowledge or a declared training-only rule. Prediction
+batches never choose or update them. Values and
+derivatives of every basis column change with each candidate habitat scale.
+The knots, native column order, contrasts and coefficient priors do not change.
+The columns do not acquire separate ecological scale parameters.
+
+This analytic contract requires cubic bases with distinct strictly interior
+knots and two increasing boundaries. `knots = NULL` explicitly requests no
+interior knots. Recipes such as `ns(habitat, df = 3)` that learn quantile knots
+as habitat changes still require native refitting. Their knot derivatives are
+not replaced with a fixed-knot approximation. Other degrees and repeated or
+boundary knots also remain outside the analytic contract.
+
+Natural-spline tails are linear on the linear predictor scale, not necessarily
+on the response scale. A knot close to zero is not evidence for a biological
+threshold. These unpenalized fixed-complexity responses need not be monotone
+or have a single peak. Coefficient uncertainty remains distinct from kernel
+scale uncertainty. This feature introduces no smoothing-variance uncertainty.
+Ordinary retained training recipes continue to govern new points and raster
+chunks. This response-design support does not establish GDR TMB fitting or
+paired held-out scoring, which require their own likelihood and integration
+qualification.
 
 A fixed-radius metric has no estimated bandwidth. Keep its original prepared
 numeric column in the native model frame or Bayesian `data`. Analytic and

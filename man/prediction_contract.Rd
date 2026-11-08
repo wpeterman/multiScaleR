@@ -52,6 +52,23 @@ The fields describe the calculation:
   \item{fixed_inputs, component}{Whether the rows and controls are bound to a
     snapshot, and the named component when applicable.}
 }
+Native glmmTMB response/link predictions with recognized exponential,
+Gaussian or Matern response covariance add \code{response_spatial_field}.
+It records the provider/layout status, conditional-response component and
+each field's native term, covariance, coordinate/grouping variable names,
+number of locations, independent fields and covariance-parameter count.
+Conditioning records the native spatial prediction or all response random
+effects set to zero. New-location controls retain their native meaning.
+Coordinate units are not inferred from factor labels. The field range is
+distinct from ecological kernel scale; kernel uncertainty is not included.
+Metadata identification never establishes fit eligibility. The current
+layout is qualified against glmmTMB1.1.14; other versions are labeled
+unqualified rather than silently interpreted. Coordinate-aware response-field
+maps additionally record \code{geometry}: projected CRS/units, native column
+names/shared group, reference/context hashes, serial batch size and memory
+budget. Cell centers supply coordinates; the working-memory estimate is
+not an operating-system memory cap.
+
 Private spatial contrasts use \code{quantity = "kernel_scale_contrast"}
 and \code{output_scale = "log_ratio"} or \code{"ratio"}. Both locations use
 the same complete joint vector. Their intervals summarize the contrasts,
