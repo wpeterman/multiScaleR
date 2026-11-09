@@ -498,3 +498,44 @@ package = "multiScaleR")` for uncertainty distinctions.
 | `validate_unmarked_data()` | Audit event identities, layout, paired counts, protocol, and effort |
 | `sim_dat_gdr()` | Return single-primary observed margins and separate generating truth |
 | `score_simulation()` | Score named response-scale targets while retaining failed attempts |
+
+
+## Inspecting the stored state basis
+
+For the existing single-primary fixed-effect native C Poisson/NB audit domain,
+set `design = TRUE` to inspect the actual stored component matrices. The added
+summaries report column rank, condition number and the original matrix-column
+scale. They do not change fitting tolerances or numerical admission gates.
+
+```{r gdr-design-audit, eval=FALSE}
+# This illustration assumes hab is the only state predictor. Include all
+# required state covariates, including factor/year levels, for your own model.
+# Supply scenarios in the predictor units retained by the fitted native model.
+audit <- audit_gdr_integration(model, design = TRUE,
+  design_data = data.frame(hab = c(0, 0.2, 0.8)))
+audit$design$components$lambda
+audit$design$state$splines
+audit$design$projection
+```
+
+State spline metadata are reported only after reconstruction exactly reproduces
+the original native matrix, including factor interactions. Requested spline
+calls and retained numeric knots are separate fields. A native constructor can
+move a requested knot that coincides with a boundary, especially with zero-heavy
+cover. The audit retains that distinction, its warnings and any reconstruction
+failure. It never repairs knots or interprets a near-zero knot as a threshold.
+Natural-spline basis columns have linear tails; added products or transformations
+can change the full predictor's tail behavior. Rank and support do not establish
+monotonicity or a single response peak.
+
+Optional scenarios use the verified training prediction calls and original
+factor levels/contrasts. Counts and knots use modeled predictor units; a legacy
+standardized column does not automatically recover raw cover. For bare numeric
+spline inputs, the audit reports counts
+outside observed training ranges and outside spline boundaries separately.
+Other expressions retain native matrix/recipe diagnostics with an explicit
+support status. The returned summaries contain no full matrices or scenario
+rows. Scenario-matrix rank describes that batch and does not reassess fitted-model
+identifiability. They provide no response predictions, coefficient/kernel uncertainty,
+learned GDR component context or new fitting admission. TMB, random-effect,
+multiple-primary and other existing audit guards remain.

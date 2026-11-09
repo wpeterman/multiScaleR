@@ -94,10 +94,15 @@ the raw-unit fitting/prediction foundation, not GDR TMB or paired-CV admission.
    ns3/ns4 fixtures. Keep conditional means, new-group prediction and
    uncertainty sources distinct. Preserve actual training-selected shapes and
    each paired fold outcome; exploratory fold reuse is not new confirmation.
-4. Add spline rank, conditioning, support and extrapolation diagnostics and
-   clearly labeled response-curve scenarios. A near-zero knot is not a
-   biological threshold. Natural tails are linear on the linear predictor
-   scale, and fixed-complexity splines need not be monotone or single-peaked.
+4. Version 0.7.26 adds opt-in rank/conditioning summaries and exactly verified
+   state spline recipes to the existing fixed-effect native C GDR audit domain.
+   It retains requested calls versus actual knots, native warnings/failures and
+   compact training/scenario support counts, without fitting or prediction
+   admission. Broader TMB/random-effect component diagnostics and response-curve
+   scenarios remain separate. A near-zero knot is not a
+   biological threshold. Natural-spline basis columns have linear tails;
+   added products or transformations can change the full predictor's tails.
+   Fixed-complexity spline responses need not be monotone or single-peaked.
    Retain requested and actual native knots. The zero-heavy vireo ns4 example
    needs that diagnostic, not a silently changed knot or biological threshold.
 5. Retain authenticated provenance for new spatial preparations with an explicit

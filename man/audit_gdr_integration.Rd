@@ -4,7 +4,12 @@
 \alias{audit_gdr_integration}
 \title{Audit native GDR integration at the stored coefficient estimates}
 \usage{
-audit_gdr_integration(model, cutoffs = NULL)
+audit_gdr_integration(
+  model,
+  cutoffs = NULL,
+  design = FALSE,
+  design_data = NULL
+)
 }
 \arguments{
 \item{model}{A native C `unmarkedFitGDR` from unmarked 1.5.2, with one primary
@@ -18,6 +23,16 @@ total and at most 100000. The stored cutoff is always included first.
 At most 32 distinct cutoffs and ten million event-by-latent-count positions
 per evaluation are admitted. These bounds limit diagnostic work, not model
 parameters.}
+
+\item{design}{Logical. If `TRUE`, add compact rank and conditioning summaries
+of the stored native component matrices. Reconstructed state spline recipes
+are reported only after exact agreement with the stored native state matrix.
+Default: `FALSE`, preserving the original audit output.}
+
+\item{design_data}{Optional data frame of state-design scenarios, in the
+model's retained predictor units. Requires `design = TRUE`. This evaluates
+the verified training basis, not ecological kernels, response predictions
+or new observation/random-effect contexts.}
 }
 \value{
 A list with the `cutoffs` table, `references` for the infinite-sum
@@ -29,6 +44,10 @@ A list with the `cutoffs` table, `references` for the infinite-sum
   Errors and warnings from individual numerical
   evaluations remain in the corresponding records. No model, optimizer,
   covariance or likelihood environment is stored in the returned audit.
+  With `design = TRUE`, `design` contains native matrix summaries, requested
+  spline calls, retained knots/boundaries and optional scenario support counts.
+  Reconstruction errors and native warnings remain explicit. No design
+  matrices, formula environments or individual scenario rows are returned.
 }
 \description{
 Separate finite latent-count truncation from distance-integration differences
@@ -70,6 +89,32 @@ Numerical agreement does not establish convergence, global optimality,
   observed count law, expected circle abundance, density and realized latent
   population are distinct quantities. TMB/random-effect/ZIP/missing-history
   and multiple-primary extensions require separate qualification.
+
+Optional design diagnostics use native columns without additional rescaling.
+Rank uses QR tolerance `1e-7`; this descriptive tolerance does not change any
+fitting or numerical-admission gate. The condition number is infinite when
+column rank is deficient.
+
+At most 256 columns and two million matrix positions per component are
+summarized. Larger designs retain an explicit work-limit status; scenario
+work is bounded before its model matrix is allocated. These are read-only
+audit limits and do not constrain or qualify a fitted model.
+
+Basis reconstruction must reproduce the original
+matrix exactly, including factor/interacted columns, before native training
+prediction calls can be used. No knot is repaired or moved by the audit.
+Standard scale/poly/ns/bs preprocessing uses the existing training-only
+machinery shared with CV. Unqualified custom transformations fail the
+scenario audit explicitly rather than being learned from scenario rows.
+Requested calls and actual retained knots are distinct because native spline
+constructors may adjust a knot that coincides with a boundary.
+
+Support counts are provided for bare numeric spline inputs. Other expressions
+keep their native matrix/recipe audit with an explicit support status.
+Support calculations do not reevaluate those source expressions. Counts
+outside observed training ranges and outside spline boundaries describe
+different extrapolation questions. A full-rank basis does not establish a
+converged fit, ecological threshold, response shape or calibrated uncertainty.
 }
 \seealso{
 [make_gdr_refitter()], [validate_unmarked_data()]

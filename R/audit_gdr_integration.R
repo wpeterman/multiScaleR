@@ -45,6 +45,14 @@
 #'   At most 32 distinct cutoffs and ten million event-by-latent-count positions
 #'   per evaluation are admitted. These bounds limit diagnostic work, not model
 #'   parameters.
+#' @param design Logical. If `TRUE`, add compact rank and conditioning summaries
+#'   of the stored native component matrices. Reconstructed state spline recipes
+#'   are reported only after exact agreement with the stored native state matrix.
+#'   Default: `FALSE`, preserving the original audit output.
+#' @param design_data Optional data frame of state-design scenarios, in the
+#'   model's retained predictor units. Requires `design = TRUE`. This evaluates
+#'   the verified training basis, not ecological kernels, response predictions
+#'   or new observation/random-effect contexts.
 #' @return A list with the `cutoffs` table, `references` for the infinite-sum
 #'   native-bin and stable analytic laws, `distance` comparison, stored-point
 #'   agreement, coefficient and provider fingerprints, and explicit numerical
@@ -54,6 +62,10 @@
 #'   Errors and warnings from individual numerical
 #'   evaluations remain in the corresponding records. No model, optimizer,
 #'   covariance or likelihood environment is stored in the returned audit.
+#'   With `design = TRUE`, `design` contains native matrix summaries, requested
+#'   spline calls, retained knots/boundaries and optional scenario support counts.
+#'   Reconstruction errors and native warnings remain explicit. No design
+#'   matrices, formula environments or individual scenario rows are returned.
 #' @details
 #' Original evaluated designs, area conversions, units and durations come from
 #'   the stored C likelihood. Additional evaluations use those same coefficients
@@ -90,9 +102,39 @@
 #'   observed count law, expected circle abundance, density and realized latent
 #'   population are distinct quantities. TMB/random-effect/ZIP/missing-history
 #'   and multiple-primary extensions require separate qualification.
+#'
+#' Optional design diagnostics use native columns without additional rescaling.
+#' Rank uses QR tolerance `1e-7`; this descriptive tolerance does not change any
+#' fitting or numerical-admission gate. The condition number is infinite when
+#' column rank is deficient.
+#'
+#' At most 256 columns and two million matrix positions per component are
+#' summarized. Larger designs retain an explicit work-limit status; scenario
+#' work is bounded before its model matrix is allocated. These are read-only
+#' audit limits and do not constrain or qualify a fitted model.
+#'
+#' Basis reconstruction must reproduce the original
+#' matrix exactly, including factor/interacted columns, before native training
+#' prediction calls can be used. No knot is repaired or moved by the audit.
+#' Standard scale/poly/ns/bs preprocessing uses the existing training-only
+#' machinery shared with CV. Unqualified custom transformations fail the
+#' scenario audit explicitly rather than being learned from scenario rows.
+#' Requested calls and actual retained knots are distinct because native spline
+#' constructors may adjust a knot that coincides with a boundary.
+#'
+#' Support counts are provided for bare numeric spline inputs. Other expressions
+#' keep their native matrix/recipe audit with an explicit support status.
+#' Support calculations do not reevaluate those source expressions. Counts
+#' outside observed training ranges and outside spline boundaries describe
+#' different extrapolation questions. A full-rank basis does not establish a
+#' converged fit, ecological threshold, response shape or calibrated uncertainty.
 #' @seealso [make_gdr_refitter()], [validate_unmarked_data()]
 #' @export
-audit_gdr_integration <- function(model, cutoffs = NULL) {
+audit_gdr_integration <- function(model, cutoffs = NULL, design = FALSE, design_data = NULL) {
+  validate_scalar_logical(design, "design")
+  if (!is.null(design_data) && (!isTRUE(design) || !is.data.frame(design_data) ||
+      !nrow(design_data) || anyDuplicated(names(design_data))))
+    stop("design_data requires design = TRUE and a nonempty data frame with unique columns.", call. = FALSE)
   settings <- .msr_gdr_C_settings(model)
   frame <- model@data
   if (frame@numPrimary != 1L || !model@mixture %in% c("P", "NB") ||
@@ -222,7 +264,7 @@ audit_gdr_integration <- function(model, cutoffs = NULL) {
   }
   stored_nll <- -as.numeric(unmarked::logLik(model))
   difference <- references$native_bins$nll - references$stable_analytic$nll
-  list(cutoffs = table, evaluations = evaluations, references = references,
+  result <- list(cutoffs = table, evaluations = evaluations, references = references,
     finite_poisson = finite_poisson,
     distance = list(native_minus_analytic_nll = difference,
       analytic_equivalence_qualified = is.finite(difference) && abs(difference) <= 1e-9,
@@ -240,8 +282,14 @@ audit_gdr_integration <- function(model, cutoffs = NULL) {
       audit_adapter_sha256 = .msr_gdr_hash(lapply(list(audit_gdr_integration,
         .msr_gdr_audit_native_bins, .msr_gdr_exact_observed, .msr_gdr_exact_score_bins,
         .msr_gdr_exact_distance_bins, .msr_gdr_exact_removal_bins,
-        .msr_gdr_finite_poisson_score_bins, .msr_gdr_poisson_cutoff_correction), function(fn)
+        .msr_gdr_finite_poisson_score_bins, .msr_gdr_poisson_cutoff_correction,
+        .msr_gdr_design_audit, .msr_gdr_design_summary, .msr_cv_prediction_terms,
+        .msr_fixed_function_name, .msr_standard_prediction_function,
+        .msr_prediction_pointwise_functions), function(fn)
           list(formals = deparse(formals(fn)), body = deparse(body(fn)))))),
     parameter_count = .msr_parameter_count(model), uncertainty = "none_read_only_numerical_audit",
     fitting_admission_established = FALSE, density_identification_established = FALSE)
+  if (isTRUE(design)) result$design <- .msr_gdr_design_audit(gd, active,
+    model@formlist$lambda, frame@siteCovs, design_data)
+  result
 }
