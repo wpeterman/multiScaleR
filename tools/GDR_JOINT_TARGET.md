@@ -33,7 +33,10 @@ constant. A paired-cell likelihood has a different observed constant and cannot
 be substituted. All Gaussian densities remain normalized.
 
 Stable half-normal annulus moments use explicit adjoints through fourth order,
-including the uniform-distance limit. The serial R callbacks are ephemeral and
+including the uniform-distance limit. The original qualified seven-moment primitive and its beyond-chain derivative
+guard remain unchanged. A separate single-callback experiment is not integrated:
+its mathematical derivative proof does not establish conservative AD memory.
+The serial R callbacks are ephemeral and
 cannot be checkpointed as portable objectives or evaluated through OpenMP.
 RTMB2.0 is the qualified callback layout. Bind each callback function by value;
 lazy loop arguments can resolve a later binding and change every derivative.
@@ -41,12 +44,24 @@ The [RTMB adjoint documentation](https://cran.r-project.org/web/packages/RTMB/re
 describes the derivative contract and thread restriction. This R callback route
 has overhead, so no speed gain is claimed from operation counts alone.
 
-The prepared fingerprint binds numeric design VALUES, responses, rows, geometry,
-K, parameter layout and the relevant R implementation. A retained basis recipe
-alone cannot identify a design at a changed ecological scale. Rebuild a context
-when any of those values changes. Do not mutate env$data and assume recorded
-constants changed. The fingerprint is not a full dependency/DLL identity, a
-portable fitted model or evidence of inference eligibility.
+The private observation context validates the invariant response layout once
+and constructs its constants, geometry and serial callbacks once. Its prepare
+method accepts a refreshed abundance design only with the exact original
+survey identities, dimensions, column names and row labels. Distance/removal
+predictors and Gaussian densities are still evaluated at the current fitted
+parameters. They are not frozen probability vectors. Existing one-program
+calls retain their formal interface through a convenience wrapper.
+
+Response fingerprints bind counts, observation designs, rows, geometry, K,
+parameter layout, abundance layout and the relevant R implementation. Program
+fingerprints additionally bind the refreshed abundance VALUES; their private
+format version is 2. Rebuild the context when invariant inputs change. Prepare
+a separate program and new AD tape when abundance values change. Never mutate
+env$data and assume recorded constants changed. Caller edits or later prepare
+calls cannot change a previous program. A numeric design is not a retained
+training/basis recipe or permission to relearn prediction transformations.
+Neither fingerprint supplies complete dependency/DLL provenance, a portable
+fitted model or inference eligibility.
 
 Metadata reports fixed and latent coordinate counts separately. Fixed counts
 include regression and present-field log-SDs, excluding latent modes and fixed

@@ -504,7 +504,15 @@ kernel_scale_fn <- function(par,
          call. = FALSE)
   }
 
-  scl_df <- scale(cov.w)
+  if (identical(opt_context$covariate_transform, "raw")) {
+    # Keep the metric's units and a reusable identity transform. Upstream
+    # surface normalization and fixed-covariate transforms are unchanged.
+    scl_df <- as.matrix(cov.w)
+    attr(scl_df, "scaled:center") <- stats::setNames(rep(0, ncol(scl_df)), colnames(scl_df))
+    attr(scl_df, "scaled:scale") <- stats::setNames(rep(1, ncol(scl_df)), colnames(scl_df))
+  } else {
+    scl_df <- scale(cov.w)
+  }
   refit_error <- NULL
 
   if(mod_class == 'unmarked'){

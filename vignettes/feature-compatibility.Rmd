@@ -109,6 +109,12 @@ Knots are in the modeled habitat predictor's units. The analytic GLM,
 conditional-logistic and joint mixed methods retain their existing candidate-
 specific centering and SD, including complete derivatives of that standardization.
 A fixed standardized knot in these methods is not a fixed raw-cover threshold.
+Native refits additionally accept `covariate_transform = "raw"` for optimized
+predictors when the initial model/formula uses those kernel or metric units.
+This identity transform persists through point/raster prediction, effect curves
+and supported spatial CV initial fits. Fixed metrics keep their existing
+transforms. Raw mode does not add analytic raw-input derivatives or change the
+Bayesian target.
 Bayesian targets retain their frozen reference transformation. With a fixed
 reference, convert raw knots and boundaries by subtracting its retained center
 and dividing by its SD before inserting literal values in the formula. Choose
@@ -632,8 +638,10 @@ response_curves <- plot_marginal_effects(gam_fit, reference_data = gam_reference
   component = 2, link = TRUE)
 ```
 
-For native refits, the reference must contain the final fitted, standardized
-spatial columns alongside the raw fixed predictors. Retain those columns
+For native refits, the reference must contain the final fitted spatial
+columns in their fitted units alongside the raw fixed predictors. Optimized
+columns are standardized by default or retain their kernel/metric units under
+the explicit raw transform. Retain those columns
 during fitting. Analytic GLM/NB2 and admitted conditional-logistic fits rebuild
 selected kernel values from their verified preparation before checking the
 reference. Original preparation and normalization remain authoritative.

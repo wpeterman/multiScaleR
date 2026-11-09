@@ -275,6 +275,7 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
     stop("cox_control must be a named coxph.control() list.", call. = FALSE)
   cox_control <- do.call(survival::coxph.control, cox_control)
   actual_backend <- if (is.null(inputs)) "clogit" else backend
+  covariate_transform <- .msr_cv_covariate_transform(optim_args, backend, !is.null(inputs))
   settings <- list(family = "conditional_choice", link = "softmax", method = method, backend = actual_backend,
     cox_control = cox_control, optim_args = optim_args, metrics = "neg_log_score", normalization = "training_only",
     prediction_target = "within_set_choice_probability", assessment_unit = "choice_set", recorded_row_unit = "alternative",
@@ -293,6 +294,8 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
         train <- .msr_cv_inputs(inputs, split$analysis, covariates)
         raw <- .msr_cv_initial_values(train); center <- colMeans(raw); spread <- apply(raw, 2L, stats::sd)
         if (any(!is.finite(spread) | spread <= 0)) stop("Training spatial predictors require positive finite spread.")
+        normalization <- .msr_cv_raw_identity(center, spread, covariate_transform, train$scale_vars)
+        center <- normalization$mean; spread <- normalization$sd
         train$kernel_dat <- as.data.frame(sweep(sweep(raw, 2L, center), 2L, spread, "/"), optional = TRUE)
         train$scl_params <- list(mean = center, sd = spread)
         for (nm in covariates) training[[nm]] <- train$kernel_dat[[nm]]

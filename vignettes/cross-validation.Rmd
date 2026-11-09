@@ -352,6 +352,41 @@ spatial predictor. Grouped fold generation is distinct from grouped raster
 preparation. The former defines sampling units for validation; the latter
 chooses a fixed covariate map for each row.
 
+## Keep optimized predictors in kernel or metric units
+
+Candidate standardization remains the default. A native-refit model can instead
+use `optim_args = list(covariate_transform = "raw")`. The optimized predictors
+then retain the units returned by their kernel or metric calculation. This is
+useful when a fixed spline knot represents a habitat fraction rather than a
+candidate-specific number of standard deviations. It removes only the final
+centering/scaling step. Upstream surface reference normalization and the
+existing transforms of fixed metrics remain in place.
+
+```{r raw-unit-spatial-cv, eval=FALSE}
+# Reuse the prepared raw cells, response rows and predeclared folds above.
+spatial_raw <- cross_validate(counts ~ land1 + land2, dat, inputs, folds,
+  family = "poisson", backend = "refit",
+  optim_args = list(covariate_transform = "raw"), keep_selection = TRUE)
+cv_tab(list(candidate = spatial, raw = spatial_raw), metric = "neg_log_score")
+selected_units <- select_cv(list(candidate = spatial, raw = spatial_raw),
+                            criterion = "AICc", ties = "first")
+```
+
+Each fold's initial native model uses the same units as its subsequent scale
+refits. Raw optimized predictors retain zero centers and unit divisors for
+assessment prediction; fixed metrics still learn their transforms from training
+rows only. Assessment rows never choose the transformation, knots or scale.
+Declare this choice and any raw-unit knots before using the CV results. A
+transformation can change a constrained or nonlinear response model, so compare
+its held-out predictions rather than assuming numerical equivalence.
+
+Raw mode currently requires the native `refit` backend. Analytic backends retain
+their complete candidate-standardization derivatives, and Bayesian methods keep
+their frozen reference targets. Parameter penalties, retained fold failures,
+conditional coefficient uncertainty and the absence of selection/parameter
+integration in these scores are unchanged. This option does not add mixed-model
+GDR held-out integration or new uncertainty intervals.
+
 ## Use fixed maps for different raster groups
 
 Modern `kernel_prep_by_group()` inputs retain raw buffers and a named

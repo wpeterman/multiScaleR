@@ -19,7 +19,8 @@ multiScale_optim(
   verbose = TRUE,
   refit_fn = NULL,
   backend = c("refit", "profile_glm", "joint_nb2", "joint_mixed", "conditional_logit"),
-  profile_control = list()
+  profile_control = list(),
+  covariate_transform = c("candidate", "raw")
 )
 }
 \arguments{
@@ -176,6 +177,15 @@ the upper bound must remain infinite, and the lower bound must be at least
 at an interior dispersion, giving 12 fits with the default six kernel
 starts. \code{iter.max} limits each L-BFGS-B search; \code{eval.max} applies
 to subsequent profile/inference refits, which use conditional fitting.}
+
+\item{covariate_transform}{Transformation of optimized spatial predictors.
+\code{"candidate"} (default) centers and scales each candidate's kernel or
+metric values. \code{"raw"} is an opt-in native-refit contract that passes
+their unstandardized values and retains named zero centers/unit scales for
+prediction. Fit the initial model in those units, including any fixed
+spline knots. This changes neither upstream surface/reference normalization
+nor fixed-metric fallback transforms. Raw mode currently requires
+\code{backend = "refit"}; Bayesian targets are unchanged.}
 }
 \value{
 A list of class \code{"multiScaleR"} containing:
@@ -208,11 +218,13 @@ A list of class \code{"multiScaleR"} containing:
   \item{\code{scl_params}}{Named list with \code{mean} and \code{sd} vectors
     for each covariate: the centering and scaling parameters from the
     optimized kernel data. Used by \code{\link{kernel_scale.raster}} when
-    \code{scale_center = TRUE}.}
+    \code{scale_center = TRUE}. Raw optimized predictors retain centers of
+    zero and scales of one; prediction batches never relearn these values.}
   \item{\code{join_by}}{The \code{join_by} data frame, or \code{NULL}.}
   \item{\code{opt_context}}{Internal optimization context object storing the
     model-class-specific refit logic. Retained for use by
-    \code{\link{profile_sigma}}.}
+    \code{\link{profile_sigma}}. Raw mode also retains
+    \code{covariate_transform = "raw"} here.}
   \item{\code{profile_scale_est}}{Profile-likelihood CI data frame, or
     \code{NULL} until \code{\link{profile_sigma}} has been run.}
   \item{\code{diagnostics}}{List of diagnostic objects; see

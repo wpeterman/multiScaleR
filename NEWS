@@ -1,3 +1,14 @@
+multiScaleR 0.7.25
+
+* Add opt-in unstandardized optimized covariates for native scale refits,
+  preserving their units through prediction and training-only spatial CV.
+  Analytic and Bayesian normalization contracts remain unchanged.
+
+* Reuse private GDR observation preparation while refreshing abundance designs
+  with exact survey identities. Preserve normalized targets and fitting guards.
+* Bind private program fingerprints to invariant response inputs and refreshed
+  abundance values without treating numeric designs as prediction recipes.
+
 multiScaleR 0.7.24
 
 * Qualify private Gaussian GDR joint-target prerequisites, preserving normalized

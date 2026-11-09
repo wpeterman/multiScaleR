@@ -85,7 +85,25 @@ function Assert-TaskAdmission {
   }
   $taskCPU=Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'" -ErrorAction Stop
   $taskInventory.global_CPU_percent=[int]$taskCPU.PercentProcessorTime
-  if ($taskInventory.global_CPU_percent -gt 75) { Write-TaskJson $taskInventory (Join-Path $taskStudy "$Phase-admission-blocked.json"); throw 'Other work is using the CPU; defer this new producer.' }
+  while ($taskInventory.global_CPU_percent -gt 75) {
+    # No owned R exists yet. Retain the deferral and wait, leaving foreign work
+    # untouched. Recheck every launch/resource limit before permitting entry.
+    $taskInventory | ConvertTo-Json -Depth 8 -Compress | Add-Content -LiteralPath (Join-Path $taskStudy "$Phase-CPU-deferred.jsonl")
+    Start-Sleep -Seconds 15
+    $taskNow = [DateTimeOffset]::UtcNow
+    if ($taskNow -ge [DateTimeOffset]::Parse([string]$taskControl.launch_until) -or
+        (($taskPhaseIsLong -or $Phase -match 'build|check|install|full') -and
+         $taskNow -ge [DateTimeOffset]::Parse([string]$taskControl.long_launch_until))) {
+      throw 'Launch window closed while waiting for other CPU work; checkpoint only.'
+    }
+    $taskInventory = Get-TaskInventory @()
+    if ($taskInventory.unknown -or $taskInventory.disk_bytes -le 20GB -or $taskInventory.RAM_bytes -lt 8GB -or ($taskInventory.foreign -gt 2 -and -not $taskControl.RAM_and_known_foreign_R_exceptions_authorized)) {
+      Write-TaskJson $taskInventory (Join-Path $taskStudy "$Phase-admission-blocked.json")
+      throw 'Unknown inventory or morning resource reserve unavailable.'
+    }
+    $taskCPU = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'" -ErrorAction Stop
+    $taskInventory.global_CPU_percent = [int]$taskCPU.PercentProcessorTime
+  }
   return $taskInventory
 }
 function Invoke-TaskPhase($Phase, $Executable, $Arguments, $Directory) {

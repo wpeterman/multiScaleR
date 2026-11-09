@@ -19,7 +19,8 @@ Knots are fixed in the modeled predictor's units. Analytic GLM, conditional-
 logistic and joint mixed methods retain candidate-specific standardization
 with complete derivatives. Those standardized knots do not fix raw-cover
 thresholds. Bayesian targets keep the frozen reference transformation. A raw-
-unit/fixed-reference GDR context remains part of the next integration work.
+unit contract for native refits is added in 0.7.25 below. Learned GDR component
+recipes and a frozen-reference fitting alternative still need integration.
 
 Native exponential response fields have opt-in projected coordinate descriptors
 and serial raster prediction with conservative memory planning. Conformance
@@ -38,13 +39,35 @@ complete exact-archive installed suite. This supplies derivative prerequisites;
 it does not enable `make_gdr_refitter()` for TMB, qualify new outer fits or
 connect an analytic GDR scale search. Existing admission guards remain.
 
+Version 0.7.25 separates immutable private observation preparation from
+refreshed abundance designs with exact row and column identity. It retains the
+original qualified seven-moment primitive. A single-callback experiment passed
+its mathematical proof but remains outside the package after an interrupted
+AD-memory/cold check. Numeric fingerprints are versioned and remain distinct
+from training recipes, provider/DLL provenance and inference eligibility.
+Final-source qualification requires all eight references, including both ns4
+examples, with fresh R process boundaries and every original numerical gate.
+Public TMB fitting remains guarded.
+
 The new evaluation supplies eight independently qualified analysis fits with
 72 native/numerical checks, 24 fold fits and 20 training-contract fixtures.
 Those are acceptance examples for the package adapter. They are distinct from
-the separate 54-record semantic ledger and from the six current package
-fixed-point checks. See `GDR_JOINT_TARGET.md` for the private likelihood contract.
+the separate 54-record semantic ledger and from the six 0.7.24 package
+fixed-point checks. The 0.7.25 context qualification adds both ns4 references.
+See `GDR_JOINT_TARGET.md` for the private likelihood contract.
 The local evaluation and its acceptance ledgers are retained separately from
 package source.
+
+## Explicit native-refit units in 0.7.25
+
+The opt-in raw transformation applies to optimized kernel/metric outputs and
+retains named identity transforms through prediction, effect curves, raster
+projection and spatial GLM/choice/NB2/Gamma CV initial fits. Candidate
+standardization stays the default. Fixed metrics keep their existing training
+transforms; upstream weighted-SQ reference normalization is unchanged. Raw mode
+requires native refitting, preserving analytic derivative and Bayesian target
+contracts. It adds no penalty parameter or uncertainty source. This supplies
+the raw-unit fitting/prediction foundation, not GDR TMB or paired-CV admission.
 
 ## Next integration steps
 
@@ -59,11 +82,11 @@ package source.
    Point-only evaluations must not acquire inference eligibility. Verify which
    covariance work is omitted, retaining latent curvature and full final
    native inference. Keep evaluated controls and warm-start recipe identity.
-2. Add an explicit opt-in raw-unit/fixed-reference GDR context spanning fitting,
-   stored normalization, response curves and prediction. A raw-only refitter
-   would conflict with current prediction's stored means/SDs. Preserve legacy
-   candidate standardization, Bayesian frozen references and fixed observation
-   predictors while abundance shapes or ecological scales change.
+2. Extend the implemented native raw-unit contract to retained GDR component
+   recipes and a separately qualified fixed-reference fitting option. Preserve
+   legacy candidate standardization, Bayesian frozen references and fixed
+   observation predictors while abundance shapes or ecological scales change.
+   Numeric design contexts do not reconstruct learned prediction recipes.
 3. Integrate retained component recipes with paired GDR held-out scores and
    reusable fold jobs. Learn scales, transformations and starts from training
    data only. Declare integration over unknown states, retain failed folds and

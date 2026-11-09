@@ -502,7 +502,7 @@ For `opt2`, the profile confirms a clear, well-defined minimum in AICc near the 
 
 We can also apply the optimized kernel to the full raster surfaces. This is a key step if you want to generate spatially explicit predictions across the landscape.
 
-`kernel_scale.raster()` smooths each raster layer using the estimated σ from the optimization. When `scale_center = TRUE`, the smoothed values are standardized using the mean and SD from the sample points, matching the scaling used during model fitting. This ensures that `terra::predict()` receives covariate values in the same space as the training data.
+`kernel_scale.raster()` smooths each raster layer using the estimated σ from the optimization. When `scale_center = TRUE`, the smoothed values use the retained fitting centers and divisors. These are training means/SDs by default, or zero/unit identity values for optimized predictors fitted with `covariate_transform = "raw"` in the native-refit backend. This ensures that `terra::predict()` receives covariate values in the same space as the training data.
 
 For a model containing `offset(log(n_weeks))`, the projected raster stack contains a layer named `n_weeks` with value 1 by default. Set `offset_values = c(n_weeks = 4)` to predict for four weeks of exposure. Direct offsets default to zero. Choose values that match the quantity you want to predict.
 
@@ -865,7 +865,8 @@ predict(prepared)
 
 The two tables describe the same four prediction rows. The two copies of site
 1 have identical spatial predictors. Values inserted into `nd` are already on
-the fitted standardized scale. Do not scale them again or use the prediction
+the fitted predictor scale, including the declared identity transform for
+raw native-refit predictors. Do not scale them again or use the prediction
 sample's mean and SD. Prepare a new snapshot after changing locations, scenarios,
 or native prediction controls. Fixed-radius covariates remain explicit by default.
 To calculate them at prediction sites too, set `include_fixed = TRUE` in

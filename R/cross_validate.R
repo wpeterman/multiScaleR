@@ -1,3 +1,24 @@
+# Resolve the explicit spatial refit transform before any fold is fitted.
+.msr_cv_covariate_transform <- function(optim_args, backend, spatial = TRUE) {
+  selected <- optim_args$covariate_transform
+  if (is.null(selected)) return("candidate")
+  selected <- match.arg(selected, c("candidate", "raw"))
+  if (selected == "raw" && (!isTRUE(spatial) || backend != "refit"))
+    stop("Raw optimized covariates require spatial CV with backend = 'refit'.", call. = FALSE)
+  selected
+}
+
+.msr_cv_raw_identity <- function(center, spread, transform, scale_vars) {
+  if (identical(transform, "raw")) {
+    optimized <- if (is.null(scale_vars)) names(center) else
+      scale_vars$covariate[scale_vars$optimize]
+    optimized <- intersect(names(center), optimized)
+    center[optimized] <- 0
+    spread[optimized] <- 1
+  }
+  list(mean = center, sd = spread)
+}
+
 # Validate the whole split plan before starting any fold fits. IDs, rather than
 # changing row positions, bind raw data, spatial buffers and assessment output.
 .msr_cv_folds <- function(folds, ids) {
@@ -235,7 +256,10 @@
 #'   two-column response, separately from frequency weights; weighted proportions
 #'   are not accepted. A backend may impose stricter native weight requirements.
 #' @param optim_args Named list of additional \code{multiScale_optim()} controls,
-#'   such as \code{par} or \code{profile_control}. Defaults preserve that backend's
+#'   such as \code{par} or \code{profile_control}. With spatial native refits,
+#'   \code{covariate_transform = "raw"} keeps optimized predictors in their
+#'   kernel/metric units for both initial training fits and later prediction.
+#'   Fixed-metric transforms still use training rows only. Defaults preserve that backend's
 #'   controls. Starts must be selected without assessment outcomes. Object/data
 #'   arguments, custom refit functions, worker pools and parallel controls cannot
 #'   be replaced. Each fold uses one fit worker.
@@ -479,6 +503,7 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
   if (!is.list(glm_control) || is.null(names(glm_control)) || anyDuplicated(names(glm_control)) ||
       any(!names(glm_control) %in% names(formals(stats::glm.control))))
     stop("glm_control must be a named glm.control() list.", call. = FALSE)
+  covariate_transform <- .msr_cv_covariate_transform(optim_args, backend)
   # Validate controls before any fit, without changing native defaults.
   glm_control <- do.call(stats::glm.control, glm_control)
   family_object <- switch(family, gaussian = stats::gaussian(), poisson = stats::poisson(), binomial = stats::binomial())
@@ -505,6 +530,8 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
       center <- colMeans(raw); spread <- apply(raw, 2L, stats::sd)
       if (any(!is.finite(spread) | spread <= 0))
         stop("Training spatial predictors must have positive finite standard deviations.", call. = FALSE)
+      normalization <- .msr_cv_raw_identity(center, spread, covariate_transform, train$scale_vars)
+      center <- normalization$mean; spread <- normalization$sd
       train$kernel_dat <- as.data.frame(sweep(sweep(raw, 2L, center), 2L, spread, "/"), optional = TRUE)
       train$scl_params <- list(mean = center, sd = spread)
       training_data <- data[ai, , drop = FALSE]

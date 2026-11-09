@@ -454,6 +454,25 @@ are not checkpointed. These native coefficient intervals remain conditional on
 the selected ecological scales. Native mixture codes also distinguish default
 AIC/BIC labels without changing their parameter penalties.
 
+For an initial native model whose optimized habitat predictors are in their
+kernel or metric units, `multiScale_optim(..., backend = "refit",
+covariate_transform = "raw")` preserves those units throughout refitting and
+spatial prediction. The default continues to standardize each candidate. For
+example, a knot at habitat fraction `0.2` has a different meaning from a knot at
+`0.2` candidate standard deviations. Fit the initial model and specify its
+formula in the intended units; the optimizer does not reinterpret an existing
+formula or its knots.
+
+Raw mode stores an identity transform for optimized predictors, so a later
+prediction batch cannot supply new means or SDs. It leaves upstream weighted-SQ
+reference normalization, fixed-metric transforms, native observation roles,
+sample identity and parameter penalties under their existing contracts.
+Coefficient SEs remain native and conditional on the selected ecological
+scales. Changing units does not qualify a TMB GDR refitter, learned GDR
+prediction contexts or paired-process CV. Requested and actual spline knots
+can differ under the native basis rules; inspect that distinction rather than
+treating a near-zero knot as a biological threshold.
+
 A smooth ecological-scale estimate at a search bound does not support an
 ordinary outer Wald interval, even if its Hessian is positive. The refit backend
 stores the bound and original curvature diagnostics and withholds its joint

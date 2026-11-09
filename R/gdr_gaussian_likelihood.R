@@ -124,13 +124,15 @@
   invisible(data)
 }
 
-#' Private normalized finite-K Gaussian GDR derivative program
-#'
-#' Prepared numeric designs only. This is neither a model constructor nor a
-#' prediction, selection or uncertainty adapter. All public fitting guards stay.
+#' Private immutable observation context for normalized finite-K Gaussian GDR
 #' @noRd
-.msr_gdr_gaussian_program <- function(data, parameters) {
+.msr_gdr_gaussian_context <- function(data, parameters) {
   .msr_gdr_gaussian_data(data, parameters)
+  abundance_dimension <- dim(data$Xlambda)
+  abundance_columns <- colnames(data$Xlambda)
+  abundance_rows <- rownames(data$Xlambda)
+  # Keep invariant inputs separate from the abundance matrix that is refreshed.
+  data <- data[setdiff(names(data), "Xlambda")]
   n <- rowSums(data$yd)
   cdf <- .msr_gdr_poisson_logcdf_program(data$K - n)$evaluate
   ratio <- .msr_gdr_annulus_program()$evaluate
@@ -142,57 +144,89 @@
   lower <- utils::head(data$breaks, -1L)/radius
   upper <- utils::tail(data$breaks, -1L)/radius
   width <- (upper - lower) * (upper + lower)
-  force(data); force(cdf); force(ratio); force(constant)
-  objective <- function(p) {
-    eta <- as.vector(data$Xlambda %*% p$beta_lambda)
-    if (length(data$block)) eta <- eta + p$b_lambda[data$block]
-    log_lambda <- eta + log(data$area)
-    eta_dist <- as.vector(data$Xdist %*% p$beta_dist)
-    if (length(data$observer)) eta_dist <- eta_dist + p$b_dist[data$observer]
-    a <- .5 * (radius * exp(-eta_dist))^2
-    pd <- lapply(seq_along(width), function(j)
-      exp(-a * lower[j]^2) * width[j] * ratio(a * width[j]))
-    pd <- do.call(cbind, pd)
-    eta_rem <- RTMB::matrix(as.vector(data$Xrem %*% p$beta_rem), M, length(data$periods), byrow = TRUE)
-    survived <- eta * 0
-    pr <- vector("list", length(data$periods))
-    for (j in seq_along(pr)) {
-      current <- data$periods[j] * RTMB::logspace_add(eta * 0, eta_rem[, j])
-      pr[[j]] <- exp(-survived) * (-expm1(-current))
-      survived <- survived + current
-    }
-    pr <- do.call(cbind, pr)
-    q <- RTMB::rowSums(pd) * (-expm1(-survived))
-    # Keep ONE observed total and the native product-of-margin constant.
-    log_cutoff <- cdf(log_lambda + log1p(-q))
-    ll <- sum(n * log_lambda - exp(log_lambda) * q + constant + log_cutoff) +
-      sum(data$yd[pd_positive] * log(pd[pd_positive])) +
-      sum(data$yr[pr_positive] * log(pr[pr_positive]))
-    if (length(data$observer))
-      ll <- ll + sum(RTMB::dnorm(p$b_dist, 0, exp(p$lsigma_dist), log = TRUE))
-    if (length(data$block))
-      ll <- ll + sum(RTMB::dnorm(p$b_lambda, 0, exp(p$lsigma_lambda), log = TRUE))
-    -ll
-  }
   block <- rep(names(parameters), lengths(parameters))
   within <- unlist(lapply(lengths(parameters), seq_len), use.names = FALSE)
   kind <- ifelse(startsWith(block, "b_"), "latent_state",
     ifelse(startsWith(block, "lsigma_"), "log_sd", "regression"))
   layout <- data.frame(position = seq_along(block), block = block, within_block = within, kind = kind)
-  implementation <- lapply(list(.msr_gdr_gaussian_program, .msr_gdr_gaussian_data,
-    .msr_gdr_annulus_program, .msr_gdr_poisson_logcdf_program), function(fn)
+  implementation <- lapply(list(.msr_gdr_gaussian_program, .msr_gdr_gaussian_context,
+    .msr_gdr_gaussian_data, .msr_gdr_annulus_program,
+    .msr_gdr_poisson_logcdf_program), function(fn)
       list(formals = deparse(formals(fn)), body = deparse(body(fn))))
-  list(evaluate = objective, parameter_map = layout,
-    fixed_coordinate_count = sum(kind != "latent_state"),
-    latent_coordinate_count = sum(kind == "latent_state"),
-    unused_states = c(lambda = length(parameters$b_lambda) - length(unique(data$block)),
-      dist = length(parameters$b_dist) - length(unique(data$observer))),
-    fingerprint = digest::digest(list(data = data, parameter_layout = layout,
-      implementation = implementation, RTMB = as.character(getNamespaceVersion("RTMB"))), algo = "sha256"),
-    fingerprint_is_not_full_provider_provenance = TRUE, format_version = 1L,
-    target = "P_finite_K_native_margins_normalized_iid_Gaussian_joint",
-    coordinate_count_is_not_AIC_admission = TRUE,
+  response_fingerprint <- digest::digest(list(data = data,
+    abundance_dimension = abundance_dimension, abundance_columns = abundance_columns,
+    abundance_rows = abundance_rows, parameter_layout = layout, implementation = implementation,
+    RTMB = as.character(getNamespaceVersion("RTMB"))), algo = "sha256")
+  force(data); force(parameters); force(cdf); force(ratio); force(constant)
+  prepare <- function(Xlambda, row_ids) {
+    if (missing(row_ids) || !identical(row_ids, data$row_ids$survey) ||
+        !is.matrix(Xlambda) || !identical(dim(Xlambda), abundance_dimension) ||
+        !(is.double(Xlambda) || is.integer(Xlambda)) || is.object(Xlambda) ||
+        any(!is.finite(Xlambda)) ||
+        !identical(colnames(Xlambda), abundance_columns) ||
+        !identical(rownames(Xlambda), abundance_rows))
+      stop("Refresh the original abundance columns and row labels with exact survey identities.", call. = FALSE)
+    # The complete observation layout was checked once. Only this numeric
+    # matrix changes through the API; callers cannot update response fields.
+    force(Xlambda); force(row_ids)
+    objective <- function(p) {
+      eta <- as.vector(Xlambda %*% p$beta_lambda)
+      if (length(data$block)) eta <- eta + p$b_lambda[data$block]
+      log_lambda <- eta + log(data$area)
+      eta_dist <- as.vector(data$Xdist %*% p$beta_dist)
+      if (length(data$observer)) eta_dist <- eta_dist + p$b_dist[data$observer]
+      a <- .5 * (radius * exp(-eta_dist))^2
+      pd <- lapply(seq_along(width), function(j)
+        exp(-a * lower[j]^2) * width[j] * ratio(a * width[j]))
+      pd <- do.call(cbind, pd)
+      eta_rem <- RTMB::matrix(as.vector(data$Xrem %*% p$beta_rem), M, length(data$periods), byrow = TRUE)
+      survived <- eta * 0
+      pr <- vector("list", length(data$periods))
+      for (j in seq_along(pr)) {
+        current <- data$periods[j] * RTMB::logspace_add(eta * 0, eta_rem[, j])
+        pr[[j]] <- exp(-survived) * (-expm1(-current))
+        survived <- survived + current
+      }
+      pr <- do.call(cbind, pr)
+      q <- RTMB::rowSums(pd) * (-expm1(-survived))
+      # Keep one observed total, native margin constant and normalized fields.
+      log_cutoff <- cdf(log_lambda + log1p(-q))
+      ll <- sum(n * log_lambda - exp(log_lambda) * q + constant + log_cutoff) +
+        sum(data$yd[pd_positive] * log(pd[pd_positive])) +
+        sum(data$yr[pr_positive] * log(pr[pr_positive]))
+      if (length(data$observer))
+        ll <- ll + sum(RTMB::dnorm(p$b_dist, 0, exp(p$lsigma_dist), log = TRUE))
+      if (length(data$block))
+        ll <- ll + sum(RTMB::dnorm(p$b_lambda, 0, exp(p$lsigma_lambda), log = TRUE))
+      -ll
+    }
+    list(evaluate = objective, parameter_map = layout,
+      fixed_coordinate_count = sum(kind != "latent_state"),
+      latent_coordinate_count = sum(kind == "latent_state"),
+      unused_states = c(lambda = length(parameters$b_lambda) - length(unique(data$block)),
+        dist = length(parameters$b_dist) - length(unique(data$observer))),
+      fingerprint = digest::digest(list(response_context = response_fingerprint,
+        Xlambda = Xlambda), algo = "sha256"),
+      response_fingerprint = response_fingerprint, shared_observation_preparation = TRUE,
+      fingerprint_is_not_full_provider_provenance = TRUE, format_version = 2L,
+      target = "P_finite_K_native_margins_normalized_iid_Gaussian_joint",
+      coordinate_count_is_not_AIC_admission = TRUE,
+      requires_serial_R_callbacks = TRUE, portable_objective = FALSE,
+      fit_admission_established = FALSE, uncertainty_evaluated = FALSE,
+      prediction_recipe_qualified = FALSE,
+      qualification = "private_prepared_numeric_derivative_prerequisite_only")
+  }
+  list(prepare = prepare, response_fingerprint = response_fingerprint,
+    survey_count = M, abundance_columns = abundance_columns,
+    shared_observation_preparation = TRUE, context_format_version = 1L,
     requires_serial_R_callbacks = TRUE, portable_objective = FALSE,
-    fit_admission_established = FALSE, uncertainty_evaluated = FALSE,
-    qualification = "private_prepared_numeric_derivative_prerequisite_only")
+    fit_admission_established = FALSE, prediction_recipe_qualified = FALSE,
+    qualification = "private_numeric_context_not_fitted_model_or_prediction_recipe")
+}
+
+#' Private one-program convenience interface
+#' @noRd
+.msr_gdr_gaussian_program <- function(data, parameters) {
+  context <- .msr_gdr_gaussian_context(data, parameters)
+  context$prepare(data$Xlambda, data$row_ids$survey)
 }

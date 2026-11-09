@@ -109,6 +109,7 @@
         !is.null(optim_args$profile_control$worker_pool))
       stop("optim_args must name supported serial controls without data/worker overrides.", call. = FALSE)
   }
+  covariate_transform <- .msr_cv_covariate_transform(optim_args, backend, !is.null(inputs))
   settings <- list(family = family, link = "log", backend = backend, metrics = metrics,
     glm_control = glm_control, distribution_control = distribution, normalization = "training_only",
     prediction_target = "held_out_GLM_expected_response", density_target = "training_fitted_response_distribution",
@@ -135,6 +136,8 @@
         train <- .msr_cv_inputs(inputs, split$analysis, covariates)
         raw <- .msr_cv_initial_values(train); center <- colMeans(raw); spread <- apply(raw, 2L, stats::sd)
         if (any(!is.finite(spread) | spread <= 0)) stop("Training spatial predictors require positive finite spread.")
+        normalization <- .msr_cv_raw_identity(center, spread, covariate_transform, train$scale_vars)
+        center <- normalization$mean; spread <- normalization$sd
         train$kernel_dat <- as.data.frame(sweep(sweep(raw, 2L, center), 2L, spread, "/"), optional = TRUE)
         train$scl_params <- list(mean = center, sd = spread)
         for (nm in covariates) training[[nm]] <- train$kernel_dat[[nm]]

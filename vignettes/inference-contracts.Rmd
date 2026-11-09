@@ -91,10 +91,18 @@ binned summaries. Estimating other surface metrics' radii uses the refit backend
 Declared fixed-radius metrics enter analytic and Bayesian models as verified
 numeric columns, without additional bandwidth parameters. The Bayesian
 adapter also accepts weighted SQ, retaining its fixed pooled reference
-normalization and proper priors. Optimization's scale-dependent standardization
-is not substituted into the Bayesian target. SQ preparation, sampling, Laplace
+normalization and proper priors. Neither optimization's default scale-dependent
+standardization nor its opt-in raw native-refit transform is substituted into
+the Bayesian target. SQ preparation, sampling, Laplace
 and marginal approximation retain their existing uncertainty and diagnostic rules.
 Connecting SQ to likelihood profiles does not establish coverage for SQ intervals.
+
+Native refits can retain unstandardized optimized kernel/metric outputs with
+`covariate_transform = "raw"`. This declared identity transform is reused for
+prediction, curves and spatial CV; it is not estimated from a prediction batch.
+The default remains candidate standardization. Fixed-metric transforms,
+upstream SQ reference normalization, coefficient SEs, parameter penalties and
+all admission guards retain their existing meanings.
 
 The native-refit path also shares spatial point preparation and fixed-row
 snapshots across supported model classes. Raster predictions require a retained

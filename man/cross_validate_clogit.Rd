@@ -45,7 +45,10 @@ normalization/bin references are refit only on analysis rows.}
 \item{cox_control}{Named native \code{survival::coxph.control()} settings.}
 
 \item{optim_args}{Named list of additional \code{multiScale_optim()} controls,
-such as \code{par} or \code{profile_control}. Defaults preserve that backend's
+such as \code{par} or \code{profile_control}. With spatial native refits,
+\code{covariate_transform = "raw"} keeps optimized predictors in their
+kernel/metric units for both initial training fits and later prediction.
+Fixed-metric transforms still use training rows only. Defaults preserve that backend's
 controls. Starts must be selected without assessment outcomes. Object/data
 arguments, custom refit functions, worker pools and parallel controls cannot
 be replaced. Each fold uses one fit worker.}
