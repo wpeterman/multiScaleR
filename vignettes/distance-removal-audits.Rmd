@@ -427,7 +427,11 @@ count does not replace the native AIC penalty. No likelihood, score, Hessian or
 covariance is evaluated by this inspector. In the inspected native TMB path,
 top-level controls and `se = FALSE` do not provide a likelihood-only fit.
 
-An opt-in C coefficient refitter is available through `make_gdr_refitter()`.
+An opt-in native C or TMB refitter is available through `make_gdr_refitter()`.
+The C path recovers its original evaluated settings. The TMB path requires
+explicit evaluated settings and keeps the fitted native engine. It supports
+native Poisson/NB targets and normalized Gaussian random effects subject to
+the existing offset, zero-inflation and covariance guards.
 Its `contract.rds` binds numeric starts to the original data/design fingerprints,
 evaluated settings, standard-error request and native provider identity. Every
 refit records the actual permitted input design and a contract-linked input
@@ -443,10 +447,41 @@ design matrices, Hessians or executable objectives. A saved record cannot replac
 fresh native construction, independent starts or the original final uncertainty
 checks. No new coefficient score is evaluated by checkpointing.
 
-Create it for the original native model, provide explicit named cold coefficient
-starts, and keep its audit directory. It retains evaluated optimizer settings
-and cutoff K, skips intermediate coefficient Hessians, and restores the original
-SE request for the final model. Each request, completed attempt and final outcome
+Create it for the original native model and keep its audit directory. C cold
+starts retain their named-coefficient interface, skip intermediate coefficient
+Hessians and restore the original SE request. TMB starts include every fixed
+coefficient and log-SD in native constructor order, excluding latent modes.
+Do not substitute the fitted optimizer's block order or repeated coefficient
+labels for the constructor map. Each TMB attempt starts its latent coordinates
+at zero and creates a fresh native objective.
+
+```{r tmb-refitter-settings, eval=FALSE}
+# Inspect the native constructor coordinates before changing a cold start.
+coordinates <- gdr_start_values(native_tmb_fit)
+cold <- coordinates$starts
+cold[coordinates$map$kind == "log_sd"] <- log(0.4)
+# Also change an appropriate fixed coefficient if the model has no log-SD.
+cold[1L] <- cold[1L] - 0.2
+refit <- make_gdr_refitter(native_tmb_fit, list(cold = cold),
+  audit_dir = tempfile("gdr-tmb-audit-"),
+  tmb_settings = list(method = "BFGS", se = TRUE, threads = 1L,
+    control = list(maxit = 2000L, reltol = 1e-10)))
+# Supply refit as refit_fn to multiScale_optim(backend = "refit").
+```
+
+Declare the settings deliberately. A saved call does not establish the original
+evaluated TMB controls, and unmarked 1.5.2 drops optimizer extras on its TMB path.
+The adapter forwards the declared controls locally without patching unmarked.
+It evaluates native `sdreport()` at the returned optimizer coordinates so that
+the native estimates, covariance and optimizer metadata refer to the same point.
+It retains finite marginal scores, native positive-Hessian status and full
+joint-precision checks. Bad covariance remains a failed fit.
+
+TMB still computes native `sdreport()` for intermediate fits, even with
+`se = FALSE`. This interface supplies working native refits, not a claim of
+Hessian-free TMB optimization. Final covariance keeps fixed/latent and component
+cross-covariances; ecological-scale and model-selection uncertainty are not
+added to it. Each request, completed attempt and final outcome
 has an atomic compact RDS record. Higher likelihoods with failed convergence or
 unusable final covariance remain failures rather than being replaced silently.
 Input fingerprints are computed in memory; raw data and candidate-model arrays
@@ -468,8 +503,8 @@ prediction batch cannot supply new means or SDs. It leaves upstream weighted-SQ
 reference normalization, fixed-metric transforms, native observation roles,
 sample identity and parameter penalties under their existing contracts.
 Coefficient SEs remain native and conditional on the selected ecological
-scales. Changing units does not qualify a TMB GDR refitter, learned GDR
-prediction contexts or paired-process CV. Requested and actual spline knots
+scales. Changing units does not establish learned GDR prediction contexts or
+paired-process CV. Native TMB refitting has the separate contract above. Requested and actual spline knots
 can differ under the native basis rules; inspect that distinction rather than
 treating a near-zero knot as a biological threshold.
 

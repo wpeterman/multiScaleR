@@ -58,7 +58,10 @@
 .msr_gdr_adapter_identity <- function() {
   functions <- c("make_gdr_refitter", ".msr_gdr_C_settings", ".msr_gdr_variance_status",
     ".msr_gdr_atomic_audit", ".msr_gdr_hash", ".msr_gdr_design_hash", ".msr_gdr_adapter_identity",
-    ".msr_gdr_optimizer_checkpoint", "gdr_start_values", ".msr_gdr_exact_start_map")
+    ".msr_gdr_optimizer_checkpoint", "gdr_start_values", ".msr_gdr_exact_start_map",
+    ".msr_gdr_TMB_settings", ".msr_gdr_TMB_provider", ".msr_gdr_TMB_diagnostics",
+    ".msr_gdr_TMB_refit", ".msr_gdr_refit_start", ".msr_gdr_TMB_preparation", ".msr_gdr_TMB_fit",
+    ".msr_gdr_TMB_layout")
   .msr_gdr_hash(lapply(functions, function(name) {
     fun <- get(name, envir = environment(.msr_gdr_adapter_identity), inherits = FALSE)
     list(name = name, formals = deparse(formals(fun)), body = deparse(body(fun)))
@@ -71,6 +74,12 @@
 }
 
 .msr_gdr_variance_status <- function(model, requested) {
+  if (!is.null(model@TMB)) {
+    value <- attr(model, "msr_gdr_tmb_diagnostics")
+    if (is.null(value)) return(list(requested = requested, status = "unavailable"))
+    value$requested <- requested
+    return(value)
+  }
   if (!requested) return(list(requested = FALSE, status = "not_requested"))
   n <- length(unmarked::coef(model))
   check <- .msr_refit_hessian_se(model@opt$hessian, rep(TRUE, n), rep(1, n))
@@ -116,22 +125,27 @@
   path
 }
 
-#' Create an audited native C refitter for combined distance-removal models
+#' Create an audited native refitter for combined distance-removal models
 #'
 #' @description Retain a small declared set of coefficient starts while
-#'   refitting a GDR model during ecological-scale optimization. Intermediate
-#'   fits omit coefficient Hessians; the returned final fit uses the original
-#'   evaluated standard-error setting.
-#' @param model An original \code{unmarkedFitGDR} fitted with the native C engine
-#'   in unmarked 1.5.2. Data, formulas, coefficient identities, actual integration
-#'   cutoff and evaluated optimizer settings must remain recoverable. The TMB
-#'   engine, active offsets and stochastic optimizer controls need separate
-#'   qualification. Existing generic refit interfaces remain available.
+#'   refitting a GDR model during ecological-scale optimization. The C engine
+#'   omits intermediate coefficient Hessians. The TMB engine retains native
+#'   joint covariance checks; both engines return an actual native fitted model.
+#' @param model An original \code{unmarkedFitGDR} fitted with the native C or
+#'   TMB engine in unmarked 1.5.2 (TMB 1.9.25 for TMB fits). Data, formulas,
+#'   coefficient identities, actual integration cutoff and evaluated optimizer
+#'   settings must remain available. Active offsets, TMB ZIP and stochastic
+#'   optimizer controls remain unsupported. No engine is switched silently.
 #' @param cold_starts A nonempty named list of finite numeric vectors on the
-#'   native coefficient link scales. Every vector must have exactly the unique
-#'   names in \code{unmarked::coef(model)}. Their order is matched by name.
-#'   Provide independent starts distinct from the fitted coefficients. These
-#'   are coefficient starts, not ecological kernel scales or native cutoff K.
+#'   native link scales. For C models, every vector must have exactly the unique
+#'   names in \code{unmarked::coef(model)} and is matched by name. For TMB models,
+#'   supply unnamed constructor-order vectors from \code{gdr_start_values(model)$starts},
+#'   including every estimated log-SD and excluding latent modes. Alternatively,
+#'   name each TMB coordinate as \code{block[within_block]}, using that snapshot's
+#'   map (for example, \code{beta_lambda[1]} or \code{lsigma_lambda[1]}).
+#'   Named TMB vectors are matched by those unique names. Provide independent
+#'   starts distinct from the fitted coordinates. These are neither ecological
+#'   kernel scales nor the native integration cutoff K.
 #' @param audit_dir A new directory, or an existing empty directory, for compact
 #'   audit records. Each refit writes atomic request, validated-input, attempt
 #'   and summary RDS files with all attempted starts and diagnostics. An attempt
@@ -142,6 +156,16 @@
 #' @param provenance Optional named list of caller-supplied source, data or
 #'   archive identities. Use simple atomic values and lists. This information
 #'   supplements the automatically recorded input and provider fingerprints.
+#' @param tmb_settings For a TMB model, an explicit named list containing
+#'   \code{method}, \code{se}, \code{threads} and \code{control}. Use a supported
+#'   deterministic \code{optim()} method (\code{"BFGS"}, \code{"Nelder-Mead"},
+#'   \code{"CG"} or \code{"L-BFGS-B"}), a scalar logical final SE request, \code{threads = 1}
+#'   and a named list of finite numeric controls with positive integer
+#'   \code{maxit}. Declare the intended evaluated settings; they cannot be
+#'   recovered reliably from a saved TMB call. Optional \code{lower}/\code{upper}
+#'   bounds require L-BFGS-B and use scalar or native fitted-optimizer order,
+#'   which can differ from constructor-start order. Leave \code{NULL} for C models,
+#'   whose original evaluated settings are recovered automatically.
 #' @return A function accepting \code{model}, \code{data} and \code{context},
 #'   suitable for \code{refit_fn} in \code{\link{multiScale_optim}}. It returns
 #'   one native fitted model with a compact \code{msr_gdr_refit_audit} attribute.
@@ -157,8 +181,22 @@
 #' updates to static spatial columns named by \code{context$covs}. All other
 #' native frame fields and nonspatial columns remain fixed. Native engine,
 #' actual cutoff K, mixture, distance key, density units, formulas, method,
-#' threads, bounds and optimizer controls are retained from evaluated settings,
-#' rather than re-evaluating the original call's potentially changed variables.
+#' threads and optimizer controls are bound to evaluated settings rather than
+#' re-evaluating the original call's potentially changed variables. C bounds
+#' retain their existing contract. TMB settings are supplied explicitly because
+#' the native saved objective does not retain the original evaluated controls.
+#' The unmarked 1.5.2 TMB constructor does not forward its optimizer extras;
+#' this adapter forwards the declared controls through a local fitting helper
+#' without changing the installed provider or its namespace. Native data,
+#' random-effect preparation, compiled likelihood and S4 construction are used.
+#' Every TMB attempt creates a fresh tape with zero incoming latent coordinates.
+#' Fixed parameters and log-SDs use the declared original/cold starts. Native
+#' \code{sdreport()} is evaluated explicitly at the returned optimizer coordinates
+#' so that estimates, covariance and optimizer metadata describe the same point.
+#'
+#' Returned native calls retain the declared controls without capturing the
+#' temporary constructor environment. Use this callback for audited refits;
+#' ordinary \code{unmarked::update()} retains the provider's TMB control handling.
 #'
 #' Every call compares the original fitted coefficients with every declared
 #' cold start. It retains errors, warnings, native convergence, likelihood,
@@ -167,8 +205,14 @@
 #' a warning-free converged fit. A better but unusable attempt causes an explicit
 #' failure rather than an inferior fit being labeled the winner.
 #'
-#' When \code{context$return_model = FALSE}, coefficient Hessians are omitted.
-#' Final calls polish the selected coefficients using the original SE request.
+#' When \code{context$return_model = FALSE}, C coefficient Hessians are omitted.
+#' TMB still computes native \code{sdreport()} for every attempt, including
+#' \code{se = FALSE}; this is not a faster likelihood-only TMB interface. TMB
+#' eligibility also requires finite scores, positive-definite fixed covariance
+#' and, when latent effects are present, positive-definite full joint precision.
+#' These checks retain cross-component covariance. Unusable covariance remains
+#' a failure even when the final SE request is false. Final calls polish the
+#' selected coordinates using the original C or explicitly declared TMB SE request.
 #' A final likelihood loss greater than \code{1e-5}, inconsistent parameter
 #' count, or unusable requested native covariance fails with its audit retained.
 #' Kernel-conditional coefficient SEs do not include uncertainty in estimated
@@ -217,28 +261,35 @@
 #'   # Supply callback as refit_fn in multiScale_optim().
 #' }
 #' @export
-make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()) {
-  settings <- .msr_gdr_C_settings(model)
+make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list(),
+                              tmb_settings = NULL) {
+  tmb <- methods::is(model, "unmarkedFitGDR") && !is.null(model@TMB)
+  if (!tmb && !is.null(tmb_settings))
+    stop("tmb_settings apply only to native TMB models.", call. = FALSE)
+  settings <- if (tmb) .msr_gdr_TMB_settings(model, tmb_settings) else .msr_gdr_C_settings(model)
   # Native optim can report code zero for a point-only maxit = 0 evaluation.
   maxit <- settings$dots$control$maxit
   if (!is.null(maxit) && (length(maxit) != 1L || !is.numeric(maxit) ||
       !is.finite(maxit) || maxit <= 0 || maxit != floor(maxit)))
     stop("The original GDR optimizer must permit a positive integer maxit.", call. = FALSE)
-  coefficients <- unmarked::coef(model)
+  coefficients <- .msr_gdr_refit_start(model, settings)
   coefficient_names <- settings$coefficient_names
-  if (!length(coefficients) || any(!is.finite(coefficients)) || is.null(coefficient_names) ||
-      anyNA(coefficient_names) || anyDuplicated(coefficient_names))
+  start_names <- names(coefficients)
+  if (!length(coefficients) || any(!is.finite(coefficients)) || is.null(start_names) ||
+      anyNA(start_names) || anyDuplicated(start_names))
     stop("The original GDR model must have finite uniquely named coefficients.", call. = FALSE)
   if (!is.list(cold_starts) || !length(cold_starts) || is.null(names(cold_starts)) ||
       anyNA(names(cold_starts)) || any(!nzchar(names(cold_starts))) ||
       anyDuplicated(names(cold_starts)) || any(names(cold_starts) %in% c("original", "final")))
     stop("cold_starts must be a nonempty uniquely named list; original and final are reserved names.", call. = FALSE)
   cold_starts <- lapply(cold_starts, function(start) {
+    if (tmb && is.numeric(start) && is.null(names(start)) && length(start) == length(start_names))
+      names(start) <- start_names
     if (!is.numeric(start) || !is.null(dim(start)) || any(!is.finite(start)) ||
         is.null(names(start)) || anyNA(names(start)) || anyDuplicated(names(start)) ||
-        !setequal(names(start), coefficient_names))
+        !setequal(names(start), start_names))
       stop("Each cold start must have exactly the finite named native coefficients.", call. = FALSE)
-    start <- start[coefficient_names]
+    start <- start[start_names]
     if (identical(as.numeric(start), as.numeric(coefficients)))
       stop("A cold start must be independent of the original fitted coefficient vector.", call. = FALSE)
     start
@@ -269,6 +320,7 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
     stop("Current training transformations differ from the retained native design; restore the original training settings.", call. = FALSE)
   original_key <- .msr_gdr_hash(list(data = original_data, formulas = lapply(formulas, deparse),
     coefficients = as.list(coefficients), metadata = metadata))
+  if (tmb) source_TMB <- .msr_gdr_TMB_provider()
   source <- list(unmarked_version = as.character(utils::packageVersion("unmarked")),
     multiScaleR_version = as.character(utils::packageVersion("multiScaleR")),
     adapter_sha256 = .msr_gdr_adapter_identity(),
@@ -276,6 +328,7 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
       body = deparse(body(unmarked::gdistremoval)))),
     native_R_sha256 = digest::digest(file = file.path(find.package("unmarked"), "R", "unmarked.rdb"), algo = "sha256"),
     native_DLL_sha256 = digest::digest(file = getLoadedDLLs()[["unmarked"]][["path"]], algo = "sha256"))
+  if (tmb) source$TMB <- source_TMB
   # Full matrices are needed only to verify the original design at creation.
   settings$design <- NULL
   header <- list(schema = 1L, original_model_sha256 = original_key, provider = source,
@@ -301,7 +354,7 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
     audit <- list(schema = 1L, original_model_sha256 = original_key, provider = source,
       metadata = metadata, provenance = provenance, attempts = list(), selected = NULL,
       final_SE_requested = settings$se, objective_only = NULL,
-      parameter_count = length(coefficients), input_sha256 = NULL, status = "started",
+      parameter_count = if (tmb) settings$parameter_count else length(coefficients), input_sha256 = NULL, status = "started",
       contract_sha256 = contract_sha256, contract_file = contract_file,
       contract_file_sha256 = contract_file_sha256,
       input_design_sha256 = NULL, input_context_sha256 = NULL)
@@ -338,15 +391,22 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
         if (!identical(audit$provider_check$native_R_sha256, source$native_R_sha256) ||
             !identical(audit$provider_check$native_DLL_sha256, source$native_DLL_sha256))
           stop("The restored GDR native files differ from the qualified provider.")
-        counter$provider_pid <- Sys.getpid()
       }
+      if (tmb) {
+        actual <- .msr_gdr_TMB_provider(files = audit$provider_check$files_rechecked)
+        audit$provider_check$TMB <- actual
+        if (!identical(actual, source$TMB[names(actual)]))
+          stop("The TMB refitter provider or native TMB files changed.")
+      }
+      counter$provider_pid <- Sys.getpid()
       .msr_gdr_native_guard(model)
       if (!methods::is(model, "unmarkedFitGDR") || !methods::is(data, "unmarkedFrameGDR"))
         stop("Supply the original GDR model and a native GDR frame.")
       current_metadata <- stats::setNames(lapply(names(metadata), function(name) methods::slot(model, name)), names(metadata))
       current_key <- .msr_gdr_hash(list(data = model@data, formulas = lapply(model@formlist, deparse),
-        coefficients = as.list(unmarked::coef(model)), metadata = current_metadata))
-      if (!identical(current_key, original_key) || !is.null(model@TMB))
+        coefficients = as.list(.msr_gdr_refit_start(model, settings)), metadata = current_metadata))
+      if (!identical(current_key, original_key) || !identical(!is.null(model@TMB), tmb) ||
+          (tmb && !identical(.msr_gdr_hash(model@TMB$env$data), settings$native_data_sha256)))
         stop("The callback is bound to a different original model; create a new refitter.")
       covs <- context$covs
       if (is.null(covs)) covs <- character()
@@ -365,6 +425,9 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
         stop("A refit changed histories, protocol, yearly/observation data or frame layout.")
       if (!identical(.msr_gdr_design_hash(original_data, formulas), design_hash))
         stop("The original training transformations changed after the refitter was created.")
+      if (tmb && !identical(.msr_gdr_TMB_layout(get("getDesign", asNamespace("unmarked"))(data, formulas)),
+          settings$design_layout))
+        stop("A TMB refit changed native design columns, rows or random-effect layout.")
       if (!identical(settings, header$controls) || !identical(metadata, header$metadata) ||
           !identical(lapply(formulas, deparse), header$formulas) ||
           !identical(cold_starts, header$cold_starts) ||
@@ -400,25 +463,42 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
           distanceformula = formulas$dist, removalformula = formulas$rem, data = data,
           keyfun = metadata$keyfun, output = metadata$output, unitsOut = metadata$unitsOut,
           mixture = metadata$mixture, K = metadata$K, starts = unname(start),
-          method = settings$method, se = se, engine = "C", threads = settings$threads), settings$dots)
-        value <- do.call(unmarked::gdistremoval, args)
+          method = settings$method, se = se, engine = settings$engine, threads = settings$threads),
+          if (!tmb) settings$dots)
+        value <- if (tmb) .msr_gdr_TMB_refit(args, settings) else do.call(unmarked::gdistremoval, args)
         record$optimizer <- .msr_gdr_optimizer_checkpoint(value@opt)
         if (!identical(names(unmarked::coef(value)), coefficient_names) ||
-            .msr_parameter_count(value) != length(coefficients) ||
-            !identical(as.numeric(value@K), as.numeric(metadata$K)) || !is.null(value@TMB))
+            .msr_parameter_count(value) != audit$parameter_count ||
+            !identical(as.numeric(value@K), as.numeric(metadata$K)) ||
+            !identical(!is.null(value@TMB), tmb) || !identical(value@sitesRemoved, model@sitesRemoved))
           stop("A native refit changed coefficient identities, parameter count, engine or cutoff.")
         record$logLik <- as.numeric(unmarked::logLik(value))
         record$convergence <- value@opt$convergence
         record$converged <- identical(as.integer(value@opt$convergence), 0L)
         record$coefficients <- unmarked::coef(value)
+        if (tmb) record$constructor_coordinates <- .msr_gdr_refit_start(value, settings)
         record$gradient <- value@opt$gradient
         if (!is.null(record$gradient)) record$gradient_status <- "provided_by_native_optimizer"
         record$covariance <- .msr_gdr_variance_status(value, se)
+        if (tmb) {
+          record$gradient <- record$covariance$gradient
+          record$gradient_status <- "native_TMB_marginal_score_at_optimizer"
+        }
         value
       }, warning = function(w) record$warnings <<- c(record$warnings, conditionMessage(w))),
-        error = function(e) { record$error <<- conditionMessage(e); NULL })
+        error = function(e) {
+          record$error <<- conditionMessage(e)
+          if (inherits(e, "msr_gdr_tmb_error") && !is.null(e$optimizer)) {
+            record$optimizer <<- e$optimizer
+            record$logLik <<- -e$optimizer$value
+            record$convergence <<- e$optimizer$convergence
+            record$converged <<- identical(as.integer(e$optimizer$convergence), 0L)
+            if (!is.null(e$covariance)) record$covariance <<- e$covariance
+          }
+          NULL
+        })
       record$eligible <- !is.null(fit) && is.finite(record$logLik) && record$converged &&
-        !length(record$warnings) && (!se || identical(record$covariance$status, "available"))
+        !length(record$warnings) && ((!se && !tmb) || identical(record$covariance$status, "available"))
       record$status <- if (is.null(record$error)) "returned" else "failed"
       .msr_gdr_atomic_audit(record, record$audit_file)
       list(fit = fit, record = record)
@@ -430,19 +510,19 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
     for (i in seq_along(starts)) {
       attempt <- run(starts[[i]], names(starts)[i], FALSE)
       audit$attempts[[i]] <- attempt$record
-      if (!is.null(attempt$fit) && is.finite(attempt$record$logLik) && attempt$record$logLik > best_value) {
+      if (is.finite(attempt$record$logLik) && attempt$record$logLik > best_value) {
         best <- attempt$fit
         best_value <- attempt$record$logLik
         best_index <- i
       }
       attempt <- NULL
     }
-    if (is.null(best)) fail("Every declared native coefficient start failed.")
+    if (is.na(best_index)) fail("Every declared native coefficient start failed.")
     audit$selected <- best_index
-    if (!audit$attempts[[best_index]]$eligible)
+    if (is.null(best) || !audit$attempts[[best_index]]$eligible)
       fail("The highest declared native likelihood is not an eligible converged warning-free fit.")
     if (!audit$objective_only) {
-      final <- run(unmarked::coef(best), "final", settings$se)
+      final <- run(.msr_gdr_refit_start(best, settings), "final", settings$se)
       audit$attempts[[length(audit$attempts) + 1L]] <- final$record
       if (!final$record$eligible || !is.finite(final$record$logLik) ||
           final$record$logLik < best_value - 1e-5)

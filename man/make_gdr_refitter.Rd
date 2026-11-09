@@ -2,22 +2,33 @@
 % Please edit documentation in R/gdr_refitter.R
 \name{make_gdr_refitter}
 \alias{make_gdr_refitter}
-\title{Create an audited native C refitter for combined distance-removal models}
+\title{Create an audited native refitter for combined distance-removal models}
 \usage{
-make_gdr_refitter(model, cold_starts, audit_dir, provenance = list())
+make_gdr_refitter(
+  model,
+  cold_starts,
+  audit_dir,
+  provenance = list(),
+  tmb_settings = NULL
+)
 }
 \arguments{
-\item{model}{An original \code{unmarkedFitGDR} fitted with the native C engine
-in unmarked 1.5.2. Data, formulas, coefficient identities, actual integration
-cutoff and evaluated optimizer settings must remain recoverable. The TMB
-engine, active offsets and stochastic optimizer controls need separate
-qualification. Existing generic refit interfaces remain available.}
+\item{model}{An original \code{unmarkedFitGDR} fitted with the native C or
+TMB engine in unmarked 1.5.2 (TMB 1.9.25 for TMB fits). Data, formulas,
+coefficient identities, actual integration cutoff and evaluated optimizer
+settings must remain available. Active offsets, TMB ZIP and stochastic
+optimizer controls remain unsupported. No engine is switched silently.}
 
 \item{cold_starts}{A nonempty named list of finite numeric vectors on the
-native coefficient link scales. Every vector must have exactly the unique
-names in \code{unmarked::coef(model)}. Their order is matched by name.
-Provide independent starts distinct from the fitted coefficients. These
-are coefficient starts, not ecological kernel scales or native cutoff K.}
+native link scales. For C models, every vector must have exactly the unique
+names in \code{unmarked::coef(model)} and is matched by name. For TMB models,
+supply unnamed constructor-order vectors from \code{gdr_start_values(model)$starts},
+including every estimated log-SD and excluding latent modes. Alternatively,
+name each TMB coordinate as \code{block[within_block]}, using that snapshot's
+map (for example, \code{beta_lambda[1]} or \code{lsigma_lambda[1]}).
+Named TMB vectors are matched by those unique names. Provide independent
+starts distinct from the fitted coordinates. These are neither ecological
+kernel scales nor the native integration cutoff K.}
 
 \item{audit_dir}{A new directory, or an existing empty directory, for compact
 audit records. Each refit writes atomic request, validated-input, attempt
@@ -30,6 +41,17 @@ directory to inspect failures, including scalar objective failures.}
 \item{provenance}{Optional named list of caller-supplied source, data or
 archive identities. Use simple atomic values and lists. This information
 supplements the automatically recorded input and provider fingerprints.}
+
+\item{tmb_settings}{For a TMB model, an explicit named list containing
+\code{method}, \code{se}, \code{threads} and \code{control}. Use a supported
+deterministic \code{optim()} method (\code{"BFGS"}, \code{"Nelder-Mead"},
+\code{"CG"} or \code{"L-BFGS-B"}), a scalar logical final SE request, \code{threads = 1}
+and a named list of finite numeric controls with positive integer
+\code{maxit}. Declare the intended evaluated settings; they cannot be
+recovered reliably from a saved TMB call. Optional \code{lower}/\code{upper}
+bounds require L-BFGS-B and use scalar or native fitted-optimizer order,
+which can differ from constructor-start order. Leave \code{NULL} for C models,
+whose original evaluated settings are recovered automatically.}
 }
 \value{
 A function accepting \code{model}, \code{data} and \code{context},
@@ -45,17 +67,31 @@ A function accepting \code{model}, \code{data} and \code{context},
 }
 \description{
 Retain a small declared set of coefficient starts while
-  refitting a GDR model during ecological-scale optimization. Intermediate
-  fits omit coefficient Hessians; the returned final fit uses the original
-  evaluated standard-error setting.
+  refitting a GDR model during ecological-scale optimization. The C engine
+  omits intermediate coefficient Hessians. The TMB engine retains native
+  joint covariance checks; both engines return an actual native fitted model.
 }
 \details{
 The factory binds to the supplied original model. The callback permits only
 updates to static spatial columns named by \code{context$covs}. All other
 native frame fields and nonspatial columns remain fixed. Native engine,
 actual cutoff K, mixture, distance key, density units, formulas, method,
-threads, bounds and optimizer controls are retained from evaluated settings,
-rather than re-evaluating the original call's potentially changed variables.
+threads and optimizer controls are bound to evaluated settings rather than
+re-evaluating the original call's potentially changed variables. C bounds
+retain their existing contract. TMB settings are supplied explicitly because
+the native saved objective does not retain the original evaluated controls.
+The unmarked 1.5.2 TMB constructor does not forward its optimizer extras;
+this adapter forwards the declared controls through a local fitting helper
+without changing the installed provider or its namespace. Native data,
+random-effect preparation, compiled likelihood and S4 construction are used.
+Every TMB attempt creates a fresh tape with zero incoming latent coordinates.
+Fixed parameters and log-SDs use the declared original/cold starts. Native
+\code{sdreport()} is evaluated explicitly at the returned optimizer coordinates
+so that estimates, covariance and optimizer metadata describe the same point.
+
+Returned native calls retain the declared controls without capturing the
+temporary constructor environment. Use this callback for audited refits;
+ordinary \code{unmarked::update()} retains the provider's TMB control handling.
 
 Every call compares the original fitted coefficients with every declared
 cold start. It retains errors, warnings, native convergence, likelihood,
@@ -64,8 +100,14 @@ one winning model is retained. The highest finite likelihood must come from
 a warning-free converged fit. A better but unusable attempt causes an explicit
 failure rather than an inferior fit being labeled the winner.
 
-When \code{context$return_model = FALSE}, coefficient Hessians are omitted.
-Final calls polish the selected coefficients using the original SE request.
+When \code{context$return_model = FALSE}, C coefficient Hessians are omitted.
+TMB still computes native \code{sdreport()} for every attempt, including
+\code{se = FALSE}; this is not a faster likelihood-only TMB interface. TMB
+eligibility also requires finite scores, positive-definite fixed covariance
+and, when latent effects are present, positive-definite full joint precision.
+These checks retain cross-component covariance. Unusable covariance remains
+a failure even when the final SE request is false. Final calls polish the
+selected coordinates using the original C or explicitly declared TMB SE request.
 A final likelihood loss greater than \code{1e-5}, inconsistent parameter
 count, or unusable requested native covariance fails with its audit retained.
 Kernel-conditional coefficient SEs do not include uncertainty in estimated

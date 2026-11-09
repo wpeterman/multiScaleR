@@ -1,3 +1,10 @@
+multiScaleR 0.7.27
+
+* Integrate audited native TMB GDR refits with explicit optimizer controls,
+  constructor-order fixed/log-SD starts and retained original/cold attempts.
+* Align native TMB estimates and joint covariance with optimizer coordinates,
+  preserving parameter counts, likelihood guards and uncertainty distinctions.
+
 multiScaleR 0.7.26
 
 * Add opt-in native GDR design audits for matrix rank/conditioning, verified

@@ -3,8 +3,11 @@
 The internal program combines native finite-cutoff Poisson GDR margin
 probabilities with every normalized Gaussian intercept density. It is a
 prepared-numeric derivative prerequisite, not a fitted-model, prediction,
-model-selection or uncertainty adapter. `make_gdr_refitter()` retains its
-original TMB rejection. Offset, ZIP and all other existing guards remain.
+model-selection or uncertainty adapter. The separate native TMB path in
+`make_gdr_refitter()` uses the native compiled target and actual S4 constructor,
+explicit evaluated controls and full native covariance. It does not promote this
+private RTMB program or provide likelihood-only fitting. Offset, TMB ZIP and
+all other applicable guards remain.
 
 The initial native layout has one primary survey, complete distance/removal
 margins, half-normal distance detection, a 75 m complete point circle with

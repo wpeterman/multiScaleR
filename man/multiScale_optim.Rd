@@ -512,9 +512,11 @@ and Wald limits. The raw optimizer Hessian remains available for
 compatibility and diagnostics; it is not inverted for those radii. Use
 \code{summary(x, profile = TRUE)} for profile-likelihood intervals.
 
-Use \code{\link{make_gdr_refitter}} as an opt-in native C callback when
-independent coefficient starts and retained audits are needed. It freezes
-evaluated original settings and restores the final native SE request.
+Use \code{\link{make_gdr_refitter}} as an opt-in native C or TMB callback
+when independent starts and retained audits are needed. It freezes evaluated
+settings and retains final native covariance. TMB requires explicit
+\code{tmb_settings}, constructor-order starts including log-SDs, and native
+joint covariance checks. Its intermediate fits still compute sdreport.
 
 Only active GDR component formulas identify spatial predictors. Availability
 is inactive for one primary period, and the distance formula is inactive for

@@ -69,9 +69,20 @@ requires native refitting, preserving analytic derivative and Bayesian target
 contracts. It adds no penalty parameter or uncertainty source. This supplies
 the raw-unit fitting/prediction foundation, not GDR TMB or paired-CV admission.
 
+## Native TMB refitting in 0.7.27
+
+The native GDR refitter accepts explicit evaluated TMB settings and fixed/log-SD
+constructor starts, retains all original/cold attempts, and returns the actual
+native S4 model. The native compiled likelihood and Gaussian densities remain
+unchanged. Controls are forwarded locally, and native sdreport is evaluated at
+the optimizer coordinates. Intermediate TMB attempts retain full covariance
+checks; no likelihood-only efficiency claim follows. TMB ZIP, offsets and
+unusable native covariance remain failures. Priors, counts, fixed references
+and kernel-conditional uncertainty conventions are unchanged.
+
 ## Next integration steps
 
-1. Qualify fast GDR TMB evaluation/refitting for one primary survey, Poisson
+1. Qualify a faster point-only GDR TMB interface after native refitting. Start with one primary survey, Poisson
    abundance, half-normal distance detection, the established removal law and
    supported normalized Gaussian observer/abundance effects. Reuse exact private
    thinning prerequisites. Preserve native constants, independent/cold/latent
