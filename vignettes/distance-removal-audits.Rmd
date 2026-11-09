@@ -304,6 +304,8 @@ integration$stored_point
 integration$cutoffs
 integration$references
 integration$distance
+# Additional exact finite-cutoff reference for Poisson abundance.
+integration$finite_poisson
 ```
 
 `truncation_loss` compares each finite-cutoff negative log likelihood with an
@@ -312,6 +314,19 @@ is a numerical integration finding, even when local convergence and Hessian
 checks look satisfactory. The helper records the requested evaluations and
 their failures. It leaves the fitted cutoff and all coefficients unchanged;
 it does not select a replacement fit or change an optimization target.
+
+For Poisson abundance, `finite_poisson` also evaluates an exact finite-cutoff
+identity with the same native distance/removal probabilities. The observed total
+has mean `lambda*q`, with a Poisson CDF correction for unobserved individuals up
+to `K-n`. This reference removes its latent-abundance sum while retaining the
+original finite cutoff and multinomial constants. It is not a renormalized
+truncated abundance distribution. The native cutoff ladder still runs, and a
+passing identity comparison does not replace a failing truncation-loss check.
+Inspect `comparison$agrees` and each retained error/warning record. NB is
+explicitly unqualified for this additional identity; its original audit remains.
+A longer cutoff ladder retains compact summaries instead of a set of event-level
+predictions for every cutoff. This reference supplies neither a TMB refitter
+nor Gaussian integration or SEs.
 
 The separate distance comparison uses stable analytic annulus integrals.
 Native unmarked 1.5.2 exponential bins use 100 trapezoids per bin, while native

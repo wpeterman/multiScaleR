@@ -48,7 +48,10 @@
 #' @return A list with the `cutoffs` table, `references` for the infinite-sum
 #'   native-bin and stable analytic laws, `distance` comparison, stored-point
 #'   agreement, coefficient and provider fingerprints, and explicit numerical
-#'   qualification flags. Errors and warnings from individual numerical
+#'   qualification flags. The additive `finite_poisson` reference contains its
+#'   status, compact evaluations and a cutoff comparison with native nll values,
+#'   differences and agreement flags. It does not supply fitting admission.
+#'   Errors and warnings from individual numerical
 #'   evaluations remain in the corresponding records. No model, optimizer,
 #'   covariance or likelihood environment is stored in the returned audit.
 #' @details
@@ -62,6 +65,18 @@
 #'   using the same native distance bins. Qualification requires a finite loss
 #'   between -1e-11 and 1e-9. This is evaluated at each supplied cutoff; it is
 #'   not an adaptive change to an ecological-scale optimization target.
+#'
+#' For Poisson abundance, the additional finite-cutoff reference uses the exact
+#' identity `Pois(n; lambda*q) * P(Pois(lambda*(1-q)) <= K-n)` at each event,
+#' followed by the same native-bin distance/removal multinomial terms. It avoids
+#' a latent-abundance loop for this reference and preserves the original finite
+#' cutoff. The cutoff is not renormalized into a truncated abundance model.
+#' The original native evaluations and truncation-loss gate still run unchanged.
+#' `finite_poisson$comparison$agrees` requires finite values, no evaluation
+#' warnings and an absolute nll difference at most 1e-9. Errors stay in its
+#' evaluation records. NB retains its original audit and is explicitly marked
+#' unqualified for this additional Poisson identity. Expected means retain
+#' their underlying native meaning; no uncertainty or TMB integration is added.
 #'
 #' The separate distance comparison uses the infinite-sum native-bin law and
 #'   stable analytic point-annulus integrals. Native exponential bins use 100
@@ -182,9 +197,33 @@ audit_gdr_integration <- function(model, cutoffs = NULL) {
   table$truncation_loss <- table$nll - references$native_bins$nll
   table$truncation_qualified <- !length(native$warnings) & is.finite(table$truncation_loss) &
     table$truncation_loss >= -1e-11 & table$truncation_loss <= 1e-9 & table$warning_count == 0L
+  finite_poisson <- list(status = "not_qualified_for_NB", comparison = NULL,
+    evaluations = NULL, fitting_admission_established = FALSE)
+  if (model@mixture == "P") {
+    # Keep one invariant point and only scalar records across the ladder.
+    detection <- if (is.null(native$value)) NULL else
+      rowSums(native$value$distance_probability) * rowSums(native$value$removal_probability)
+    observed <- rowSums(yd)
+    records <- lapply(all_cutoffs, function(k) compact(capture({
+      if (is.null(native$value)) stop("Native-bin reference failed: ", native$error)
+      correction <- .msr_gdr_poisson_cutoff_correction(abundance, detection, observed, k)
+      list(logLik = sum(native$value$per_event$logLik + correction),
+        probability_method = paste0(native$value$probability_method, "_finite_K_P_CDF"))
+    })))
+    comparison <- data.frame(cutoff = all_cutoffs,
+      nll = vapply(records, function(x) x$nll, numeric(1)),
+      warning_count = vapply(records, function(x) length(x$warnings), integer(1)))
+    comparison$native_minus_identity_nll <- table$nll - comparison$nll
+    comparison$agrees <- is.finite(comparison$nll) & is.finite(table$nll) &
+      comparison$warning_count == 0L & table$warning_count == 0L &
+      !length(native$warnings) & abs(comparison$native_minus_identity_nll) <= 1e-9
+    finite_poisson <- list(status = "evaluated_closed_form_reference", comparison = comparison,
+      evaluations = records, fitting_admission_established = FALSE)
+  }
   stored_nll <- -as.numeric(unmarked::logLik(model))
   difference <- references$native_bins$nll - references$stable_analytic$nll
   list(cutoffs = table, evaluations = evaluations, references = references,
+    finite_poisson = finite_poisson,
     distance = list(native_minus_analytic_nll = difference,
       analytic_equivalence_qualified = is.finite(difference) && abs(difference) <= 1e-9,
       native_probability_error = native$error, stable_probability_error = stable$error),
@@ -200,7 +239,8 @@ audit_gdr_integration <- function(model, cutoffs = NULL) {
         body = deparse(body(model@nllFun)))),
       audit_adapter_sha256 = .msr_gdr_hash(lapply(list(audit_gdr_integration,
         .msr_gdr_audit_native_bins, .msr_gdr_exact_observed, .msr_gdr_exact_score_bins,
-        .msr_gdr_exact_distance_bins, .msr_gdr_exact_removal_bins), function(fn)
+        .msr_gdr_exact_distance_bins, .msr_gdr_exact_removal_bins,
+        .msr_gdr_finite_poisson_score_bins, .msr_gdr_poisson_cutoff_correction), function(fn)
           list(formals = deparse(formals(fn)), body = deparse(body(fn)))))),
     parameter_count = .msr_parameter_count(model), uncertainty = "none_read_only_numerical_audit",
     fitting_admission_established = FALSE, density_identification_established = FALSE)

@@ -1,3 +1,15 @@
+multiScaleR 0.7.24
+
+* Qualify private Gaussian GDR joint-target prerequisites, preserving normalized
+  densities, exact reduced models and stable distance derivatives. TMB refitting
+  remains guarded pending the remaining integration and prediction checks.
+
+* Add exact finite-cutoff Poisson references to GDR integration audits while
+  preserving native cutoff evaluations, failures and fitting guards. Reuse
+  invariant references and retain compact cutoff comparisons.
+
+* Keep development validation and benchmark assets out of source packages.
+
 multiScaleR 0.7.23
 
 * Recompute fixed-knot cubic spline response bases and complete kernel

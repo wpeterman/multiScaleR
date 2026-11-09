@@ -1,7 +1,9 @@
 # Development priorities
 
-The November 8 priority update places GDR evaluation/refitting and retained
-training recipes ahead of the remaining spatial extensions.
+The November 8 priority update and nonlinear evaluation place supported GDR
+evaluation/refitting and retained training recipes ahead of the remaining
+spatial extensions. The evaluation adds two `ns4` full references and extends
+the training-contract fixtures to both three- and four-coefficient bases.
 
 ## Implemented in 0.7.23
 
@@ -26,6 +28,24 @@ selected global ecological scales. Native mean SEs omit ecological-scale
 uncertainty and observation noise. Zero-field references are not marginal
 predictions, and raster batches do not supply cross-row covariance.
 
+## Private GDR prerequisites in 0.7.24
+
+Version 0.7.24 adds a normalized Gaussian,
+finite-Poisson-cutoff GDR joint program. It passed six fixed native-reference
+likelihood/score, curvature, full covariance, joint-delta density-SE and fresh
+latent-start checks, plus a normal vignette-enabled package check and the
+complete exact-archive installed suite. This supplies derivative prerequisites;
+it does not enable `make_gdr_refitter()` for TMB, qualify new outer fits or
+connect an analytic GDR scale search. Existing admission guards remain.
+
+The new evaluation supplies eight independently qualified analysis fits with
+72 native/numerical checks, 24 fold fits and 20 training-contract fixtures.
+Those are acceptance examples for the package adapter. They are distinct from
+the separate 54-record semantic ledger and from the six current package
+fixed-point checks. See `GDR_JOINT_TARGET.md` for the private likelihood contract.
+The local evaluation and its acceptance ledgers are retained separately from
+package source.
+
 ## Next integration steps
 
 1. Qualify fast GDR TMB evaluation/refitting for one primary survey, Poisson
@@ -33,20 +53,34 @@ predictions, and raster batches do not supply cross-row covariance.
    supported normalized Gaussian observer/abundance effects. Reuse exact private
    thinning prerequisites. Preserve native constants, independent/cold/latent
    starts, scores, curvature, full covariance and joint-delta uncertainty gates.
-   Point-only evaluations must not acquire inference eligibility.
-2. Integrate retained component recipes with paired GDR held-out scores and
+   Use all eight actual linear/quadratic/ns3/ns4 references for a chosen new
+   implementation. Add a deliberate scalar-result contract to the optimizer;
+   its existing native S4 sample checks do not admit an arbitrary scalar/list.
+   Point-only evaluations must not acquire inference eligibility. Verify which
+   covariance work is omitted, retaining latent curvature and full final
+   native inference. Keep evaluated controls and warm-start recipe identity.
+2. Add an explicit opt-in raw-unit/fixed-reference GDR context spanning fitting,
+   stored normalization, response curves and prediction. A raw-only refitter
+   would conflict with current prediction's stored means/SDs. Preserve legacy
+   candidate standardization, Bayesian frozen references and fixed observation
+   predictors while abundance shapes or ecological scales change.
+3. Integrate retained component recipes with paired GDR held-out scores and
    reusable fold jobs. Learn scales, transformations and starts from training
    data only. Declare integration over unknown states, retain failed folds and
-   verify that unused Gaussian levels integrate to one. Keep conditional means,
-   new-group prediction and uncertainty sources distinct.
-3. Add spline rank, conditioning, support and extrapolation diagnostics and
+   verify that unused Gaussian levels integrate to one. Port all 20 supplied
+   ns3/ns4 fixtures. Keep conditional means, new-group prediction and
+   uncertainty sources distinct. Preserve actual training-selected shapes and
+   each paired fold outcome; exploratory fold reuse is not new confirmation.
+4. Add spline rank, conditioning, support and extrapolation diagnostics and
    clearly labeled response-curve scenarios. A near-zero knot is not a
    biological threshold. Natural tails are linear on the linear predictor
    scale, and fixed-complexity splines need not be monotone or single-peaked.
-4. Retain authenticated provenance for new spatial preparations with an explicit
+   Retain requested and actual native knots. The zero-heavy vireo ns4 example
+   needs that diagnostic, not a silently changed knot or biological threshold.
+5. Retain authenticated provenance for new spatial preparations with an explicit
    legacy/unverified path. Bind raw coordinate predictors to geometry without
    relearning transformations from prediction batches.
-5. Qualify broader native covariance/family combinations, normalized correlated
+6. Qualify broader native covariance/family combinations, normalized correlated
    joint fitting and spatial mixed-model CV separately. Spatially varying
    ecological kernels and penalized GDR smooths need their own reference,
    identifiability, integration and uncertainty validation.

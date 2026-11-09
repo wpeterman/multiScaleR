@@ -23,7 +23,10 @@ parameters.}
 A list with the `cutoffs` table, `references` for the infinite-sum
   native-bin and stable analytic laws, `distance` comparison, stored-point
   agreement, coefficient and provider fingerprints, and explicit numerical
-  qualification flags. Errors and warnings from individual numerical
+  qualification flags. The additive `finite_poisson` reference contains its
+  status, compact evaluations and a cutoff comparison with native nll values,
+  differences and agreement flags. It does not supply fitting admission.
+  Errors and warnings from individual numerical
   evaluations remain in the corresponding records. No model, optimizer,
   covariance or likelihood environment is stored in the returned audit.
 }
@@ -42,6 +45,18 @@ Original evaluated designs, area conversions, units and durations come from
   using the same native distance bins. Qualification requires a finite loss
   between -1e-11 and 1e-9. This is evaluated at each supplied cutoff; it is
   not an adaptive change to an ecological-scale optimization target.
+
+For Poisson abundance, the additional finite-cutoff reference uses the exact
+identity `Pois(n; lambda*q) * P(Pois(lambda*(1-q)) <= K-n)` at each event,
+followed by the same native-bin distance/removal multinomial terms. It avoids
+a latent-abundance loop for this reference and preserves the original finite
+cutoff. The cutoff is not renormalized into a truncated abundance model.
+The original native evaluations and truncation-loss gate still run unchanged.
+`finite_poisson$comparison$agrees` requires finite values, no evaluation
+warnings and an absolute nll difference at most 1e-9. Errors stay in its
+evaluation records. NB retains its original audit and is explicitly marked
+unqualified for this additional Poisson identity. Expected means retain
+their underlying native meaning; no uncertainty or TMB integration is added.
 
 The separate distance comparison uses the infinite-sum native-bin law and
   stable analytic point-annulus integrals. Native exponential bins use 100

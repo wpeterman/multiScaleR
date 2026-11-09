@@ -26,3 +26,7 @@
 ^tools/benchmarks/joint_scale_assessment$
 ^tools/benchmarks/bayesian_scales$
 ^tools/benchmarks/tmb_marginal_likelihood$
+^tools/validation$
+^tools/benchmarks$
+^tools/DEVELOPMENT_PRIORITIES\.md$
+^tools/GDR_JOINT_TARGET\.md$
