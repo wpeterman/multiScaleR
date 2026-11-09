@@ -63,6 +63,15 @@
 
 # Rasters are already smoothed and normalized. This adapter never replaces
 # posterior scale integration with a single scale or creates joint scale SEs.
+.msr_native_raster_logical_names <- function(model, type) {
+  typed <- class(model)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount", "unmarkedFitGDR") &&
+    is.character(type) && length(type) == 1L && !is.na(type) && type %in% names(model@formlist)
+  frame <- if (typed) get("get_covariates", asNamespace("unmarked"))(model, type) else
+    if (methods::is(model, "unmarkedFit")) model@data@siteCovs else .msr_selection_frame(model)
+  if (is.null(frame) && is.list(model) && is.data.frame(model$data)) frame <- model$data
+  if (is.null(frame)) character() else names(frame)[vapply(frame, is.logical, logical(1))]
+}
+
 .msr_predict_raster <- function(object, raster, type, se.fit, uncertainty, interval, ...) {
   validate_scalar_logical(se.fit, "se.fit")
   if (interval != "none" || (se.fit && uncertainty != "conditional"))
@@ -129,11 +138,7 @@
     stop("Point preparation controls do not apply to computed rasters.", call. = FALSE)
   if (identical(object$backend, "conditional_logit") && is.null(dots$reference))
     dots$reference <- "zero"
-  frame <- if (methods::is(model, "unmarkedFit")) model@data@siteCovs else
-    .msr_selection_frame(model)
-  if (is.null(frame) && is.list(model) && is.data.frame(model$data)) frame <- model$data
-  logical_names <- if (is.null(frame)) character() else
-    names(frame)[vapply(frame, is.logical, logical(1))]
+  logical_names <- .msr_native_raster_logical_names(model, type)
   thin <- list(object = list(opt_mod = model), type = type, se.fit = se.fit,
     native_args = dots, logical_names = logical_names,
     unmarked_predictor = if (methods::is(model, "unmarkedFit"))

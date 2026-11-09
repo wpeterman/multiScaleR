@@ -14,6 +14,7 @@ $taskPhaseIsLong = [bool]$taskPhase.long
 $taskRscriptShimHashes = @('C:/Program Files/R/R-4.6.0/bin/Rscript.exe','C:/Program Files/R/R-4.6.1/bin/Rscript.exe') | Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }
 $taskRexeHashes = @('C:/Program Files/R/R-4.6.0/bin/x64/R.exe','C:/Program Files/R/R-4.6.1/bin/x64/R.exe') | Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }
 $env:R_LIBS = $taskPlan.library_paths -join ';'
+$env:MSR_VALIDATION_RUNTIME = $PSScriptRoot
 $env:RSTUDIO_PANDOC = 'C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools'
 $env:PATH = $env:RSTUDIO_PANDOC + ';' + $env:PATH
 $env:MAKEFLAGS = '-j1'

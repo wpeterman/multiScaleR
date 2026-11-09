@@ -113,7 +113,8 @@
 #' sets random effects to zero and does not integrate over their distribution.
 #'
 #' For unmarked without \code{kernel_inputs}, supply native prediction rows
-#' with spatial covariates on the fitted standardized scale. Ordinary occupancy
+#' with spatial covariates on their fitted modeled scale, including raw units
+#' when selected during native refitting. Ordinary occupancy
 #' and pcount state/detection terms use original raw training transformations,
 #' fitted factor contrasts and native component covariance. Missing contrasts
 #' can be recovered from unambiguous original main-factor columns; other missing
@@ -125,6 +126,12 @@
 #' retain their native zero-inflation estimate and uncertainty, and all outputs
 #' retain full model parameter counts and diagnostics. Keep the original covariates and
 #' fitted designs. Frame subsets retain original known-group columns.
+#' GDR snapshots likewise freeze the active lambda/phi/dist/rem component's
+#' original training terms and native covariance. Site, primary-period and
+#' removal-interval recipes remain distinct. Data-frame rows scope preparation
+#' to the requested component, and native GDR frames retain all active designs
+#' and their original missing-input checks. No model or executable TMB tape is
+#' saved in the numerical snapshot.
 #' Conditional learned random-effect terms require precomputed training
 #' predictors. Zero-effect contexts need only their fixed design and offsets,
 #' and reject a later conditional-effect request. Ordinary native S4 control

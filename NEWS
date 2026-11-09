@@ -1,3 +1,10 @@
+multiScaleR 0.7.28
+
+* Retain trained GDR component transformations and factor coding through native
+  points, frames, snapshots, raster chunks and component effect curves.
+* Reuse checked unmarked prediction covariates across chunks and preserve
+  native covariance, missing-input guards and uncertainty distinctions.
+
 multiScaleR 0.7.27
 
 * Integrate audited native TMB GDR refits with explicit optimizer controls,

@@ -59,6 +59,8 @@
 }
 
 .msr_unmarked_prediction_basis <- function(object, type, verify_random = TRUE) {
+  gdr <- methods::is(object, "unmarkedFitGDR")
+  if (gdr) .msr_gdr_native_guard(object)
   ns <- asNamespace("unmarked")
   raw <- get("get_covariates", ns)(object, type)
   formula <- get("get_formula", ns)(object, type)
@@ -70,9 +72,11 @@
   # C/R fits retain the actual post-removal design in the likelihood closure.
   # TMB stores the same fixed matrices and offsets in its original data.
   dm <- if (is.list(object@TMB) && is.environment(object@TMB$env))
-    object@TMB$env$data else get0("dm", environment(object@nllFun), inherits = FALSE)
+    object@TMB$env$data else get0(if (gdr) "gd" else "dm", environment(object@nllFun), inherits = FALSE)
   fitted <- dm[[paste0("X_", type)]]
-  fitted_offset <- dm[[paste0("offset_", type)]]
+  # GDR's qualified likelihood has no active offsets, and its original gd
+  # contains no offset vectors. The native offset guard above stays in force.
+  fitted_offset <- if (gdr && is.matrix(fitted)) rep(0, nrow(fitted)) else dm[[paste0("offset_", type)]]
   if (!is.matrix(fitted) || !is.numeric(fitted_offset))
     stop("Original fitted unmarked designs and offsets are required to freeze training transformations.", call. = FALSE)
   tt <- .msr_unmarked_curve_basis(formula, raw)$terms
@@ -139,7 +143,8 @@
 .msr_unmarked_prediction_function <- function(object, re.form = NULL, component = NULL) {
   .msr_gdr_native_guard(object)
   native <- unmarked::predict
-  if (!class(object)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount")) return(native)
+  if (!class(object)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount", "unmarkedFitGDR")) return(native)
+  gdr <- identical(class(object)[1L], "unmarkedFitGDR")
   if (!is.null(component) && (!is.character(component) || length(component) != 1L ||
       is.na(component) || !nzchar(component)))
     stop("component must name one native prediction type.", call. = FALSE)
@@ -147,8 +152,9 @@
   # native frame missing-row removal, which evaluates both regression designs.
   # Nuisance and unknown native types keep the original full-context guards.
   # Only the two qualified regression outputs admit component scoping.
-  if (!is.null(component) && !component %in% c("state", "det")) component <- NULL
-  components <- if (is.null(component)) c("state", "det") else component
+  active <- if (gdr) names(.msr_gdr_active_formulas(object)) else c("state", "det")
+  if (!is.null(component) && !component %in% active) component <- NULL
+  components <- if (is.null(component)) active else component
   ns <- asNamespace("unmarked")
   formulas <- object@formlist
   zero_context <- !is.null(re.form)
@@ -172,6 +178,8 @@
       any(vapply(raw[[i]][columns], is.factor, logical(1)))
     }, logical(1)))
   if (!needed) return(native)
+  if (gdr && as.character(utils::packageVersion("unmarked")) != "1.5.2")
+    stop("This GDR trained-design adapter requires separate provider qualification.", call. = FALSE)
   bases <- stats::setNames(lapply(components, function(type)
     .msr_unmarked_prediction_basis(object, type, verify_random = !zero_context)), components)
   generic <- methods::getGeneric("predict_internal", where = ns)
@@ -197,6 +205,8 @@
       out
     }
     frame_inputs <- function(object, type, newdata, na.rm, re.form) {
+      if (gdr) return(.msr_unmarked_gdr_frame_inputs(object, type, newdata,
+        na.rm, re.form, bases, raw, formulas))
       # Run the native site/observation removal algorithm with tagged LOCAL
       # formulas, so identical state and detection syntax can use distinct bases.
       tagged <- formulas
@@ -229,7 +239,14 @@
       inputs(object, type, newdata, na.rm, re.form)
     }
     predict <- .msr_unmarked_local_method(selected,
-      list(make_mod_matrix = make_matrix, predict_inputs_from_umf = frame_inputs))
+      list(make_mod_matrix = make_matrix, predict_inputs_from_umf = frame_inputs,
+        # Native point/raster prediction would reconstruct every original
+        # site/period/observation table for each chunk. This context already
+        # checked and retained those immutable training rows.
+        get_covariates = function(object, type) {
+          if (type %in% names(raw)) return(raw[[type]])
+          get("get_covariates", ns)(object, type)
+        }))
     predict(object, type, newdata = newdata, backTransform = backTransform,
       na.rm = na.rm, appendData = appendData, level = level, re.form = re.form, ...)
   }

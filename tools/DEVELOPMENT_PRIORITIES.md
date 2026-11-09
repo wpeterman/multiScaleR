@@ -19,8 +19,9 @@ Knots are fixed in the modeled predictor's units. Analytic GLM, conditional-
 logistic and joint mixed methods retain candidate-specific standardization
 with complete derivatives. Those standardized knots do not fix raw-cover
 thresholds. Bayesian targets keep the frozen reference transformation. A raw-
-unit contract for native refits is added in 0.7.25 below. Learned GDR component
-recipes and a frozen-reference fitting alternative still need integration.
+unit contract for native refits is added in 0.7.25 below. Trained GDR prediction
+recipes have their separate 0.7.28 qualification below. A frozen-reference
+fitting alternative still needs integration.
 
 Native exponential response fields have opt-in projected coordinate descriptors
 and serial raster prediction with conservative memory planning. Conformance
@@ -80,7 +81,46 @@ checks; no likelihood-only efficiency claim follows. TMB ZIP, offsets and
 unusable native covariance remain failures. Priors, counts, fixed references
 and kernel-conditional uncertainty conventions are unchanged.
 
+## Native GDR prediction recipes in 0.7.28
+
+Component-scoped C/TMB GDR predictions retain checked original fixed designs,
+factor coding and supported learned transformations. Site, primary-period and
+removal-interval recipes remain distinct through points, frames, numerical
+snapshots, raster chunks and active-component curves. Known-group columns and
+native covariance are retained; zero effects are not random-effect integration.
+Original covariates are reused within chunk contexts. Conditional learned
+random designs, offsets, TMB ZIP, missing coding and changed layouts remain
+guarded. No new prior, target, penalty parameter, paired-CV admission or scale-
+uncertainty claim follows.
+
 ## Next integration steps
+
+The November 9 additions put faster development feedback ahead of the next
+package batch. The validation tools now inventory every test file and provide
+explicit partial feedback profiles, with compact block/file timing records for
+future runs. The normal vignette-enabled check and complete exact-archive suite
+remain publication gates. Use measurements to remove redundant fixture work;
+do not trim scientific guards or use assertion totals as a growth target.
+
+The added OBBA_lsm profile-GLM memo concerns 14,347 binary recorded-detection
+responses, a different target and cohort from paired GDR surveys. It requests
+an opt-in raw/reference analytic transformation contract with fixed physical-
+unit ns2 recipes, then exact native hard-radius MI/ED search outside smooth
+bandwidth/coefficient profiling. Keep hard-radius differentiability guards
+until that hybrid route is separately validated. Preserve exact event/edge
+inclusion, finite-coefficient existence checks, failed/unknown/lower points,
+boundary and multiple-basin evidence, and radius-versus-smooth uncertainty.
+Nominal coefficient-plus-scale counts are 7/10 for its declared amount/metric
+families; unfinished searches do not supply maximized AICc.
+
+A prepared-feature provider must represent actual immutable inputs and site/
+response identities without fabricated cell lists. Bound exact-radius caches,
+qualify cached/uncached and fresh-process equality, and retain prediction
+recipes. Benchmark equal scientific work only after qualification and when
+whole process-tree memory permits independent species. Do not copy its large
+feature store or change pinned analysis libraries. These are new priorities,
+not implemented hybrid fitting, public prepared-provider admission or a speedup
+claim. Retained GDR prediction recipes below remain a correctness priority.
 
 1. Qualify a faster point-only GDR TMB interface after native refitting. Start with one primary survey, Poisson
    abundance, half-normal distance detection, the established removal law and
@@ -93,8 +133,8 @@ and kernel-conditional uncertainty conventions are unchanged.
    Point-only evaluations must not acquire inference eligibility. Verify which
    covariance work is omitted, retaining latent curvature and full final
    native inference. Keep evaluated controls and warm-start recipe identity.
-2. Extend the implemented native raw-unit contract to retained GDR component
-   recipes and a separately qualified fixed-reference fitting option. Preserve
+2. Extend the implemented native raw-unit contract with a separately qualified
+   fixed-reference fitting option, retaining the checked GDR prediction recipes. Preserve
    legacy candidate standardization, Bayesian frozen references and fixed
    observation predictors while abundance shapes or ecological scales change.
    Numeric design contexts do not reconstruct learned prediction recipes.
@@ -129,3 +169,7 @@ and admission guards remain. Numeric conformance does not resolve observation-
 law misspecification or establish ecological recovery. Use focused regressions,
 generated help, a fresh vignette-enabled check and complete installed tests for
 each coherent batch. Keep checkpoints compact and preserve failed attempts.
+
+## Updated profile-GLM memo queue, November 9
+
+[The ordered implementation plan](benchmarks/tmb_marginal_likelihood/profile_glm_integration_20261109/NEXT_STEPS.md) incorporates the memo's 15:26/16:06 UTC updates and supplements the priorities above. After the GDR prediction batch, qualify an official prepared raw-design binomial evaluator and independent finite-MLE status, then opt-in physical spline references, exact hard-radius hybrid search, bounded authenticated providers/caches, downstream prediction/selection/CV and equal-work efficiency. External fixed-point benchmarks are attributed evidence to port, not new package acceptance or whole-optimizer speedup claims. Preserve the current hard-radius guard, exact sample/response identity, nominal 7/10 counts, failures and all uncertainty distinctions.

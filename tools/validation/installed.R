@@ -1,3 +1,4 @@
+setup_started <- proc.time()[["elapsed"]]
 input <- jsonlite::fromJSON(commandArgs(TRUE)[[1L]])
 .libPaths(c(dirname(input$installed_library), input$dependency_overlay, .libPaths()))
 stopifnot(identical(normalizePath(find.package("MASS"), winslash = "/"),
@@ -13,7 +14,9 @@ trace("makePSOCKcluster", where = asNamespace("parallel"), print = FALSE,
   tracer = quote({ if (is.numeric(names) && length(names) == 1L) names <- min(names, 2L)
                   else if (length(names) > 2L) names <- names[seq_len(2L)] }))
 setwd(input$exact_archive_tests)
+test_started <- proc.time()[["elapsed"]]
 result <- source("testthat.R", echo = FALSE)
+test_elapsed <- proc.time()[["elapsed"]] - test_started
 d <- as.data.frame(result$value)
 value <- lapply(split(seq_len(nrow(d)), basename(d$file)), function(i)
   list(passed = sum(d$passed[i]), failed = sum(d$failed[i]), errors = sum(d$error[i]),
@@ -21,3 +24,5 @@ value <- lapply(split(seq_len(nrow(d)), basename(d$file)), function(i)
 stopifnot(!file.exists(input$result), !file.exists(paste0(input$result, ".tmp")))
 jsonlite::write_json(value, paste0(input$result, ".tmp"), auto_unbox = TRUE, pretty = TRUE)
 stopifnot(file.rename(paste0(input$result, ".tmp"), input$result))
+source(file.path(Sys.getenv("MSR_VALIDATION_RUNTIME"), "test_metrics.R"), local = TRUE)
+msr_write_test_timings(d, input$result, test_elapsed, test_started - setup_started)

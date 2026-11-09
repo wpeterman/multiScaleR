@@ -32,8 +32,10 @@ to evaluate the marginal effect curve for each covariate. Default: \code{100}.}
 \item{type}{Character. Prediction type for \code{unmarked} models.
 \code{"state"} is the default. Ordinary \code{occu} and \code{pcount}
 fits also accept \code{"det"} for native conditional detection probability;
-\code{"lambda"} is a plotting alias for their state component. Other
-classes retain their native state or lambda type. Ignored for non-unmarked
+\code{"lambda"} is a plotting alias for their state component.
+GDR fits accept their active \code{"lambda"}, \code{"phi"}, \code{"dist"}
+or \code{"rem"} component; \code{"state"} is a plotting alias for lambda.
+Other classes retain their native state or lambda type. Ignored for non-unmarked
 models.}
 
 \item{link}{Logical. If \code{TRUE}, predictions are passed through the
@@ -171,6 +173,13 @@ Detection is conditional on occupancy for \code{occu}; for \code{pcount},
 it is the per-individual survey detection probability. Fixed
 scaling, polynomial and spline calls and transformed offsets use original
 raw covariates before site removal. The plotting grid never relearns them.
+GDR curves use the original component's site, primary-period or removal-
+interval rows and its fitted design. Spline knots, polynomial recipes,
+nested scaling and factor interactions remain fixed at training. Lambda
+retains its native abundance/density parameter, phi is availability, dist
+is the native distance-detection parameter and rem is the interval removal
+parameter. Inactive components do not acquire a curve. These are native
+component references, not survey averages or random-effect marginal means.
 Factor coding uses retained or unambiguously recoverable original metadata.
 Zero-effect curves need only the checked fixed design and offsets; unused
 learned random slopes or new grouping variables are not evaluated. Conditional

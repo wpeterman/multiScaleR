@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 RUNTIME_FILES = ("phase_runner.py", "run_phase.ps1", "resource_control.ps1", "seal_phase.ps1",
-                 "document.R", "focus.R", "installed.R", "make_plan.py", "study_inputs.py")
+                 "document.R", "focus.R", "installed.R", "installed_focus.R", "test_metrics.R", "make_plan.py", "study_inputs.py")
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()

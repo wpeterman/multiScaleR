@@ -3,8 +3,36 @@
   "focused": {
     "reference_and_metric": "(curve-reference|kernel-bins|surface-metrics)",
     "native_bam": "native-bam",
-    "selection_and_radius": "(aic|bic|selection|fixed-kernel-radius)"
+    "selection_and_radius": "(aic|bic|selection|fixed-kernel-radius)",
+    "core": "^(0-7-issues|internals-and-helpers|optimization-workflow|coverage-expansion|simulation-and-selection|sim-dat-gdr|year-specific-example|score-simulation|scale-model-capabilities|scale-model-preparation|estimate-multiscale-ram|ram-discovery|extract-batches|spatial-source-report|planar-kernel-reporting)$",
+    "gdr": "^(gdr-|sim-dat-gdr$)",
+    "gdr_tmb": "^(gdr-tmb-|gdr-start-map$|gdr-start-values$|gdr-native-guard$|gdr-refit-contract$|gdr-refitter$|native-raw-transform$)",
+    "glm": "^(profile-|analytic-formulas|logical-binomial|response-design|scale-inference|scale-response-likelihood|spatial-response-log-lik)",
+    "smoothing": "^(kernel-|landscape-|surface-|weighted-sq|sq-|shared-weighted|shared-fixed|metric-focal|adjacency-events|expow-hard|fixed-|grouped-feature|smooth-kernel|projection-buffer|raster-support)",
+    "native_prediction": "(predict|raster|marginal|curve-|offset|inverse-links|gam|^native-|shared-fixed|selected-native|^unmarked-)",
+    "formulas": "(formula|expression|splin|nested|metadata|response-design|native-raw)",
+    "selection": "(selection|cv-|cross-validation|fixed-kernel-radius|refit-reporting|simulation-and-selection)",
+    "cv": "^(cross-validation|cv-)",
+    "native_mixed": "^(joint-|mixed-|nb2-|native-response-field|response-field-geometry|native-spamm|native-model)",
+    "bayesian": "^(bayesian-|latent-gaussian$|returned-prediction-uncertainty$)",
+    "integrated": "^(factorized-|private-sq-|marginal-scale-likelihood$|likelihood-prediction$|spatial-scale-)",
+    "refit": "^(refit-|saved-clogit|prepared-|native-raw-transform$)",
+    "choice": "(conditional-|amt-|clogit|ssf-)",
+    "benchmark_contracts": "^benchmark-",
+    "unmarked_prediction": "^(gdr-native-guard|gdr-trained-prediction|native-raster-components|native-raster-prediction|unmarked-trained-prediction)$"
   },
+  "smoke_files": ["test-gdr-start-map.R", "test-ram-discovery.R", "test-kernel-math.R"],
+  "source_profiles": [
+    {"pattern": "^R/gdr|^R/audit_gdr|^R/prepare_gdr|^R/expand_gdr", "profiles": ["gdr", "refit", "selection", "smoothing", "native_prediction"]},
+    {"pattern": "^R/.*(predict|prediction|marginal_effects|curve)", "profiles": ["native_prediction", "formulas", "refit", "gdr", "cv", "bayesian", "integrated"]},
+    {"pattern": "^R/.*(cross_validate|cv_|fold|select_cv)", "profiles": ["cv", "selection", "formulas", "smoothing", "refit"]},
+    {"pattern": "^R/.*(kernel|surface|landscape|metric|extract)", "profiles": ["smoothing", "formulas", "glm", "native_mixed", "bayesian", "integrated", "cv", "refit"]},
+    {"pattern": "^R/.*(profile|response_design|conditional_logit)", "profiles": ["glm", "formulas", "choice", "smoothing", "native_prediction", "selection"]},
+    {"pattern": "^R/.*(bayes|posterior)", "profiles": ["bayesian", "integrated", "native_prediction"]},
+    {"pattern": "^R/.*(factorized|latent|spatial_scale|scale_likelihood)", "profiles": ["integrated", "bayesian", "native_mixed", "glm"]},
+    {"pattern": "^R/.*(aic|bic|selection|parameter_count)", "profiles": ["selection", "gdr", "native_mixed", "cv", "core"]},
+    {"pattern": "^(src/|NAMESPACE$|DESCRIPTION$|R/multiScale_optim[.]R$|tests/testthat/helper)", "profiles": [], "full": true}
+  ],
   "full": {
     "normal_vignette_build": true,
     "normal_check_arguments": ["--no-manual", "--no-tests"],

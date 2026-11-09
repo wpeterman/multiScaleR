@@ -308,6 +308,15 @@
 #' Unmarked treats every non-NULL \code{re.form} as zero random effects;
 #' these controls do not select partial effects or integrate over them.
 #' Other unmarked classes retain their provider's prediction requirements.
+#' Qualified GDR predictions retain the original lambda, active phi, distance
+#' and removal component recipes using their native site, primary-period and
+#' interval rows. Native C and TMB designs are checked before using frozen
+#' scaling, polynomial/spline terms or factor interactions. Points, prepared
+#' outputs, effect curves and raster chunks share these terms. Component-scoped
+#' rows need only that component's inputs; native GDR frames retain their native
+#' layout and missing-covariate checks. Logical raster inputs use the selected
+#' component's training types. Native component covariance and conditioning
+#' are unchanged; zero effects are not integration over unknown groups.
 #' Native GAM term selection, exclusions and
 #' smoothing-parameter covariance requests retain their native behavior;
 #' none includes uncertainty in the selected spatial scales.

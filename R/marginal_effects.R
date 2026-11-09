@@ -21,8 +21,10 @@
 #' @param type Character. Prediction type for \code{unmarked} models.
 #'   \code{"state"} is the default. Ordinary \code{occu} and \code{pcount}
 #'   fits also accept \code{"det"} for native conditional detection probability;
-#'   \code{"lambda"} is a plotting alias for their state component. Other
-#'   classes retain their native state or lambda type. Ignored for non-unmarked
+#'   \code{"lambda"} is a plotting alias for their state component.
+#'   GDR fits accept their active \code{"lambda"}, \code{"phi"}, \code{"dist"}
+#'   or \code{"rem"} component; \code{"state"} is a plotting alias for lambda.
+#'   Other classes retain their native state or lambda type. Ignored for non-unmarked
 #'   models.
 #' @param link Logical. If \code{TRUE}, predictions are passed through the
 #'   model's inverse link function before plotting (i.e., plotted on the
@@ -147,6 +149,13 @@
 #' it is the per-individual survey detection probability. Fixed
 #' scaling, polynomial and spline calls and transformed offsets use original
 #' raw covariates before site removal. The plotting grid never relearns them.
+#' GDR curves use the original component's site, primary-period or removal-
+#' interval rows and its fitted design. Spline knots, polynomial recipes,
+#' nested scaling and factor interactions remain fixed at training. Lambda
+#' retains its native abundance/density parameter, phi is availability, dist
+#' is the native distance-detection parameter and rem is the interval removal
+#' parameter. Inactive components do not acquire a curve. These are native
+#' component references, not survey averages or random-effect marginal means.
 #' Factor coding uses retained or unambiguously recoverable original metadata.
 #' Zero-effect curves need only the checked fixed design and offsets; unused
 #' learned random slopes or new grouping variables are not evaluated. Conditional
@@ -322,18 +331,24 @@ plot_marginal_effects <- function(x,
 
   ordinary_unmarked_curve <- methods::is(mod, "unmarkedFit") &&
     class(mod)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount")
+  gdr_unmarked_curve <- identical(class(mod)[1L], "unmarkedFitGDR")
+  trained_unmarked_curve <- ordinary_unmarked_curve || gdr_unmarked_curve
   # Extract variables from fitted model
   if (any(grepl("^unmarked", class(mod)))) {
-    allowed <- if (ordinary_unmarked_curve) c("lambda", "state", "det") else c("lambda", "state")
+    allowed <- if (gdr_unmarked_curve) c("state", names(.msr_gdr_active_formulas(mod))) else
+      if (ordinary_unmarked_curve) c("lambda", "state", "det") else c("lambda", "state")
     if (is.null(type) || !type %in% allowed) {
+      if (gdr_unmarked_curve)
+        stop("`type` must name an active native GDR component: ", paste(setdiff(allowed, "state"), collapse = ", "), ".")
       if (ordinary_unmarked_curve)
         stop("`type` must be specified as 'state', 'lambda', or 'det'.")
       stop("`type` must be specified as either 'lambda' or 'state'.")
     }
     # Keep the documented plotting alias; ordinary providers name it state.
     if (ordinary_unmarked_curve && identical(type, "lambda")) type <- "state"
+    if (gdr_unmarked_curve && identical(type, "state")) type <- "lambda"
     component <- .msr_unmarked_marginal_formula(mod, type)
-    dat <- if (ordinary_unmarked_curve)
+    dat <- if (trained_unmarked_curve)
       get("get_covariates", asNamespace("unmarked"))(mod, type) else
         unmarked::siteCovs(unmarked::getData(mod))
     active_terms <- stats::terms(component, data = dat)
@@ -341,13 +356,15 @@ plot_marginal_effects <- function(x,
     c_vars <- .msr_marginal_variables(active_terms, offsets = FALSE)
     # Legacy class paths may evaluate inactive frame context. The checked
     # ordinary zero-effect predictor uses only its active fixed design/offsets.
-    if (!ordinary_unmarked_curve) {
+    if (!trained_unmarked_curve) {
       frame_variables <- as.list(attr(active_terms, "variables"))[-1L]
       vars <- unique(c(vars, unlist(lapply(frame_variables, all.vars), use.names = FALSE)))
     }
     missing_vars <- setdiff(vars, names(dat))
     if (length(missing_vars)) {
-      stop("Could not recover ", if (ordinary_unmarked_curve && type == "det") "observation" else "site",
+      level <- if (trained_unmarked_curve && type %in% c("det", "rem")) "observation" else
+        if (gdr_unmarked_curve && type %in% c("phi", "dist")) "primary-period" else "site"
+      stop("Could not recover ", level,
            " covariates for marginal effects: ",
            paste(missing_vars, collapse = ", "), call. = FALSE)
     }
@@ -367,7 +384,7 @@ plot_marginal_effects <- function(x,
     }, logical(1)))
     # Ordinary native curves use the same checked target as points and maps.
     # Zero effects need no new random slopes, groups or random-design mapping.
-    native_curve <- if (ordinary_unmarked_curve)
+    native_curve <- if (trained_unmarked_curve)
       .msr_unmarked_prediction_function(mod, re.form = NA, component = type) else NULL
     basis <- if (is.null(native_curve)) .msr_unmarked_curve_basis(active_terms, dat) else NULL
     plot_list <- lapply(c_vars, function(v) {
@@ -722,10 +739,10 @@ plot_marginal_effects <- function(x,
       theme_cowplot()
     if (all(is.na(df$lwr)) && all(is.na(df$upr)))
       p <- p + labs(caption = paste(c(
-        if (ordinary_unmarked_curve || native_mixed_response || inherits(analysis_mod, "HLfit"))
+        if (trained_unmarked_curve || native_mixed_response || inherits(analysis_mod, "HLfit"))
           "Random effects are set to zero, not integrated.",
         "Confidence limits unavailable; point predictions condition on spatial scales."), collapse = " "))
-    else if (ordinary_unmarked_curve)
+    else if (trained_unmarked_curve)
       p <- p + labs(caption = paste(
         "Random effects are set to zero, not integrated.",
         "Native component confidence limits condition on the selected spatial scales."))
@@ -778,7 +795,7 @@ plot_marginal_effects <- function(x,
     contract$native_output <- list(type = if (link) "response" else "link", column = component)
     attr(gg_list, "prediction_contract") <- contract
   }
-  if (ordinary_unmarked_curve)
+  if (trained_unmarked_curve)
     attr(gg_list, "prediction_contract") <- .msr_native_prediction_contract(x,
       "unmarked", type, list(re.form = NA), se.fit = TRUE)
   invisible(gg_list)

@@ -574,3 +574,57 @@ rows. Scenario-matrix rank describes that batch and does not reassess fitted-mod
 identifiability. They provide no response predictions, coefficient/kernel uncertainty,
 learned GDR component context or new fitting admission. TMB, random-effect,
 multiple-primary and other existing audit guards remain.
+
+## Retaining component training recipes
+
+Predictions use the component's actual training rows. This matters when a
+formula contains learned spline knots, an orthogonal polynomial, nested
+`scale()` calls or factor interactions. Rebuilding those terms from a single
+site or a raster chunk can change the fitted design. The checked GDR adapter
+reconstructs the original design first, then retains its prediction recipe.
+Native C and TMB component covariance and confidence limits are preserved.
+
+| Type | Native component | Original training rows |
+|:--|:--|:--|
+| `lambda` | Abundance or density parameter under the fitted model | Sites |
+| `phi` | Availability, when there is more than one primary period | Site by primary period |
+| `dist` | Distance-detection parameter for the fitted key | Site by primary period |
+| `rem` | Native removal parameter | Site by primary period by removal interval |
+
+These outputs retain the provider's parameter interpretation. They are not
+automatically survey averages, observed detection probabilities or expectations
+integrated over random effects. In particular, native C ZIP component semantics
+are retained. Inactive availability or uniform-distance components do not gain
+an estimated response curve.
+
+```{r gdr-trained-predictions, eval=FALSE}
+# Use the covariates in the fitted model's units. Do not recenter this batch.
+site_rows <- unmarked::siteCovs(msr_fit$opt_mod@data)[c(2, 9), , drop = FALSE]
+# A numerical snapshot keeps these already prepared rows and controls.
+snapshot <- prepare_prediction(msr_fit, newdata = site_rows,
+  component = "lambda", native_args = list(re.form = NA))
+predict(snapshot)
+
+# Select an active component explicitly. Its own original rows define the grid.
+plot_marginal_effects(msr_fit, type = "dist", ylab = "Distance parameter")
+```
+
+Explicit data-frame predictions prepare only the requested component. Spatial
+`predict()` calls still require newdata and matching kernel_inputs
+together. Use the snapshot route above for already computed native columns.
+Native GDR frames retain the original site/period/interval layout and missing-input
+checks. Raster chunks use the same terms and the component's original logical
+and factor types. The checked original covariates are reused across chunks,
+avoiding repeated reconstruction of every training observation table.
+
+Keep the original covariates, fitted design and recoverable training metadata.
+A mismatched design, unavailable factor coding or unsupported native layout
+stops. Conditional learned random-design transformations remain guarded.
+`re.form = NA` sets effects to zero, while ordinary conditional predictions use
+the fitted known-group effects. Neither operation integrates new groups. Native
+coefficient uncertainty remains conditional on selected ecological scales;
+kernel/shape selection uncertainty and observation noise are not added.
+
+This prediction adapter is separate from the numeric likelihood/design audit.
+It does not enable paired-process CV, a spatial response field or the private
+RTMB scale likelihood. Those targets retain their own qualification gates.
