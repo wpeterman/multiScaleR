@@ -30,8 +30,8 @@
 #' hashes, without a model, coordinate array or prediction array.
 #'
 #' @param object A \code{multiScaleR} refit result containing a native glmmTMB
-#'   Gaussian or log-link Poisson model with one shared exponential response
-#'   field and no other random effects.
+#'   Gaussian, log-link Poisson/NB2/Gamma or logit-binomial model with one shared
+#'   exponential, Gaussian or Matern response field and no other random effects.
 #' @param coords Numeric matrix or data frame with two finite projected coordinate
 #'   columns, one row per retained native fitting row in its original order.
 #'   Repeated locations must repeat their coordinate pairs. Use the original
@@ -79,6 +79,9 @@
 #'
 #'   Native mean-prediction SEs remain conditional on selected ecological kernel
 #'   scales. They do not add observation noise or kernel-scale uncertainty.
+#'   Binomial output keeps the native per-trial probability scale, including
+#'   when fitting grouped success/failure counts. Poisson/NB2 output is the
+#'   native expected count; Gaussian/Gamma output is the native response mean.
 #'   \code{re.form = NA} gives a zero-field reference, not integration over the
 #'   random field. Output retains fit and requested SE bands even if all cells
 #'   are NA. Multiple rows in \code{raster_args$const} produce one fit/SE band
@@ -105,16 +108,18 @@ response_field_geometry <- function(object, coords, crs, batch_size = 128L,
   if (is.null(fields) || !identical(fields$status, "native_layout_identified") ||
       length(fields$fields) != 1L || length(model$modelInfo$reStruc$condReStruc) != 1L ||
       length(model$modelInfo$reStruc$ziReStruc) ||
-      !identical(fields$fields[[1L]]$covariance, "exponential") ||
+      !fields$fields[[1L]]$covariance %in% c("exponential", "gaussian", "matern") ||
       fields$fields[[1L]]$independent_fields != 1L)
-    stop("Coordinate-aware maps currently require one shared native exponential response field.", call. = FALSE)
+    stop("Coordinate-aware maps require one shared native exponential, Gaussian or Matern response field.", call. = FALSE)
   field <- fields$fields[[1L]]
   if (length(field$coordinate_variables) != 1L || length(field$grouping_variables) != 1L)
     stop("The field needs simple position and group column names.", call. = FALSE)
   family <- model$modelInfo$family
-  if (!family$family %in% c("gaussian", "poisson") ||
-      (family$family == "poisson" && family$link != "log"))
-    stop("Coordinate-aware field maps are qualified for Gaussian and log-Poisson models.", call. = FALSE)
+  qualified <- family$family == "gaussian" ||
+    (family$family %in% c("poisson", "nbinom2", "Gamma") && family$link == "log") ||
+    (family$family == "binomial" && family$link == "logit")
+  if (!qualified)
+    stop("Coordinate-aware field maps require Gaussian, log-Poisson, log-NB2, log-Gamma or logit-binomial models.", call. = FALSE)
   validate_scalar_numeric(batch_size, "batch_size", integerish = TRUE, positive = TRUE)
   validate_scalar_numeric(max_memory_mb, "max_memory_mb", positive = TRUE)
   if (batch_size > .Machine$integer.max || !is.finite(max_memory_mb))

@@ -192,7 +192,16 @@
     }
   }
 
-  eval(refit_call, envir = list(data = data), enclos = parent.frame())
+  replay_environment <- parent.frame()
+  if (identical(class(model)[1L], "glmmTMB")) {
+    # A reusable native call can contain locally bound family/start/map/control
+    # objects. Resolve them where the retained formula was created, while the
+    # replacement data argument remains bound explicitly for this refit.
+    replay_environment <- environment(stats::formula(model))
+    if (!is.environment(replay_environment))
+      stop("Native glmmTMB refitting requires its retained formula environment.", call. = FALSE)
+  }
+  eval(refit_call, envir = list(data = data), enclos = replay_environment)
 }
 
 
@@ -204,6 +213,10 @@
 
   call_refit <- try(.refit_from_call(model, data), silent = TRUE)
   if (!inherits(call_refit, "try-error")) {
+    if (identical(class(model)[1L], "glmmTMB"))
+      attr(call_refit, "msr_refit_call") <- list(
+        evaluation_scope = "retained_native_formula_environment",
+        initial_update_error = conditionMessage(attr(refit, "condition")))
     return(call_refit)
   }
 
@@ -433,7 +446,11 @@
 #'   scaled and refit directly. Used by `profile_sigma()` to reuse the columns of
 #'   covariates that are held at their optimum. Default: NULL (compute internally).
 #' @return Either estimated parameters or the fitted model using provided parameters
-#' @details For internal use
+#' @details For internal use. Native glmmTMB call replay resolves local
+#'   constructor arguments in the retained formula environment when ordinary
+#'   updating fails. The replacement data stay explicit. Constructor arguments
+#'   and defaults are not replaced; the initial update error is retained in the
+#'   returned model's \code{msr_refit_call} attribute.
 #' @rdname kernel_scale_fn
 #' @keywords internal
 #' @importFrom insight get_data get_loglikelihood find_predictors

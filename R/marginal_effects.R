@@ -70,7 +70,9 @@
 #'       intervals, with the retained draw indices and prediction contract
 #'       attached to the returned list. Ordinary unmarked curves also attach
 #'       their native prediction contract, including zero-effect conditioning
-#'       and kernel-conditional confidence limits.
+#'       and kernel-conditional confidence limits. Native glmmTMB and lme4
+#'       curves also attach their zero-effect response prediction contract,
+#'       including identified native spatial-field conditioning.
 #'     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
 #'       terms that involve the covariate.
 #'   }
@@ -798,6 +800,10 @@ plot_marginal_effects <- function(x,
   if (trained_unmarked_curve)
     attr(gg_list, "prediction_contract") <- .msr_native_prediction_contract(x,
       "unmarked", type, list(re.form = NA), se.fit = TRUE)
+  if (native_mixed_response)
+    attr(gg_list, "prediction_contract") <- .msr_native_prediction_contract(x,
+      if (inherits(analysis_mod, "glmmTMB")) "glmmTMB" else "merMod",
+      "response", list(re.form = NA), se.fit = TRUE)
   invisible(gg_list)
 }
 

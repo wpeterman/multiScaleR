@@ -1,3 +1,9 @@
+multiScaleR 0.7.30
+
+* Extend qualified native response-field geometry to exponential, Gaussian and Matern covariance with Gaussian, log-Poisson, logit-binomial, log-NB2 and log-Gamma response predictions. Retain native SEs, parameter penalties and memory/coordinate guards.
+* Attach explicit zero-effect prediction contracts to native mixed-model effect curves.
+* Add private normalized fixed-range GDR spatial-response prerequisites with distinct new-location residual variance; public spatial GDR fitting and inference remain guarded.
+
 multiScaleR 0.7.29
 
 * Add private prepared raw-design binomial prerequisites with fixed spline and factor recipes, normalized grouped/frequency likelihoods, and explicit nominal coefficient-plus-scale counts.

@@ -126,8 +126,13 @@
 
 #' Private immutable observation context for normalized finite-K Gaussian GDR
 #' @noRd
-.msr_gdr_gaussian_context <- function(data, parameters) {
+.msr_gdr_gaussian_context <- function(data, parameters, .lambda_loading = NULL) {
   .msr_gdr_gaussian_data(data, parameters)
+  if (!is.null(.lambda_loading) && (!is.matrix(.lambda_loading) ||
+      !is.numeric(.lambda_loading) || any(!is.finite(.lambda_loading)) ||
+      !length(data$block) || !identical(dim(.lambda_loading),
+        c(nrow(data$Xlambda), length(parameters$b_lambda)))))
+    stop("Retain a finite abundance loading matrix in the exact survey/state layout.", call. = FALSE)
   abundance_dimension <- dim(data$Xlambda)
   abundance_columns <- colnames(data$Xlambda)
   abundance_rows <- rownames(data$Xlambda)
@@ -153,11 +158,11 @@
     .msr_gdr_gaussian_data, .msr_gdr_annulus_program,
     .msr_gdr_poisson_logcdf_program), function(fn)
       list(formals = deparse(formals(fn)), body = deparse(body(fn))))
-  response_fingerprint <- digest::digest(list(data = data,
+  response_fingerprint <- digest::digest(list(data = data, lambda_loading = .lambda_loading,
     abundance_dimension = abundance_dimension, abundance_columns = abundance_columns,
     abundance_rows = abundance_rows, parameter_layout = layout, implementation = implementation,
     RTMB = as.character(getNamespaceVersion("RTMB"))), algo = "sha256")
-  force(data); force(parameters); force(cdf); force(ratio); force(constant)
+  force(data); force(parameters); force(cdf); force(ratio); force(constant); force(.lambda_loading)
   prepare <- function(Xlambda, row_ids) {
     if (missing(row_ids) || !identical(row_ids, data$row_ids$survey) ||
         !is.matrix(Xlambda) || !identical(dim(Xlambda), abundance_dimension) ||
@@ -171,7 +176,8 @@
     force(Xlambda); force(row_ids)
     objective <- function(p) {
       eta <- as.vector(Xlambda %*% p$beta_lambda)
-      if (length(data$block)) eta <- eta + p$b_lambda[data$block]
+      if (length(data$block)) eta <- eta + if (is.null(.lambda_loading))
+        p$b_lambda[data$block] else as.vector(.lambda_loading %*% p$b_lambda)
       log_lambda <- eta + log(data$area)
       eta_dist <- as.vector(data$Xdist %*% p$beta_dist)
       if (length(data$observer)) eta_dist <- eta_dist + p$b_dist[data$observer]

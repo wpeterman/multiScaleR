@@ -46,6 +46,10 @@ Either estimated parameters or the fitted model using provided parameters
 Function for internal use with optim
 }
 \details{
-For internal use
+For internal use. Native glmmTMB call replay resolves local
+  constructor arguments in the retained formula environment when ordinary
+  updating fails. The replacement data stay explicit. Constructor arguments
+  and defaults are not replaced; the initial update error is retained in the
+  returned model's \code{msr_refit_call} attribute.
 }
 \keyword{internal}

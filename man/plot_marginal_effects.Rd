@@ -85,7 +85,9 @@ A named list of \code{ggplot2} objects, one per covariate. Plots are
       intervals, with the retained draw indices and prediction contract
       attached to the returned list. Ordinary unmarked curves also attach
       their native prediction contract, including zero-effect conditioning
-      and kernel-conditional confidence limits.
+      and kernel-conditional confidence limits. Native glmmTMB and lme4
+      curves also attach their zero-effect response prediction contract,
+      including identified native spatial-field conditioning.
     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
       terms that involve the covariate.
   }

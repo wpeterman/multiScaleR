@@ -14,8 +14,8 @@ response_field_geometry(
 }
 \arguments{
 \item{object}{A \code{multiScaleR} refit result containing a native glmmTMB
-Gaussian or log-link Poisson model with one shared exponential response
-field and no other random effects.}
+Gaussian, log-link Poisson/NB2/Gamma or logit-binomial model with one shared
+exponential, Gaussian or Matern response field and no other random effects.}
 
 \item{coords}{Numeric matrix or data frame with two finite projected coordinate
 columns, one row per retained native fitting row in its original order.
@@ -76,6 +76,9 @@ Supply this object as
 
   Native mean-prediction SEs remain conditional on selected ecological kernel
   scales. They do not add observation noise or kernel-scale uncertainty.
+  Binomial output keeps the native per-trial probability scale, including
+  when fitting grouped success/failure counts. Poisson/NB2 output is the
+  native expected count; Gaussian/Gamma output is the native response mean.
   \code{re.form = NA} gives a zero-field reference, not integration over the
   random field. Output retains fit and requested SE bands even if all cells
   are NA. Multiple rows in \code{raster_args$const} produce one fit/SE band

@@ -190,3 +190,7 @@ priorities; they do not replace the GDR observation law or loosen admission.
 ## Prepared binomial and current spatial priority, 0.7.29
 
 [Prepared raw-binomial contracts](benchmarks/tmb_marginal_likelihood/pb_20261109/CONTRACT16.md) now have exact original-design existence certificates, focused installed/worker tests and full package qualification. Public raw fitting/selection/provider and uncertainty guards remain closed. The latest direct priority is [response spatial integration](benchmarks/tmb_marginal_likelihood/pb_20261109/SPATIAL_PLAN.md), especially native glmmTMB and a proper normalized GDR abundance field. Existing iid groups and spatially varying ecological kernels remain distinct.
+
+## Response-field compatibility, 0.7.30
+
+[Validated spatial contracts](benchmarks/tmb_marginal_likelihood/sf_20261109/CONTRACT07.md) extend native glmmTMB covariance/family prediction and fixed-reference refits while keeping native SE and penalty meanings. A private normalized GDR fixed-range field now has joint and Laplace derivative/curvature prerequisites, not public fitting admission. [Remaining spatial gates](benchmarks/tmb_marginal_likelihood/sf_20261109/NEXT07.md) prioritize optimized GDR references with full fixed/latent uncertainty.

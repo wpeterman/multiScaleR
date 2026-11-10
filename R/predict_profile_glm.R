@@ -265,9 +265,10 @@
 #' predictors or complete saved prediction calls. New prediction rows never
 #' supply the training constants. Scaling arguments retain their original
 #' order and standard abbreviations. Custom functions retain their own semantics.
-#' Native glmmTMB exponential response fields retain their provider prediction
-#' and mean-prediction SEs through the refit adapter at selected kernel scales.
-#' Gaussian and log-Poisson conformance checks use one shared projected field
+#' Native glmmTMB exponential, Gaussian and Matern response fields retain their
+#' provider predictions and mean-prediction SEs through the refit adapter at
+#' selected kernel scales. Conformance checks cover Gaussian, log-Poisson,
+#' logit-binomial, log-NB2 and log-Gamma responses with one shared projected field
 #' without a year effect. Supply the native coordinate factor and grouping
 #' columns explicitly, including newly constructed \code{glmmTMB::numFactor()}
 #' positions and \code{allow.new.levels = TRUE} when appropriate. A response
@@ -398,8 +399,8 @@
 #' \code{native_args}. The \code{raster_args} list accepts \code{filename},
 #' \code{overwrite}, \code{wopt}, \code{const}, \code{cores}, \code{na.rm},
 #' and \code{field_geometry}. The latter takes a checked
-#' \code{response_field_geometry()} descriptor for one shared exponential
-#' response field. It requires a matching projected CRS, uses cell-center
+#' \code{response_field_geometry()} descriptor for one shared exponential,
+#' Gaussian or Matern response field. It requires a matching projected CRS, uses cell-center
 #' coordinates and one worker, and gates serial native batch expansion against
 #' an explicit working-memory budget. New positions require an explicit
 #' \code{allow.new.levels = TRUE} in \code{native_args}. Native SEs and zero-field references

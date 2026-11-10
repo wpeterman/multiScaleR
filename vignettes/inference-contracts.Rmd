@@ -557,10 +557,13 @@ Their native coefficient SEs still condition on the selected spatial scales.
 A native glmmTMB response field adds correlated variation to the response's
 linear predictor. It does not make the ecological kernel scale vary by location.
 Native refitting can retain this covariance while kernel predictors change.
-The initial conformance checks cover one shared exponential field, Gaussian or
-log-Poisson responses, and selected fixed ecological scales with no year term.
-They verify adapter behavior, not recovery, calibrated uncertainty or general
-spatial model selection performance. The `joint_mixed` backend retains its
+Coordinate-aware prediction checks cover one shared exponential, Gaussian or
+Matern field with Gaussian, log-Poisson, logit-binomial, log-NB2 or log-Gamma
+responses. They use selected fixed ecological scales without a year term.
+The expanded constructions fix correlation range and Matern shape while
+estimating the field SD; the original Gaussian/log-Poisson exponential
+references also estimate range. These checks verify native adapter behavior,
+not recovery, interval calibration or general spatial model selection performance. The `joint_mixed` backend retains its
 independent-random-intercept guard and does not admit these fields.
 
 ```{r native-response-field, eval=FALSE}
@@ -577,13 +580,19 @@ attr(pred, "prediction_contract")$response_spatial_field
 ```
 
 The contract names the response covariance, coordinate inputs, field replication
-and covariance-parameter count. Units are not guessed from factor labels.
-glmmTMB's likelihood degrees of freedom count the fitted covariance parameters. The realized field values are not added as separate likelihood parameters.
+and covariance-coordinate count. That diagnostic count describes the native
+layout before parameter maps, including any coordinates fixed by the user.
+Units are not guessed from factor labels. glmmTMB's likelihood degrees of
+freedom supply the actual estimated-parameter penalty; mapped fixed ranges
+and shapes add no parameter. Realized field values are not counted separately.
 multiScaleR also counts its fitted ecological kernel parameters. A field's
 correlation range and an ecological scale have different interpretations.
 
 Native point predictions and prepared fixed-row snapshots preserve their
-mean-prediction SEs, conditional on the selected ecological scales. Setting
+mean-prediction SEs, conditional on the selected ecological scales. Binomial
+output is a per-trial probability even for grouped success/failure fitting
+data. Poisson/NB2 maps retain native expected counts and Gaussian/Gamma maps
+retain native response means. These mean SEs do not add observation variance. Setting
 `re.form = NA` supplies a zero-deviation reference rather than integrating over
 the field. Observation noise and ecological-scale uncertainty remain separate.
 For predictions at new field locations, construct new coordinate factors with
@@ -622,11 +631,15 @@ intentional change.
 Native calls use serial sub-batches. A conservative dense-array estimate must
 fit the declared MiB budget before field expansion. This guards a planned working
 set, not an operating-system memory cap or an exact accounting of native tapes.
-Smaller batches reduce expansion but repeat preparation. The initial map adapter
-qualifies one shared exponential Gaussian or log-Poisson field. Correlated joint
-scale fitting, cross-row raster covariance and spatial mixed-model CV remain
-separate gates. The checked layout is glmmTMB1.1.14. Gaussian
-and Matern covariance layout witnesses are not fitted-model qualification.
+Smaller batches reduce expansion but repeat preparation. One shared field
+uses the native covariance and prediction method for the qualified families
+and covariance structures above. Correlated joint analytic scale fitting,
+cross-row raster covariance and spatial mixed-model CV remain separate gates.
+The checked provider layout is glmmTMB 1.1.14. Mixed-model effect curves attach
+the same explicit zero-field contract; their reference is not a random-field
+average. GDR's native iid abundance groups remain independent effects. A
+continuous GDR response field has separate normalized-target and prediction
+prerequisites and is not enabled by this glmmTMB coordinate descriptor.
 
 Ordinary unmarked `pcount` and `occu` effect curves instead freeze each learner
 from the original raw site covariates before site removal. This supports
