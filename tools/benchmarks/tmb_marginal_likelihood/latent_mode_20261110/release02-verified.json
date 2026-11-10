@@ -1,0 +1,22 @@
+{
+  "accepted": true,
+  "version": "0.7.32",
+  "check_status": "OK",
+  "normal_vignette_enabled": true,
+  "archive": "C:\\Users\\peterman.73\\AppData\\Local\\Temp\\msr-release32-mt6y285u\\multiScaleR_0.7.32.tar.gz",
+  "archive_sha256": "69195a82d4c470f4d08beee4e5f7a4e52527402135748b5ac644ecbde2aa78d9",
+  "package_code_and_tests_identical_to_full29": true,
+  "matched_archive_code_files": 550,
+  "inherited_full_validation": {
+    "failed": 0,
+    "warnings": 0,
+    "skips": 10,
+    "passed": 42575
+  },
+  "full_installed_suite_rerun": false,
+  "coverage": "Full29 exact code/test identity plus fresh 0.7.32 normal vignette check",
+  "no_statistical_code_changed_after_full29": true,
+  "timing_comparison_eligible": false,
+  "retained_failure": "release02-failure.json",
+  "normal_check_continuation": "release05"
+}

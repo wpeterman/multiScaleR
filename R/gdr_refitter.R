@@ -61,7 +61,8 @@
     ".msr_gdr_optimizer_checkpoint", "gdr_start_values", ".msr_gdr_exact_start_map",
     ".msr_gdr_TMB_settings", ".msr_gdr_TMB_provider", ".msr_gdr_TMB_diagnostics",
     ".msr_gdr_TMB_refit", ".msr_gdr_refit_start", ".msr_gdr_TMB_preparation", ".msr_gdr_TMB_fit",
-    ".msr_gdr_TMB_layout")
+    ".msr_gdr_TMB_layout", ".msr_gdr_TMB_policy", ".msr_gdr_TMB_adfun",
+    ".msr_gdr_TMB_phase", ".msr_gdr_TMB_point")
   .msr_gdr_hash(lapply(functions, function(name) {
     fun <- get(name, envir = environment(.msr_gdr_adapter_identity), inherits = FALSE)
     list(name = name, formals = deparse(formals(fun)), body = deparse(body(fun)))
@@ -166,6 +167,13 @@
 #'   bounds require L-BFGS-B and use scalar or native fitted-optimizer order,
 #'   which can differ from constructor-start order. Leave \code{NULL} for C models,
 #'   whose original evaluated settings are recovered automatically.
+#'   Optional \code{random.start} is \code{"cached_best"} (the unchanged native
+#'   default) or \code{"zero"}. Optional \code{inner.control} explicitly supplies
+#'   positive \code{maxit}, \code{tol}, \code{grad.tol} and \code{step.tol} for
+#'   native conditional-mode Newton iterations. These numerical policies are
+#'   bound to the audit contract; they do not change priors or prove a rescue.
+#'   Optional \code{record_memory = TRUE} requires \pkg{ps} and records process
+#'   memory at phase boundaries; its default is \code{FALSE}.
 #' @return A function accepting \code{model}, \code{data} and \code{context},
 #'   suitable for \code{refit_fn} in \code{\link{multiScale_optim}}. It returns
 #'   one native fitted model with a compact \code{msr_gdr_refit_audit} attribute.
@@ -176,6 +184,13 @@
 #'   identities, their request/completion paths and the native optimizer's
 #'   `par`, `value`, `counts`, `convergence` and `message` when supplied. Values
 #'   stay on native link scales; failed/nonfinite diagnostics remain visible.
+#'   Each TMB attempt also identifies an `optimizer_point_file`, written before
+#'   covariance computation. Its `msr_gdr_optimizer_point` packet contains native
+#'   fixed optimizer positions, repeated display labels, data/layout hashes,
+#'   finite-cutoff value and storage type, declared policy and phase records.
+#'   It is always inference-ineligible and contains no fitted S4 object, latent
+#'   states or covariance. A completed point survives a later covariance error;
+#'   it does not provide coefficient SEs or permission to resume inference.
 #' @details
 #' The factory binds to the supplied original model. The callback permits only
 #' updates to static spatial columns named by \code{context$covs}. All other
@@ -245,6 +260,28 @@
 #' The native integration cutoff K is distinct from the K column in information
 #' criterion tables, which counts fitted parameters. Reusing one cutoff does
 #' not replace a separate cutoff-sensitivity analysis.
+#'
+#' TMB diagnostics evaluate the direct joint gradient and current latent
+#' precision at the retained complete mode. They record its maximum latent
+#' gradient and precision-scaled Newton decrement, each required below 1e-3,
+#' and align the covariance's random coordinates with that mode. The returned
+#' marginal value must also agree within 1e-7. These are local consistency checks,
+#' not evidence of a unique/global mode or accurate high-dimensional integration.
+#' A zero inner start or tighter tolerances may reach another numerical branch;
+#' retain every failure and qualify each policy independently. No automatic
+#' policy rescue, population-prior change or uncertainty adjustment is applied.
+#'
+#' Attempt records separate native constructor preparation from TMB tape
+#' construction, outer optimization, returned-value checking, covariance and
+#' diagnostic qualification. Elapsed times include the declared observer work.
+#' With `record_memory = TRUE`, `ps` supplies whole-process RSS and lifetime
+#' maximum RSS in bytes at phase boundaries. These include other objects loaded
+#' in that R process. They are not isolated tape costs, phase-specific maxima or
+#' operating-system memory caps. An unavailable observation retains its reason.
+#' Ordinary unmarked constructor replay does not forward these policies in the
+#' qualified provider; use this audited refitter to retain the declared controls.
+#' Returned native models still retain full native coefficient/latent uncertainty
+#' conditional on ecological scales. The numeric point does not replace them.
 #' @seealso \code{\link{multiScale_optim}}, \code{\link{validate_unmarked_data}},
 #'   \code{\link{aic_tab}}
 #' @examples
@@ -266,6 +303,7 @@
 #'   is.function(callback)
 #'   # Supply callback as refit_fn in multiScale_optim().
 #' }
+#' @md
 #' @export
 make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list(),
                               tmb_settings = NULL) {
@@ -465,6 +503,8 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
         input_design_sha256 = audit$input_design_sha256, optimizer = NULL, status = "started")
       record$audit_file <- sub("[.]rds$", paste0("-attempt-", length(audit$attempts) + 1L, ".rds"), path)
       record$request_file <- sub("[.]rds$", "-request.rds", record$audit_file)
+      if (tmb) record$native_preparation_started <- .msr_gdr_TMB_phase("native_preparation_started",
+        proc.time()[["elapsed"]], settings$policy)
       .msr_gdr_atomic_audit(record, record$request_file)
       fit <- tryCatch(withCallingHandlers({
         args <- c(list(lambdaformula = formulas$lambda, phiformula = formulas$phi,
@@ -473,7 +513,17 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
           mixture = metadata$mixture, K = metadata$K, starts = unname(start),
           method = settings$method, se = se, engine = settings$engine, threads = settings$threads),
           if (!tmb) settings$dots)
-        value <- if (tmb) .msr_gdr_TMB_refit(args, settings) else do.call(unmarked::gdistremoval, args)
+        checkpoint <- function(point) {
+          point$native_preparation <- list(started = record$native_preparation_started,
+            elapsed_seconds = point$phases$construction_started$process_elapsed_seconds -
+              record$native_preparation_started$process_elapsed_seconds,
+            scope = "native_constructor_preparation_before_TMB_tape_helper")
+          point$binding <- list(contract_sha256 = contract_sha256, provider = header$provider,
+            input_context_sha256 = audit$input_context_sha256, input_sha256 = audit$input_sha256,
+            input_design_sha256 = audit$input_design_sha256, start_name = name)
+          .msr_gdr_atomic_audit(point, sub("[.]rds$", "-point.rds", record$audit_file))
+        }
+        value <- if (tmb) .msr_gdr_TMB_refit(args, settings, checkpoint = checkpoint) else do.call(unmarked::gdistremoval, args)
         record$optimizer <- .msr_gdr_optimizer_checkpoint(value@opt)
         if (!identical(names(unmarked::coef(value)), coefficient_names) ||
             .msr_parameter_count(value) != audit$parameter_count ||
@@ -488,6 +538,10 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
         record$gradient <- value@opt$gradient
         if (!is.null(record$gradient)) record$gradient_status <- "provided_by_native_optimizer"
         record$covariance <- .msr_gdr_variance_status(value, se)
+        if (tmb) record$optimizer_point_file <- record$covariance$workflow$point_file
+        if (tmb) record$native_preparation_elapsed_seconds <-
+          record$covariance$workflow$phases$construction_started$process_elapsed_seconds -
+          record$native_preparation_started$process_elapsed_seconds
         if (tmb) {
           record$gradient <- record$covariance$gradient
           record$gradient_status <- "native_TMB_marginal_score_at_optimizer"
@@ -495,8 +549,11 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
         value
       }, warning = function(w) record$warnings <<- c(record$warnings, conditionMessage(w))),
         error = function(e) {
+          if (inherits(e, "msr_gdr_audit_error")) stop(e)
           record$error <<- conditionMessage(e)
           if (inherits(e, "msr_gdr_tmb_error") && !is.null(e$optimizer)) {
+            record$optimizer_point_file <<- e$point_file
+            record$workflow <<- e$workflow
             record$optimizer <<- e$optimizer
             record$logLik <<- -e$optimizer$value
             record$convergence <<- e$optimizer$convergence

@@ -43,7 +43,9 @@ test_that("unusable highest TMB attempts retain optimizer evidence and cannot lo
   counter <- 0L
   # A declared constructor stub tests the audit selection contract only.
   # Its returned original model is not a fitted update or scientific reference.
-  constructor <- function(args, settings) {
+  # The selection-only stub accepts the new checkpoint callback without
+  # invoking it or claiming that its returned original model was refitted.
+  constructor <- function(args, settings, checkpoint = NULL) {
     counter <<- counter + 1L
     if (counter == 1L) stop(structure(list(message = "declared post-optimizer covariance failure",
       call = NULL, optimizer = list(par = f$model@opt$par, value = -1e9,

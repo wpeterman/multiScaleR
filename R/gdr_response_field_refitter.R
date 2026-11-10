@@ -8,6 +8,7 @@
     threads = settings$threads, control = settings$dots$control)
   requested[names(settings$dots)[names(settings$dots) != "control"]] <-
     settings$dots[names(settings$dots) != "control"]
+  requested[names(settings$policy$requested)] <- settings$policy$requested
   if (!is.list(tmb_settings) || !setequal(names(tmb_settings), names(requested)) ||
       !identical(tmb_settings[names(requested)], requested))
     stop("Field refits must explicitly retain the original qualified tmb_settings.", call. = FALSE)

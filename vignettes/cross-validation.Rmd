@@ -513,9 +513,70 @@ and use outer assessment if these results tune the candidate set or selection
 rule. These point scores integrate no parameter/selection uncertainty and
 provide no observation intervals or calibration certificate.
 
+# Gaussian spatial response fields
+
+Use `cross_validate_field()` when a Gaussian response model needs a spatial
+field as well as fixed predictors. It estimates the response correlation range,
+field SD, observation SD and regression coefficients inside each training fold.
+The initial native glmmTMB route supports exponential and Gaussian correlation,
+one shared field, constant observation dispersion and maximum likelihood.
+Keep repeated surveys at a response-field location together in the split.
+
+The following template uses caller-supplied raw predictors and projected points.
+The response-field coordinates can differ from ecological predictor focal
+locations, but each declared field state needs its actual consistent location.
+Grouped landscape blocks do not supply point coordinates automatically.
+
+```{r spatial-field-cv-template, eval=FALSE}
+folds <- spatial_cv_folds(field_xy, block_size = 10000, k = 5,
+  buffer = 1000, crs = 32617, ids = rownames(raw_data))
+covariances <- c(exponential = "exponential", gaussian = "gaussian")
+candidates <- lapply(covariances, function(covariance) {
+  cross_validate_field(y ~ habitat * cover + offset(log(exposure)),
+    raw_data, field_xy, folds, crs = 32617, covariance = covariance,
+    kernel_inputs = inputs, audit_dir = file.path("field-cv-audits", covariance))
+})
+cv_tab(candidates, metric = "neg_log_score")
+selected <- select_cv(candidates, criterion = "AICc")
+selected$selection$chosen  # training criterion only, one choice per fold
+selected$summary
+```
+
+**How to read these results:** RMSE and MAE summarize conditional response-mean
+errors. Negative log score uses one joint Gaussian density for each held-out
+block, including the remaining covariance between its observations and the
+Gaussian observation noise. The reported pooled score is total joint loss
+divided by the number of assessment observations. Smaller is better. Multiplying
+independent marginal densities would discard this field dependence and defines
+a different score. `cv_tab()` therefore keeps these targets separate from
+ordinary independent GLM density scores.
+
+Field states are integrated jointly at the fitted training parameters. Parameter
+uncertainty, including uncertainty in correlation range, observation SD and any
+selected ecological scale, is not integrated into this plug-in density. Native
+mean-prediction SEs keep their own meaning and are not observation predictive
+variances. New-location field variance, remaining training-field uncertainty
+and observation noise are identified separately in the returned predictions.
+Software agreement is not a calibration or recovery assessment.
+
+Supplying `kernel_inputs` also re-estimates its ecological scales inside each
+training fold. Raw cells, bins, normalizers and supported scale/poly/ns/bs
+recipes use analysis rows only. Assessment and excluded buffer responses never
+enter fitting. The response-field range and ecological kernel bandwidth remain
+separate estimated quantities. Both native covariance starts must pass the
+original convergence, score, curvature and agreement gates. Failed folds and
+their compact audit records are retained; no passing replacement start is used.
+
+Compact training records always support AIC/AICc/BIC selection for these field
+results. They count native regression, range and variance parameters plus
+estimated ecological scales, while integrated field realizations add no penalty.
+Choosing a model from held-out ranks still needs independent outer assessment.
+The adapter estimates no Matern shape, additional random effects or paired GDR
+field score. Those routes retain separate qualification guards.
+
 # Keep outputs proportionate to the task
 
-Both CV functions default to `keep_fits = FALSE` and `keep_selection = FALSE`,
+The GLM and conditional-choice adapters default to `keep_fits = FALSE` and `keep_selection = FALSE`,
 retaining scores, training summaries and diagnostics. For training-based model
 selection, use `keep_selection = TRUE`. Each `$selection_records` entry captures
 the actual training fit's native log likelihood, full parameter count, effective

@@ -68,6 +68,9 @@ artifacts. Run `python -B tools/validation/test_package_batch.py` for its
 non-numerical archive and full-profile tests.
 
 `profiles.json` lists focused feedback filters and the full acceptance policy.
+The CV and selection profiles include `test-field-cv.R` alongside the existing
+independent-response CV tests. Source-based field-CV plans retain that file
+without expanding partial feedback to the entire suite.
 Focused tests never replace the complete suite. Assertion totals describe
 coverage; they are not a development target. Remove duplication by sharing
 unchanged fixtures and helpers. Keep scientific gates, edge cases and regression

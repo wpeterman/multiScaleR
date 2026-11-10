@@ -9,7 +9,8 @@
     ".msr_gdr_TMB_fit", ".msr_gdr_TMB_diagnostics", ".msr_gdr_field_configuration_hash",
     ".msr_gdr_field_binding", ".msr_gdr_field_geometry", ".msr_gdr_field_contract",
     ".msr_gdr_field_prediction_budget", ".msr_gdr_field_raster_eval",
-    ".add_site_covariate_rasters")
+    ".add_site_covariate_rasters", ".msr_gdr_TMB_policy", ".msr_gdr_TMB_adfun",
+    ".msr_gdr_TMB_phase", ".msr_gdr_TMB_point")
   # Runtime byte compilation is not a source edit. Bind canonical formals
   # and code, as in the existing GDR adapter identity, rather than bytecode.
   ordinary <- lapply(functions, function(name) {
@@ -70,9 +71,14 @@
 #'   disagreements stop rather than returning a preferred passing fit.
 #' @param audit_dir Directory for compact atomic request/attempt/result records.
 #'   Records retain failures, controls and identities, not models or tapes.
+#'   Each native optimizer point is saved before covariance work as an explicitly
+#'   inference-ineligible numeric packet. A later failure cannot turn that point
+#'   into a fitted field or erase its completed optimization evidence.
 #' @param tmb_settings Explicit native settings as in [make_gdr_refitter()].
 #'   This initial field route requires BFGS, `se = TRUE`, one thread and positive
 #'   `control$maxit`. Full fixed and joint curvature remain mandatory.
+#'   Optional inner-mode policies and process-memory observations follow
+#'   [make_gdr_refitter()] and must remain identical in field-preserving refits.
 #' @param max_memory_mb Positive finite conservative planning budget in MiB.
 #'   Default 512. Dense field/covariance and finite-K tape planning must fit it.
 #'   This estimate is not an operating-system memory cap.
@@ -229,6 +235,9 @@ fit_gdr_response_field <- function(model, coords, crs, range, cold_starts,
   run <- function(start, name, index) {
     attempt <- list(name = name, start = unname(start), status = "started", warnings = character(), error = NULL)
     path <- sub("[.]rds$", paste0("-attempt-", index, ".rds"), audit)
+    attempt$native_preparation_started <- .msr_gdr_TMB_phase("native_preparation_started",
+      proc.time()[["elapsed"]], settings$policy)
+    .msr_gdr_atomic_audit(attempt, sub("[.]rds$", "-request.rds", path))
     on.exit(.msr_gdr_atomic_audit(attempt, path))
     constructor <- unmarked::gdistremoval
     scope <- new.env(parent = environment(constructor)); result <- NULL
@@ -245,7 +254,18 @@ fit_gdr_response_field <- function(model, coords, crs, range, cold_starts,
       old_threads <- TMB::openmp(DLL = "unmarked_TMBExports")
       on.exit(TMB::openmp(old_threads, DLL = "unmarked_TMBExports"))
       TMB::openmp(1L, DLL = "unmarked_TMBExports")
-      result <<- .msr_gdr_TMB_fit(model, data, params, random, starts, method, settings$dots)
+      checkpoint <- function(point) {
+        point$native_preparation <- list(started = attempt$native_preparation_started,
+          elapsed_seconds = point$phases$construction_started$process_elapsed_seconds -
+            attempt$native_preparation_started$process_elapsed_seconds,
+          scope = "native_constructor_and_field_loading_before_TMB_tape_helper")
+        point$binding <- list(field_id = field$field_id, provider = field$provider,
+          source = field$source, input_design_sha256 = record$input_design_sha256,
+          start_name = name, input_field_configuration_sha256 = .msr_gdr_field_configuration_hash(field))
+        .msr_gdr_atomic_audit(point, sub("[.]rds$", "-point.rds", path))
+      }
+      result <<- .msr_gdr_TMB_fit(model, data, params, random, starts, method, settings$dots,
+        policy = settings$policy, checkpoint = checkpoint)
       result
     }
     environment(constructor) <- scope
@@ -257,8 +277,10 @@ fit_gdr_response_field <- function(model, coords, crs, range, cold_starts,
       starts = unname(start), method = settings$method),
       warning = function(w) attempt$warnings <<- c(attempt$warnings, conditionMessage(w))),
       error = function(e) {
+        if (inherits(e, "msr_gdr_audit_error")) stop(e)
         attempt$status <<- "failed"; attempt$error <<- conditionMessage(e)
         if (inherits(e, "msr_gdr_tmb_error")) {
+          attempt$optimizer_point_file <<- e$point_file; attempt$workflow <<- e$workflow
           attempt$optimizer <<- e$optimizer; attempt$covariance <<- e$covariance
         }
         NULL
@@ -270,6 +292,10 @@ fit_gdr_response_field <- function(model, coords, crs, range, cold_starts,
     attempt$converged <- identical(as.integer(result$opt$convergence), 0L)
     attempt$SE_requested <- TRUE
     attempt$covariance <- .msr_gdr_TMB_diagnostics(result)
+    attempt$optimizer_point_file <- result$workflow$point_file
+    attempt$native_preparation_elapsed_seconds <-
+      result$workflow$phases$construction_started$process_elapsed_seconds -
+      attempt$native_preparation_started$process_elapsed_seconds
     attempt$gradient <- attempt$covariance$gradient
     attempt$eligible <- identical(as.integer(result$opt$convergence), 0L) &&
       !length(attempt$warnings) && identical(attempt$covariance$status, "available") &&

@@ -1,0 +1,26 @@
+{
+  "accepted": true,
+  "verified_at": "2026-11-10T13:41:10.930416-05:00",
+  "verifier_sha256": "9da92f920ba28717dafbd2fabe58de2ea3c175e6dd6479f6c7387396eb64f569",
+  "configuration_sha256": "40c9ed56fb4b23686492084a37cc344aeb048fb330f55008b334837c0f867a6d",
+  "branch": "inference-dev",
+  "head": "1324db883d8c46e6d14b05ca18de3cf774e73a93",
+  "check_status": "OK",
+  "normal_vignette_enabled": true,
+  "full_validation": {
+    "failed": 0,
+    "warnings": 0,
+    "skips": 10,
+    "passed": 42575
+  },
+  "archive_sha256": "0980a080a27787d5fa1618604a1c7509126ba1efa2bf27fb4c4c560801cf6419",
+  "source_files": 623,
+  "source_archive_installed_tests_dependency_verified": true,
+  "all14scientific_markers_preserved": true,
+  "skip_identities_preserved": true,
+  "reviewed_ledger_deltas": {},
+  "verified_owned_R_remaining": 0,
+  "private_admission_guards_preserved": true,
+  "timing_comparison_eligible": false,
+  "as_cran_incoming_status": "unresolved_external_metadata_timeouts_from_full67"
+}

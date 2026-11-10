@@ -51,25 +51,39 @@ and a named list of finite numeric controls with positive integer
 recovered reliably from a saved TMB call. Optional \code{lower}/\code{upper}
 bounds require L-BFGS-B and use scalar or native fitted-optimizer order,
 which can differ from constructor-start order. Leave \code{NULL} for C models,
-whose original evaluated settings are recovered automatically.}
+whose original evaluated settings are recovered automatically.
+Optional \code{random.start} is \code{"cached_best"} (the unchanged native
+default) or \code{"zero"}. Optional \code{inner.control} explicitly supplies
+positive \code{maxit}, \code{tol}, \code{grad.tol} and \code{step.tol} for
+native conditional-mode Newton iterations. These numerical policies are
+bound to the audit contract; they do not change priors or prove a rescue.
+Optional \code{record_memory = TRUE} requires \pkg{ps} and records process
+memory at phase boundaries; its default is \code{FALSE}.}
 }
 \value{
 A function accepting \code{model}, \code{data} and \code{context},
-  suitable for \code{refit_fn} in \code{\link{multiScale_optim}}. It returns
-  one native fitted model with a compact \code{msr_gdr_refit_audit} attribute.
-  Failed calls raise a condition carrying their audit record and its path.
-  The audit adds `contract_sha256`, identifying the original `contract.rds`,
-  and `input_context_sha256`, binding the actual input data/design hashes and
-  authorized spatial columns to that contract. Attempt records retain these
-  identities, their request/completion paths and the native optimizer's
-  `par`, `value`, `counts`, `convergence` and `message` when supplied. Values
-  stay on native link scales; failed/nonfinite diagnostics remain visible.
+suitable for \code{refit_fn} in \code{\link{multiScale_optim}}. It returns
+one native fitted model with a compact \code{msr_gdr_refit_audit} attribute.
+Failed calls raise a condition carrying their audit record and its path.
+The audit adds \code{contract_sha256}, identifying the original \code{contract.rds},
+and \code{input_context_sha256}, binding the actual input data/design hashes and
+authorized spatial columns to that contract. Attempt records retain these
+identities, their request/completion paths and the native optimizer's
+\code{par}, \code{value}, \code{counts}, \code{convergence} and \code{message} when supplied. Values
+stay on native link scales; failed/nonfinite diagnostics remain visible.
+Each TMB attempt also identifies an \code{optimizer_point_file}, written before
+covariance computation. Its \code{msr_gdr_optimizer_point} packet contains native
+fixed optimizer positions, repeated display labels, data/layout hashes,
+finite-cutoff value and storage type, declared policy and phase records.
+It is always inference-ineligible and contains no fitted S4 object, latent
+states or covariance. A completed point survives a later covariance error;
+it does not provide coefficient SEs or permission to resume inference.
 }
 \description{
 Retain a small declared set of coefficient starts while
-  refitting a GDR model during ecological-scale optimization. The C engine
-  omits intermediate coefficient Hessians. The TMB engine retains native
-  joint covariance checks; both engines return an actual native fitted model.
+refitting a GDR model during ecological-scale optimization. The C engine
+omits intermediate coefficient Hessians. The TMB engine retains native
+joint covariance checks; both engines return an actual native fitted model.
 }
 \details{
 The factory binds to the supplied original model. The callback permits only
@@ -122,7 +136,7 @@ The contract retains original data and evaluated-design fingerprints,
 numeric constructor-coordinate metadata and the original optimizer summary.
 Its SHA256 covers the entire contract before its own fingerprint is added,
 including evaluated settings and native provider identity. This is stronger
-than the coordinate-only fingerprint from `gdr_start_values()`. Caller
+than the coordinate-only fingerprint from \code{gdr_start_values()}. Caller
 provenance is recorded as supplied; it is not independently verified.
 Input-design fingerprints identify the actual permitted spatial update.
 None of these records restores an executable objective or evaluates a new
@@ -140,6 +154,28 @@ guarded; the private RTMB fitting admission is unchanged.
 The native integration cutoff K is distinct from the K column in information
 criterion tables, which counts fitted parameters. Reusing one cutoff does
 not replace a separate cutoff-sensitivity analysis.
+
+TMB diagnostics evaluate the direct joint gradient and current latent
+precision at the retained complete mode. They record its maximum latent
+gradient and precision-scaled Newton decrement, each required below 1e-3,
+and align the covariance's random coordinates with that mode. The returned
+marginal value must also agree within 1e-7. These are local consistency checks,
+not evidence of a unique/global mode or accurate high-dimensional integration.
+A zero inner start or tighter tolerances may reach another numerical branch;
+retain every failure and qualify each policy independently. No automatic
+policy rescue, population-prior change or uncertainty adjustment is applied.
+
+Attempt records separate native constructor preparation from TMB tape
+construction, outer optimization, returned-value checking, covariance and
+diagnostic qualification. Elapsed times include the declared observer work.
+With \code{record_memory = TRUE}, \code{ps} supplies whole-process RSS and lifetime
+maximum RSS in bytes at phase boundaries. These include other objects loaded
+in that R process. They are not isolated tape costs, phase-specific maxima or
+operating-system memory caps. An unavailable observation retains its reason.
+Ordinary unmarked constructor replay does not forward these policies in the
+qualified provider; use this audited refitter to retain the declared controls.
+Returned native models still retain full native coefficient/latent uncertainty
+conditional on ecological scales. The numeric point does not replace them.
 }
 \examples{
 if (as.character(utils::packageVersion("unmarked")) == "1.5.2") {
@@ -163,5 +199,5 @@ if (as.character(utils::packageVersion("unmarked")) == "1.5.2") {
 }
 \seealso{
 \code{\link{multiScale_optim}}, \code{\link{validate_unmarked_data}},
-  \code{\link{aic_tab}}
+\code{\link{aic_tab}}
 }

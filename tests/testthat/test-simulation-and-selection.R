@@ -26,6 +26,7 @@ test_that("expected public helpers remain exported", {
     "check_bayes_setup",
     "cross_validate",
     "cross_validate_glm",
+    "cross_validate_field",
     "cross_validate_clogit",
     "cv_tab",
     "grouped_cv_folds",

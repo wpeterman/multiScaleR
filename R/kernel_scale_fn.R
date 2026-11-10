@@ -733,8 +733,9 @@ build_opt_context <- function(fitted_mod,
   } else {
     nrow(dat)
   }
+  point_ids <- if (!is.null(cov_df)) names(cov_df) else binned$point_ids
   complete_cases <- .model_complete_indices(dat = dat,
-                                            n_sites = n_sites)
+                                            n_sites = n_sites, point_ids = point_ids)
   data_idx <- complete_cases$data_idx
   complete_idx <- complete_cases$complete_idx
 
@@ -771,7 +772,7 @@ build_opt_context <- function(fitted_mod,
 }
 
 
-.model_complete_indices <- function(dat, n_sites) {
+.model_complete_indices <- function(dat, n_sites, point_ids = NULL) {
   data_idx <- which(stats::complete.cases(dat))
   complete_idx <- data_idx
 
@@ -779,7 +780,12 @@ build_opt_context <- function(fitted_mod,
   has_numeric_row_ids <- length(row_ids) == nrow(dat) &&
     all(grepl("^[0-9]+$", row_ids))
 
-  if (isTRUE(has_numeric_row_ids)) {
+  # Explicit named raw-cell IDs take precedence over numeric row-name
+  # guesses. This matters when CV subsets or permutes complete training rows.
+  if (.msr_valid_observation_ids(point_ids, n_sites) &&
+      .msr_valid_observation_ids(row_ids, nrow(dat)) && all(row_ids %in% point_ids)) {
+    complete_idx <- match(row_ids, point_ids)[data_idx]
+  } else if (isTRUE(has_numeric_row_ids)) {
     row_idx <- suppressWarnings(as.integer(row_ids))
     valid_row_idx <- !anyNA(row_idx) &&
       !anyDuplicated(row_idx) &&

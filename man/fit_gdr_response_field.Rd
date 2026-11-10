@@ -41,11 +41,16 @@ fitted starts and zero latent states are also checked. Failed attempts and
 disagreements stop rather than returning a preferred passing fit.}
 
 \item{audit_dir}{Directory for compact atomic request/attempt/result records.
-Records retain failures, controls and identities, not models or tapes.}
+Records retain failures, controls and identities, not models or tapes.
+Each native optimizer point is saved before covariance work as an explicitly
+inference-ineligible numeric packet. A later failure cannot turn that point
+into a fitted field or erase its completed optimization evidence.}
 
 \item{tmb_settings}{Explicit native settings as in \code{\link[=make_gdr_refitter]{make_gdr_refitter()}}.
 This initial field route requires BFGS, \code{se = TRUE}, one thread and positive
-\code{control$maxit}. Full fixed and joint curvature remain mandatory.}
+\code{control$maxit}. Full fixed and joint curvature remain mandatory.
+Optional inner-mode policies and process-memory observations follow
+\code{\link[=make_gdr_refitter]{make_gdr_refitter()}} and must remain identical in field-preserving refits.}
 
 \item{max_memory_mb}{Positive finite conservative planning budget in MiB.
 Default 512. Dense field/covariance and finite-K tape planning must fit it.

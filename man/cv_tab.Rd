@@ -52,6 +52,12 @@ There is no added complexity penalty, Akaike weight or model probability.
   Use \code{\link{select_cv}} for training-only information-criterion selection.
   Choosing a model or tuning rule from pooled CV results requires independent
   assessment or an outer validation layer to evaluate that choice.
+
+Complete \code{\link{cross_validate_field}} results compare their
+  separately qualified Gaussian joint block densities. Those scores include
+  conditional field covariance and observation noise at training estimates,
+  without parameter or ecological-scale uncertainty. They cannot be mixed
+  with independent GLM row-density targets. All failures remain explicit.
 }
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)

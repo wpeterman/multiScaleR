@@ -1,5 +1,57 @@
 # Development priorities
 
+## 0.7.32 release and latent-mode continuation, November 10
+
+The validated range/CV/GDR batch is being published under the user's explicit
+commit/push instruction. All shipped code passed42,575 assertions with ten
+unchanged skips and a clean normal vignette-enabled check. Only release metadata
+changes after that code qualification; the new archive is checked for exact
+code/test identity. Priors, diagnostics, penalties and uncertainty scopes remain.
+
+Proceed with [GDR latent-mode priorities](benchmarks/tmb_marginal_likelihood/latent_mode_20261110/NEXT_PRIORITIES.md),
+incorporating the latest external November10 memo. Actual mode/integral failures,
+prepared fitting, paired GDR CV, physical state IDs and estimated GDR ranges
+retain their gates. The user's current logoff is17:30 Eastern November10.
+
+
+## November 10 validated integration, uncommitted
+
+The current inference-dev source adds training-only Gaussian glmmTMB field CV
+with exponential/Gaussian correlation, estimated range, optional ecological
+kernel refits, joint held-out scores and training-only AIC/AICc/BIC selection.
+The private normalized GDR range prerequisites are also applied; public GDR
+estimated-range fitting and paired spatial CV retain their guards.
+
+The latest GDR workflow adds explicit retained inner policies/controls, typed
+optimizer packets before covariance, phase/process observations and local
+joint-mode/covariance alignment diagnostics. Native final SEs, priors, counts
+and uncertainty scopes are retained. Private NB finite-cutoff references and
+rare-availability sections preserve the existing Poisson primitives and guards.
+The fresh normal vignette-enabled check is OK; all 42,575 installed assertions
+pass, with ten unchanged skips and no failures/warnings. The CV planner also
+includes field-CV tests in focused feedback; all 12 Python planner tests pass.
+
+Continue range/CV integration through the critical memo prerequisites in
+[the GDR continuation](benchmarks/tmb_marginal_likelihood/range_cv_20261110/NEXT34.md).
+Actual removal-observer mode failures, prepared numeric fitting, paired GDR
+scores, physical state identities and field recovery remain separate gates.
+The [current checkpoint](benchmarks/tmb_marginal_likelihood/range_cv_20261110/RESUME.md)
+and report retain source/archive identities, all failures and exact resume steps.
+Version remains 0.7.31; no staging, commit, merge or push is authorized.
+
+
+## First priority on resume
+
+Support estimating response-field correlation ranges and spatially blocked
+cross-validation across appropriate spatial-field models, including GDR and
+glmmTMB. These take priority over point-only fitting/performance work and broader
+extensions. Preserve normalized targets, priors, diagnostics, parameter counts,
+and uncertainty distinctions. The [next spatial/GDR gates](benchmarks/tmb_marginal_likelihood/sg_20261109/NEXT67.md)
+record the required fitting and validation contracts. These capabilities still
+require qualification; the published GDR route retains its fixed-range guards.
+
+The remaining sections retain earlier priorities and completed work.
+
 The November 8 priority update and nonlinear evaluation place supported GDR
 evaluation/refitting and retained training recipes ahead of the remaining
 spatial extensions. The evaluation adds two `ns4` full references and extends

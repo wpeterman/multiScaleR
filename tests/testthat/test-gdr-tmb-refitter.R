@@ -63,11 +63,12 @@ test_that("TMB conditional curvature uses the current mode rather than its initi
   env <- new.env(parent = emptyenv())
   env$random <- 2L
   env$last.par <- c(0, .3)
+  env$f <- function(par, order) numeric(length(par))
   env$spHess <- function(par = c(0, 0), random = TRUE) {
     Matrix::Diagonal(1L, if (identical(par, c(0, .3))) 2 else -2)
   }
-  result <- list(opt = list(par = 0), TMB = list(env = env, gr = function(par) 0),
-    sdr = list(pdHess = TRUE, cov.fixed = matrix(1), par.fixed = 0,
+  result <- list(opt = list(par = 0, value = 0), TMB = list(env = env, fn = function(par) 0, gr = function(par) 0),
+    sdr = list(pdHess = TRUE, cov.fixed = matrix(1), par.fixed = 0, par.random = .3,
       jointPrecision = Matrix::Diagonal(2L)))
   diagnostic <- .msr_gdr_TMB_diagnostics(result)
   expect_identical(diagnostic$status, "available")

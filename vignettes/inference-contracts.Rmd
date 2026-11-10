@@ -733,6 +733,23 @@ integration, interval calibration, spatial CV or public AIC admission. New-field
 residual variance remains separate from fitted-field/parameter uncertainty,
 observation noise and ecological-scale uncertainty. No year field is added.
 
+### Private correlation-range prerequisites
+
+A private GDR target adds one log correlation-range parameter to the same
+finite-K Poisson/half-normal observation law. Abundance states use physical
+field coordinates. Their correlated Gaussian density retains its determinant
+and original field SD; the range parameter adds no prior or fitting-coordinate
+Jacobian. Physical and whitened joint densities differ by a state-coordinate
+Jacobian, which cancels when those states are integrated. Independent stationary
+AR1 and compiled native sections check these distinctions, including range/SD/
+state derivatives and the existing conditional-mode curvature checks.
+
+This is a likelihood prerequisite, not an estimated-range fitted-model route.
+Its extra coordinate does not enable AIC, spatial CV, new prediction uncertainty
+or public RTMB fitting. The published native GDR field still requires a supplied
+fixed range. Estimated range needs independent optimum/identifiability checks,
+correct penalties and full prediction covariance before its guards can change.
+
 ### Native fixed-range GDR abundance fields
 
 `fit_gdr_response_field()` adds an opt-in native TMB response field. The initial
@@ -819,3 +836,93 @@ fitting admission remains closed. Estimated range, additional GDR mixtures or
 distance keys, annual availability, field simulation, profile intervals and
 spatial GDR CV require separate qualification. These software comparisons do
 not establish empirical recovery or interval calibration.
+
+### Gaussian response-field cross-validation
+
+`cross_validate_field()` estimates a native Gaussian response field and its
+correlation range using analysis rows only. Optional ecological scales and
+learned transformations are also refitted in training. The held-out target is
+a joint Gaussian response block at fitted parameters, with conditional field
+covariance and observation noise. Coefficient, range, SD and ecological-scale
+parameter uncertainty is not integrated. Native mean-prediction SEs are not
+substitutes for that observation predictive covariance.
+
+Exponential and Gaussian covariance, one shared field, constant observation SD
+and ML are qualified separately from existing GLM CV. Whole field locations
+remain in one split part. Buffered-out rows enter neither the model nor its
+score. Compact training likelihood/count records support AIC/AICc/BIC selection;
+integrated states add no penalty and an estimated range adds its native
+parameter. Every failed fold/start and uncertainty distinction is retained.
+Paired GDR and other non-Gaussian joint scores remain separately guarded. See
+`vignette("cross-validation", package = "multiScaleR")` for the workflow.
+
+### GDR optimizer points and inner-mode policies
+
+Audited native TMB GDR and fixed-range GDR field refits save a typed numeric
+optimizer point before expensive covariance work. A point packet retains its
+native fixed-coordinate positions, repeated display labels, original cutoff
+value/storage, input/layout fingerprints and numerical policy. It contains no
+model, tape, latent-state array or covariance, and is always inference-ineligible.
+Keep both the point and its request/completion records if a later phase fails.
+A numeric point is evidence of completed optimization, not a fitted-model shortcut.
+
+The following settings show the separately bound inner and outer controls.
+They do not launch a model or change the native cached-start default. Changing
+an inner policy requires a new audited factory and independent qualification.
+
+```{r gdr-inner-policy-settings}
+tmb_settings <- list(method = "BFGS", se = TRUE, threads = 1L,
+  control = list(maxit = 2500L, reltol = 1e-10),
+  random.start = "cached_best",
+  inner.control = list(maxit = 1000L, tol = 1e-8,
+    grad.tol = 1e-8, step.tol = 1e-8),
+  record_memory = FALSE)
+```
+
+**How to read the diagnostics:** The direct joint gradient and current latent
+precision describe local conditional-mode stationarity. Both the maximum latent
+gradient and precision-scaled Newton decrement must be below 1e-3. Fixed and
+random covariance coordinates must match the retained point, and the returned
+marginal value must still agree within 1e-7. Positive curvature alone is
+insufficient. Neither these checks nor native likelihood/score agreement proves
+unique mode selection or accuracy of the underlying high-dimensional integral.
+The separately retained removal-observer failures are not repaired by exposing
+controls. No automatic zero-start rescue or prior/interval adjustment is applied.
+
+Preparation, TMB tape construction, optimization, value checking, covariance and
+qualification have separate progress/elapsed records. Optional
+`record_memory = TRUE` uses `ps` for whole-current-process RSS and lifetime peak
+RSS at phase boundaries. Those values include other loaded objects and are not
+isolated tape costs or phase-specific peaks. Memory observations are optional;
+missing observations retain a reason, and planning budgets remain unchanged.
+Default `FALSE` avoids the optional memory observer. No speed comparison follows
+from runs sharing resources with other work.
+
+Final native S4 fits still require all declared starts, cold comparisons, full
+native covariance, counts and original uncertainty distinctions. Their SEs remain
+conditional on selected ecological scales. Estimated field ranges, paired GDR
+spatial scores, prepared point-only search, physical state-identity tables and
+integration-accuracy/recovery assessment retain their separate development gates.
+
+#### A private conditional finite-cutoff reference
+
+An extension reuses the existing Poisson correction and adds a conditional NB
+reference. It retains the native finite-count cutoff rather than
+silently substituting an infinite-count likelihood. Let Y be the observed total,
+M the missed count, lambda the expected circle abundance and p the recorded
+probability. The native finite-K sum is its unbounded observed likelihood times
+P(M <= K-Y | Y). For Poisson abundance M is Poisson(lambda*(1-p)); with NB size r,
+its conditional size is r+Y and mean is lambda*(1-p)*(r+Y)/(r+lambda*p).
+This is the original truncated sum, without renormalizing the population prior.
+Caller-supplied bin probabilities retain their own integration approximation.
+
+Independent finite-count sums check this identity, including zero detections and
+the exact Poisson parent. Fixed rare-availability sections show how an unbounded
+conditional observed likelihood can approach a finite limit while a fixed cutoff
+loses mass. Those sections shift log abundance and the removal logit intercept
+in opposite directions. Cue probabilities retain their logistic law; the rare
+limit does not replace that law with a log-linear hazard. Positive numerical curvature induced by that cutoff is not a finite-
+intensity identification certificate. These are conditional fixed-parameter
+references, not Gaussian-integrated likelihoods, derivative qualification,
+zero-variance-field admission or a prepared fitter. Existing public targets,
+priors, fitted parameter counts and uncertainty remain unchanged.

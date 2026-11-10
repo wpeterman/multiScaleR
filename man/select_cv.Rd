@@ -76,6 +76,13 @@ Assessment outcomes and CV scores never choose the winner inside a fold.
   selection rule. If those are tuned using these results, use an independent
   test set or outer validation layer. Selection does not integrate parameter
   or selection uncertainty, add intervals or establish calibration.
+
+Complete Gaussian spatial-field CV candidates also support
+  training-only selection using their compact native ML likelihood/count
+  records. Native coefficients, field SD, estimated range and observation SD
+  keep their parameter penalties; integrated states add zero. Selected joint
+  block scores retain their original uncertainty scope. No assessment score
+  enters the training criterion, and failed candidates cannot be dropped.
 }
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)

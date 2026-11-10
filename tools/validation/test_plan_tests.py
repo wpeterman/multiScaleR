@@ -53,6 +53,26 @@ class FeedbackPlanTests(unittest.TestCase):
         out = planner.plan(self.root, self.config, changed=["tests/testthat/test-gdr-refitter.R"])
         self.assertEqual(out["selected_files"], ["test-gdr-refitter.R", "test-gdr-tmb-refitter.R"])
 
+    def test_field_cv_is_in_explicit_and_source_selected_cv_feedback(self):
+        # Exercise the actual profile filters so new field tests cannot be
+        # omitted merely because their name lacks the old cv- prefix.
+        config = planner.read(Path(__file__).with_name("profiles.json"))
+        config = dict(config, smoke_files=[])
+        for name in ("field-cv", "cross-validation", "cv-comparison"):
+            (self.root / "tests/testthat" / ("test-" + name + ".R")).write_text("one()\n")
+        for profile in ("cv", "selection"):
+            out = planner.plan(self.root, config, [profile])
+            self.assertIn("test-field-cv.R", out["selected_files"])
+            self.assertIn("test-cross-validation.R", out["selected_files"])
+            self.assertFalse(out["all_files_selected"])
+            self.assertFalse(out["release_eligible"])
+        for source in ("R/cross_validate_field.R", "R/field_cv_gaussian.R", "R/field_cv_comparison.R"):
+            out = planner.plan(self.root, config, changed=[source])
+            self.assertIn("test-field-cv.R", out["selected_files"], source)
+            self.assertIn("test-cross-validation.R", out["selected_files"], source)
+            self.assertFalse(out["all_files_selected"])
+            self.assertFalse(out["release_eligible"])
+
     def test_source_references_are_not_claimed_as_runtime_coverage(self):
         out = planner.inventory(self.root, self.config)
         self.assertEqual(out["exports_without_direct_source_reference"], ["two"])

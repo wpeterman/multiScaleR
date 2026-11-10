@@ -233,7 +233,8 @@ complement \code{\link{aic_tab}}; they are not AIC values or Akaike weights.
 Read \code{complete} first. Inspect failed folds and original diagnostics
 before ranking models. Partial fold scores remain available for diagnosis,
 while an incomplete pooled summary stays \code{NA}. This stage does not
-score GAMs, mixed, unmarked or Bayesian fits. See
+score GAMs, mixed, unmarked or Bayesian fits. Use \code{\link{cross_validate_field}}
+for the separately qualified Gaussian spatial-field workflow. See
 \code{\link{grouped_cv_folds}} and \code{\link{spatial_cv_folds}} for
 deterministic whole-group and spatial-grid fold construction.
 NB2 and Gamma held-out negative log scores use complete normalized densities

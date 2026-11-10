@@ -116,6 +116,12 @@
 #' \code{"selection_by_request"} identifies that capability description.
 #' None of these fields certifies finite SEs, covariance eligibility, or calibration.
 #'
+#' Gaussian spatial-field CV records a joint assessment-response component.
+#' It integrates the conditional Gaussian field and includes observation noise
+#' at fitted training parameters, with no coefficient, range/SD, ecological-scale
+#' or selection uncertainty integration. Its predictive SD is distinct from
+#' native mean-prediction SEs. Its metadata never upgrades an ineligible fit.
+#'
 #' Contracts describe the original prediction call. Ordinary data-frame
 #' subsetting can retain its attributes; it does not recompute the contract for
 #' a smaller batch. Use the existing row-level new-group flags for individual rows.

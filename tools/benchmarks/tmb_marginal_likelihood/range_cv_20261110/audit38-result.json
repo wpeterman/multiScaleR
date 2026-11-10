@@ -1,0 +1,33 @@
+{
+  "qualified": true,
+  "scope": "existing_small_native_mixed_fixed_point_joint_API_reference",
+  "inference_admitted": false,
+  "large_case_replayed": false,
+  "package_source_changed": false,
+  "fixed_coordinates": 6,
+  "latent_coordinates": 12,
+  "native_cutoff": 400,
+  "native_cutoff_storage": "double",
+  "gaps": {
+    "value": 0,
+    "gradient": 0,
+    "random_Hessian": 3.4106051316484809e-13
+  },
+  "local_latent_gradient_inf": 2.3447910280083306e-13,
+  "local_Newton_decrement": 2.2245257407840863e-14,
+  "minimum_latent_curvature": 35.734273212229851,
+  "repeated_marginal_value_gap": 0,
+  "input_sha256": "03afeb10cb97e38668bc3da608e5556f292e7af841b9d4406f1249a704df2cb4",
+  "full_point_sha256": "d395855695418bf7f6d76a69e92088511b17d1c35023ab41776298c18d6a59f3",
+  "complete_coordinate_labels_sha256": "611574d1b691fe87df25f5f59a56561687c58307e9fe4b6882b3b3beeb5bea06",
+  "provider": {
+    "TMB_version": "1.9.25",
+    "fit_TMB_sha256": "1248def31a98058b63f81fb9fce0b9602afb595a581192b24cd95c3ea1f0e3fa",
+    "TMB_R_sha256": "b994e77293958e5ecf95d101b39f112a087cc80d8534d2f366af10f659a7f01a",
+    "TMB_DLL_sha256": "1863388497b9546f106bb41518155c6025010a5ed19e8585fbf8baf7b9be8a9b",
+    "native_TMB_DLL_sha256": "0686d362fbf5b987a1311dad94ddb84fdb9b96f3cbc0c4fded800f6864efe4cd"
+  },
+  "seconds": 15.859999999999999,
+  "timing_comparison_eligible": false,
+  "full_arrays_or_models_saved": false
+}

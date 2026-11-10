@@ -1,3 +1,13 @@
+multiScaleR 0.7.32
+
+* Extend the private Poisson finite-cutoff reference to conditional NB values and add rare-availability limit checks without admitting a new fitting or integration backend.
+
+* Preserve typed native GDR optimizer points before covariance work, bind optional inner-mode controls, and strengthen current-mode diagnostics without changing priors, parameter counts or final native uncertainty.
+
+* Add private normalized correlation-range likelihood prerequisites for GDR while retaining public fixed-range guards.
+* Add training-only Gaussian response-field CV with native range estimation, optional ecological-scale refitting, joint block density scores and guarded training model selection.
+* Align named raw-cell rows explicitly when numeric observation labels are subset or permuted during refitting.
+
 multiScaleR 0.7.31
 
 * Add an opt-in native TMB fixed-range GDR abundance field, an identified fitted class, audited scale refitter, full joint conditional prediction uncertainty, numeric snapshots, effect curves and bounded coordinate maps. Preserve private RTMB and unqualified inference guards.
