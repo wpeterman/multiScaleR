@@ -173,3 +173,20 @@ each coherent batch. Keep checkpoints compact and preserve failed attempts.
 ## Updated profile-GLM memo queue, November 9
 
 [The ordered implementation plan](benchmarks/tmb_marginal_likelihood/profile_glm_integration_20261109/NEXT_STEPS.md) incorporates the memo's 15:26/16:06 UTC updates and supplements the priorities above. After the GDR prediction batch, qualify an official prepared raw-design binomial evaluator and independent finite-MLE status, then opt-in physical spline references, exact hard-radius hybrid search, bounded authenticated providers/caches, downstream prediction/selection/CV and equal-work efficiency. External fixed-point benchmarks are attributed evidence to port, not new package acceptance or whole-optimizer speedup claims. Preserve the current hard-radius guard, exact sample/response identity, nominal 7/10 counts, failures and all uncertainty distinctions.
+
+## Additional GDR follow-up, November 9
+
+[The updated GDR queue](benchmarks/tmb_marginal_likelihood/pb_20261109/GDR_NEXT16.md)
+incorporates the OBBA2 native-TMB evaluation memo. The native adapter and
+0.7.28 component recipes are implemented. Remaining GDR work is qualified
+point-only finite-K refitting with explicit numeric result contracts, paired
+prediction/fold scoring, scaled convergence and response-encoding metadata,
+and a supported controlled initial-fit route. Penalized smooths and continuous
+spatial abundance remain separate evidence-led extensions. Preserve all32
+full/fold cases,20 training/unused-group fixtures and the analysis-driver
+factorial-constant correction. These join the current raw-binomial/provider
+priorities; they do not replace the GDR observation law or loosen admission.
+
+## Prepared binomial and current spatial priority, 0.7.29
+
+[Prepared raw-binomial contracts](benchmarks/tmb_marginal_likelihood/pb_20261109/CONTRACT16.md) now have exact original-design existence certificates, focused installed/worker tests and full package qualification. Public raw fitting/selection/provider and uncertainty guards remain closed. The latest direct priority is [response spatial integration](benchmarks/tmb_marginal_likelihood/pb_20261109/SPATIAL_PLAN.md), especially native glmmTMB and a proper normalized GDR abundance field. Existing iid groups and spatially varying ecological kernels remain distinct.

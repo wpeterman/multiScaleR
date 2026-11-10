@@ -1,3 +1,8 @@
+multiScaleR 0.7.29
+
+* Add private prepared raw-design binomial prerequisites with fixed spline and factor recipes, normalized grouped/frequency likelihoods, and explicit nominal coefficient-plus-scale counts.
+* Independently verify finite-MLE geometry with exact original-design certificates; retain unresolved cases and all public fitting, selection, and uncertainty guards.
+
 multiScaleR 0.7.28
 
 * Retain trained GDR component transformations and factor coding through native
