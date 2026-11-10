@@ -52,6 +52,13 @@ The fields describe the calculation:
   \item{fixed_inputs, component}{Whether the rows and controls are bound to a
     snapshot, and the named component when applicable.}
 }
+Identified native GDR response fields record a fixed correlation range,
+conditional physical abundance effects and distinct new-location residual
+variance. Their SEs retain full fitted fixed/latent covariance. Density point
+predictions are inverse-link conditional predictors, not lognormal field
+averages. These native field calculations do not enable the private RTMB
+fitting route, field simulation, spatial CV or ecological-scale uncertainty.
+
 Native glmmTMB response/link predictions with recognized exponential,
 Gaussian or Matern response covariance add \code{response_spatial_field}.
 It records the provider/layout status, conditional-response component and

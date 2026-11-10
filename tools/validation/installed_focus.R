@@ -2,6 +2,10 @@
 # package-environment serialization artifacts without suppressing warnings.
 setup_started <- proc.time()[["elapsed"]]
 input <- jsonlite::fromJSON(commandArgs(TRUE)[1L])
+audit_root <- input$audit_root
+if (is.null(audit_root)) audit_root <- file.path(dirname(input$result), "a")
+dir.create(audit_root, recursive = TRUE, showWarnings = FALSE)
+Sys.setenv(MSR_GDR_TEST_AUDIT_ROOT = normalizePath(audit_root, winslash = "/", mustWork = TRUE))
 if (!is.character(input$filter) || length(input$filter) != 1L || !nzchar(input$filter))
   stop("Installed focused feedback requires an explicit nonempty filter.")
 .libPaths(c(dirname(input$installed_library), input$dependency_overlay, .libPaths()))

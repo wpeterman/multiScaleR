@@ -74,6 +74,14 @@
     union(names(mf), names(site_values))) else union(.model_predictors(mod),
       unique(unlist(lapply(formulas, function(f) if (is.null(f)) character() else
         all.vars(f[[length(f)]])), use.names = FALSE)))
+  if (methods::is(mod, "unmarkedFitGDRField")) {
+    # Coordinate-aware GDR maps supply the abundance field separately.
+    # Pure random-group labels do not define fixed response scenarios.
+    # Keep factors that also enter fixed terms, and explicit user scenarios.
+    fixed_vars <- unique(unlist(lapply(mod@response_field$bases, function(x)
+      all.vars(x$terms)), use.names = FALSE))
+    model_vars <- intersect(model_vars, union(fixed_vars, names(site_values)))
+  }
   site_vars <- setdiff(union(model_vars, offset_vars), raster_covs)
   if (length(setdiff(names(site_values), site_vars)))
     stop("site_values must name nonraster model predictors; spatial layers cannot be overwritten.", call. = FALSE)

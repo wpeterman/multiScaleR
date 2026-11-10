@@ -53,6 +53,7 @@ test_that("expected public helpers remain exported", {
     "prepare_gdr_intervals",
     "expand_gdr_intervals",
     "gdr_start_values",
+    "fit_gdr_response_field",
     "prepare_prediction",
     "prepare_unmarked_data",
     "prepare_unmarked_data",
@@ -69,7 +70,27 @@ test_that("expected public helpers remain exported", {
     "validate_unmarked_data"
   )
 
-  expect_setequal(getNamespaceExports("multiScaleR"), expected_exports)
+  # Explicit reviewed S4 class/method exports and their native generics.
+  # Exporting vcov also exports its existing registered covariance method.
+  expected_S4_exports <- c(
+    ".__C__unmarkedFitGDRField",
+    ".__T__confint:stats",
+    ".__T__predict:stats",
+    ".__T__profile:stats",
+    ".__T__ranef:unmarked",
+    ".__T__simulate:stats",
+    ".__T__update:stats",
+    ".__T__vcov:stats",
+    "confint",
+    "predict",
+    "profile",
+    "ranef",
+    "simulate",
+    "update",
+    "vcov",
+    "vcov.multiScaleR"
+  )
+  expect_setequal(getNamespaceExports("multiScaleR"), c(expected_exports, expected_S4_exports))
 })
 
 test_that("aic_tab and bic_tab compare optimized and standard models", {

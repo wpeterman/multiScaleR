@@ -518,6 +518,11 @@ settings and retains final native covariance. TMB requires explicit
 \code{tmb_settings}, constructor-order starts including log-SDs, and native
 joint covariance checks. Its intermediate fits still compute sdreport.
 
+Identified native GDR response fields require the refit backend and a
+serial scale search: \code{n_cores = 1}, \code{PSOCK = FALSE}. A null
+core count selects one for this field route. Native fit/tape transport
+to fit workers remains unqualified.
+
 Only active GDR component formulas identify spatial predictors. Availability
 is inactive for one primary period, and the distance formula is inactive for
 a uniform key. Optimized static site names must not also occur in native

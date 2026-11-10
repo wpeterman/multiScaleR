@@ -1,5 +1,9 @@
 setup_started <- proc.time()[["elapsed"]]
 input <- jsonlite::fromJSON(commandArgs(TRUE)[[1L]])
+audit_root <- input$audit_root
+if (is.null(audit_root)) audit_root <- file.path(dirname(input$result), "a")
+dir.create(audit_root, recursive = TRUE, showWarnings = FALSE)
+Sys.setenv(MSR_GDR_TEST_AUDIT_ROOT = normalizePath(audit_root, winslash = "/", mustWork = TRUE))
 .libPaths(c(dirname(input$installed_library), input$dependency_overlay, .libPaths()))
 stopifnot(identical(normalizePath(find.package("MASS"), winslash = "/"),
   normalizePath(file.path(input$dependency_overlay, "MASS"), winslash = "/")))

@@ -131,6 +131,12 @@ apply, and no Hessians, raw data or design matrices are checkpointed.
 Restored callbacks verify their adapter and native function identities.
 Native R and DLL files are hashed once again in each new worker process;
 a changed provider fails before fitting and leaves an audit record.
+Identified native GDR response-field models retain their fixed exponential
+correlation, frozen component designs and full joint covariance through this
+callback. Supply the same explicit tmb_settings used by fit_gdr_response_field().
+Ordinary iid update, field simulation, profile and spatial-CV routes remain
+guarded; the private RTMB fitting admission is unchanged.
+
 The native integration cutoff K is distinct from the K column in information
 criterion tables, which counts fitted parameters. Reusing one cutoff does
 not replace a separate cutoff-sensitivity analysis.

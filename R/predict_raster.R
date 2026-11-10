@@ -64,7 +64,7 @@
 # Rasters are already smoothed and normalized. This adapter never replaces
 # posterior scale integration with a single scale or creates joint scale SEs.
 .msr_native_raster_logical_names <- function(model, type) {
-  typed <- class(model)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount", "unmarkedFitGDR") &&
+  typed <- class(model)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount", "unmarkedFitGDR", "unmarkedFitGDRField") &&
     is.character(type) && length(type) == 1L && !is.na(type) && type %in% names(model@formlist)
   frame <- if (typed) get("get_covariates", asNamespace("unmarked"))(model, type) else
     if (methods::is(model, "unmarkedFit")) model@data@siteCovs else .msr_selection_frame(model)
@@ -139,6 +139,7 @@
   if (identical(object$backend, "conditional_logit") && is.null(dots$reference))
     dots$reference <- "zero"
   logical_names <- .msr_native_raster_logical_names(model, type)
+  if (methods::is(model, "unmarkedFitGDRField") && is.null(type)) type <- "lambda"
   thin <- list(object = list(opt_mod = model), type = type, se.fit = se.fit,
     native_args = dots, logical_names = logical_names,
     unmarked_predictor = if (methods::is(model, "unmarkedFit"))
@@ -162,9 +163,20 @@
     thin$object <- NULL
   }
   cores <- if (is.null(raster_args$cores)) 1L else raster_args$cores
+  if (methods::is(model, "unmarkedFitGDRField") &&
+      !(is.numeric(cores) && is.null(dim(cores)) && length(cores) == 1L &&
+        is.finite(cores) && cores == 1))
+    stop("GDR field raster predictions require cores = 1, including zero-effect references; native fit/tape worker transport is not qualified.", call. = FALSE)
+  if (methods::is(model, "unmarkedFitGDRField") && is.null(dots[["re.form"]]) && is.null(field_geometry))
+    stop("Conditional GDR field maps require response_field_geometry().", call. = FALSE)
   if (!is.null(field_geometry)) {
-    if (!is.null(type) && !type %in% c("response", "link", "conditional"))
+    allowed_field_types <- if (methods::is(model, "unmarkedFitGDRField")) c("lambda", "state") else c("response", "link", "conditional")
+    if (!is.null(type) && !type %in% allowed_field_types) {
+      if (methods::is(model, "unmarkedFitGDRField"))
+        stop("Coordinate-aware GDR field maps require one of: ",
+          paste(allowed_field_types, collapse = ", "), ".", call. = FALSE)
       stop("Coordinate-aware field maps require response, link or conditional predictions.", call. = FALSE)
+    }
     .msr_response_field_preflight(field_geometry, object, raster, cores, raster_args$const)
     thin$field_geometry <- field_geometry
   }

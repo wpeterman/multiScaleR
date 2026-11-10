@@ -717,3 +717,105 @@ selection does not reduce the fitted model's parameter count, alter its
 likelihood or diagnostics, integrate random effects, or include uncertainty in
 the selected spatial scales. A component mean or confidence limit still does
 not define the joint held-out density needed for N-mixture cross-validation.
+
+### Private GDR response-field references
+
+A fixed-range GDR abundance field is an internal prerequisite, not a public
+fitted-model route. It preserves the finite-cutoff Poisson/half-normal
+distance/removal target, its observation constants and normalized Gaussian SD.
+The canonical two- and three-distance-bin references retain a complete
+75-meter sampled circle. Joint derivatives, conditional modes and curvature
+are distinct from optimized fixed-parameter covariance. Optimized reference
+checks use the existing 160-survey mixed fixture, both declared coefficient/SD
+starts and full fixed/latent cross-covariance. Conditional log-density
+contrasts retain those cross-terms; they do not establish response-mean
+integration, interval calibration, spatial CV or public AIC admission. New-field
+residual variance remains separate from fitted-field/parameter uncertainty,
+observation noise and ecological-scale uncertainty. No year field is added.
+
+### Native fixed-range GDR abundance fields
+
+`fit_gdr_response_field()` adds an opt-in native TMB response field. The initial
+scope is Poisson abundance, half-normal distance detection, density per square
+kilometer, one primary period and complete canonical 75-meter point-circle
+bins. Supply a prespecified exponential range and projected coordinates for
+the original abundance states. Repeated surveys for one state share its exact
+location. The original optional observer intercept remains independent. No
+year field, estimated correlation range or population prior is introduced.
+
+The following template assumes you have an actual native GDR fit named
+`template`, explicit projected field-center columns and prepared kernel inputs.
+Choose independent starting values appropriate to the fitted component scales.
+The intercept examples below use density per square kilometer and meters.
+They assume each component includes an intercept; adjust the cold vector
+when your formulas differ.
+
+```{r gdr-field-native-template, eval=FALSE}
+sc <- unmarked::siteCovs(template@data)
+coords <- as.matrix(sc[c("field_easting", "field_northing")])
+rownames(coords) <- rownames(sc)  # exact retained survey identities
+snapshot <- gdr_start_values(template)
+cold <- snapshot$starts
+cold[snapshot$map$kind == "regression"] <- 0
+cold[snapshot$map$block == "beta_lambda" & snapshot$map$within_block == 1] <- log(700)
+cold[snapshot$map$block == "beta_dist" & snapshot$map$within_block == 1] <- log(30)
+cold[snapshot$map$block == "beta_rem" & snapshot$map$within_block == 1] <- qlogis(.5)
+cold[snapshot$map$kind == "log_sd"] <- log(.4)
+settings <- list(method = "BFGS", se = TRUE, threads = 1L,
+  control = list(maxit = 2500L, reltol = 1e-10))
+field_fit <- fit_gdr_response_field(template, coords, crs = 32617,
+  range = 50000, cold_starts = list(cold = cold),
+  audit_dir = "gdr-field-audit", tmb_settings = settings)
+callback <- make_gdr_refitter(field_fit, list(cold = cold),
+  audit_dir = "gdr-field-refits", tmb_settings = settings)
+# Use callback as refit_fn in the usual refit backend, with original kernel
+# inputs and training-only transformations. Range remains fixed throughout.
+scaled_fit <- multiScale_optim(field_fit, kernel_inputs,
+  refit_fn = callback, backend = "refit", covariate_transform = "raw", n_cores = 1)
+geometry <- response_field_geometry(scaled_fit, coords, 32617, batch_size = 32)
+# Here the ecological feature supplies the fixed predictors. The field
+# geometry supplies response locations, without dummy group-factor rasters.
+layers <- kernel_scale.raster(source_raster, multiScaleR = scaled_fit,
+  scale_center = TRUE, match_buffer = TRUE, include_fixed = FALSE)
+map <- predict(scaled_fit, layers, type = "lambda", se.fit = TRUE,
+  uncertainty = "conditional", raster_args = list(field_geometry = geometry))
+```
+
+The returned `unmarkedFitGDRField` is identified separately from an iid GDR fit.
+It retains the normalized native finite-K observation target and original
+Gaussian field SD. Both original and independent cold starts must pass full
+fixed/joint curvature, current latent precision, score and agreement checks.
+Failures retain compact audit records. The correlation range adds zero fitted
+parameters; native coefficient and SD counts remain, along with any estimated
+ecological scales and shapes. Correlation-whitened coordinates are internal;
+reported abundance effects and component covariance use physical field values.
+
+Point predictions and native numeric snapshots use the original fixed-design
+recipes, factors, spline definitions and products. `vcov()` returns retained
+full cross-component covariance aligned with native coefficients, without
+executing a saved TMB tape. At new locations, the predictor SE combines fitted
+coefficient/field covariance with a separately identified conditional field
+residual variance. That field variance is not observation noise. Density
+predictions back-transform the conditional log predictor; they do not average
+over a lognormal field. `re.form = NA` gives a zero-effect reference rather
+than field integration. Ecological-scale uncertainty is not added.
+
+Supply any additional fixed predictor rasters or scenarios explicitly.
+Pure random-group labels are not added as constant rasters for this field
+route; response-field geometry supplies the abundance locations. A factor
+that also enters a fixed component still needs an explicit fitted-level
+scenario through `site_values` or a correctly encoded raster. `include_fixed`
+controls fixed-radius metric normalization, not these site scenarios.
+
+Scale fitting is serial for this field route (`n_cores = 1`, `PSOCK = FALSE`);
+a null core count selects one. Native fit/tape worker transport remains
+guarded. Prediction and refit callbacks retain isolated numeric recipes
+and protocol data rather than an unused original fit in their closure.
+
+Coordinate maps require a matching projected CRS, one worker and explicit
+bounded batches. They return point and requested SE bands without full-grid
+covariance. The native route does not require RTMB callbacks. Private RTMB
+fitting admission remains closed. Estimated range, additional GDR mixtures or
+distance keys, annual availability, field simulation, profile intervals and
+spatial GDR CV require separate qualification. These software comparisons do
+not establish empirical recovery or interval calibration.

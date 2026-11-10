@@ -2,7 +2,9 @@
 # model, replace the observation likelihood, or vary ecological kernel scales.
 #' Prepare a private fixed-range GDR abundance response field
 #'
-#' @param data,parameters Qualified private finite-K GDR numeric inputs.
+#' @param data,parameters Qualified private finite-K GDR numeric inputs using
+#'   canonical c(0,25,75) or c(0,25,50,75) meter bins in a complete point circle.
+#'   The original normalized distance/removal likelihood and Gaussian SD remain.
 #' @param coords Two finite projected coordinate columns in the exact survey row
 #'   order, with row names equal to the retained survey identities. Each abundance
 #'   state must have one distinct location and at least one observed survey.
@@ -13,6 +15,8 @@
 #' @param max_memory_mb Positive finite planning budget in MiB. The default is
 #'   512. Dense correlation/loading work must fit a conservative estimate. This
 #'   estimate is not an operating-system or automatic-differentiation tape cap.
+#' @param .geometry_only Internal logical flag. If TRUE, prepare only numeric
+#'   geometry without RTMB callbacks or any private fitting admission.
 #' @return A private immutable observation context with a prepare function and
 #'   bounded new-coordinate projection. Abundance states are correlation-whitened
 #'   coordinates with the original normalized Gaussian SD. Conditional new-field
@@ -20,7 +24,8 @@
 #'   fitting, prediction, AIC and CV admission remain false.
 #' @noRd
 .msr_gdr_response_field_context <- function(data, parameters, coords, crs, range,
-    max_memory_mb = 512) {
+    max_memory_mb = 512, .geometry_only = FALSE) {
+  validate_scalar_logical(.geometry_only, ".geometry_only")
   .msr_gdr_gaussian_data(data, parameters)
   m <- length(parameters$b_lambda); n <- nrow(data$Xlambda)
   if (!m || !length(data$block))
@@ -56,7 +61,6 @@
   lower <- tryCatch(t(chol(correlation)), error = function(e)
     stop("The fixed response correlation is not numerically positive definite; no jitter is added.", call. = FALSE))
   loading <- lower[data$block, , drop = FALSE]
-  base <- .msr_gdr_gaussian_context(data, parameters, .lambda_loading = loading)
   definition <- list(covariance = "exponential", range = range, range_estimated = FALSE,
     crs = declared$wkt, units = declared$units_gdal, state_count = m, survey_count = n,
     coordinate_sha256 = .msr_gdr_hash(list(coords, data$block, data$row_ids$survey)),
@@ -66,17 +70,6 @@
     annual_field_coordinates = 0L, additional_estimated_range_parameters = 0L,
     geometry_authentication = "explicit_caller_coordinates_and_exact_survey_state_map")
   field_id <- .msr_gdr_hash(definition)
-  response_id <- .msr_gdr_hash(list(base$response_fingerprint, field_id))
-  prepare <- function(Xlambda, row_ids) {
-    program <- base$prepare(Xlambda, row_ids)
-    program$field <- definition; program$field_id <- field_id
-    program$response_fingerprint <- response_id
-    program$fingerprint <- .msr_gdr_hash(list(program$fingerprint, field_id))
-    program$target <- "P_finite_K_native_margins_normalized_fixed_range_spatial_Gaussian_joint"
-    program$format_version <- 3L
-    program$qualification <- "private_fixed_range_spatial_derivative_prerequisite_only"
-    program
-  }
   project <- function(newcoords, row_ids, crs) {
     if ((!is.matrix(newcoords) && !is.data.frame(newcoords)) || ncol(newcoords) != 2L ||
         !is.numeric(as.matrix(newcoords)) || any(!is.finite(as.matrix(newcoords))) ||
@@ -130,6 +123,21 @@
   numeric_budget <- budget; environment(numeric_budget) <- projection_env
   projection_env$budget <- numeric_budget
   environment(project) <- projection_env
+  if (.geometry_only) return(list(project = project, field = definition,
+    field_id = field_id, numeric_projection_portable = TRUE,
+    fit_admission_established = FALSE, prediction_recipe_qualified = FALSE))
+  base <- .msr_gdr_gaussian_context(data, parameters, .lambda_loading = loading)
+  response_id <- .msr_gdr_hash(list(base$response_fingerprint, field_id))
+  prepare <- function(Xlambda, row_ids) {
+    program <- base$prepare(Xlambda, row_ids)
+    program$field <- definition; program$field_id <- field_id
+    program$response_fingerprint <- response_id
+    program$fingerprint <- .msr_gdr_hash(list(program$fingerprint, field_id))
+    program$target <- "P_finite_K_native_margins_normalized_fixed_range_spatial_Gaussian_joint"
+    program$format_version <- 3L
+    program$qualification <- "private_fixed_range_spatial_derivative_prerequisite_only"
+    program
+  }
   list(prepare = prepare, project = project, field = definition, field_id = field_id,
     response_fingerprint = response_id,
     fixed_coordinate_count_change = 0L, annual_field_coordinates = 0L,

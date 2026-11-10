@@ -1,3 +1,8 @@
+multiScaleR 0.7.31
+
+* Add an opt-in native TMB fixed-range GDR abundance field, an identified fitted class, audited scale refitter, full joint conditional prediction uncertainty, numeric snapshots, effect curves and bounded coordinate maps. Preserve private RTMB and unqualified inference guards.
+* Extend private normalized GDR preparation to the canonical three-distance-bin reference. Check fixed-range spatial Laplace optima, declared starts, full fixed/latent covariance and conditional density contrasts against native TMB while keeping private RTMB fitting admission guarded.
+
 multiScaleR 0.7.30
 
 * Extend qualified native response-field geometry to exponential, Gaussian and Matern covariance with Gaussian, log-Poisson, logit-binomial, log-NB2 and log-Gamma response predictions. Retain native SEs, parameter penalties and memory/coordinate guards.

@@ -141,6 +141,8 @@
 }
 
 .msr_unmarked_prediction_function <- function(object, re.form = NULL, component = NULL) {
+  if (methods::is(object, "unmarkedFitGDRField"))
+    return(.msr_gdr_field_prediction_function(object))
   .msr_gdr_native_guard(object)
   native <- unmarked::predict
   if (!class(object)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount", "unmarkedFitGDR")) return(native)

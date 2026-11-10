@@ -812,6 +812,11 @@
 #' \code{tmb_settings}, constructor-order starts including log-SDs, and native
 #' joint covariance checks. Its intermediate fits still compute sdreport.
 #'
+#' Identified native GDR response fields require the refit backend and a
+#' serial scale search: \code{n_cores = 1}, \code{PSOCK = FALSE}. A null
+#' core count selects one for this field route. Native fit/tape transport
+#' to fit workers remains unqualified.
+#'
 #' Only active GDR component formulas identify spatial predictors. Availability
 #' is inactive for one primary period, and the distance formula is inactive for
 #' a uniform key. Optimized static site names must not also occur in native
@@ -1064,6 +1069,13 @@ multiScale_optim <- function(fitted_mod,
                              covariate_transform = c("candidate", "raw")){
   backend <- match.arg(backend)
   covariate_transform <- match.arg(covariate_transform)
+  if (methods::is(fitted_mod, "unmarkedFitGDRField")) {
+    if (!identical(backend, "refit") || !identical(PSOCK, FALSE) ||
+        (!is.null(n_cores) && !(is.numeric(n_cores) && is.null(dim(n_cores)) &&
+          length(n_cores) == 1L && is.finite(n_cores) && n_cores == 1)))
+      stop("Native GDR response-field scale fitting requires backend = 'refit', n_cores = 1 and PSOCK = FALSE; native fit/tape worker transport is not qualified.", call. = FALSE)
+    n_cores <- 1L
+  }
   if (covariate_transform == "raw" && backend != "refit")
     stop("Raw optimized covariates currently require backend = 'refit'; analytic backends retain candidate standardization.", call. = FALSE)
   if(is.null(fitted_mod)){

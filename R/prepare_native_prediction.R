@@ -12,6 +12,7 @@
       newdata = !is.null(newdata))
   allowed <- if (kind == "glmmTMB") c("re.form", "allow.new.levels", "na.action") else
     c("backTransform", "na.rm", "appendData", "level", "re.form")
+  if (methods::is(object$opt_mod, "unmarkedFitGDRField")) allowed <- c(allowed, "coords", "crs")
   if (!is.list(native_args) || (length(native_args) &&
       (is.null(names(native_args)) || anyNA(names(native_args)) ||
        any(!names(native_args) %in% allowed) || anyDuplicated(names(native_args)))))

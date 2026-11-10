@@ -99,8 +99,25 @@ def validate_plan(plan):
     if not generated.issubset(paths):
         raise ValueError("Generated documentation must have a declared starting identity")
     for name in generated:
-        if Path(name).suffix.lower() != ".rd" or not inside(name, Path(plan["candidate"]) / "man"):
-            raise ValueError("Only isolated candidate Rd files may be regenerated")
+        candidate = Path(plan["candidate"]).resolve()
+        if Path(name).suffix.lower() == ".rd" and inside(name, candidate / "man"):
+            continue
+        # Roxygen also generates NAMESPACE when a batch adds public methods.
+        # Admit only that exact file, outside the live repository, through the
+        # frozen documentation script and its explicitly bound package input.
+        phase = phases[0]
+        arguments = phase["arguments"]
+        namespace = (Path(name).resolve() == candidate / "NAMESPACE" and
+                     not inside(candidate, repo) and len(phases) == 1 and
+                     re.fullmatch(r"doc[0-9]+", phase["name"]) and
+                     Path(phase["executable"]).name.lower() == "rscript.exe" and
+                     len(arguments) == 3 and arguments[0] == "--vanilla" and
+                     Path(arguments[1]).resolve() == Path(__file__).with_name("document.R").resolve() and
+                     str(Path(arguments[1]).resolve()) in paths and
+                     str(Path(arguments[2]).resolve()) in paths and
+                     Path(read_json(arguments[2])["package"]).resolve() == candidate)
+        if not namespace:
+            raise ValueError("Regenerate only candidate Rd files or an isolated roxygen NAMESPACE")
     return plan
 
 

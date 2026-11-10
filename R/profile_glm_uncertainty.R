@@ -162,7 +162,8 @@
 #'   For \code{joint_mixed} with \code{type = "conditional"}, returns the native
 #'   glmmTMB covariance list by model component, conditional on selected scales.
 #' @seealso \code{\link{multiScale_optim}}, \code{\link{predict.multiScaleR}}
-#' @export
+#' @export vcov.multiScaleR
+#' @exportS3Method stats::vcov
 vcov.multiScaleR <- function(object, type = c("joint", "conditional"), ...) {
   type <- match.arg(type)
   if (identical(object$backend, "joint_mixed")) {

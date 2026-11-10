@@ -16,6 +16,7 @@
 # Bind a field descriptor to the retained fit without retaining a model or tape.
 .msr_response_field_binding <- function(object) {
   model <- .analysis_model(object$opt_mod)
+  if (methods::is(model, "unmarkedFitGDRField")) return(.msr_gdr_field_binding(object))
   .msr_gdr_hash(list(frame = list(rows = rownames(model$frame),
     columns = lapply(model$frame, identity)),
     fit = model$fit[c("par", "parfull", "objective", "convergence")],
@@ -32,9 +33,12 @@
 #' @param object A \code{multiScaleR} refit result containing a native glmmTMB
 #'   Gaussian, log-link Poisson/NB2/Gamma or logit-binomial model with one shared
 #'   exponential, Gaussian or Matern response field and no other random effects.
+#'   An identified native TMB GDR response-field result is also supported.
 #' @param coords Numeric matrix or data frame with two finite projected coordinate
 #'   columns, one row per retained native fitting row in its original order.
-#'   Repeated locations must repeat their coordinate pairs. Use the original
+#'   Repeated locations must repeat their coordinate pairs. GDR uses its retained
+#'   abundance-state coordinates, which may be coarser than ecological predictor
+#'   focal locations. For glmmTMB, use the original
 #'   coordinates supplied to \code{glmmTMB::numFactor()}, in the same units.
 #' @param crs Known two-dimensional projected horizontal coordinate reference
 #'   system, accepted by
@@ -70,6 +74,13 @@
 #'   setting fails before that batch enters native prediction. Native warnings
 #'   from otherwise supported calls pass through unchanged.
 #'
+#'   Native GDR field maps use type = "lambda" and fixed-range numeric
+#'   projection at cell centers. They do not use glmmTMB's allow.new.levels
+#'   control. Their descriptor identifies provider, fixed range and target binding;
+#'   no native position factor or shared-group scenario is stored. Conditional
+#'   predictor SEs include full fitted covariance and separately identified
+#'   new-location field residual variance, with no observation or kernel noise.
+#'
 #'   Prepare ecological layers with \code{kernel_scale.raster()},
 #'   \code{scale_center = TRUE} and \code{match_buffer = TRUE}. Supply ordinary
 #'   site and offset scenarios as usual. Position/group scenarios can select
@@ -101,6 +112,8 @@
 #' @export
 response_field_geometry <- function(object, coords, crs, batch_size = 128L,
                                     max_memory_mb = 512) {
+  if (inherits(object, "multiScaleR") && methods::is(object$opt_mod, "unmarkedFitGDRField"))
+    return(.msr_gdr_field_geometry(object, coords, crs, batch_size, max_memory_mb))
   if (!inherits(object, "multiScaleR") || !identical(object$backend, "refit"))
     stop("Use a native glmmTMB multiScaleR refit result.", call. = FALSE)
   model <- .analysis_model(object$opt_mod)
@@ -151,6 +164,8 @@ response_field_geometry <- function(object, coords, crs, batch_size = 128L,
 }
 
 .msr_response_field_budget <- function(geometry, model, rows) {
+  if (methods::is(model, "unmarkedFitGDRField"))
+    return(.msr_gdr_field_prediction_budget(geometry, model, rows))
   # Allow substantial dense covariance/factorization/AD workspace. The opaque
   # native tape is not measurable by object.size(), so do not call this a cap.
   m <- as.double(geometry$training_locations) + rows
@@ -198,6 +213,8 @@ response_field_geometry <- function(object, coords, crs, batch_size = 128L,
     return(output)
   }
   geometry <- model$field_geometry
+  if (identical(geometry$provider, "native_GDR_fixed_range"))
+    return(.msr_gdr_field_raster_eval(model, data))
   model$field_geometry <- NULL
   xy_names <- c(".msr_field_x", ".msr_field_y")
   if (!all(xy_names %in% names(data)) ||

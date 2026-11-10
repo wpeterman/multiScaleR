@@ -333,7 +333,7 @@ plot_marginal_effects <- function(x,
 
   ordinary_unmarked_curve <- methods::is(mod, "unmarkedFit") &&
     class(mod)[1L] %in% c("unmarkedFitOccu", "unmarkedFitPCount")
-  gdr_unmarked_curve <- identical(class(mod)[1L], "unmarkedFitGDR")
+  gdr_unmarked_curve <- class(mod)[1L] %in% c("unmarkedFitGDR", "unmarkedFitGDRField")
   trained_unmarked_curve <- ordinary_unmarked_curve || gdr_unmarked_curve
   # Extract variables from fitted model
   if (any(grepl("^unmarked", class(mod)))) {

@@ -49,6 +49,13 @@
 #'   \item{fixed_inputs, component}{Whether the rows and controls are bound to a
 #'     snapshot, and the named component when applicable.}
 #' }
+#' Identified native GDR response fields record a fixed correlation range,
+#' conditional physical abundance effects and distinct new-location residual
+#' variance. Their SEs retain full fitted fixed/latent covariance. Density point
+#' predictions are inverse-link conditional predictors, not lognormal field
+#' averages. These native field calculations do not enable the private RTMB
+#' fitting route, field simulation, spatial CV or ecological-scale uncertainty.
+#'
 #' Native glmmTMB response/link predictions with recognized exponential,
 #' Gaussian or Matern response covariance add \code{response_spatial_field}.
 #' It records the provider/layout status, conditional-response component and
@@ -301,6 +308,10 @@ NULL
     intervals = if (kind == "unmarked") "native_conditional_confidence" else "conditional_standard_errors_only",
     omitted = c("kernel_parameter_uncertainty", "observation_noise"),
     fixed_inputs = TRUE, component = type)
+  if (methods::is(model, "unmarkedFitGDRField")) {
+    out$response_spatial_field <- .msr_gdr_field_contract(model, zero)
+    out$uncertainty$population_parameters <- "joint_native_coefficients_and_response_field_conditional_on_kernel_and_fixed_range"
+  }
   if (kind == "glmmTMB" && type %in% c("response", "link", "conditional")) {
     fields <- .msr_glmmTMB_response_fields(model, zero,
       isTRUE(native_args[["allow.new.levels"]]))

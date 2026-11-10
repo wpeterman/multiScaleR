@@ -14,8 +14,14 @@ python <frozen-runtime>/phase_runner.py <plan.json> <phase-name>
 
 Each attempt reserves a new record before launch. Existing requests, partial
 reservations, admissions, logs, processes and results block replay. Inputs and
-Git identity are checked before and after the phase. Only explicitly listed Rd
-files in an isolated candidate can change during documentation generation.
+Git identity are checked before and after the phase. Explicitly listed candidate
+Rd files may change during documentation generation. A candidate NAMESPACE is
+also admitted only outside the live repository, through a single frozen roxygen
+phase whose hashed input names that exact package. Its starting identity remains
+checked; other source, process and resource guards are unchanged.
+Installed-suite inputs also bind a short audit directory under their output.
+Compact GDR request/attempt records survive R temporary-directory cleanup;
+models, tapes and candidate arrays are not checkpointed.
 Declare a new continuation when a phase fails; retain its original records.
 
 The reviewed Windows resource engine inventories actual R interpreters, including

@@ -153,7 +153,8 @@ def run(input_path):
     extra = [dict(root=str(installed), files=installed_files), dict(root=str(tests), files=test_files)]
     inp = output / "installed-input01.json"
     write(inp, dict(installed_library=str(installed), exact_archive_tests=str(tests),
-        dependency_overlay=config["dependency_overlay"], result=str(output / "test-counts01.json")))
+        dependency_overlay=config["dependency_overlay"], result=str(output / "test-counts01.json"),
+        audit_root=str(output / "a")))
     metadata.append(str(inp))
     libraries = [str(installed.parent)] + libraries
     phase("installed01", config["rscript"], ["--vanilla", "@runtime/installed.R", str(inp)], extra=extra, installed=True)

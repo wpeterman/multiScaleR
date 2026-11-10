@@ -659,6 +659,8 @@ build_opt_context <- function(fitted_mod,
   mod <- fitted_mod
   analysis_mod <- .analysis_model(mod)
   .msr_gdr_native_guard(analysis_mod)
+  if (methods::is(analysis_mod, "unmarkedFitGDRField") && is.null(refit_fn))
+    stop("Supply make_gdr_refitter() for this audited GDR response field.", call. = FALSE)
   cov_names <- .msr_optimized_covariates(scale_vars, cov_df = cov_df)
 
   if(any(class(mod) == 'gls')){

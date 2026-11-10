@@ -15,11 +15,14 @@ response_field_geometry(
 \arguments{
 \item{object}{A \code{multiScaleR} refit result containing a native glmmTMB
 Gaussian, log-link Poisson/NB2/Gamma or logit-binomial model with one shared
-exponential, Gaussian or Matern response field and no other random effects.}
+exponential, Gaussian or Matern response field and no other random effects.
+An identified native TMB GDR response-field result is also supported.}
 
 \item{coords}{Numeric matrix or data frame with two finite projected coordinate
 columns, one row per retained native fitting row in its original order.
-Repeated locations must repeat their coordinate pairs. Use the original
+Repeated locations must repeat their coordinate pairs. GDR uses its retained
+abundance-state coordinates, which may be coarser than ecological predictor
+focal locations. For glmmTMB, use the original
 coordinates supplied to \code{glmmTMB::numFactor()}, in the same units.}
 
 \item{crs}{Known two-dimensional projected horizontal coordinate reference
@@ -66,6 +69,13 @@ Supply this object as
   \code{native_args = list(allow.new.levels = TRUE)}. A missing or false
   setting fails before that batch enters native prediction. Native warnings
   from otherwise supported calls pass through unchanged.
+
+  Native GDR field maps use type = "lambda" and fixed-range numeric
+  projection at cell centers. They do not use glmmTMB's allow.new.levels
+  control. Their descriptor identifies provider, fixed range and target binding;
+  no native position factor or shared-group scenario is stored. Conditional
+  predictor SEs include full fitted covariance and separately identified
+  new-location field residual variance, with no observation or kernel noise.
 
   Prepare ecological layers with \code{kernel_scale.raster()},
   \code{scale_center = TRUE} and \code{match_buffer = TRUE}. Supply ordinary

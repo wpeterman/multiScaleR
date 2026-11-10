@@ -250,7 +250,7 @@
   dots <- .msr_native_control_names(model, dots, newdata = !is.null(newdata))
   # A survival linear predictor or risk is not a within-choice-set probability.
   # Keep its native names, including lp/risk/survival where the model permits.
-  if (is.null(type)) type <- if (unmarked) "state" else
+  if (is.null(type)) type <- if (methods::is(model, "unmarkedFitGDRField")) "lambda" else if (unmarked) "state" else
     if (inherits(model, "coxph")) "lp" else "response"
   validate_character_scalar(type, "type")
   if (inherits(model, "coxph")) {

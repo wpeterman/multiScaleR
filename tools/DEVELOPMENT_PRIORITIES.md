@@ -194,3 +194,7 @@ priorities; they do not replace the GDR observation law or loosen admission.
 ## Response-field compatibility, 0.7.30
 
 [Validated spatial contracts](benchmarks/tmb_marginal_likelihood/sf_20261109/CONTRACT07.md) extend native glmmTMB covariance/family prediction and fixed-reference refits while keeping native SE and penalty meanings. A private normalized GDR fixed-range field now has joint and Laplace derivative/curvature prerequisites, not public fitting admission. [Remaining spatial gates](benchmarks/tmb_marginal_likelihood/sf_20261109/NEXT07.md) prioritize optimized GDR references with full fixed/latent uncertainty.
+
+## Native GDR response field, 0.7.31
+
+[The qualified native field contract](benchmarks/tmb_marginal_likelihood/sg_20261109/CONTRACT67.md) adds fixed-range Poisson/half-normal GDR abundance fitting, serial raw-reference refits, full-joint conditional predictions, numeric snapshots, zero-effect curves and bounded coordinate maps. Native counts and all private RTMB/unqualified-method guards remain. [Validation and retained failures](benchmarks/tmb_marginal_likelihood/sg_20261109/VALIDATION67.md) and [next spatial/GDR gates](benchmarks/tmb_marginal_likelihood/sg_20261109/NEXT67.md) distinguish this native software qualification from recovery, calibration, spatial CV, estimated ranges and spatially varying ecological kernels.

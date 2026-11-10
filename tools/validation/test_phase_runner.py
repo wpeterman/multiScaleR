@@ -101,6 +101,52 @@ class PhasePlanTests(unittest.TestCase):
         with self.assertRaises(ValueError): runner.atomic_json(record, dict(value=2))
         self.assertEqual(runner.read_json(record), dict(value=1))
 
+    def namespace_plan(self):
+        temporary = tempfile.TemporaryDirectory(prefix="msr-doc-candidate-")
+        self.addCleanup(temporary.cleanup)
+        candidate = Path(temporary.name).resolve()
+        namespace = candidate / "NAMESPACE"; namespace.write_text("old")
+        input_path = self.root / "document-input.json"
+        input_path.write_text(json.dumps(dict(package=str(candidate))))
+        script = Path(runner.__file__).with_name("document.R").resolve()
+        plan = copy.deepcopy(self.plan); plan["candidate"] = str(candidate)
+        plan["generated_files"] = [str(namespace)]
+        arguments = ["--vanilla", str(script), str(input_path)]
+        plan["phases"][0].update(name="doc01", arguments=arguments,
+            argument_line=subprocess.list2cmdline(arguments))
+        plan["identities"] += [dict(root=str(q.parent), files={q.name: runner.digest(q)})
+                               for q in (namespace, input_path, script)]
+        return plan, namespace, input_path
+
+    def test_isolated_roxygen_namespace_has_bound_input_and_starting_identity(self):
+        plan, namespace, _ = self.namespace_plan()
+        runner.validate_plan(plan); runner.verify_inputs(plan)
+        namespace.write_text("generated")
+        runner.verify_inputs(plan, after=True)
+        with self.assertRaises(ValueError): runner.verify_inputs(plan)
+        self.input.write_text("source changed")
+        with self.assertRaises(ValueError): runner.verify_inputs(plan, after=True)
+
+    def test_namespace_cannot_relax_live_source_or_phase_guards(self):
+        plan, namespace, input_path = self.namespace_plan()
+        for field, value in (("name", "focus01"), ("executable", "Rcmd.exe")):
+            changed = copy.deepcopy(plan); changed["phases"][0][field] = value
+            with self.assertRaises(ValueError): runner.validate_plan(changed)
+        changed = copy.deepcopy(plan); changed["candidate"] = str(self.root)
+        with self.assertRaises(ValueError): runner.validate_plan(changed)
+        changed = copy.deepcopy(plan); changed["phases"] *= 2
+        with self.assertRaises(ValueError): runner.validate_plan(changed)
+        input_path.write_text(json.dumps(dict(package=str(self.root))))
+        with self.assertRaises(ValueError): runner.validate_plan(plan)
+
+    def test_namespace_requires_the_frozen_roxygen_script(self):
+        plan, _, _ = self.namespace_plan()
+        changed = copy.deepcopy(plan); changed["phases"][0]["arguments"][1] = str(self.input)
+        changed["phases"][0]["argument_line"] = subprocess.list2cmdline(changed["phases"][0]["arguments"])
+        with self.assertRaises(ValueError): runner.validate_plan(changed)
+        changed = copy.deepcopy(plan); changed["identities"] = changed["identities"][:-3] + changed["identities"][-2:]
+        with self.assertRaises(ValueError): runner.validate_plan(changed)
+
     def test_replay_never_reaches_subprocess(self):
         plan_path = self.root / "plan.json"
         plan_path.write_text(json.dumps(self.plan))

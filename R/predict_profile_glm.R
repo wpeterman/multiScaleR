@@ -265,6 +265,19 @@
 #' predictors or complete saved prediction calls. New prediction rows never
 #' supply the training constants. Scaling arguments retain their original
 #' order and standard abbreviations. Custom functions retain their own semantics.
+#' Identified native TMB GDR response-field models retain their conditional
+#' component predictor and full joint covariance through the unmarked adapter.
+#' Explicit new abundance coordinates require the fitted projected CRS. Native
+#' snapshots store numeric outputs only; field maps require a checked geometry
+#' descriptor and type = "lambda". New-location field residual variance is
+#' distinct from observation noise and ecological-scale uncertainty.
+#' GDR field rasters require one worker, including zero-effect references;
+#' native fit/tape worker transport remains unqualified.
+#' Logical raster inputs use 0/1 encoding and regain their training types
+#' before the frozen component design is evaluated; other codes stop.
+
+
+#'
 #' Native glmmTMB exponential, Gaussian and Matern response fields retain their
 #' provider predictions and mean-prediction SEs through the refit adapter at
 #' selected kernel scales. Conformance checks cover Gaussian, log-Poisson,

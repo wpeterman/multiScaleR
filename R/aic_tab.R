@@ -17,6 +17,8 @@
 }
 
 .msr_selection_model <- function(model) {
+  retained <- if (inherits(model, "multiScaleR")) model$opt_mod else model
+  if (methods::is(retained, "unmarkedFitGDRField")) .msr_gdr_field_guard(retained)
   if (inherits(model, "multiScaleR_cv"))
     stop("CV results contain held-out scores, not a maximized likelihood; use cv_tab() or select_cv() with retained training fits.", call. = FALSE)
   if (inherits(model, "multiScaleR_bayes"))

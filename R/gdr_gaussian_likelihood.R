@@ -60,9 +60,11 @@
       any(rowSums(data$yd) != rowSums(data$yr)))
     fail("Use aligned complete integer distance/removal margins with equal totals.")
   M <- nrow(data$yd); J <- ncol(data$yr)
+  canonical <- list(c(0, 25, 75), c(0, 25, 50, 75))
   if (!real(data$breaks) || !is.null(dim(data$breaks)) ||
-      !identical(as.numeric(data$breaks), c(0, 25, 75)) || ncol(data$yd) != 2L)
-    fail("This private native geometry requires complete c(0,25,75) meter point bins.")
+      !any(vapply(canonical, identical, logical(1), as.numeric(data$breaks))) ||
+      ncol(data$yd) != length(data$breaks) - 1L)
+    fail("This private native geometry requires canonical c(0,25,75) or c(0,25,50,75) meter point bins.")
   if (!real(data$K) || !is.null(dim(data$K)) || length(data$K) != 1L ||
       data$K < 0 || data$K != floor(data$K) || data$K > .Machine$integer.max ||
       any(rowSums(data$yd) > data$K))
@@ -89,11 +91,12 @@
       any(abs(data$area - pi * .075^2) >= 1e-15))
     fail("Expected circle abundance must use the original square-kilometer area.")
   annulus <- pi * diff(data$breaks^2)
-  expected_area <- matrix(rep(annulus, each = M), M, 2L)
+  distance_bins <- length(annulus)
+  expected_area <- matrix(rep(annulus, each = M), M, distance_bins)
   expected_weights <- expected_area/(pi * 75^2)
   if (!matrix_ok(data$annulus_area_m2) || !matrix_ok(data$annulus_weights) ||
-      !identical(dim(data$annulus_area_m2), c(M, 2L)) ||
-      !identical(dim(data$annulus_weights), c(M, 2L)) ||
+      !identical(dim(data$annulus_area_m2), c(M, distance_bins)) ||
+      !identical(dim(data$annulus_weights), c(M, distance_bins)) ||
       any(abs(data$annulus_area_m2 - expected_area) >= 1e-10) ||
       any(abs(data$annulus_weights - expected_weights) >= 1e-12))
     fail("Native annulus areas and weights must describe the complete sampled circle.")
