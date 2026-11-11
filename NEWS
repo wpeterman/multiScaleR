@@ -1,3 +1,11 @@
+multiScaleR 0.7.35
+
+* Add full Bayesian slice sampling for shared, covariate-dependent, and
+  partially pooled scales of effect.
+* Distribute chains, optimizer starts, and importance density evaluations
+  across optional local workers. Document parallel setup, chain plots,
+  derived-scale diagnostics, and posterior predictive checks.
+
 multiScaleR 0.7.34
 
 * Bind trained GDR recipes and verified survey and group identities to private

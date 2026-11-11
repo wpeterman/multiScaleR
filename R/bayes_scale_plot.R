@@ -34,11 +34,23 @@
 #'   Continuous half-normal SD priors have no point mass at zero. A positive
 #'   lower SD interval limit does not establish between-group heterogeneity;
 #'   assess meaningful variation and compare a shared-scale model instead.
-#'   For NUTS fits the stored flag checks raw parameters and sampler behavior;
-#'   use \code{\link{diagnose_bayes_scales}} to check derived annual quantities.
+#'   For NUTS and slice fits, the stored flag describes checks on the original
+#'   parameters. NUTS also checks sampler behavior. Use
+#'   \code{\link{diagnose_bayes_scales}} to check mixing and simulation
+#'   precision of derived log distances and group SDs.
+#'
+#'   For chain plots, pass \code{fit$chains} for a slice fit or
+#'   \code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
+#'   for a NUTS fit to bayesplot. Use \code{mcmc_trace()} for trajectories,
+#'   \code{mcmc_rank_overlay()} for rank distributions by chain, and
+#'   \code{mcmc_dens_overlay()} for posterior densities by chain. Select
+#'   \code{regex_pars = "^scale_beta"} to view the scale formula coefficients
+#'   on the internal log scale. Approximate fits and compact examples support
+#'   interval plots and posterior predictive checks. Chain plots require
+#'   the original post-warmup draws in iteration and chain order.
 #' @seealso \code{\link{posterior_scales}}, \code{\link{multiScale_bayes}},
-#'   \code{\link{diagnose_bayes_scales}};
-#'   \code{vignette("bayesian-scales", package = "multiScaleR")}.
+#'   \code{\link{diagnose_bayes_scales}}, \code{\link{simulate.multiScaleR_bayes}},
+#'   and \code{vignette("bayesian-scales", package = "multiScaleR")}.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))

@@ -8,7 +8,7 @@ diagnose_bayes_scales(object, probs = c(0.025, 0.5, 0.975))
 }
 \arguments{
 \item{object}{A \code{\link{multiScale_bayes}} fit. Computing new diagnostics
-requires its original NUTS sampler with unpermuted post-warmup chains.
+requires the original unpermuted post-warmup chains from NUTS or slice sampling.
 Prepared, approximate, and compact fits return an unavailable report.}
 
 \item{probs}{Numeric vector of distinct probabilities strictly between zero
@@ -39,7 +39,9 @@ A list with the following components:
       chain hold for every derived quantity. \code{NA} when unavailable.}
     \item{passed}{Whether both the original sampler checks and the derived
       checks passed. \code{NA} when derived diagnostics are unavailable.
-      This does not replace or change \code{object$diagnostics$passed}.}
+      For slice fits sampled without posterior installed, the original
+      parameter checks are computed from the stored chains. The fit's
+      stored diagnostics stay as recorded at fitting.}
     \item{criteria, notes}{The fixed derived checks and their limitations.}
   }
 }
@@ -66,8 +68,11 @@ Landscape distances are diagnosed on the natural log axis in map
   Permuted or thinned stored draws do not reconstruct the original chain
   order or full-chain precision. Compact examples therefore retain their
   original diagnostic evidence but cannot provide new chain diagnostics.
-  MCMC diagnostics are not defined for Laplace draws or weighted importance
-  candidates; inspect those fits' original numerical checks instead.
+  For chain plots in bayesplot, use \code{fit$chains} for a slice fit or
+  \code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
+  for a NUTS fit. The scale vignette shows trace, rank, and density plots
+  alongside the derived diagnostics. Use the stored numerical checks for
+  Laplace draws and weighted importance candidates.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -77,5 +82,7 @@ report$available  # FALSE: the compact example contains no full sampler
 report$reason
 }
 \seealso{
-\code{\link{multiScale_bayes}}, \code{\link{posterior_scales}}
+\code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
+  \code{\link{plot.multiScaleR_bayes}}, \code{\link{diagnose_bayes_probabilities}},
+  and \code{vignette("bayesian-scales", package = "multiScaleR")}.
 }

@@ -1,12 +1,12 @@
 ---
-title: "Bayesian Scales Across Years"
+title: "Bayesian Scale Estimation"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Bayesian Scales Across Years}
+  %\VignetteIndexEntry{Bayesian Scale Estimation}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -17,10 +17,11 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5,
   fig.height = 4.25)
 ```
 
-This development interface estimates landscape scales and response effects
-together in a Bayesian model. It accepts stacked observations, such as the same
-sites surveyed over several years. Annual scales can borrow information from a
-common distribution, an approach called partial pooling.
+Bayesian scale models estimate landscape scales and response effects jointly.
+Start with one scale per landscape predictor. Add a scale formula if you expect
+the distances at which a predictor matters to vary with a measured covariate
+or among groups. The annual-map example later in this guide shows how group
+scales can borrow information from a shared distribution through partial pooling.
 
 Start with `vignette("quickstart", package = "multiScaleR")` for kernel preparation
 and `vignette("year-specific-rasters", package = "multiScaleR")` for annual maps.
@@ -32,6 +33,43 @@ you can read the fitted results without installing sampling software. The
 long fitting calls are shown but are not rerun during a package build. Full
 sampling is the primary workflow; approximation methods follow later.
 
+## Fit shared scales
+
+The simulated counts from the quickstart have two spatial predictors and a
+site covariate. Prepare binned landscape values once. By default
+`multiScale_bayes()` gives each landscape layer one scale shared across sites.
+
+```{r shared-scales, eval=FALSE}
+data("landscape_counts")
+data("surv_pts")
+landscape <- terra::rast(system.file("extdata", "landscape.tif",
+  package = "multiScaleR"))
+inputs <- kernel_prep(terra::vect(surv_pts), landscape, max_D = 1700,
+  kernel = "gaussian", bin = TRUE, verbose = FALSE)
+
+# Give each layer a prior median distance in projected map units.
+fit <- multiScale_bayes(counts ~ site + land1 + land2, inputs, landscape_counts,
+  family = "poisson", method = "slice",
+  priors = list(scale_median = c(land1 = 300, land2 = 300)), seed = 5211)
+summary(fit)$diagnostics
+diagnose_bayes_scales(fit)$quantiles
+posterior_scales(fit)[c("covariate", "median", "lower", "upper")]
+```
+
+Each row of `posterior_scales()` gives the median and central credible
+interval for one layer's kernel scale in map units. These distances determine
+how quickly the weights decline. Use `summary(fit)$coefficients` to read the
+response association on the log count scale. If chain diagnostics are poor,
+compare independent runs and consider whether your data distinguish the scales.
+
+For a study with a centered elevation covariate and a region factor, use
+`scales = list(land1 = ~ elevation_centered + (1 | region), land2 = ~1)`.
+This models the log scale of `land1` as a function of elevation with a
+partially pooled intercept by region. Exponentiate the elevation coefficient
+in `summary(fit)$scale_coefficients$land1` to obtain the distance multiplier
+per unit of elevation. The scale of `land2` stays shared. The elevation and
+region columns belong in the observation data.
+
 ## Check your setup
 
 Preparation and the stored example need no optional Bayesian packages. Before
@@ -41,8 +79,14 @@ fitting your own model, check the packages required by your chosen method:
 check_bayes_setup(method = "prepare")
 ```
 
-For full sampling, install RTMB, tmbstan, rstan and posterior, then run the
-dependency check in your R session:
+Slice sampling uses the fitted model's full posterior. It needs no optional
+fitting packages. Install `posterior` for chain diagnostics. Slice sampling
+can be efficient for small shared-scale models. NUTS can explore stronger
+dependencies among scales and coefficients more efficiently, so compare
+effective sample size per second for larger models.
+
+For NUTS, install RTMB, tmbstan, rstan, and posterior, then run the
+dependency check in your R session.
 
 ```{r install-sampler, eval=FALSE}
 install.packages(c("RTMB", "tmbstan", "rstan", "posterior"))
@@ -62,6 +106,27 @@ You can validate your observations, maps and formulas with `method = "prepare"`
 before installing the sampler. Run a small fit next and inspect its
 diagnostics. More iterations can improve simulation precision, but they
 cannot repair an inappropriate likelihood or an uninformative landscape.
+
+## Use multiple cores
+
+Set `cores` to the number of workers you want to use. For either full
+sampler, `chains = 4, cores = 2` runs up to two of four chains at a time.
+Check availability with `check_bayes_setup("slice", cores = 2)` or the
+corresponding call for NUTS. Parallel fitting uses the optional
+`processx` package.
+
+| Method | Work distributed across cores |
+|---|---|
+| `"slice"` and `"sample"` | Sampling chains |
+| `"laplace"` | Optimizer starts |
+| `"marginal"` | Optimizer starts within each grid node |
+| `"marginal"` with importance correction | Optimizer starts and evaluation of candidate posterior densities |
+
+The marginal grid proceeds in order so a completed node can provide a starting
+value for the next one. Importance proposals and diagnostic summaries are
+computed in the main R process. Each worker holds a copy of the prepared
+model and builds its own differentiation tape when needed. Startup and data
+transfer can outweigh any speed gain for small fits.
 
 ## Response year effects and scale year effects
 
@@ -118,7 +183,7 @@ must be prepared for the two-predictor example. Separate predictors have
 separate scale parameters and independent prior group effects. Using the same
 group name does not introduce an estimated correlation between their scales.
 
-Full NUTS can fit multiple scale-group SDs. The marginal approximation currently
+NUTS and slice sampling can fit multiple scale-group SDs. The marginal approximation currently
 integrates exactly one scale-group SD and rejects models with more than one.
 Additional response random intercepts are distinct from this limit. Broad
 simulation evidence is strongest for one landscape predictor with annual
@@ -332,13 +397,14 @@ continue to describe the same posterior.
 
 ## Sample and inspect the posterior
 
-This call fits the annual hierarchy. The example uses more iterations than
-the function's default to obtain stable displayed results. Chains run serially.
+This NUTS call fits the annual hierarchy. It uses more iterations than the
+function's default to obtain stable displayed results. The stored example used
+one worker. Set `cores = 4` to run four chains concurrently with processx.
 
 ```{r sample, eval=FALSE}
 fit <- multiScale_bayes(
   response, inputs, dat, scales = scales, row_id = "site_year",
-  family = "nbinom2",
+  family = "nbinom2", method = "sample",
   priors = list(scale_median = 250, scale_group_sd = 0.5),
   chains = 4, iter = 6000, warmup = 3000, seed = 5211,
   control = list(adapt_delta = 0.95, max_treedepth = 12)
@@ -348,15 +414,19 @@ summary(fit)$diagnostics
 ```
 
 Sampling includes response coefficients, annual scales, site effects,
-between-group SDs, and NB2 dispersion. Laplace approximation is disabled.
-Chains run serially.
+between-group SDs, and NB2 dispersion. Use `method = "slice"` and omit the
+NUTS-specific `control` settings to fit the same model with slice sampling.
 
-Diagnostics report rank-normalized R-hat, bulk and tail effective sample sizes,
+NUTS diagnostics report rank-normalized R-hat, bulk and tail effective sample sizes,
 divergences, tree-depth hits, and energy behavior. The passed flag requires at
 least two chains, R-hat no greater than 1.01, bulk and tail effective sample
 sizes of at least 100 per chain, no divergences or maximum-depth hits, and
 E-BFMI of at least 0.3. Inspect individual parameters when a flag fails.
-Good mixing does not rule out missed modes or establish model adequacy.
+Slice sampling uses the same Rhat and effective sample size checks. The
+divergence, tree-depth, and energy checks apply to NUTS. If posterior was
+unavailable when you ran slice sampling, the fitted object still retains
+ordered chains. Install posterior and call `diagnose_bayes_scales()` to
+check both the original parameters and the derived scales.
 
 Check the fitted annual distances as well as the raw coefficients. Annual
 log distance combines the population location, group SD and annual deviation;
@@ -376,6 +446,46 @@ posterior uncertainty about that year's distance. Compare computational
 precision with the decision you need to make: passing the screen does not
 guarantee a stable lower endpoint. Inspect independent runs when tails matter.
 The function leaves the original sampler flag unchanged.
+
+### Plot chain mixing and posterior distributions
+
+Use a NUTS or slice fit you ran yourself with `bayesplot` installed.
+The compact examples later in this vignette retain posterior draws for
+inference and prediction without their original chain order.
+
+```{r chain-plots, eval=FALSE}
+draws <- if (!is.null(fit$chains)) fit$chains else
+  rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)
+
+bayesplot::mcmc_trace(draws, regex_pars = "^scale_beta")
+bayesplot::mcmc_rank_overlay(draws, regex_pars = "^scale_beta")
+bayesplot::mcmc_dens_overlay(draws, regex_pars = "^scale_beta")
+```
+
+The trace plot shows each chain in iteration order. Look for chains that
+repeatedly visit the same range of values. Rank plots make it easier to spot
+chains concentrated toward one end of that range. Density overlays show
+whether chains cover similar parts of the posterior and can reveal skew or
+multiple peaks. These plots select the scale formula coefficients on the
+internal log axis. Use `plot(fit)` for fitted distances in map units and
+`diagnose_bayes_scales(fit)` for diagnostics on those distances.
+
+### Check the observation model
+
+Use `simulate()` to draw replicated observations from either sampler or
+from an approximation. This check compares the observed fraction of zero
+counts with the distribution of that fraction in replicated datasets.
+`bayesplot` expects one dataset per row, so transpose the simulation output.
+
+```{r bayesplot-ppc, eval=FALSE}
+yrep <- t(as.matrix(simulate(fit, nsim = 200, seed = 123)))
+bayesplot::ppc_stat(fit$specification$y, yrep,
+  stat = function(y) mean(y == 0))
+```
+
+An observed statistic far from the replicate distribution indicates that
+the fitted model struggles to reproduce that aspect of the data. Check
+other features relevant to the study, such as the upper tail of the counts.
 
 The stored fits were run with the calls described here. Diagnostics were
 computed before retaining 2000 joint posterior draws per fitted model. Keeping
@@ -705,7 +815,7 @@ fit <- multiScale_bayes(
 )
 # 3. Inspect diagnostics before interpreting scales.
 summary(fit)$diagnostics
-precision <- diagnose_bayes_scales(fit)  # full NUTS sampler required
+precision <- diagnose_bayes_scales(fit)  # requires original NUTS or slice chains
 precision$parameters
 precision$quantiles                    # simulation error of annual log endpoints
 posterior_scales(fit)
@@ -721,7 +831,7 @@ simulate(fit, nsim = 100, seed = 1)  # replicated observation counts
 | `simulate_bayes_prior()` | Check prior implications before fitting, using the prepared design |
 | `posterior_scales()` | Summarize shared and annual scales in map units |
 | `predict_scales()` | Predict scales at new covariates and years, including new-group variation |
-| `diagnose_bayes_scales()` | Check annual log-scale mixing and quantile simulation error |
+| `diagnose_bayes_scales()` | Check mixing and quantile simulation error for fitted log distances and group SDs |
 | `plot()` | Display fitted scale intervals or between-group SDs |
 | `predict()` | Propagate posterior uncertainty into fitted or new-observation means |
 | `simulate()` | Generate posterior predictive responses |

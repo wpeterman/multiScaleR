@@ -1,6 +1,6 @@
 test_that("capabilities distinguish structural support from inference targets", {
   table <- multiScaleR:::.msr_scale_capabilities()
-  expect_equal(nrow(table), 7)
+  expect_equal(nrow(table), 8)
   expect_false(anyDuplicated(table[c("target", "method")]) > 0L)
   expect_false(any(table$public_interface[table$target == "marginal_likelihood"]))
   expect_true(all(is.infinite(table$max_kernel_predictors[table$target == "posterior"])))
@@ -40,7 +40,7 @@ test_that("supported families, kernels and zero-SD faces pass without changing m
     }
     b <- multiScale_bayes(count ~ habitat + temp + (1 | site), f$inputs, f$data,
       list(habitat = ~1 + (1 | year)), family, "key", method = "prepare")$specification
-    for (method in c("prepare", "nuts", "joint_laplace", "marginal_laplace", "importance_corrected"))
+    for (method in c("prepare", "nuts", "slice", "joint_laplace", "marginal_laplace", "importance_corrected"))
       expect_identical(check(b, "posterior", method), b)
     expect_identical(check(b, "marginal_likelihood", "laplace"), b)
     if (family != "gaussian")
@@ -62,7 +62,7 @@ test_that("marginal posterior requires one total scale SD, rather than one kerne
   two <- prepare(list(habitat = ~1 + (1 | year), cover = ~1 + (1 | year)))
   none <- prepare(list(habitat = ~1, cover = ~1))
   check <- multiScaleR:::.msr_scale_check_capability
-  for (fit in list(one, two, none)) for (method in c("prepare", "nuts", "joint_laplace"))
+  for (fit in list(one, two, none)) for (method in c("prepare", "nuts", "slice", "joint_laplace"))
     expect_identical(check(fit$specification, "posterior", method), fit$specification)
   for (method in c("marginal_laplace", "importance_corrected")) {
     expect_identical(check(one$specification, "posterior", method), one$specification)
@@ -115,7 +115,7 @@ test_that("private likelihood solvers reject crossed terms before optimization",
   f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
   fit <- prepare_bayesian_fixture(f,
     scales = list(habitat = ~1 + (1 | year) + (1 | site)))
-  for (method in c("prepare", "nuts", "joint_laplace"))
+  for (method in c("prepare", "nuts", "slice", "joint_laplace"))
     expect_identical(multiScaleR:::.msr_scale_check_capability(fit$specification,
       "posterior", method), fit$specification)
   local_mocked_bindings(.msr_marginal_attempt = function(...) stop("optimizer was called"),

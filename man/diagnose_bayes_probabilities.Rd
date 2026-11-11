@@ -13,8 +13,9 @@ diagnose_bayes_probabilities(
 }
 \arguments{
 \item{object}{A \code{\link{multiScale_bayes}} fit retaining its original
-unpermuted, post-warmup NUTS sampler. Compact and approximate fits return
-an unavailable report; permuted draws cannot recover chain order.}
+unpermuted post-warmup chains from NUTS or slice sampling. Compact and
+approximate fits return an unavailable report because permuted draws
+cannot recover chain order.}
 
 \item{thresholds}{A nonempty named list of numeric vectors. Each name selects
 a fitted kernel predictor, and each vector contains distinct finite scale

@@ -41,35 +41,33 @@ library(multiScaleR) # Load the package
 The package vignettes provide worked analyses of simulated data and
 explain the main workflows.
 
-## Bayesian scales across years
+## Bayesian scale estimation
 
-The experimental Bayesian development interface fits shared, independent
-annual or partially pooled landscape scales with `multiScale_bayes()`.
-Response and scale formulas describe separate parts of the model. After
-loading a development build that contains this interface, start with:
+Estimate one shared scale per landscape predictor or model scales as a
+function of measured covariates and groups. Use `method = "slice"` for full
+posterior sampling without a Stan toolchain. Install `posterior` to assess
+chain mixing and simulation precision.
 
 ``` r
-check_bayes_setup(method = "sample")
+check_bayes_setup(method = "slice")
 vignette("bayesian-scales", package = "multiScaleR")
 # Before fitting, simulate_bayes_prior() checks a prepared model's implications.
 
 fit <- multiScale_bayes(
-  count ~ habitat + factor(year) + (1 | site), inputs, dat,
-  scales = list(habitat = ~1 + (1 | year)), row_id = "site_year",
-  priors = list(scale_median = 250), seed = 5211
+  counts ~ site + land1 + land2, kernel_inputs, dat,
+  family = "poisson", method = "slice", seed = 5211
 )
-summary(fit)$diagnostics             # inspect before interpreting estimates
-diagnose_bayes_scales(fit)$quantiles  # simulation error of derived scale quantiles
-posterior_scales(fit)                # annual distances and credible intervals
-plot(fit)                           # annual scale estimates
-plot(fit, type = "group_sd")         # population variation, not annual uncertainty
+summary(fit)$diagnostics             # inspect chain mixing
+diagnose_bayes_scales(fit)$quantiles  # check simulation error of scale quantiles
+posterior_scales(fit)                # one distance and credible interval per layer
+plot(fit)
 ```
 
 The vignette displays actual fitted results from an artificial
 annual-map example, including shared and independent controls,
 predictive checks and prior sensitivity. Compact stored draws let you
-read it without rerunning MCMC. Full sampling needs the optional RTMB,
-tmbstan, rstan and posterior packages. Preparation can be checked
+read it without rerunning MCMC. NUTS sampling uses RTMB,
+tmbstan, rstan, and posterior. Preparation can be checked
 without them using `method = "prepare"`. `predict_scales()` predicts
 scales for unobserved years. `predict()` and `simulate()` accept new
 observations and matching prepared landscapes, with explicit choices for

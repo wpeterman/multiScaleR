@@ -1,6 +1,6 @@
 .msr_bayes_draw_ids <- function(object, draws) {
   if (is.null(object$draws))
-    stop("This object has no posterior draws. Fit with method = 'sample', 'laplace', or 'marginal'.", call. = FALSE)
+    stop("This object has no posterior draws. Fit with method = 'sample', 'slice', 'laplace', or 'marginal'.", call. = FALSE)
   n <- nrow(object$draws$beta)
   if (is.null(draws)) return(seq_len(n))
   validate_scalar_numeric(draws, "draws", integerish = TRUE, lower = 1, upper = n)
@@ -55,7 +55,7 @@
 #'   draws. For importance-corrected fits, \code{"weighted"} instead summarizes
 #'   all retained production candidates using their normalized importance
 #'   weights. This avoids additional resampling error. It requires
-#'   \code{draws = NULL} and is unavailable for NUTS or uncorrected Laplace fits.
+#'   \code{draws = NULL} and a fit with importance correction.
 #' @return A data frame with one row per predictor and distinct scale-formula
 #'   covariate combination. \code{covariate} identifies the landscape predictor;
 #'   \code{group} labels the scale predictors; \code{row} is a representative
@@ -230,7 +230,7 @@ print.multiScaleR_bayes <- function(x, ...) {
         if (is.null(x$laplace)) "Raw-parameter sampling checks:" else "Laplace numerical checks:",
         status, "\n")
     if (is.null(x$importance) && is.null(x$marginal) && is.null(x$laplace))
-      cat("Check derived annual scales with diagnose_bayes_scales().\n")
+      cat("Check derived scales with diagnose_bayes_scales().\n")
   }
   invisible(x)
 }

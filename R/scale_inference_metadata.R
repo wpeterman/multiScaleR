@@ -9,6 +9,8 @@
       population_parameters = "not_computed"),
     nuts = c(scale_effects = "joint_sampling", response_effects = "joint_sampling",
       population_parameters = "joint_sampling"),
+    slice = c(scale_effects = "joint_sampling", response_effects = "joint_sampling",
+      population_parameters = "joint_sampling"),
     joint_laplace = c(scale_effects = "joint_gaussian", response_effects = "joint_gaussian",
       population_parameters = "joint_gaussian"),
     marginal_laplace = c(scale_effects = "conditional_gaussian", response_effects = "conditional_gaussian",
@@ -23,7 +25,7 @@
     objective = if (posterior) "negative_log_posterior" else "negative_marginal_log_likelihood",
     population_priors = if (posterior) "proper" else "none",
     response_normalizers = "retained", integration = as.list(integration),
-    solver = if (prepared) "none" else if (method == "nuts") "nuts" else
+    solver = if (prepared) "none" else if (method %in% c("nuts", "slice")) method else
       if (method == "importance_corrected") "importance_sampling" else "optimization",
     uncertainty = list(
       intervals = if (posterior && !prepared) "marginal_credible" else "not_provided",

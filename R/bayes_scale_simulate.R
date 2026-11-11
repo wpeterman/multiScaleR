@@ -28,6 +28,10 @@
 #' @details Compare summaries of these replicate datasets with the observed
 #'   response to assess model adequacy. Good sampling diagnostics do not
 #'   establish that the observation model fits the data.
+#'   To use bayesplot, convert the replicates to a matrix and transpose it
+#'   with \code{t(as.matrix(replicated))}. This gives one simulated dataset
+#'   per row. For a count model, use \code{ppc_stat()} with
+#'   \code{stat = function(y) mean(y == 0)} to check the fraction of zeros.
 #'   For new groups, effects are sampled afresh for each replicate dataset,
 #'   shared by its rows in that group and independent across replicate datasets
 #'   conditional on the sampled posterior vector. Observation noise is then

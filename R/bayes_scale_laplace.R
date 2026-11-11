@@ -1,6 +1,6 @@
 # Joint Laplace approximation of the existing posterior. Keeping this objective
 # identical to NUTS makes approximation error distinguishable from model changes.
-.msr_bayes_laplace <- function(out, draws, seed, control) {
+.msr_bayes_laplace <- function(out, draws, seed, control, cores = 1L) {
   out$inference_metadata <- NULL
   if (!requireNamespace("RTMB", quietly = TRUE))
     stop("Laplace inference requires the optional package 'RTMB'.", call. = FALSE)
@@ -16,8 +16,7 @@
   validate_scalar_numeric(ctl$starts, "starts", integerish = TRUE, lower = 1)
   validate_scalar_numeric(ctl$iter.max, "iter.max", integerish = TRUE, lower = 1)
   spec <- out$specification
-  obj <- RTMB::MakeADFun(.msr_bayes_objective(spec, ad = TRUE),
-                         spec$parameters, silent = TRUE)
+  obj <- .msr_bayes_ad_object(spec)
   initial <- lapply(seq_len(ctl$starts), function(i) {
     p <- obj$par
     if (i == 1L) return(p)
@@ -30,62 +29,15 @@
         rep(c(-.7, .7, -.3, .3, 0), length.out = ctl$starts - 1L)[i - 1L]
     p
   })
-  attempts <- lapply(initial, function(p) {
-    tryCatch({
-      a <- stats::nlminb(p, obj$fn, obj$gr,
-        control = list(iter.max = ctl$iter.max, eval.max = 2 * ctl$iter.max,
-                       rel.tol = 1e-10))
-      # Tight stationarity matters more than the optimizer's relative stopping
-      # rule, which can stop early for large negative log likelihoods.
-      if (max(abs(obj$gr(a$par))) > 1e-4) {
-        b <- stats::optim(a$par, obj$fn, obj$gr, method = "BFGS",
-          control = list(maxit = ctl$iter.max, reltol = 1e-12))
-        if (is.finite(b$value) && b$value <= a$objective) {
-          a$par <- b$par
-          a$objective <- b$value
-          a$convergence <- b$convergence
-          a$message <- "BFGS polish"
-        }
-      }
-      # Relative objective tolerances can leave a small gradient even after
-      # BFGS. Refine with positive-curvature Newton steps and a line search;
-      # never repair indefinite curvature or weaken the stationarity gate.
-      a$newton_steps <- 0L
-      for (step in seq_len(8L)) {
-        gradient <- as.numeric(obj$gr(a$par))
-        if (max(abs(gradient)) <= 1e-6) {
-          a$convergence <- 0L
-          break
-        }
-        R <- tryCatch(chol(obj$he(a$par)), error = function(e) NULL)
-        if (is.null(R)) break
-        direction <- as.numeric(backsolve(R, forwardsolve(t(R), gradient)))
-        accepted <- FALSE
-        for (half in 0:12) {
-          candidate <- a$par - direction * 2^-half
-          value <- obj$fn(candidate)
-          # Allow roundoff in a nearly identical objective only when the
-          # gradient improves. This is not an objective-increasing restart.
-          roundoff <- 1e-12 * max(1, abs(a$objective))
-          if (is.finite(value) && value <= a$objective + roundoff &&
-              max(abs(obj$gr(candidate))) < max(abs(gradient))) {
-            a$par <- candidate
-            a$objective <- value
-            a$newton_steps <- a$newton_steps + 1L
-            accepted <- TRUE
-            break
-          }
-        }
-        if (!accepted) break
-      }
-      if (max(abs(obj$gr(a$par))) <= 1e-6) a$convergence <- 0L
-      a$gradient_max <- max(abs(obj$gr(a$par)))
-      a$usable <- is.finite(a$objective) && a$convergence == 0L &&
-        is.finite(a$gradient_max) && a$gradient_max <= 1e-4
-      a
-    }, error = function(e) list(usable = FALSE, objective = Inf,
-                                message = conditionMessage(e)))
-  })
+  cores <- min(cores, length(initial))
+  if (cores > 1L) .msr_scale_surface_ram(spec, copies = cores + 1)
+  pool <- .msr_bayes_pool(cores, .msr_bayes_ad_object, spec)
+  if (is.null(pool)) {
+    attempts <- lapply(initial, .msr_bayes_laplace_start, obj, ctl)
+  } else {
+    on.exit(.msr_bayes_pool_stop(pool), add = TRUE)
+    attempts <- .msr_bayes_pool_map(pool, initial, .msr_bayes_laplace_start, ctl)
+  }
   good <- which(vapply(attempts, function(a) isTRUE(a$usable), logical(1)))
   if (!length(good))
     .msr_bayes_laplace_failure("Laplace optimization found no converged stationary mode.", attempts)
@@ -112,7 +64,7 @@
   names(out$draws) <- names(spec$parameters)
   out$inference <- "joint Laplace Gaussian approximation"
   out$laplace <- list(mode = mode, covariance = covariance, hessian = hessian,
-    starts = attempts, selected_start = best, draws = draws, seed = seed,
+    starts = attempts, selected_start = best, draws = draws, seed = seed, cores = cores,
     coordinates = "Unconstrained, noncentered; log SDs include prior Jacobians")
   out$diagnostics <- list(passed = !competing, type = "Laplace numerical checks",
     gradient_max = attempts[[best]]$gradient_max,
@@ -127,6 +79,63 @@
             call. = FALSE)
   out$inference_metadata <- .msr_scale_inference_metadata("posterior", "joint_laplace")
   out
+}
+
+.msr_bayes_laplace_start <- function(p, obj, ctl) {
+  tryCatch({
+    a <- stats::nlminb(p, obj$fn, obj$gr,
+      control = list(iter.max = ctl$iter.max, eval.max = 2 * ctl$iter.max,
+                     rel.tol = 1e-10))
+    # Tight stationarity matters more than the optimizer's relative stopping
+    # rule, which can stop early for large negative log likelihoods.
+    if (max(abs(obj$gr(a$par))) > 1e-4) {
+      b <- stats::optim(a$par, obj$fn, obj$gr, method = "BFGS",
+        control = list(maxit = ctl$iter.max, reltol = 1e-12))
+      if (is.finite(b$value) && b$value <= a$objective) {
+        a$par <- b$par
+        a$objective <- b$value
+        a$convergence <- b$convergence
+        a$message <- "BFGS polish"
+      }
+    }
+    # Relative objective tolerances can leave a small gradient even after
+    # BFGS. Refine with positive-curvature Newton steps and a line search;
+    # never repair indefinite curvature or weaken the stationarity gate.
+    a$newton_steps <- 0L
+    for (step in seq_len(8L)) {
+      gradient <- as.numeric(obj$gr(a$par))
+      if (max(abs(gradient)) <= 1e-6) {
+        a$convergence <- 0L
+        break
+      }
+      R <- tryCatch(chol(obj$he(a$par)), error = function(e) NULL)
+      if (is.null(R)) break
+      direction <- as.numeric(backsolve(R, forwardsolve(t(R), gradient)))
+      accepted <- FALSE
+      for (half in 0:12) {
+        candidate <- a$par - direction * 2^-half
+        value <- obj$fn(candidate)
+        # Allow roundoff in a nearly identical objective only when the
+        # gradient improves. This is not an objective-increasing restart.
+        roundoff <- 1e-12 * max(1, abs(a$objective))
+        if (is.finite(value) && value <= a$objective + roundoff &&
+            max(abs(obj$gr(candidate))) < max(abs(gradient))) {
+          a$par <- candidate
+          a$objective <- value
+          a$newton_steps <- a$newton_steps + 1L
+          accepted <- TRUE
+          break
+        }
+      }
+      if (!accepted) break
+    }
+    if (max(abs(obj$gr(a$par))) <= 1e-6) a$convergence <- 0L
+    a$gradient_max <- max(abs(obj$gr(a$par)))
+    a$usable <- is.finite(a$objective) && a$convergence == 0L &&
+      is.finite(a$gradient_max) && a$gradient_max <= 1e-4
+    a
+  }, error = function(e) list(usable = FALSE, objective = Inf,
+                              message = conditionMessage(e)))
 }
 
 .msr_bayes_laplace_failure <- function(message, attempts) {

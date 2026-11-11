@@ -4,7 +4,7 @@
 \alias{summary.multiScaleR_bayes}
 \alias{print.multiScaleR_bayes}
 \alias{multiScale_bayes}
-\title{Estimate Hierarchical Scales of Effect with Bayesian Inference}
+\title{Estimate Scales of Effect with Bayesian Inference}
 \usage{
 \method{summary}{multiScaleR_bayes}(object, ...)
 
@@ -18,13 +18,14 @@ multiScale_bayes(
   family = c("nbinom2", "poisson", "binomial", "gaussian"),
   row_id = NULL,
   priors = list(),
-  method = c("sample", "prepare", "laplace", "marginal"),
+  method = c("sample", "prepare", "laplace", "marginal", "slice"),
   chains = 4L,
   iter = 2000L,
   warmup = floor(iter/2),
   seed = NULL,
   control = list(),
-  laplace_draws = 2000L
+  laplace_draws = 2000L,
+  cores = 1L
 )
 }
 \arguments{
@@ -102,7 +103,10 @@ a normal prior on log NB2 theta or log Gaussian residual SD.}
 
 \item{method}{\code{"sample"} runs full Bayesian NUTS sampling through
 RTMB and tmbstan, with Laplace approximation disabled. NUTS is a
-gradient-based Markov chain Monte Carlo method. \code{"prepare"} validates
+gradient-based Markov chain Monte Carlo method. \code{"slice"} samples the
+same joint posterior in R and uses no optional fitting packages. Install
+posterior (version 1.6.0 or later) to check chain mixing and precision.
+\code{"prepare"} validates
 formulas, rows, priors, and bins without loading either optional package.
 \code{"laplace"} fits a joint Gaussian approximation to the posterior
 in the same unconstrained, noncentered coordinates used by the sampler.
@@ -111,7 +115,7 @@ It requires only RTMB and does not run MCMC.
 conditional Laplace approximations for all remaining parameters. This
 retains a non-Gaussian SD distribution and also requires only RTMB.}
 
-\item{chains}{Number of sampling chains; default 4. Chains run serially.}
+\item{chains}{Number of sampling chains; default 4.}
 
 \item{iter}{Total iterations per chain, including warmup; default 2000.}
 
@@ -122,6 +126,7 @@ retains a non-Gaussian SD distribution and also requires only RTMB.}
 
 \item{control}{Named list with optional NUTS settings
 \code{adapt_delta} (default 0.9) and \code{max_treedepth} (default 12).
+Use an empty list for slice sampling.
 For \code{method = "laplace"}, instead supports \code{starts} (default 6,
 deterministic dispersed initial values) and \code{iter.max} (default 1000,
 optimizer iterations per start). All starts contribute to computational cost.
@@ -177,6 +182,23 @@ or mixture draws. Corrected draws are resampled from a finite weighted
 candidate population. Increasing this count reduces resampling error,
 but does not increase importance effective sample size or improve the
 underlying Laplace approximation.}
+
+\item{cores}{Positive integer worker limit; default 1. NUTS and slice
+sampling distribute chains. Joint and marginal Laplace distribute
+optimizer starts. With importance correction, workers also evaluate
+batches of candidate posterior densities. Preparation uses one process.
+Parallel fits use the optional package processx to launch local R
+processes. Each worker holds its own model data and, where needed, its
+own differentiation tape. Temporary worker files are removed after fitting.
+The effective limit is recorded in \code{sampling$cores},
+\code{laplace$cores}, or \code{marginal$cores}, depending on the method.
+For a given seed, slice sampling uses the same chain seeds at every core
+count. The worker limit for sampling is the number of chains. For
+uncorrected Laplace and marginal fits, it is the number of optimizer
+starts. Marginal integration keeps grid nodes in order so each node can
+use the previous fits as starts. Importance proposal generation and
+diagnostics run in the main process. Worker startup and data transfer
+can make small fits slower.}
 }
 \value{
 A \code{multiScaleR_bayes} list with \code{specification} (frozen
@@ -203,9 +225,13 @@ A \code{multiScaleR_bayes} list with \code{specification} (frozen
   Older saved fits can lack this additive metadata and remain usable.
   Newly prepared fits retain compact training levels/contrasts and the
   original row-ID column name, when supplied, for new-observation prediction.
-  Sampled fits additionally contain
-  \code{sampler} (a \code{stanfit}), \code{draws} (posterior matrices by
+  Sampled fits additionally contain \code{draws} (posterior matrices by
   parameter block), \code{diagnostics}, and \code{sampling} settings.
+  NUTS fits retain \code{sampler} (a \code{stanfit}). Slice fits retain
+  \code{chains}, a numeric array ordered by post-warmup iteration, chain, and
+  parameter. Without posterior installed, a slice fit records
+  \code{diagnostics$passed = NA} and the reason in \code{diagnostics$reason}.
+  Install posterior to compute derived diagnostics from the saved chains.
   Laplace fits contain \code{draws}, numerical \code{diagnostics}, and
   \code{laplace}: the unconstrained \code{mode}, joint \code{covariance},
   \code{hessian}, optimizer \code{starts}, \code{draws}, \code{seed}, and
@@ -277,9 +303,9 @@ A \code{multiScaleR_bayes} list with \code{specification} (frozen
   summaries, as used by the plot's automatic estimator.
 }
 \description{
-Fit an experimental Bayesian model in which each landscape predictor has
-its own formula for spatial scale. Year-specific scales can borrow information
-through a shared distribution while response effects account for repeated sites.
+Estimate landscape scales and response effects jointly. Give each landscape
+predictor one shared scale, model scale as a function of measured covariates,
+or let scales vary among groups such as regions or years.
 }
 \details{
 Each scale formula models log spatial scale. Random intercepts use
@@ -288,12 +314,12 @@ For \code{~1 + (1 | year)}, annual log scales share a population mean and
 an estimated between-year SD. Years are exchangeable; this first
 implementation does not impose temporal autocorrelation.
 
-Model support depends on the computation. Preparation, NUTS and joint
-Laplace allow multiple kernel predictors and additive or crossed random
+Model support depends on the computation. Preparation, NUTS, slice sampling
+and joint Laplace allow multiple kernel predictors and additive or crossed random
 intercept groups. Marginal Laplace, including importance correction, requires
 exactly one scale-group SD across all kernel predictors. A second random
 scale term adds another SD even if it uses the same grouping variable.
-Use NUTS or joint Laplace for those models. The function checks this
+Use NUTS, slice sampling, or joint Laplace for those models. The function checks this
 structural restriction before starting the numerical fit; it does not
 switch methods automatically. Supported syntax does not establish numerical
 convergence, useful scale identification or interval calibration.
@@ -302,7 +328,7 @@ Scale and response formulas describe different parts of the model. A
 response year effect changes baseline abundance or occurrence; a scale
 year effect changes how the surrounding landscape is weighted. Repeated
 observations can use \code{(1 | site)} in the response formula. Random
-slopes, kernel interactions, spatial fields, observation weights,
+slopes, spatial fields, observation weights,
 and imperfect-detection likelihoods are not supported in this development
 implementation. \code{\link{predict_scales}} predicts scales at new
 covariates and groups. \code{predict()} and \code{simulate()} also accept new
@@ -348,6 +374,15 @@ central credible interval is therefore not a test of the exact zero-variance
 model. Compare shared scales and scientifically meaningful variation instead.
 This interface is experimental; its interval calibration and practical
 performance have not been established for general ecological datasets.
+
+Slice sampling alternates among blocks of parameters in the full posterior.
+For Gaussian responses, it draws regression coefficients from their exact
+conditional distribution. It reuses kernel values when updating response
+parameters and recomputes only the changed kernel during scale updates.
+Sampling efficiency depends on the dataset and on dependence among scales
+and response effects. Compare Rhat and effective sample size per second
+before choosing a method for larger fits. Explicit slice seeds preserve the
+caller's random-number state. Chain seeds are generated before dispatch.
 
 Laplace inference uses the inverse positive-definite Hessian of the full
 negative log posterior at a numerically stationary mode, including log-SD
@@ -458,6 +493,10 @@ unsupported. Nonfinite expression domains are errors; values are not clipped.
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
   package = "multiScaleR"))
+# Share the habitat scale while allowing baseline counts to vary.
+shared <- multiScale_bayes(count ~ habitat + factor(year) + (1 | site),
+  example$inputs, example$data, row_id = "site_year", method = "prepare")
+summary(shared)$scale_formulas
 response_formula <- count ~ habitat + factor(year) + (1 | site)
 scale_formulas <- list(habitat = ~1 + (1 | year))
 prepared <- multiScale_bayes(response_formula, example$inputs, example$data,

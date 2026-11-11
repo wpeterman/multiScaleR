@@ -5,7 +5,7 @@
 #' individual coefficients checked by the original sampler diagnostics.
 #'
 #' @param object A \code{\link{multiScale_bayes}} fit. Computing new diagnostics
-#'   requires its original NUTS sampler with unpermuted post-warmup chains.
+#'   requires the original unpermuted post-warmup chains from NUTS or slice sampling.
 #'   Prepared, approximate, and compact fits return an unavailable report.
 #' @param probs Numeric vector of distinct probabilities strictly between zero
 #'   and one. Defaults to \code{c(0.025, 0.5, 0.975)}, the endpoints and median
@@ -33,7 +33,9 @@
 #'       chain hold for every derived quantity. \code{NA} when unavailable.}
 #'     \item{passed}{Whether both the original sampler checks and the derived
 #'       checks passed. \code{NA} when derived diagnostics are unavailable.
-#'       This does not replace or change \code{object$diagnostics$passed}.}
+#'       For slice fits sampled without posterior installed, the original
+#'       parameter checks are computed from the stored chains. The fit's
+#'       stored diagnostics stay as recorded at fitting.}
 #'     \item{criteria, notes}{The fixed derived checks and their limitations.}
 #'   }
 #' @details Landscape distances are diagnosed on the natural log axis in map
@@ -53,9 +55,14 @@
 #'   Permuted or thinned stored draws do not reconstruct the original chain
 #'   order or full-chain precision. Compact examples therefore retain their
 #'   original diagnostic evidence but cannot provide new chain diagnostics.
-#'   MCMC diagnostics are not defined for Laplace draws or weighted importance
-#'   candidates; inspect those fits' original numerical checks instead.
-#' @seealso \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}}
+#'   For chain plots in bayesplot, use \code{fit$chains} for a slice fit or
+#'   \code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
+#'   for a NUTS fit. The scale vignette shows trace, rank, and density plots
+#'   alongside the derived diagnostics. Use the stored numerical checks for
+#'   Laplace draws and weighted importance candidates.
+#' @seealso \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
+#'   \code{\link{plot.multiScaleR_bayes}}, \code{\link{diagnose_bayes_probabilities}},
+#'   and \code{vignette("bayesian-scales", package = "multiScaleR")}.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'                               package = "multiScaleR"))
@@ -82,14 +89,14 @@ diagnose_bayes_scales <- function(object, probs = c(0.025, 0.5, 0.975)) {
     out$reason <- "MCMC chain diagnostics are unavailable for approximate draws or importance candidates."
     return(out)
   }
-  if (is.null(object$sampler)) {
-    out$reason <- paste("Full unpermuted NUTS chains are not retained.",
+  if (is.null(object$sampler) && is.null(object$chains)) {
+    out$reason <- paste("Full unpermuted MCMC chains are not retained.",
       "Stored permuted or thinned draws cannot recover original chain diagnostics.")
     return(out)
   }
   if (!requireNamespace("posterior", quietly = TRUE))
     stop("Install posterior to compute derived sampling diagnostics.", call. = FALSE)
-  a <- .msr_bayes_sampler_array(object$sampler)
+  a <- .msr_bayes_fit_chains(object)
   if (!is.numeric(a) || length(dim(a)) != 3L || any(dim(a) < 1L) ||
       is.null(dimnames(a)[[3L]]) || anyDuplicated(dimnames(a)[[3L]]))
     stop("Sampler output must have named iterations-by-chains-by-parameters dimensions.", call. = FALSE)
@@ -151,9 +158,31 @@ diagnose_bayes_scales <- function(object, probs = c(0.025, 0.5, 0.975)) {
     all(is.finite(d$rhat) & d$rhat <= 1.01) &&
     all(is.finite(d$ess_bulk) & d$ess_bulk >= 100 * out$chains) &&
     all(is.finite(d$ess_tail) & d$ess_tail >= 100 * out$chains)
-  out$passed <- isTRUE(object$diagnostics$passed) && out$derived_passed
+  raw_passed <- object$diagnostics$passed
+  if (!is.null(object$chains) && !isTRUE(raw_passed) && !isFALSE(raw_passed))
+    raw_passed <- .msr_bayes_chain_checks(.msr_bayes_chain_summary(a), out$chains)
+  out$passed <- isTRUE(raw_passed) && out$derived_passed
   out$available <- TRUE
   out
+}
+
+.msr_bayes_fit_chains <- function(object) {
+  if (!is.null(object$chains)) return(object$chains)
+  .msr_bayes_sampler_array(object$sampler)
+}
+
+.msr_bayes_chain_summary <- function(a) {
+  as.data.frame(posterior::summarise_draws(posterior::as_draws_array(a)))
+}
+
+.msr_bayes_chain_checks <- function(tab, chains) {
+  chains >= 2L && all(is.finite(tab$rhat) & tab$rhat <= 1.01) &&
+    all(is.finite(tab$ess_bulk) & tab$ess_bulk >= 100 * chains) &&
+    all(is.finite(tab$ess_tail) & tab$ess_tail >= 100 * chains)
+}
+
+.msr_bayes_chain_criteria <- function() {
+  "At least 2 chains; Rhat <= 1.01; bulk/tail ESS >= 100 per chain."
 }
 
 .msr_bayes_sampler_array <- function(sampler) {

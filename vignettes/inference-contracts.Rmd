@@ -59,6 +59,7 @@ even when they share formulas, kernel arithmetic and response distributions.
 |:---------|:-----------------------|:-------------------------|
 | `multiScale_optim()` | The selected backend's likelihood, profiling or native model calculation | Preserve that backend's conditioning and covariance restrictions. |
 | `multiScale_bayes(method = "sample")` | Posterior with proper population priors, sampled using NUTS | Read sampling and derived-scale diagnostics before interpreting posterior summaries. |
+| `multiScale_bayes(method = "slice")` | The same joint posterior, sampled using slice updates and Gaussian conditional draws where available | Read chain diagnostics on the sampled parameters and derived scales. |
 | `multiScale_bayes(method = "laplace")` | Posterior with the same declared priors, approximated jointly by a Gaussian distribution | A finite approximation is not proof of accurate tails or intervals. |
 | `multiScale_bayes(method = "marginal")` | Posterior with proper priors, using the supported marginal approximation and optional importance correction | Integration and correction diagnostics belong to this posterior calculation. This is not unpenalized maximum likelihood. |
 
