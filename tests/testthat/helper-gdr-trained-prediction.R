@@ -36,7 +36,8 @@ gdr_trained_fixture <- local({
       frame <- unmarked::unmarkedFrameGDR(yd, yr, numPrimary = primary,
         dist.breaks = c(0, 25, 75), unitsIn = "m", period.lengths = durations,
         siteCovs = data.frame(hab = hab, `land cover` = cover, check.names = FALSE),
-        yearlySiteCovs = data.frame(wind = wind, temperature = temperature, wind_good = wind >= 0),
+        yearlySiteCovs = data.frame(survey = factor(paste0("survey-", seq_len(n * primary))),
+          wind = wind, temperature = temperature, wind_good = wind >= 0),
         obsCovs = data.frame(effort = effort))
       forms <- list(lambda = ~splines::ns(hab, df = 4) * `land cover`,
         phi = ~I(base::scale(wind)^2) + wind_good, dist = ~stats::poly(temperature, 2), rem = ~I(base::scale(effort)^2))
@@ -75,6 +76,7 @@ gdr_trained_fixture <- local({
       models$C <- record("fixed-C", do.call(unmarked::gdistremoval, c(args, settings$dots)))
       original <- gdr_tmb_refit_fixture("mixed")$model
       mixed_frame <- original@data
+      mixed_frame@siteCovs$survey <- factor(paste0("mixed-survey-", seq_len(nrow(mixed_frame@siteCovs))))
       mixed_frame@siteCovs$temperature <- seq(-1, 1, length.out = nrow(mixed_frame@siteCovs))
       mixed_forms <- original@formlist
       mixed_forms$lambda <- ~splines::ns(hab, df = 3) + (1 | block)

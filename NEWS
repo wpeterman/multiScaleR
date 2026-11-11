@@ -1,3 +1,9 @@
+multiScaleR 0.7.34
+
+* Bind trained GDR recipes and verified survey and group identities to private
+  native objective inputs. Verify constructor types and tape data on fresh
+  reconstruction while retaining the existing inference checks.
+
 multiScaleR 0.7.33
 
 * Apply the existing response-field marginal score threshold to native TMB GDR
