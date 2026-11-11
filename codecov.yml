@@ -1,0 +1,16 @@
+# codecov.io settings. Coverage is reported for information only:
+# a drop in coverage never fails a commit or pull request check.
+comment: false
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: true
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+        informational: true

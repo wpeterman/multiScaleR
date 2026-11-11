@@ -15,6 +15,16 @@ knitr::opts_chunk$set(
 
 # multiScaleR <img src="man/figures/logo.png" align="right" height="150"/>
 
+README last updated: `r Sys.Date()`
+
+<!-- Status badges. Kept in a table (not a "badges: start/end" block) so that
+     pkgdown shows them on the home page instead of moving them to the sidebar. -->
+
+| CI | Development | CRAN | License |
+|----|-------------|------|---------|
+| [![R-CMD-check](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml/badge.svg)](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml) | [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) | [![CRAN status](https://www.r-pkg.org/badges/version/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
+| [![codecov](https://codecov.io/gh/wpeterman/multiScaleR/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/multiScaleR) | [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![DOI](https://img.shields.io/badge/DOI-10.1007/s10980--025--02267--x-yellow.svg)](https://doi.org/10.1007/s10980-025-02267-x) |
+
 ## Overview
 
 multiScaleR is an R package to identify the scale of effect of spatial environmental variables in regression analyses.

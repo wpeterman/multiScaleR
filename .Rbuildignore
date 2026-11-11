@@ -30,3 +30,7 @@
 ^tools/benchmarks$
 ^tools/DEVELOPMENT_PRIORITIES\.md$
 ^tools/GDR_JOINT_TARGET\.md$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^codecov\.yml$

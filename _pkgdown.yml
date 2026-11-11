@@ -1,0 +1,159 @@
+# pkgdown configuration for the multiScaleR website.
+# Preview locally with pkgdown::build_site(); validate with pkgdown::check_pkgdown().
+url: https://wpeterman.github.io/multiScaleR/
+
+template:
+  bootstrap: 5
+  light-switch: true   # light/dark toggle in the navbar
+
+# The package has no vignette named "multiScaleR", so pkgdown would not create
+# a "Get started" link on its own. Point it at the quick-start vignette.
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github, lightswitch]
+  components:
+    intro:
+      text: Get started
+      href: articles/quickstart.html
+
+# Vignettes, grouped for the Articles menu and index page.
+# Every vignette must be listed here, or pkgdown::check_pkgdown() fails.
+articles:
+  - title: Getting started
+    navbar: Getting started
+    contents:
+      - quickstart
+      - multiScaleR_Guide
+  - title: Covariate types
+    navbar: Covariate types
+    desc: >
+      Scale-dependent covariates beyond the kernel-weighted mean.
+    contents:
+      - landscape_metric_covariates
+      - surface_metric_covariates
+  - title: Workflows
+    navbar: Workflows
+    contents:
+      - year-specific-rasters
+      - spatial_projection_clamping
+      - cross-validation
+  - title: Bayesian scale estimation
+    navbar: Bayesian scale estimation
+    contents:
+      - bayesian-scales
+      - bayesian-computation
+      - bayesian-prediction
+  - title: Technical notes
+    navbar: Technical notes
+    desc: >
+      Definitions of inference targets, feature support across fitting and
+      prediction, and audits for distance-removal models.
+    contents:
+      - inference-contracts
+      - feature-compatibility
+      - distance-removal-audits
+
+# Function reference, grouped by step in the analysis workflow.
+# Every non-internal help topic must be listed here, or check_pkgdown() fails.
+reference:
+  - title: Prepare inputs
+    desc: >
+      Build the kernel inputs and declare how each raster covariate is
+      summarized before optimization.
+    contents:
+      - kernel_prep
+      - kernel_prep_by_group
+      - msr_vars
+      - prepare_unmarked_data
+      - validate_unmarked_data
+      - estimate_multiscale_ram
+  - title: Optimize scales of effect
+    desc: >
+      Estimate the scale of effect for each covariate by maximum likelihood
+      and assess the fit.
+    contents:
+      - multiScale_optim
+      - profile_sigma
+      - scale_inference
+      - diagnostics
+      - vcov.multiScaleR
+  - title: Bayesian scale estimation
+    desc: >
+      Estimate scales of effect with full posterior uncertainty.
+    contents:
+      - multiScale_bayes
+      - check_bayes_setup
+      - simulate_bayes_prior
+      - posterior_scales
+      - diagnose_bayes_scales
+      - diagnose_bayes_probabilities
+      - plot.multiScaleR_bayes
+      - simulate.multiScaleR_bayes
+  - title: Summarize and compare models
+    contents:
+      - summary.multiScaleR
+      - kernel_dist
+      - aic_tab
+      - bic_tab
+      - starts_with("print")
+  - title: Cross-validation
+    contents:
+      - cross_validate
+      - cross_validate_glm
+      - cross_validate_clogit
+      - cross_validate_field
+      - cv_tab
+      - select_cv
+      - grouped_cv_folds
+      - spatial_cv_folds
+  - title: Prediction and spatial projection
+    desc: >
+      Apply fitted scales to new observations and to rasters.
+    contents:
+      - kernel_scale.raster
+      - prepare_prediction
+      - predict_scales
+      - predict.multiScaleR
+      - predict.multiScaleR_bayes
+      - prediction_contract
+  - title: Distance-removal models
+    desc: >
+      Data preparation, fitting helpers, and audits for generalized
+      distance-removal (GDR) models, including spatial response fields.
+    contents:
+      - prepare_gdr_histories
+      - prepare_gdr_intervals
+      - expand_gdr_intervals
+      - gdr_start_values
+      - make_gdr_refitter
+      - audit_gdr_integration
+      - fit_gdr_response_field
+      - response_field_geometry
+      - "`unmarkedFitGDRField-class`"
+      - "`predict,unmarkedFitGDRField-method`"
+      - "`vcov,unmarkedFitGDRField-method`"
+  - title: Plot
+    contents:
+      - plot.multiScaleR
+      - plot.sigma_profile
+      - plot_kernel
+      - plot_marginal_effects
+  - title: Simulation
+    contents:
+      - sim_rast
+      - sim_dat
+      - sim_dat_unmarked
+      - sim_dat_gdr
+      - score_simulation
+  - title: Example data
+    contents:
+      - count_data
+      - landscape_counts
+      - hab
+      - landscape
+      - pts
+      - surv_pts
+  - title: Package
+    contents:
+      - multiScaleR-package
