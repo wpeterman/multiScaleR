@@ -155,6 +155,12 @@ The native integration cutoff K is distinct from the K column in information
 criterion tables, which counts fitted parameters. Reusing one cutoff does
 not replace a separate cutoff-sensitivity analysis.
 
+Native TMB refits also require a finite marginal score at every returned
+optimizer coordinate with maximum absolute value below 1e-3, matching the
+field fitting route. Each attempt records \code{marginal_score} with its maximum,
+threshold and eligibility. A convergence code or positive covariance cannot
+replace this score check. C-engine score handling remains unchanged.
+
 TMB diagnostics evaluate the direct joint gradient and current latent
 precision at the retained complete mode. They record its maximum latent
 gradient and precision-scaled Newton decrement, each required below 1e-3,

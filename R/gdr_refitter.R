@@ -261,6 +261,12 @@
 #' criterion tables, which counts fitted parameters. Reusing one cutoff does
 #' not replace a separate cutoff-sensitivity analysis.
 #'
+#' Native TMB refits also require a finite marginal score at every returned
+#' optimizer coordinate with maximum absolute value below 1e-3, matching the
+#' field fitting route. Each attempt records `marginal_score` with its maximum,
+#' threshold and eligibility. A convergence code or positive covariance cannot
+#' replace this score check. C-engine score handling remains unchanged.
+#'
 #' TMB diagnostics evaluate the direct joint gradient and current latent
 #' precision at the retained complete mode. They record its maximum latent
 #' gradient and precision-scaled Newton decrement, each required below 1e-3,
@@ -562,8 +568,16 @@ make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list()
           }
           NULL
         })
+      if (tmb) {
+        score <- record$gradient
+        maximum <- if (is.numeric(score) && length(score) == audit$parameter_count &&
+          all(is.finite(score))) max(abs(score)) else Inf
+        record$marginal_score <- list(maximum_absolute_gradient = maximum,
+          threshold = 1e-3, eligible = is.finite(maximum) && maximum < 1e-3)
+      }
       record$eligible <- !is.null(fit) && is.finite(record$logLik) && record$converged &&
-        !length(record$warnings) && ((!se && !tmb) || identical(record$covariance$status, "available"))
+        !length(record$warnings) && ((!se && !tmb) || identical(record$covariance$status, "available")) &&
+        (!tmb || isTRUE(record$marginal_score$eligible))
       record$status <- if (is.null(record$error)) "returned" else "failed"
       .msr_gdr_atomic_audit(record, record$audit_file)
       list(fit = fit, record = record)

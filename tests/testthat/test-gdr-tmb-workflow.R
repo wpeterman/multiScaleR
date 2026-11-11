@@ -87,9 +87,14 @@ test_that("native zero-inner policy retains joint inference, counts and independ
   expect_length(audit$attempts, 3L)
   expect_equal(.msr_parameter_count(model), 6L)
   expect_identical(contract$controls$policy$requested, settings[c("random.start", "inner.control", "record_memory")])
+  expect_true(audit$attempts[[audit$selected]]$eligible)
+  expect_true(audit$attempts[[length(audit$attempts)]]$eligible)
   for (attempt in audit$attempts) {
     d <- attempt$covariance
-    expect_true(attempt$eligible)
+    # Preserve the former checks; an unselected start can now fail the score gate.
+    expect_true(attempt$converged && is.finite(attempt$logLik) && !length(attempt$warnings) &&
+      identical(d$status, "available"))
+    expect_identical(attempt$eligible, max(abs(d$gradient)) < 1e-3)
     expect_true(d$conditional_latent_stationary)
     expect_true(d$covariance_at_current_latent_mode)
     expect_true(d$current_fixed_coordinates_at_optimizer)

@@ -1,3 +1,9 @@
+multiScaleR 0.7.33
+
+* Apply the existing response-field marginal score threshold to native TMB GDR
+  refit eligibility. Preserve original and cold starts, likelihood targets,
+  parameter counts, covariance diagnostics, and final native uncertainty.
+
 multiScaleR 0.7.32
 
 * Extend the private Poisson finite-cutoff reference to conditional NB values and add rare-availability limit checks without admitting a new fitting or integration backend.
