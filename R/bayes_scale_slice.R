@@ -241,12 +241,12 @@
   # moves than a prior ellipse. Subtract its log density from the slice target.
   # Its center and precision depend only on the other parameter blocks.
   if (geometry$fallback) {
-    evaluate <- function(b) {
+    evaluate_prior <- function(b) {
       eta <- state$offset + drop(state$X %*% b)
       value <- loglik(eta)
       list(ll = value, likelihood = value, eta = eta, beta = b)
     }
-    return(.msr_bayes_slice_ellipse(beta, 0, prior_sd, state$ll, evaluate)$evaluated)
+    return(.msr_bayes_slice_ellipse(beta, 0, prior_sd, state$ll, evaluate_prior)$evaluated)
   }
   correction <- function(b, z) (sum(z^2) - sum((b / prior_sd)^2)) / 2
   evaluate <- function(z) {

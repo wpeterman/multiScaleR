@@ -1,3 +1,10 @@
+multiScaleR 0.7.36
+
+* Add private GDR likelihood references for finite shared abundance across
+  paired primary surveys and the exact zero-variance Gaussian field limit.
+  Retain the fitted likelihood, parameter counts, and inference guards.
+* Give the Bayesian slice callbacks distinct names for package code checks.
+
 multiScaleR 0.7.35
 
 * Add full Bayesian slice sampling for shared, covariate-dependent, and
