@@ -1,8 +1,8 @@
-#' Estimate Hierarchical Scales of Effect with Bayesian Inference
+#' Estimate Scales of Effect with Bayesian Inference
 #'
-#' Fit an experimental Bayesian model in which each landscape predictor has
-#' its own formula for spatial scale. Year-specific scales can borrow information
-#' through a shared distribution while response effects account for repeated sites.
+#' Estimate landscape scales and response effects jointly. Give each landscape
+#' predictor one shared scale, model scale as a function of measured covariates,
+#' or let scales vary among groups such as regions or years.
 #'
 #' @param formula Two-sided response formula. Numeric spatial predictors can
 #'   enter native R crossings, nesting, and factor interactions, such as
@@ -65,7 +65,10 @@
 #'   a normal prior on log NB2 theta or log Gaussian residual SD.
 #' @param method \code{"sample"} runs full Bayesian NUTS sampling through
 #'   RTMB and tmbstan, with Laplace approximation disabled. NUTS is a
-#'   gradient-based Markov chain Monte Carlo method. \code{"prepare"} validates
+#'   gradient-based Markov chain Monte Carlo method. \code{"slice"} samples the
+#'   same joint posterior in R and uses no optional fitting packages. Install
+#'   posterior (version 1.6.0 or later) to check chain mixing and precision.
+#'   \code{"prepare"} validates
 #'   formulas, rows, priors, and bins without loading either optional package.
 #'   \code{"laplace"} fits a joint Gaussian approximation to the posterior
 #'   in the same unconstrained, noncentered coordinates used by the sampler.
@@ -73,13 +76,14 @@
 #'   \code{"marginal"} integrates one scale-group SD numerically, using
 #'   conditional Laplace approximations for all remaining parameters. This
 #'   retains a non-Gaussian SD distribution and also requires only RTMB.
-#' @param chains Number of sampling chains; default 4. Chains run serially.
+#' @param chains Number of sampling chains; default 4.
 #' @param iter Total iterations per chain, including warmup; default 2000.
 #' @param warmup Adaptation iterations discarded per chain; default
 #'   \code{floor(iter / 2)}.
 #' @param seed Optional positive integer sampling seed; default \code{NULL}.
 #' @param control Named list with optional NUTS settings
 #'   \code{adapt_delta} (default 0.9) and \code{max_treedepth} (default 12).
+#'   Use an empty list for slice sampling.
 #'   For \code{method = "laplace"}, instead supports \code{starts} (default 6,
 #'   deterministic dispersed initial values) and \code{iter.max} (default 1000,
 #'   optimizer iterations per start). All starts contribute to computational cost.
@@ -134,6 +138,22 @@
 #'   candidate population. Increasing this count reduces resampling error,
 #'   but does not increase importance effective sample size or improve the
 #'   underlying Laplace approximation.
+#' @param cores Positive integer worker limit; default 1. NUTS and slice
+#'   sampling distribute chains. Joint and marginal Laplace distribute
+#'   optimizer starts. With importance correction, workers also evaluate
+#'   batches of candidate posterior densities. Preparation uses one process.
+#'   Parallel fits use the optional package processx to launch local R
+#'   processes. Each worker holds its own model data and, where needed, its
+#'   own differentiation tape. Temporary worker files are removed after fitting.
+#'   The effective limit is recorded in \code{sampling$cores},
+#'   \code{laplace$cores}, or \code{marginal$cores}, depending on the method.
+#'   For a given seed, slice sampling uses the same chain seeds at every core
+#'   count. The worker limit for sampling is the number of chains. For
+#'   uncorrected Laplace and marginal fits, it is the number of optimizer
+#'   starts. Marginal integration keeps grid nodes in order so each node can
+#'   use the previous fits as starts. Importance proposal generation and
+#'   diagnostics run in the main process. Worker startup and data transfer
+#'   can make small fits slower.
 #'
 #' @return A \code{multiScaleR_bayes} list with \code{specification} (frozen
 #'   model rows, bin summaries, formulas, priors, reference standardization,
@@ -159,9 +179,13 @@
 #'   Older saved fits can lack this additive metadata and remain usable.
 #'   Newly prepared fits retain compact training levels/contrasts and the
 #'   original row-ID column name, when supplied, for new-observation prediction.
-#'   Sampled fits additionally contain
-#'   \code{sampler} (a \code{stanfit}), \code{draws} (posterior matrices by
+#'   Sampled fits additionally contain \code{draws} (posterior matrices by
 #'   parameter block), \code{diagnostics}, and \code{sampling} settings.
+#'   NUTS fits retain \code{sampler} (a \code{stanfit}). Slice fits retain
+#'   \code{chains}, a numeric array ordered by post-warmup iteration, chain, and
+#'   parameter. Without posterior installed, a slice fit records
+#'   \code{diagnostics$passed = NA} and the reason in \code{diagnostics$reason}.
+#'   Install posterior to compute derived diagnostics from the saved chains.
 #'   Laplace fits contain \code{draws}, numerical \code{diagnostics}, and
 #'   \code{laplace}: the unconstrained \code{mode}, joint \code{covariance},
 #'   \code{hessian}, optimizer \code{starts}, \code{draws}, \code{seed}, and
@@ -239,12 +263,12 @@
 #' an estimated between-year SD. Years are exchangeable; this first
 #' implementation does not impose temporal autocorrelation.
 #'
-#' Model support depends on the computation. Preparation, NUTS and joint
-#' Laplace allow multiple kernel predictors and additive or crossed random
+#' Model support depends on the computation. Preparation, NUTS, slice sampling
+#' and joint Laplace allow multiple kernel predictors and additive or crossed random
 #' intercept groups. Marginal Laplace, including importance correction, requires
 #' exactly one scale-group SD across all kernel predictors. A second random
 #' scale term adds another SD even if it uses the same grouping variable.
-#' Use NUTS or joint Laplace for those models. The function checks this
+#' Use NUTS, slice sampling, or joint Laplace for those models. The function checks this
 #' structural restriction before starting the numerical fit; it does not
 #' switch methods automatically. Supported syntax does not establish numerical
 #' convergence, useful scale identification or interval calibration.
@@ -253,7 +277,7 @@
 #' response year effect changes baseline abundance or occurrence; a scale
 #' year effect changes how the surrounding landscape is weighted. Repeated
 #' observations can use \code{(1 | site)} in the response formula. Random
-#' slopes, kernel interactions, spatial fields, observation weights,
+#' slopes, spatial fields, observation weights,
 #' and imperfect-detection likelihoods are not supported in this development
 #' implementation. \code{\link{predict_scales}} predicts scales at new
 #' covariates and groups. \code{predict()} and \code{simulate()} also accept new
@@ -299,6 +323,15 @@
 #' model. Compare shared scales and scientifically meaningful variation instead.
 #' This interface is experimental; its interval calibration and practical
 #' performance have not been established for general ecological datasets.
+#'
+#' Slice sampling alternates among blocks of parameters in the full posterior.
+#' For Gaussian responses, it draws regression coefficients from their exact
+#' conditional distribution. It reuses kernel values when updating response
+#' parameters and recomputes only the changed kernel during scale updates.
+#' Sampling efficiency depends on the dataset and on dependence among scales
+#' and response effects. Compare Rhat and effective sample size per second
+#' before choosing a method for larger fits. Explicit slice seeds preserve the
+#' caller's random-number state. Chain seeds are generated before dispatch.
 #'
 #' Laplace inference uses the inverse positive-definite Hessian of the full
 #' negative log posterior at a numerically stationary mode, including log-SD
@@ -384,6 +417,10 @@
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))
+#' # Share the habitat scale while allowing baseline counts to vary.
+#' shared <- multiScale_bayes(count ~ habitat + factor(year) + (1 | site),
+#'   example$inputs, example$data, row_id = "site_year", method = "prepare")
+#' summary(shared)$scale_formulas
 #' response_formula <- count ~ habitat + factor(year) + (1 | site)
 #' scale_formulas <- list(habitat = ~1 + (1 | year))
 #' prepared <- multiScale_bayes(response_formula, example$inputs, example$data,
@@ -430,14 +467,17 @@
 multiScale_bayes <- function(formula, inputs, data, scales = NULL,
                              family = c("nbinom2", "poisson", "binomial", "gaussian"),
                              row_id = NULL, priors = list(),
-                             method = c("sample", "prepare", "laplace", "marginal"),
+                             method = c("sample", "prepare", "laplace", "marginal", "slice"),
                              chains = 4L, iter = 2000L, warmup = floor(iter / 2),
-                             seed = NULL, control = list(), laplace_draws = 2000L) {
+                             seed = NULL, control = list(), laplace_draws = 2000L,
+                             cores = 1L) {
   family <- match.arg(family)
   method <- match.arg(method)
+  validate_scalar_numeric(cores, "cores", integerish = TRUE, lower = 1,
+    upper = .Machine$integer.max)
   spec <- .msr_bayes_prepare(formula, inputs, data, scales, family, row_id, priors)
   .msr_scale_check_capability(spec, "posterior", switch(method,
-    sample = "nuts", prepare = "prepare", laplace = "joint_laplace",
+    sample = "nuts", slice = "slice", prepare = "prepare", laplace = "joint_laplace",
     marginal = "marginal_laplace"))
   out <- structure(list(specification = spec, parameters = spec$parameters,
     call = match.call(), inference = "prepared",
@@ -445,19 +485,24 @@ multiScale_bayes <- function(formula, inputs, data, scales = NULL,
   if (method == "prepare") return(out)
   out$inference_metadata <- NULL
   if (method == "laplace")
-    return(.msr_bayes_laplace(out, laplace_draws, seed, control))
+    return(.msr_bayes_laplace(out, laplace_draws, seed, control, cores))
   if (method == "marginal")
-    return(.msr_bayes_marginal(out, laplace_draws, seed, control))
-  for (pkg in c("RTMB", "tmbstan", "rstan", "posterior"))
-    if (!requireNamespace(pkg, quietly = TRUE))
-      stop("Bayesian sampling requires the optional package '", pkg,
-           "'. Install it or use method = 'prepare'.", call. = FALSE)
+    return(.msr_bayes_marginal(out, laplace_draws, seed, control, cores))
   validate_scalar_numeric(chains, "chains", integerish = TRUE, lower = 1)
   validate_scalar_numeric(iter, "iter", integerish = TRUE, lower = 4)
   validate_scalar_numeric(warmup, "warmup", integerish = TRUE, lower = 1, upper = iter - 2)
   if (!is.null(seed))
     validate_scalar_numeric(seed, "seed", integerish = TRUE, lower = 1,
                              upper = .Machine$integer.max)
+  if (method == "slice") {
+    if (!is.list(control) || length(control))
+      stop("Slice sampling uses the default empty control list.", call. = FALSE)
+    return(.msr_bayes_slice(out, chains, iter, warmup, seed, cores))
+  }
+  for (pkg in c("RTMB", "tmbstan", "rstan", "posterior"))
+    if (!requireNamespace(pkg, quietly = TRUE))
+      stop("Bayesian NUTS requires the optional package '", pkg,
+           "'. Install it or use method = 'slice' or 'prepare'.", call. = FALSE)
   if (!is.list(control) || (length(control) &&
       (is.null(names(control)) || anyDuplicated(names(control)) ||
        any(!names(control) %in% c("adapt_delta", "max_treedepth")))))
@@ -466,18 +511,27 @@ multiScale_bayes <- function(formula, inputs, data, scales = NULL,
   validate_scalar_numeric(ctl$adapt_delta, "adapt_delta", lower = 0, upper = 1,
                            inclusive_lower = FALSE, inclusive_upper = FALSE)
   validate_scalar_numeric(ctl$max_treedepth, "max_treedepth", integerish = TRUE, lower = 1)
-  obj <- RTMB::MakeADFun(.msr_bayes_objective(spec, ad = TRUE),
-                         spec$parameters, silent = TRUE)
-  # Supply one initial vector per chain. Small deterministic perturbations
-  # avoid identical starts without changing the caller's random-number state.
-  initial <- lapply(seq_len(chains), function(i)
-    unname(obj$par) + .05 * sin(seq_along(obj$par) + i))
-  arguments <- list(obj = obj, chains = chains, iter = iter, warmup = warmup,
-    control = ctl, cores = 1L, refresh = 0L, init = initial,
-    laplace = FALSE, silent = TRUE)
-  # Passing NULL explicitly is not equivalent to rstan's default random seed.
-  if (!is.null(seed)) arguments$seed <- seed
-  sampler <- do.call(tmbstan::tmbstan, arguments)
+  cores <- min(cores, chains)
+  if (cores > 1L) {
+    .msr_scale_surface_ram(spec, copies = cores)
+    pool <- .msr_bayes_pool(cores, .msr_bayes_ad_object, spec)
+    on.exit(.msr_bayes_pool_stop(pool), add = TRUE)
+    # Stan assigns independent streams by chain ID under a shared seed.
+    chain_seed <- if (is.null(seed)) sample.int(.Machine$integer.max, 1L) else seed
+    fits <- .msr_bayes_pool_map(pool, seq_len(chains), .msr_bayes_nuts_chain,
+      iter, warmup, ctl, chain_seed)
+    sampler <- rstan::sflist2stanfit(fits)
+  } else {
+    obj <- .msr_bayes_ad_object(spec)
+    # Disperse the starts deterministically, using the same starts as workers.
+    initial <- lapply(seq_len(chains), function(i)
+      unname(obj$par) + .05 * sin(seq_along(obj$par) + i))
+    arguments <- list(obj = obj, chains = chains, iter = iter, warmup = warmup,
+      control = ctl, cores = 1L, refresh = 0L, init = initial,
+      laplace = FALSE, silent = TRUE)
+    if (!is.null(seed)) arguments$seed <- seed
+    sampler <- do.call(tmbstan::tmbstan, arguments)
+  }
   if (!methods::is(sampler, "stanfit") || methods::slot(sampler, "mode") != 0L)
     stop("The sampler did not return posterior draws; inspect its messages.", call. = FALSE)
   extracted <- rstan::extract(sampler, permuted = TRUE, inc_warmup = FALSE)
@@ -493,7 +547,7 @@ multiScale_bayes <- function(formula, inputs, data, scales = NULL,
   out$sampler <- sampler
   out$inference <- "full Bayesian NUTS"
   out$sampling <- list(chains = chains, iter = iter, warmup = warmup, seed = seed,
-                        control = ctl, laplace = FALSE)
+                        control = ctl, laplace = FALSE, cores = cores)
   out$diagnostics <- .msr_bayes_diagnostics(sampler, ctl, chains)
   if (!out$diagnostics$passed)
     warning("Bayesian sampling diagnostics need attention; inspect summary(fit)$diagnostics before interpreting posterior summaries.",
@@ -504,7 +558,7 @@ multiScale_bayes <- function(formula, inputs, data, scales = NULL,
 
 .msr_bayes_diagnostics <- function(sampler, control, chains) {
   a <- rstan::extract(sampler, permuted = FALSE, inc_warmup = FALSE)
-  tab <- as.data.frame(posterior::summarise_draws(posterior::as_draws_array(a)))
+  tab <- .msr_bayes_chain_summary(a)
   tab <- tab[tab$variable != "lp__", , drop = FALSE]
   sp <- rstan::get_sampler_params(sampler, inc_warmup = FALSE)
   divergences <- sum(vapply(sp, function(z) sum(z[, "divergent__"]), 0))
@@ -512,10 +566,7 @@ multiScale_bayes <- function(formula, inputs, data, scales = NULL,
     sum(z[, "treedepth__"] >= control$max_treedepth), 0))
   bfmi <- vapply(sp, function(z) mean(diff(z[, "energy__"])^2) /
                    stats::var(z[, "energy__"]), 0)
-  passed <- chains >= 2 && !divergences && !depth &&
-    all(is.finite(tab$rhat) & tab$rhat <= 1.01) &&
-    all(is.finite(tab$ess_bulk) & tab$ess_bulk >= 100 * chains) &&
-    all(is.finite(tab$ess_tail) & tab$ess_tail >= 100 * chains) &&
+  passed <- .msr_bayes_chain_checks(tab, chains) && !divergences && !depth &&
     all(is.finite(bfmi) & bfmi >= 0.3)
   list(passed = passed, parameters = tab, divergences = divergences,
        max_treedepth_hits = depth, ebfmi = bfmi,

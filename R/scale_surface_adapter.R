@@ -54,7 +54,7 @@
     estimated_AD_bytes = cells * 512)
 }
 
-.msr_scale_surface_ram <- function(spec) {
+.msr_scale_surface_ram <- function(spec, copies = 1L) {
   design <- spec$response_design
   if (!length(spec$surface$buffers) && is.null(design)) return(invisible(NULL))
   memory <- .msr_scale_surface_size(spec$surface)
@@ -73,6 +73,7 @@
     if (is.null(design)) stop("Cannot detect RAM for weighted-SQ differentiation; no tape was launched.", call. = FALSE)
     stop("Cannot detect RAM for expanded-response differentiation; no tape was launched.", call. = FALSE)
   }
+  estimate <- estimate * copies
   if (estimate > .75 * total) {
     if (is.null(design)) stop("Weighted-SQ raw buffers exceed the conservative differentiation RAM budget.", call. = FALSE)
     stop("Expanded response and raw buffers exceed the conservative differentiation RAM budget.", call. = FALSE)

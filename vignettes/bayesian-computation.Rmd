@@ -17,8 +17,9 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6.5,
   fig.height = 4.25)
 ```
 
-Start with `vignette("bayesian-scales", package = "multiScaleR")` for annual
-data preparation, full NUTS sampling and scientific interpretation. This guide
+Start with `vignette("bayesian-scales", package = "multiScaleR")` for
+shared and hierarchical scale models, full NUTS and slice sampling, and
+chain diagnostics. This guide
 explains the alternative computations, what their diagnostics establish and
 how to assess numerical precision. They use the same posterior target when
 the likelihood, priors, formulas and prepared bins are held fixed.
@@ -48,9 +49,21 @@ check_bayes_setup("marginal", correction = "importance")
 ```
 
 `ready` describes package availability, not optimizer convergence, posterior
-accuracy or available memory. Full NUTS is more general than the current
-single-scale-SD marginal interface, but also needs its own raw and derived
-diagnostics. Priors and data support must be assessed under every computation.
+accuracy or available memory. NUTS and slice sampling support multiple
+scale-group SDs. Both require chain checks on the sampled parameters and
+derived scales. Priors and data support must be assessed under every method.
+
+## Parallelize approximation work
+
+Use `cores = 2` in either approximation call below to distribute optimizer
+starts across two workers. Check processx with
+`check_bayes_setup("laplace", cores = 2)` or
+`check_bayes_setup("marginal", correction = "importance", cores = 2)`.
+The integration grid stays in order because the fit at a completed node
+provides a starting value for the next. Importance correction also distributes
+candidate posterior-density evaluations. Proposals and their final weights
+are assembled in the main process. For small models, the cost of launching
+workers can exceed the time saved on starts or density evaluations.
 
 ## Explore a joint Laplace approximation
 
@@ -448,7 +461,7 @@ plot(corrected_fit, estimator = "weighted")
 | Output | What it tells you |
 |---|---|
 | `fit$diagnostics` | Stored checks for the selected computation |
-| `diagnose_bayes_scales(fit)` | Derived NUTS mixing and quantile MCSE when full chains exist |
+| `diagnose_bayes_scales(fit)` | Derived-scale mixing and quantile MCSE from retained NUTS or slice chains |
 | `diagnose_bayes_probabilities(fit, thresholds)` | Chain precision for specified fitted-scale probabilities |
 | `fit$importance$proposal_diagnostics` | Original marginal grid and mode checks, separate from corrected weights |
 | `fit$importance$history` | Production, adaptation and discarded-stage effort |

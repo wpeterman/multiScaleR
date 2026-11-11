@@ -1,6 +1,6 @@
 # Marginalize one scale-group SD instead of approximating its posterior with
 # a Gaussian. Conditional Laplace volumes account for the other parameters.
-.msr_bayes_marginal <- function(out, draws, seed, control) {
+.msr_bayes_marginal <- function(out, draws, seed, control, cores = 1L) {
   out$inference_metadata <- NULL
   if (!requireNamespace("RTMB", quietly = TRUE))
     stop("Marginal Laplace inference requires optional package 'RTMB'.", call. = FALSE)
@@ -57,16 +57,17 @@
   for (nm in c("cdf_tol", "quantile_tol", "logz_tol"))
     validate_scalar_numeric(ctl[[nm]], nm, lower = 0, inclusive_lower = FALSE)
   spec <- out$specification
-  obj <- RTMB::MakeADFun(.msr_bayes_objective(spec, ad = TRUE),
-                         spec$parameters, silent = TRUE)
-  conditional <- obj
-  if (ctl$nested_response && length(spec$parameters$response_z)) {
-    conditional <- RTMB::MakeADFun(.msr_bayes_objective(spec, ad = TRUE),
-      spec$parameters, random = "response_z", silent = TRUE)
-    # RTMB does not provide an analytic Hessian after random-effect integration.
-    # Differentiate its analytic outer gradient; do not repair the curvature.
-    conditional$he <- function(p) stats::optimHess(p, conditional$fn, conditional$gr)
+  context <- .msr_bayes_marginal_objects(spec, ctl$nested_response)
+  obj <- context$obj
+  conditional <- context$conditional
+  if (ctl$correction == "none") cores <- min(cores, ctl$starts)
+  else cores <- min(cores, 16384L)  # The training pilot always has 16384 candidates.
+  if (cores > 1L) {
+    tapes <- if (identical(obj, conditional)) 1 else 2
+    .msr_scale_surface_ram(spec, copies = tapes * (cores + 1))
   }
+  pool <- .msr_bayes_pool(cores, .msr_bayes_marginal_objects, spec, ctl$nested_response)
+  if (!is.null(pool)) on.exit(.msr_bayes_pool_stop(pool), add = TRUE)
   hyper <- which(names(obj$par) == "log_scale_sd")
   response_factorized <- ctl$nested_response && ctl$correction == "importance" &&
     length(spec$response$random) == 1L
@@ -77,12 +78,12 @@
     tau <- if (x == 0) prior_sd * 1e-8 else if (x == 1) prior_sd * 8 else
       prior_sd * stats::qnorm((1 + x) / 2)
     if (identical(conditional, obj))
-      return(.msr_bayes_marginal_node(obj, hyper, log(tau), prior_sd, warm, ctl))
+      return(.msr_bayes_marginal_node(obj, hyper, log(tau), prior_sd, warm, ctl, pool))
     if (response_factorized)
-      return(.msr_bayes_marginal_node(conditional, grid_hyper, log(tau), prior_sd, warm, ctl))
+      return(.msr_bayes_marginal_node(conditional, grid_hyper, log(tau), prior_sd, warm, ctl, pool, nested = TRUE))
     fixed <- which(names(obj$par) != "response_z")
     small_warm <- if (is.null(warm)) NULL else list(mode = warm$mode[fixed])
-    node <- .msr_bayes_marginal_node(conditional, hyper, log(tau), prior_sd, small_warm, ctl)
+    node <- .msr_bayes_marginal_node(conditional, hyper, log(tau), prior_sd, small_warm, ctl, pool, nested = TRUE)
     .msr_bayes_nested_expand(node, conditional, obj, hyper)
   }
   grid <- .msr_bayes_marginal_grid(evaluate, prior_sd, ctl)
@@ -99,7 +100,7 @@
   out$inference <- "marginal Laplace with scale-SD quadrature"
   out$marginal <- c(grid, list(hyper_index = grid_hyper,
     parameter_indices = if (response_factorized) fixed_indices else seq_along(obj$par),
-    draws = draws, seed = seed,
+    draws = draws, seed = seed, cores = cores,
     control = ctl, coordinates = if (response_factorized)
       "Prior-CDF scale SD; response effects integrated; Gaussian outer-parameter nodes" else
       "Prior-CDF quadrature for scale SD; conditional noncentered Gaussian for other parameters"))
@@ -116,11 +117,24 @@
     warning("Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.", call. = FALSE)
   out$inference_metadata <- .msr_scale_inference_metadata("posterior", "marginal_laplace")
   if (ctl$correction == "importance")
-    out <- .msr_bayes_importance(out, obj, draws, seed, ctl)
+    out <- .msr_bayes_importance(out, obj, draws, seed, ctl, pool)
   out
 }
 
-.msr_bayes_marginal_node <- function(obj, hyper, log_tau, prior_sd, warm, control) {
+.msr_bayes_marginal_objects <- function(spec, nested_response) {
+  obj <- .msr_bayes_ad_object(spec)
+  conditional <- obj
+  if (nested_response && length(spec$parameters$response_z)) {
+    conditional <- RTMB::MakeADFun(.msr_bayes_objective(spec, ad = TRUE),
+      spec$parameters, random = "response_z", silent = TRUE)
+    # RTMB does not provide an analytic Hessian after random-effect integration.
+    # Differentiate its analytic outer gradient; do not repair the curvature.
+    conditional$he <- function(p) stats::optimHess(p, conditional$fn, conditional$gr)
+  }
+  list(spec = spec, obj = obj, conditional = conditional)
+}
+
+.msr_bayes_marginal_functions <- function(obj, hyper, log_tau) {
   initial <- obj$par
   initial[hyper] <- log_tau
   nuisance <- setdiff(seq_along(initial), hyper)
@@ -128,46 +142,70 @@
   fn <- function(u) obj$fn(unpack(u))
   gr <- function(u) as.numeric(obj$gr(unpack(u)))[nuisance]
   he <- function(u) obj$he(unpack(u))[nuisance, nuisance, drop = FALSE]
-  attempts <- lapply(seq_len(control$starts), function(i) {
-    p <- initial[nuisance]
-    if (i == 1L && !is.null(warm)) p <- warm$mode[nuisance]
-    if (i > 1L) {
-      p <- p + .1 * sin(seq_along(p) + i)
-      p[names(p) == "scale_beta"] <- p[names(p) == "scale_beta"] +
-        rep(c(-1, 1, -.5, .5), length.out = control$starts - 1L)[i - 1L]
-    }
-    tryCatch({
-      a <- stats::nlminb(p, fn, gr, control = list(iter.max = control$iter.max,
-        eval.max = 2 * control$iter.max, rel.tol = 1e-10))
-      for (step in seq_len(8L)) {
-        gradient <- gr(a$par)
-        if (max(abs(gradient)) <= 1e-6) { a$convergence <- 0L; break }
-        R <- tryCatch(chol(he(a$par)), error = function(e) NULL)
-        if (is.null(R)) break
-        direction <- as.numeric(backsolve(R, forwardsolve(t(R), gradient)))
-        accepted <- FALSE
-        for (half in 0:12) {
-          candidate <- a$par - direction * 2^-half
-          value <- fn(candidate)
-          if (is.finite(value) && value <= a$objective + 1e-12 * max(1, abs(a$objective)) &&
-              max(abs(gr(candidate))) < max(abs(gradient))) {
-            a$par <- candidate; a$objective <- value; accepted <- TRUE; break
-          }
+  list(initial = initial[nuisance], fn = fn, gr = gr, he = he, unpack = unpack,
+    nuisance = nuisance)
+}
+
+.msr_bayes_marginal_start <- function(i, opt, warm_mode, control) {
+  fn <- opt$fn; gr <- opt$gr; he <- opt$he
+  p <- opt$initial
+  if (i == 1L && !is.null(warm_mode)) p <- warm_mode[opt$nuisance]
+  if (i > 1L) {
+    p <- p + .1 * sin(seq_along(p) + i)
+    p[names(p) == "scale_beta"] <- p[names(p) == "scale_beta"] +
+      rep(c(-1, 1, -.5, .5), length.out = control$starts - 1L)[i - 1L]
+  }
+  tryCatch({
+    a <- stats::nlminb(p, fn, gr, control = list(iter.max = control$iter.max,
+      eval.max = 2 * control$iter.max, rel.tol = 1e-10))
+    for (step in seq_len(8L)) {
+      gradient <- gr(a$par)
+      if (max(abs(gradient)) <= 1e-6) { a$convergence <- 0L; break }
+      R <- tryCatch(chol(he(a$par)), error = function(e) NULL)
+      if (is.null(R)) break
+      direction <- as.numeric(backsolve(R, forwardsolve(t(R), gradient)))
+      accepted <- FALSE
+      for (half in 0:12) {
+        candidate <- a$par - direction * 2^-half
+        value <- fn(candidate)
+        if (is.finite(value) && value <= a$objective + 1e-12 * max(1, abs(a$objective)) &&
+            max(abs(gr(candidate))) < max(abs(gradient))) {
+          a$par <- candidate; a$objective <- value; accepted <- TRUE; break
         }
-        if (!accepted) break
       }
-      a$gradient_max <- max(abs(gr(a$par)))
-      if (a$gradient_max <= 1e-6) a$convergence <- 0L
-      a$usable <- a$convergence == 0L && is.finite(a$gradient_max) && a$gradient_max <= 1e-4
-      a
-    }, error = function(e) list(usable = FALSE, initial = p, objective = Inf,
-                                message = conditionMessage(e)))
-  })
+      if (!accepted) break
+    }
+    a$gradient_max <- max(abs(gr(a$par)))
+    if (a$gradient_max <= 1e-6) a$convergence <- 0L
+    a$usable <- a$convergence == 0L && is.finite(a$gradient_max) && a$gradient_max <= 1e-4
+    a
+  }, error = function(e) list(usable = FALSE, initial = p, objective = Inf,
+                              message = conditionMessage(e)))
+}
+
+.msr_bayes_marginal_worker_start <- function(i, context, hyper, log_tau, warm_mode,
+                                            control, nested) {
+  obj <- if (nested) context$conditional else context$obj
+  .msr_bayes_marginal_start(i, .msr_bayes_marginal_functions(obj, hyper, log_tau),
+    warm_mode, control)
+}
+
+.msr_bayes_marginal_node <- function(obj, hyper, log_tau, prior_sd, warm, control,
+                                    pool = NULL, nested = FALSE) {
+  opt <- .msr_bayes_marginal_functions(obj, hyper, log_tau)
+  starts <- seq_len(control$starts)
+  if (is.null(pool) || length(starts) == 1L) {
+    attempts <- lapply(starts, .msr_bayes_marginal_start, opt, warm$mode, control)
+  } else {
+    # Complete each node before warming the next one. Only starts are independent.
+    attempts <- .msr_bayes_pool_map(pool, as.list(starts), .msr_bayes_marginal_worker_start,
+      hyper, log_tau, warm$mode, control, nested)
+  }
   good <- which(vapply(attempts, function(z) isTRUE(z$usable), logical(1)))
   if (!length(good)) .msr_bayes_laplace_failure("No stationary conditional Laplace mode.", attempts)
   best <- good[which.min(vapply(attempts[good], function(z) z$objective, 0))]
   mode <- attempts[[best]]$par
-  H <- he(mode); H <- (H + t(H)) / 2
+  H <- opt$he(mode); H <- (H + t(H)) / 2
   geometry <- tryCatch(.msr_bayes_laplace_geometry(H),
     error = function(e) .msr_bayes_laplace_failure(conditionMessage(e), attempts))
   distance <- vapply(attempts[good], function(z) {
@@ -179,9 +217,9 @@
   # f includes the half-normal prior density in log(tau) coordinates. Remove
   # it because integration against the prior CDF already supplies that prior.
   log_prior_h <- stats::dnorm(exp(log_tau), 0, prior_sd, log = TRUE) + log(2) + log_tau
-  list(mode = unpack(mode), root = geometry$root, covariance = geometry$covariance,
+  list(mode = opt$unpack(mode), root = geometry$root, covariance = geometry$covariance,
     hessian = H, log_density = -attempts[[best]]$objective +
-      length(nuisance) / 2 * log(2 * pi) - sum(log(diag(chol(H)))) - log_prior_h,
+      length(opt$nuisance) / 2 * log(2 * pi) - sum(log(diag(chol(H)))) - log_prior_h,
     gradient_max = attempts[[best]]$gradient_max, condition_number = geometry$condition_number,
     competing = competing, attempts = attempts, selected_start = best)
 }

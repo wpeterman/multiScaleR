@@ -4,8 +4,9 @@
 #' thresholds, and diagnose their simulation precision using the original chains.
 #'
 #' @param object A \code{\link{multiScale_bayes}} fit retaining its original
-#'   unpermuted, post-warmup NUTS sampler. Compact and approximate fits return
-#'   an unavailable report; permuted draws cannot recover chain order.
+#'   unpermuted post-warmup chains from NUTS or slice sampling. Compact and
+#'   approximate fits return an unavailable report because permuted draws
+#'   cannot recover chain order.
 #' @param thresholds A nonempty named list of numeric vectors. Each name selects
 #'   a fitted kernel predictor, and each vector contains distinct finite scale
 #'   thresholds. The thresholds apply to every distinct fitted scale-formula
@@ -117,8 +118,8 @@ diagnose_bayes_probabilities <- function(object, thresholds,
     out$reason <- "MCMC probability diagnostics are unavailable for approximate draws or importance candidates."
     return(out)
   }
-  if (is.null(object$sampler)) {
-    out$reason <- "Full unpermuted NUTS chains are not retained; stored permuted or thinned draws cannot recover them."
+  if (is.null(object$sampler) && is.null(object$chains)) {
+    out$reason <- "Full unpermuted MCMC chains are not retained; stored permuted or thinned draws cannot recover them."
     return(out)
   }
   if (.msr_has_gaussian_blocks(object$specification)) {
@@ -127,7 +128,7 @@ diagnose_bayes_probabilities <- function(object, thresholds,
   }
   if (!requireNamespace("posterior", quietly = TRUE))
     stop("Install posterior to compute probability diagnostics.", call. = FALSE)
-  a <- .msr_bayes_sampler_array(object$sampler)
+  a <- .msr_bayes_fit_chains(object)
   if (!is.numeric(a) || length(dim(a)) != 3L || any(dim(a) < 1L) ||
       is.null(dimnames(a)[[3L]]) || anyNA(dimnames(a)[[3L]]) ||
       any(!nzchar(dimnames(a)[[3L]])) || anyDuplicated(dimnames(a)[[3L]]))

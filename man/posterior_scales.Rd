@@ -31,7 +31,7 @@ finite-moment summaries under the documented group-SD priors.}
 draws. For importance-corrected fits, \code{"weighted"} instead summarizes
 all retained production candidates using their normalized importance
 weights. This avoids additional resampling error. It requires
-\code{draws = NULL} and is unavailable for NUTS or uncorrected Laplace fits.}
+\code{draws = NULL} and a fit with importance correction.}
 }
 \value{
 A data frame with one row per predictor and distinct scale-formula

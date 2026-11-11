@@ -92,6 +92,16 @@ test_that("SQ public Laplace and marginal fits retain their posterior diagnostic
   }
 })
 
+test_that("slice sampling handles raw weighted SQ without binned predictors", {
+  f <- bayesian_sq_fixture(only = TRUE)
+  fit <- suppressWarnings(multiScale_bayes(count ~ rough + temp + (1 | site),
+    f$inputs, f$data, list(rough = ~1), "gaussian", row_id = "key",
+    method = "slice", chains = 1, iter = 16, seed = 19))
+  expect_true(all(is.finite(fit$chains)))
+  expect_equal(posterior_scales(fit)$covariate, "rough")
+  expect_true(all(is.finite(predict(fit, summary = FALSE))))
+})
+
 test_that("SQ Gaussian response integration agrees with a normalized covariance density", {
   skip_if_not_installed("RTMB")
   f <- bayesian_sq_fixture(only = TRUE)

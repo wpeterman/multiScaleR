@@ -3,16 +3,16 @@
 # they never select a fallback method or change a diagnostic decision.
 .msr_scale_capabilities <- function() {
   data.frame(
-    target = c(rep("posterior", 5L), rep("marginal_likelihood", 2L)),
-    method = c("prepare", "nuts", "joint_laplace", "marginal_laplace",
+    target = c(rep("posterior", 6L), rep("marginal_likelihood", 2L)),
+    method = c("prepare", "nuts", "slice", "joint_laplace", "marginal_laplace",
       "importance_corrected", "laplace", "factorized"),
-    max_kernel_predictors = c(rep(Inf, 5L), 1, 1),
-    max_scale_groups_per_predictor = c(rep(Inf, 5L), 1, 1),
-    max_response_groups = c(rep(Inf, 5L), 1, 1),
-    required_scale_sd_count = c(NA_integer_, NA_integer_, NA_integer_, 1L, 1L,
+    max_kernel_predictors = c(rep(Inf, 6L), 1, 1),
+    max_scale_groups_per_predictor = c(rep(Inf, 6L), 1, 1),
+    max_response_groups = c(rep(Inf, 6L), 1, 1),
+    required_scale_sd_count = c(NA_integer_, NA_integer_, NA_integer_, NA_integer_, 1L, 1L,
       NA_integer_, NA_integer_),
-    response_effects = c(rep("joint", 6L), "gaussian_within_scale_group"),
-    public_interface = c(rep(TRUE, 5L), FALSE, FALSE),
+    response_effects = c(rep("joint", 7L), "gaussian_within_scale_group"),
+    public_interface = c(rep(TRUE, 6L), FALSE, FALSE),
     stringsAsFactors = FALSE)
 }
 

@@ -69,9 +69,8 @@ Shannon diversity, see
 
 # Installation
 
-For stacked annual observations and partially pooled landscape scales, see
-`vignette("bayesian-scales", package = "multiScaleR")`. It includes optional
-sampling-software checks and actual fitted posterior results. The workflow
+For Bayesian estimation of shared, covariate-dependent, or partially pooled
+scales, see `vignette("bayesian-scales", package = "multiScaleR")`. The workflow
 below introduces the existing likelihood-based scale optimization.
 
 ```{r install, eval = FALSE}

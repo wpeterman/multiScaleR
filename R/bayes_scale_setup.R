@@ -6,9 +6,13 @@
 #'
 #' @param method Inference method to check: \code{"sample"} (default) needs
 #'   RTMB, tmbstan, rstan, and posterior; \code{"laplace"} and
-#'   \code{"marginal"} need RTMB; \code{"prepare"} needs none of these.
+#'   \code{"marginal"} need RTMB. \code{"slice"} and \code{"prepare"} need
+#'   no optional packages for serial fitting. Install posterior (version
+#'   1.6.0 or later) for slice chain diagnostics.
 #' @param correction \code{"none"} (default) or \code{"importance"} for
 #'   \code{method = "marginal"}. Importance correction also needs posterior.
+#' @param cores Requested worker limit. Values greater than one also check
+#'   processx for fitting methods. Preparation uses one process.
 #' @return A \code{multiScaleR_bayes_setup} list with \code{method},
 #'   \code{correction}, \code{ready} (whether package checks passed),
 #'   \code{packages} (a data frame with \code{package}, \code{minimum},
@@ -23,23 +27,30 @@
 #' @seealso \code{\link{multiScale_bayes}}
 #' @examples
 #' check_bayes_setup(method = "prepare")
+#' check_bayes_setup(method = "slice", cores = 2)
 #' @export
-check_bayes_setup <- function(method = c("sample", "laplace", "marginal", "prepare"),
-                              correction = c("none", "importance")) {
+check_bayes_setup <- function(method = c("sample", "laplace", "marginal", "prepare", "slice"),
+                              correction = c("none", "importance"), cores = 1L) {
   method <- match.arg(method); correction <- match.arg(correction)
+  validate_scalar_numeric(cores, "cores", integerish = TRUE, lower = 1,
+    upper = .Machine$integer.max)
   if (correction != "none" && method != "marginal")
     stop("Importance correction is available only with method = 'marginal'.", call. = FALSE)
   required <- switch(method, sample = c(RTMB = "2.0", tmbstan = "1.2.1",
     rstan = NA_character_, posterior = "1.6.0"), laplace = c(RTMB = "2.0"),
-    marginal = c(RTMB = "2.0"), prepare = character())
+    marginal = c(RTMB = "2.0"), prepare = character(), slice = character())
   if (correction == "importance") required <- c(required, posterior = "1.6.0")
+  if (method != "prepare" && cores > 1L) required <- c(required, processx = NA_character_)
   packages <- if (length(required)) do.call(rbind, lapply(seq_along(required), function(i)
     .msr_bayes_package_status(names(required)[i], required[i]))) else
       data.frame(package = character(), minimum = character(), version = character(),
         loadable = logical(), meets_version = logical(), passed = logical(), message = character())
+  notes <- if (method == "slice")
+    "Install posterior (>= 1.6.0) to compute chain diagnostics." else
+      c("Checks R packages only; does not install software or run a model.",
+        "Compiler configuration, memory and sampling diagnostics require a separate small fit.")
   structure(list(method = method, correction = correction, ready = all(packages$passed),
-    packages = packages, notes = c("Checks R packages only; does not install software or run a model.",
-      "Compiler configuration, memory and sampling diagnostics require a separate small fit.")),
+    packages = packages, notes = notes),
     class = "multiScaleR_bayes_setup")
 }
 
@@ -66,6 +77,7 @@ print.multiScaleR_bayes_setup <- function(x, ...) {
   cat("Bayesian package setup:", x$method, "\n")
   cat(if (x$ready) "Package checks passed.\n" else "Packages need attention.\n")
   if (nrow(x$packages)) print(x$packages, row.names = FALSE)
+  else if (x$method == "slice") cat("Slice sampling needs no optional fitting packages.\n")
   else cat("Preparation needs no optional Bayesian packages.\n")
   cat(paste(x$notes, collapse = "\n"), "\n")
   invisible(x)

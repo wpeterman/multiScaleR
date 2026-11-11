@@ -282,7 +282,20 @@
   list(log_density = value, diagnostics = counts)
 }
 
-.msr_bayes_importance <- function(out, obj, draws, seed, control) {
+.msr_bayes_importance_worker <- function(samples, context) {
+  .msr_bayes_importance_target(samples, context$obj, context$spec)
+}
+
+.msr_bayes_importance_batch <- function(samples, obj, spec, pool) {
+  if (is.null(pool)) return(.msr_bayes_importance_target(samples, obj, spec))
+  rows <- parallel::splitIndices(nrow(samples), min(length(pool$workers), nrow(samples)))
+  chunks <- lapply(rows, function(i) samples[i, , drop = FALSE])
+  results <- .msr_bayes_pool_map(pool, chunks, .msr_bayes_importance_worker)
+  list(log_density = unlist(lapply(results, "[[", "log_density"), use.names = FALSE),
+    diagnostics = Reduce("+", lapply(results, "[[", "diagnostics")))
+}
+
+.msr_bayes_importance <- function(out, obj, draws, seed, control, pool = NULL) {
   out$inference_metadata <- NULL
   minimum <- if (is.null(control$importance_min)) 16384L else control$importance_min
   if (!is.null(seed)) {
@@ -342,7 +355,7 @@
   pilot <- augment(pilot_outer)
   pilot_logq <- .msr_bayes_importance_logq(pilot_outer, grid, hyper, adapted = pilot_proposal) + pilot$logq
   pilot <- pilot$samples
-  pilot_target <- .msr_bayes_importance_target(pilot, obj, out$specification)
+  pilot_target <- .msr_bayes_importance_batch(pilot, obj, out$specification, pool)
   pilot_logp <- pilot_target$log_density
   target_evaluation <- pilot_target$diagnostics
   learned <- .msr_bayes_importance_adapt(pilot_outer, pilot_logp - pilot_logq, grid, hyper)
@@ -364,7 +377,7 @@
     logq <- .msr_bayes_importance_logq(outer, grid, hyper, adapted) + extra$logq
     extra <- extra$samples
     total_production <- total_production + nrow(extra)
-    production_target <- .msr_bayes_importance_target(extra, obj, out$specification)
+    production_target <- .msr_bayes_importance_batch(extra, obj, out$specification, pool)
     logp <- production_target$log_density
     target_evaluation <- target_evaluation + production_target$diagnostics
     samples <- rbind(samples, extra)

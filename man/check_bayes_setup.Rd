@@ -6,8 +6,9 @@
 \title{Check Optional Software for Bayesian Scale Models}
 \usage{
 check_bayes_setup(
-  method = c("sample", "laplace", "marginal", "prepare"),
-  correction = c("none", "importance")
+  method = c("sample", "laplace", "marginal", "prepare", "slice"),
+  correction = c("none", "importance"),
+  cores = 1L
 )
 
 \method{print}{multiScaleR_bayes_setup}(x, ...)
@@ -15,10 +16,15 @@ check_bayes_setup(
 \arguments{
 \item{method}{Inference method to check: \code{"sample"} (default) needs
 RTMB, tmbstan, rstan, and posterior; \code{"laplace"} and
-\code{"marginal"} need RTMB; \code{"prepare"} needs none of these.}
+\code{"marginal"} need RTMB. \code{"slice"} and \code{"prepare"} need
+no optional packages for serial fitting. Install posterior (version
+1.6.0 or later) for slice chain diagnostics.}
 
 \item{correction}{\code{"none"} (default) or \code{"importance"} for
 \code{method = "marginal"}. Importance correction also needs posterior.}
+
+\item{cores}{Requested worker limit. Values greater than one also check
+processx for fitting methods. Preparation uses one process.}
 
 \item{x}{A setup-check object.}
 
@@ -46,6 +52,7 @@ Preparation can validate your data and formulas before installing
 }
 \examples{
 check_bayes_setup(method = "prepare")
+check_bayes_setup(method = "slice", cores = 2)
 }
 \seealso{
 \code{\link{multiScale_bayes}}
