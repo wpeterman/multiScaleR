@@ -42,7 +42,8 @@ Suggests:
     survival,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
-URL: https://github.com/wpeterman/multiScaleR
+URL: https://wpeterman.github.io/multiScaleR/,
+    https://github.com/wpeterman/multiScaleR
 BugReports: https://github.com/wpeterman/multiScaleR/issues
 BuildVignettes: true
 VignetteBuilder: knitr

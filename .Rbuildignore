@@ -22,3 +22,6 @@
 ^bench_tmp$
 ^doc$
 ^Meta$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

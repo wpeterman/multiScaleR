@@ -1,0 +1,93 @@
+# pkgdown configuration for the multiScaleR website.
+# Preview locally with pkgdown::build_site(); validate with pkgdown::check_pkgdown().
+url: https://wpeterman.github.io/multiScaleR/
+
+template:
+  bootstrap: 5
+  light-switch: true   # light/dark toggle in the navbar
+
+# The package has no vignette named "multiScaleR", so pkgdown would not create
+# a "Get started" link on its own. Point it at the quick-start vignette.
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github, lightswitch]
+  components:
+    intro:
+      text: Get started
+      href: articles/quickstart.html
+
+# Vignettes, grouped for the Articles menu and index page.
+# Every vignette must be listed here, or pkgdown::check_pkgdown() fails.
+articles:
+  - title: Getting started
+    navbar: Getting started
+    contents:
+      - quickstart
+      - multiScaleR_Guide
+  - title: Covariate types
+    navbar: Covariate types
+    desc: >
+      Scale-dependent covariates beyond the kernel-weighted mean.
+    contents:
+      - landscape_metric_covariates
+      - surface_metric_covariates
+  - title: Workflows
+    navbar: Workflows
+    contents:
+      - year-specific-rasters
+      - spatial_projection_clamping
+
+# Function reference, grouped by step in the analysis workflow.
+# Every non-internal help topic must be listed here, or check_pkgdown() fails.
+reference:
+  - title: Prepare inputs
+    desc: >
+      Build the kernel inputs and declare how each raster covariate is
+      summarized before optimization.
+    contents:
+      - kernel_prep
+      - kernel_prep_by_group
+      - msr_vars
+      - estimate_multiscale_ram
+  - title: Optimize scales of effect
+    desc: >
+      Estimate the scale of effect for each covariate and assess the fit.
+    contents:
+      - multiScale_optim
+      - profile_sigma
+      - diagnostics
+  - title: Summarize and compare models
+    contents:
+      - summary.multiScaleR
+      - kernel_dist
+      - aic_tab
+      - bic_tab
+      - starts_with("print")
+  - title: Plot
+    contents:
+      - plot.multiScaleR
+      - plot.sigma_profile
+      - plot_kernel
+      - plot_marginal_effects
+  - title: Spatial projection
+    desc: >
+      Apply the optimized kernels to rasters for spatial prediction.
+    contents:
+      - kernel_scale.raster
+  - title: Simulation
+    contents:
+      - sim_rast
+      - sim_dat
+      - sim_dat_unmarked
+  - title: Example data
+    contents:
+      - count_data
+      - landscape_counts
+      - hab
+      - landscape
+      - pts
+      - surv_pts
+  - title: Package
+    contents:
+      - multiScaleR-package
