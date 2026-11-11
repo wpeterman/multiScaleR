@@ -1,0 +1,211 @@
+# multiScaleR
+
+README last updated: 2026-11-11
+
+| CI | Development | CRAN | License |
+|----|----|----|----|
+| [![R-CMD-check](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml/badge.svg)](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml) | [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) | [![CRAN status](https://www.r-pkg.org/badges/version/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
+| [![codecov](https://codecov.io/gh/wpeterman/multiScaleR/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/multiScaleR) | [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![DOI](https://img.shields.io/badge/DOI-10.1007/s10980--025--02267--x-yellow.svg)](https://doi.org/10.1007/s10980-025-02267-x) |
+
+## Overview
+
+multiScaleR is an R package to identify the scale of effect of spatial
+environmental variables in regression analyses.
+
+Functions to simulate data with known scales of effect are included with
+this package.
+
+## Installation
+
+Install the CRAN release with:
+
+``` r
+
+install.packages("multiScaleR")
+```
+
+If installing from GitHub on Windows, you may need Rtools to compile the
+package from source. Choose the Rtools release that matches your version
+of R and follow the installation instructions at
+<https://cran.r-project.org/bin/windows/Rtools/>.
+
+Then execute the following commands in R:
+
+``` r
+
+# Install 'remotes' package, if needed
+if (!requireNamespace("remotes", quietly = TRUE)) {
+  install.packages("remotes", repos = "https://cloud.r-project.org")
+}
+
+remotes::install_github("wpeterman/multiScaleR", 
+                        build_vignettes = TRUE) # Install & build vignette
+
+library(multiScaleR) # Load the package
+```
+
+The package vignettes provide worked analyses of simulated data and
+explain the main workflows.
+
+## Kernel distance reporting
+
+Starting with version 0.7.4,
+[`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md),
+kernel plots, and the selected summary distance default to
+`dimension = "2d"`: the radius containing the requested share of an
+ideal kernel’s total weight on a plane. At 90%, a Gaussian kernel with
+sigma = 300 m has a planar radius of about 644 m, compared with the
+original line-based distance of about 493 m. Raster edges, missing
+cells, cell geometry, and `max_D` can change the weight actually
+retained at a site.
+
+Set `dimension = "1d"` in
+[`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md),
+[`plot_kernel()`](https://wpeterman.github.io/multiScaleR/reference/plot_kernel.md),
+`plot(fit)`, or `summary(fit)` to restore the original definition.
+Summary `opt_dist` and `opt_distance` follow that selection;
+`opt_dist_1d` and `opt_dist_2d` always identify the two definitions
+explicitly. This reporting switch does not change the fitted sigma,
+coefficients, or likelihood. Simulation extents, projection windows, and
+stored optimization warnings retain their historical 1D cutoffs. See
+[`vignette("multiScaleR_Guide", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/multiScaleR_Guide.md)
+for interpretation and migration examples.
+
+## Marginal effects for unmarked models
+
+Version 0.7.4 fixes marginal-effect plots for models with factors such
+as `Year`, extra site-ID columns, and repeated site-year rows linked by
+`join_by`. Predictors are recovered from the state or abundance formula.
+Numeric predictors are held at their observed means and categorical
+predictors at their first observed values in other panels. Factors
+receive a point and confidence interval for each observed level.
+
+For random-effects models, plots set site effects to zero explicitly.
+These are conditional predictions, not averages over years, sites, or
+the random-effect distribution. Their intervals are conditional on the
+selected scale. See
+[`?plot_marginal_effects`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+for supported prediction types and factor contrast handling. Existing
+fitted objects can be plotted without rerunning scale optimization.
+
+![](reference/figures/logo.png)
+
+# Package index
+
+## Prepare inputs
+
+Build the kernel inputs and declare how each raster covariate is
+summarized before optimization.
+
+- [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  : Kernel Scale Preparation
+- [`kernel_prep_by_group()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep_by_group.md)
+  : Prepare Kernel Inputs from Group-Specific Rasters
+- [`msr_vars()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  [`kernel_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  [`landscape_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  : Define multiScaleR covariate transformations
+- [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  : Estimate Memory Requirements for Multiscale Optimization
+
+## Optimize scales of effect
+
+Estimate the scale of effect for each covariate and assess the fit.
+
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  : Multiscale optimization
+- [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+  : Profile Model Fit Across Sigma Parameter Space
+- [`diagnostics()`](https://wpeterman.github.io/multiScaleR/reference/diagnostics.md)
+  : Retrieve diagnostics from multiScaleR objects
+
+## Summarize and compare models
+
+- [`summary(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md)
+  : Summarize multiScaleR objects
+- [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md)
+  : Scale Distance
+- [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md)
+  : multiScaleR model selection
+- [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md)
+  : multiScaleR model selection
+- [`print(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/print.multiScaleR.md)
+  : Print method for multiScaleR
+- [`print(`*`<multiScaleR_data>`*`)`](https://wpeterman.github.io/multiScaleR/reference/print.multiScaleR_data.md)
+  : Print method for multiScaleR_data
+- [`print(`*`<summary_multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/print.summary_multiScaleR.md)
+  : Print method for summary_multiScaleR
+
+## Plot
+
+- [`plot(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.md)
+  : Plot method for multiScaleR objects
+- [`plot(`*`<sigma_profile>`*`)`](https://wpeterman.github.io/multiScaleR/reference/plot.sigma_profile.md)
+  : Plot Sigma Profile
+- [`plot_kernel()`](https://wpeterman.github.io/multiScaleR/reference/plot_kernel.md)
+  : Plot kernel densities
+- [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+  : Plot Marginal Effects from a Fitted Model
+
+## Spatial projection
+
+Apply the optimized kernels to rasters for spatial prediction.
+
+- [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  : Apply kernel smoothing to raster layers
+
+## Simulation
+
+- [`sim_rast()`](https://wpeterman.github.io/multiScaleR/reference/sim_rast.md)
+  : Simulate spatially autocorrelated raster surfaces
+- [`sim_dat()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat.md)
+  : Simulate data for optimizing scales of effect
+- [`sim_dat_unmarked()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_unmarked.md)
+  : Simulate data for optimizing scales of effect with \`unmarked\`
+
+## Example data
+
+- [`count_data`](https://wpeterman.github.io/multiScaleR/reference/count_data.md)
+  : Example data frame
+- [`landscape_counts`](https://wpeterman.github.io/multiScaleR/reference/landscape_counts.md)
+  : Example data frame
+- [`hab`](https://wpeterman.github.io/multiScaleR/reference/hab.md) :
+  Example raster
+- [`landscape`](https://wpeterman.github.io/multiScaleR/reference/landscape.md)
+  : Simulated raster
+- [`pts`](https://wpeterman.github.io/multiScaleR/reference/pts.md) :
+  Spatial sample points
+- [`surv_pts`](https://wpeterman.github.io/multiScaleR/reference/surv_pts.md)
+  : Spatial sample points
+
+## Package
+
+- [`multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.md)
+  [`multiScaleR-package`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.md)
+  : multiScaleR
+
+# Articles
+
+### Getting started
+
+- [multiScaleR Quick-Start
+  Guide](https://wpeterman.github.io/multiScaleR/articles/quickstart.md):
+- [multiScaleR User
+  Guide](https://wpeterman.github.io/multiScaleR/articles/multiScaleR_Guide.md):
+
+### Covariate types
+
+Scale-dependent covariates beyond the kernel-weighted mean.
+
+- [Landscape Metric
+  Covariates](https://wpeterman.github.io/multiScaleR/articles/landscape_metric_covariates.md):
+- [Surface Texture
+  Covariates](https://wpeterman.github.io/multiScaleR/articles/surface_metric_covariates.md):
+
+### Workflows
+
+- [Using Year-Specific Rasters in One
+  Model](https://wpeterman.github.io/multiScaleR/articles/year-specific-rasters.md):
+- [Spatial Projection and
+  Clamping](https://wpeterman.github.io/multiScaleR/articles/spatial_projection_clamping.md):
