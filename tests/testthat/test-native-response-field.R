@@ -104,17 +104,20 @@ test_that("native response fields retain point prediction, uncertainty and param
     expect_equal(.msr_parameter_count(final$mod), .msr_parameter_count(model))
     expect_equal(final$scl_params$mean[c("mean", "rough")], f$object$scl_params$mean[c("mean", "rough")])
     expect_equal(final$scl_params$sd[c("mean", "rough")], f$object$scl_params$sd[c("mean", "rough")])
-    if (family == "poisson") {
-      # Supply the joint backend's required binned mean preparation before
-      # asking its unchanged random-structure guard to reject the field.
-      joint_inputs <- kernel_prep(f$points, f$rasters, max_D = 40, kernel = "gaussian",
-        scale_vars = msr_vars(mean = kernel_var("hab"),
-          rough = surface_var("elev", "sq", weighted = TRUE),
-          fixed = surface_var("elev", "sa", radius = 25), unused = kernel_var("hab")),
-        bin = TRUE, verbose = FALSE)
-      expect_error(multiScale_optim(model, joint_inputs,
-        backend = "joint_mixed"), "One conditional random intercept")
-    }
+    if (family == "poisson") poisson_field <- list(f = f, model = model)
   }
+  # The joint_mixed backend needs the suggested RTMB package before it reaches
+  # its random-structure guard, so this check runs last.
+  skip_if_not_installed("RTMB")
+  # Supply the joint backend's required binned mean preparation before
+  # asking its unchanged random-structure guard to reject the field.
+  f <- poisson_field$f
+  joint_inputs <- kernel_prep(f$points, f$rasters, max_D = 40, kernel = "gaussian",
+    scale_vars = msr_vars(mean = kernel_var("hab"),
+      rough = surface_var("elev", "sq", weighted = TRUE),
+      fixed = surface_var("elev", "sa", radius = 25), unused = kernel_var("hab")),
+    bin = TRUE, verbose = FALSE)
+  expect_error(multiScale_optim(poisson_field$model, joint_inputs,
+    backend = "joint_mixed"), "One conditional random intercept")
   cat("NATIVE_RESPONSE_FIELD families=2 spatial_exp=1 no_year=1 fixed_scale_refits=2 joint_guard=retained\n")
 })

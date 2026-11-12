@@ -390,7 +390,7 @@ test_that("kernel_dist, summary, print, and plotting helpers cover alternate bra
   expect_error(kernel_dist(sigma = NULL, kernel = "gaussian"), "sigma")
   expect_error(kernel_dist(sigma = 1, kernel = NULL), "kernel")
   expect_error(kernel_dist(sigma = 1, kernel = "expow"), "shape")
-  expect_error(kernel_dist(sigma = 1, kernel = "expow", beta = -1), "beta")
+  expect_error(kernel_dist(sigma = 1, kernel = "expow", shape = -1), "shape")
 
   gls_mod <- nlme::gls(y ~ cont1 + site, data = fix$df)
   gls_obj <- structure(

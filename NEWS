@@ -1,3 +1,45 @@
+multiScaleR 0.7.37
+
+* `plot_marginal_effects()` no longer adds an explanatory caption by default,
+  including for Bayesian fits. Set `add_label = TRUE` to restore it.
+* `pct_mx` in `kernel_scale.raster()` now moves each clamping limit by
+  `pct_mx` times the observed covariate range, as documented. The old code
+  multiplied the limits by `1 + pct_mx`, so projected values change whenever
+  `pct_mx` is not 0. Valid values are now greater than -0.5 and at most 0.99.
+* `kernel_dist()` and `plot_kernel()` take `shape` for the exponential power
+  shape. `beta` still works for one release with a deprecation warning.
+* `select_cv()` compares candidates on the metrics they share, so Poisson and
+  NB2 results compare with default metrics. The result records the metrics
+  used and dropped.
+* `landscape_var()` warns when `base` has no effect on the metric, including
+  `msidi` and `msiei`, which always use the natural log. `rpr` now requires
+  `classes_max`.
+* `multiScale_optim()` warns when the default refit search returns its
+  starting values, names the remedy, and records `start_stall` in
+  `diagnostics()`. `print()` and `summary()` repeat it. Fixed-buffer kernels
+  stall this way from the default start. Use `start_strategy = "screen"` or
+  supply `par`. Estimates are unchanged.
+* Fixed-knot `ns()` and `bs()` terms now fit with
+  `backend = "conditional_logit"` from an ordinary `clogit(model = TRUE)` fit.
+* `response_field_geometry()` accepts default-backend fits, so coordinate-aware
+  maps of glmmTMB and GDR response fields work on real fits.
+* Predicting a glmmTMB response field at new positions without
+  `allow.new.levels = TRUE` now gives a message naming that argument and
+  `re.form = NA`.
+* `profile_sigma()` defaults now work on `profile_glm` and `joint_nb2` fits.
+  `profile_sigma()` also profiles `conditional_logit` fits with native refits.
+  `summary(profile = TRUE)` on those fits stops with a clear message, because
+  the backend withholds scale uncertainty.
+* `audit_gdr_integration()` and `score_simulation()` are no longer exported.
+  `vcov()` still works on fits, but `vcov.multiScaleR()` is no longer exported
+  by name.
+* `sf` moved from Depends to Imports, so `library(multiScaleR)` no longer
+  attaches it. Scripts that call `sf` functions directly need `library(sf)`.
+  `pscl` moved to Suggests.
+* Rewrite the 13 vignettes around one running example with interpretation
+  notes and restriction tables, and add vignettes on step-selection models and
+  glmmTMB spatial response fields. Slow fits load from stored results.
+
 multiScaleR 0.7.36
 
 * Add private GDR likelihood references for finite shared abundance across

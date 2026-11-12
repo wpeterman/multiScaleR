@@ -12,7 +12,8 @@ plot_marginal_effects(
   link = FALSE,
   draws = NULL,
   reference_data = NULL,
-  component = NULL
+  component = NULL,
+  add_label = FALSE
 )
 }
 \arguments{
@@ -70,6 +71,12 @@ predictor. With \code{link = TRUE}, select a native response column, whose
 interpretation and number depend on the fitted family.
 For ziplss response curves, select \code{component = 1}: the overall
 expected count combines both linear predictors.}
+
+\item{add_label}{Logical. If \code{TRUE}, a caption below each panel states
+what the plotted limits include, such as conditioning on the selected
+spatial scales or the treatment of random effects. For Bayesian fits the
+caption also reports the number of draws and the stored status of the fit
+checks. Default: \code{FALSE}, which draws the panels without a caption.}
 }
 \value{
 A named list of \code{ggplot2} objects, one per covariate. Plots are
@@ -259,7 +266,8 @@ Response random effects are zero and observation noise is excluded. Use
 \code{\link{predict.multiScaleR_bayes}} with matched spatial inputs for
 location-specific posterior expectations. A plotted credible interval does
 not establish convergence or calibration; existing fit diagnostics remain
-relevant and their stored status is shown in the caption.
+relevant and their stored status is shown in the caption when
+\code{add_label = TRUE}.
 }
 \examples{
 \donttest{
@@ -283,6 +291,9 @@ plot_marginal_effects(opt, ylab = "Predicted abundance")
 
 ## Finer evaluation grid
 plot_marginal_effects(opt, length.out = 200)
+
+## Add a caption stating what the confidence limits include
+plot_marginal_effects(opt, add_label = TRUE)
 }
 
 }

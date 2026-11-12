@@ -236,7 +236,7 @@ test_that("public analytic fixed features share point, snapshot, raster, and K c
   expect_equal(got$se.fit, as.numeric(point$se.fit), tolerance = 1e-8)
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
-  plots <- plot_marginal_effects(fit, length.out = 5)
+  plots <- plot_marginal_effects(fit, length.out = 5, add_label = TRUE)
   expect_equal(plots$fixed$data$x,
     seq(min(dat$fixed), max(dat$fixed), length.out = 5) *
       f$inputs$scl_params$sd[["fixed"]] + f$inputs$scl_params$mean[["fixed"]],
@@ -300,7 +300,7 @@ test_that("Bayesian fixed-feature curves retain original preparation units", {
   fit$draws$beta[,] <- .2
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
-  plots <- plot_marginal_effects(fit, length.out = 5)
+  plots <- plot_marginal_effects(fit, length.out = 5, add_label = TRUE)
   expect_equal(plots$fixed$data$x,
     seq(min(f$data$fixed), max(f$data$fixed), length.out = 5) *
       f$inputs$scl_params$sd[["fixed"]] + f$inputs$scl_params$mean[["fixed"]],

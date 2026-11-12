@@ -43,6 +43,23 @@ A named list with the following elements:
     \code{triggered} is \code{TRUE}
     when the fitted model uses fewer observations. Candidate scales that
     change the initial model's sample are rejected during optimization.}
+  \item{\code{start_stall}}{For the default refit backend, present only when
+    the optimizer returned its starting values, so the reported scales are
+    those starts. A search from the default start is flagged whenever it
+    returns that start. A user-supplied or screened start is flagged only
+    when the search stopped after one evaluation, because such a start may
+    already be an optimum. Fields include \code{reason}, \code{screened}
+    (whether the start came from \code{start_strategy = "screen"}),
+    \code{start} (starting sigma values in map units),
+    \code{function_evaluations}, and \code{message}, which names the remedy.
+    \code{reason} is \code{"hard_radius"} when every optimized scale is a
+    hard radius, as under \code{kernel = "fixed"}. Its likelihood changes in
+    steps, so the gradient is zero almost everywhere. \code{reason} is
+    \code{"refit_failed"} when no refitted model gave a finite
+    log-likelihood at the start. A glmmTMB model with a
+    non-positive-definite Hessian reports none. \code{reason} is
+    \code{"no_progress"} otherwise. A warning gives the same message when
+    the fit is made, and \code{print()} and \code{summary()} repeat it.}
   \item{\code{refit_hessian}}{For the default refit backend, retains
     the outer curvature status and active smooth-parameter mask. A bound table
     records estimates, lower/upper bounds in reporting units, and bound flags.

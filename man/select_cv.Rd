@@ -31,7 +31,8 @@ records. \code{TRUE} retains the selected training fit per fold in memory.}
 \value{
 A \code{multiScaleR_cv} result for the selection procedure, with
   \code{selection} metadata containing the criterion, tie policy, candidate
-  names, chosen model and native training table per fold, including original
+  names, the scoring metrics kept (\code{metrics}) and left out
+  (\code{metrics_dropped}), chosen model and native training table per fold, including original
   parameter penalties, and \code{candidate_settings} with each candidate's
   controls. Shared output settings inherit the first candidate, identified
   by \code{settings$controls_from}; use \code{candidate_settings} for the
@@ -49,8 +50,14 @@ already recorded held-out predictions. No additional model fits are run.
 \details{
 Inputs must retain native training-selection records via
   \code{keep_selection = TRUE} or full fold fits via \code{keep_fits = TRUE},
-  share compatible likelihood targets and splits, and record the same scoring
-  metrics. NB2/Poisson candidates may share a count target. Gamma/Gaussian
+  share compatible likelihood targets and splits, and record at least one
+  scoring metric in common. The selection result is scored on the metrics
+  that every candidate recorded. For example, a default Poisson candidate
+  records \code{"deviance"} but a default NB2 candidate does not, so their
+  selection result keeps \code{"rmse"}, \code{"mae"} and
+  \code{"neg_log_score"}. \code{selection$metrics} lists the metrics kept
+  and \code{selection$metrics_dropped} those left out. NB2/Poisson
+  candidates may share a count target. Gamma/Gaussian
   candidates may share a continuous target using RMSE/MAE. Density scores
   cannot compare different observation measures. Other canonical family/link
   and conditional-choice guards are unchanged.

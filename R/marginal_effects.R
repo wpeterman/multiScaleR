@@ -56,6 +56,11 @@
 #'   interpretation and number depend on the fitted family.
 #'   For ziplss response curves, select \code{component = 1}: the overall
 #'   expected count combines both linear predictors.
+#' @param add_label Logical. If \code{TRUE}, a caption below each panel states
+#'   what the plotted limits include, such as conditioning on the selected
+#'   spatial scales or the treatment of random effects. For Bayesian fits the
+#'   caption also reports the number of draws and the stored status of the fit
+#'   checks. Default: \code{FALSE}, which draws the panels without a caption.
 #'
 #' @return A named list of \code{ggplot2} objects, one per covariate. Plots are
 #'   printed as a side effect and the list is returned invisibly. Each plot
@@ -236,7 +241,8 @@
 #' \code{\link{predict.multiScaleR_bayes}} with matched spatial inputs for
 #' location-specific posterior expectations. A plotted credible interval does
 #' not establish convergence or calibration; existing fit diagnostics remain
-#' relevant and their stored status is shown in the caption.
+#' relevant and their stored status is shown in the caption when
+#' \code{add_label = TRUE}.
 #'
 #' @examples
 #' \donttest{
@@ -260,6 +266,9 @@
 #'
 #' ## Finer evaluation grid
 #' plot_marginal_effects(opt, length.out = 200)
+#'
+#' ## Add a caption stating what the confidence limits include
+#' plot_marginal_effects(opt, add_label = TRUE)
 #' }
 #'
 #' @export
@@ -274,12 +283,14 @@ plot_marginal_effects <- function(x,
                                   length.out = 100,
                                   type = "state",
                                   link = FALSE, draws = NULL,
-                                  reference_data = NULL, component = NULL) {
+                                  reference_data = NULL, component = NULL,
+                                  add_label = FALSE) {
   validate_scalar_logical(link, "link")
+  validate_scalar_logical(add_label, "add_label")
   if (inherits(x, "multiScaleR_bayes")) {
     if (!is.null(reference_data) || !is.null(component))
       stop("reference_data and component do not redefine Bayesian effect curves.", call. = FALSE)
-    return(.msr_bayes_marginal_effects(x, ylab, length.out, draws))
+    return(.msr_bayes_marginal_effects(x, ylab, length.out, draws, add_label))
   }
   if (!is.null(draws)) stop("draws applies only to Bayesian effect curves.", call. = FALSE)
   if(!inherits(x, "multiScaleR")){
@@ -788,6 +799,10 @@ plot_marginal_effects <- function(x,
   })
 
   names(gg_list) <- c_vars
+
+  # Explanatory captions are opt-in; the subtitle for interaction terms stays.
+  if (!add_label)
+    gg_list <- lapply(gg_list, function(p) p + labs(caption = NULL))
 
   lapply(gg_list, print)
   if (!is.null(reference)) attr(gg_list, "reference_data_contract") <- reference$contract

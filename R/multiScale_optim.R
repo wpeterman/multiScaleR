@@ -25,6 +25,78 @@
 }
 
 
+# Flag a refit search that never left its starting values.
+#
+# L-BFGS-B stops after one evaluation when its finite-difference gradient is
+# exactly zero. That happens when the objective is flat around the start:
+# every optimized scale is a hard radius (the likelihood changes only when a
+# whole cell enters or leaves the buffer), or every refit at the start failed
+# and returned the penalty value (for example, glmmTMB reports an NA
+# log-likelihood when its Hessian is not positive definite). A search can
+# also try a few points, find no improvement, and return its start, as with
+# an irregular refit objective. Either way the fit reports its starting values
+# as estimates, so the user must be told.
+# A start on a bound is excluded, because a zero projected gradient there is
+# a legitimate stop. A user-supplied or screened start that survives a line
+# search may already be an optimum, so only a zero-step stop flags it. The
+# fixed default start is never a plausible optimum. Returns NULL when the
+# search moved.
+.msr_start_stall_diagnostic <- function(opt_results, start, lower, upper,
+                                        unit_conv, covariates, hard_only,
+                                        screened, default_start = FALSE,
+                                        penalty = 1e6^10) {
+  evals <- opt_results$counts[[1L]]
+  stalled <- identical(as.numeric(opt_results$par), as.numeric(start)) &&
+    all(start > lower & start < upper) &&
+    (isTRUE(evals <= 1L) || isTRUE(default_start))
+  if (!stalled) return(NULL)
+
+  n_covs <- length(covariates)
+  start_sigma <- stats::setNames(start[seq_len(n_covs)] * unit_conv, covariates)
+  reason <- if (isTRUE(opt_results$value >= penalty)) {
+    "refit_failed"
+  } else if (isTRUE(hard_only)) {
+    "hard_radius"
+  } else {
+    "no_progress"
+  }
+  message <- if (reason == "refit_failed") {
+    paste0(
+      "The optimizer returned its starting values because no refitted model ",
+      "gave a finite log-likelihood at the starting scales. Check that the ",
+      "starting model converged. A glmmTMB model with a non-positive-definite ",
+      "Hessian has no log-likelihood, so refit it with explicit `start` values ",
+      "and run multiScale_optim() again.")
+  } else if (screened) {
+    paste0(
+      "The final search did not move from the screened start, so the ",
+      "estimates are the best screened candidate rather than a local optimum. ",
+      if (reason == "hard_radius") paste0(
+        "Every optimized scale is a hard radius, whose likelihood changes in ",
+        "steps. "),
+      "Increase `screen_n_sigma` or compare fits from several `par` values.")
+  } else if (reason == "hard_radius") {
+    paste0(
+      "The optimizer returned its starting values. Every optimized scale is a ",
+      "hard radius, whose likelihood changes in steps, so a gradient search ",
+      "cannot move from its start. Use start_strategy = \"screen\" or supply `par`.")
+  } else {
+    paste0(
+      "The optimizer returned its starting values because it found no ",
+      "improvement near them. The likelihood there may be flat or too ",
+      "irregular for a gradient search. Supply `par` or use ",
+      "start_strategy = \"screen\".")
+  }
+  list(code = "start_stall",
+       triggered = TRUE,
+       reason = reason,
+       screened = isTRUE(screened),
+       start = start_sigma,
+       function_evaluations = evals,
+       message = message)
+}
+
+
 .precision_diagnostic <- function(est, code) {
   ratio <- est[, 2] / est[, 1]
   triggered <- ratio >= 0.5
@@ -370,7 +442,11 @@
 #'   \code{par = NULL}: \code{"single"} (default) uses one shared default
 #'   start, while \code{"screen"} performs a low-cost prescreen of sigma
 #'   values and short screening optimizations before launching one full
-#'   optimization.
+#'   optimization. Use \code{"screen"} or supply \code{par} when every
+#'   optimized scale is a hard radius, as under \code{kernel = "fixed"}. The
+#'   gradient search cannot leave a single start on that stepped likelihood.
+#'   A refit search that returns its starting values gives a warning and
+#'   records \code{start_stall} in \code{\link{diagnostics}}.
 #' @param screen_n_sigma Positive integer. Number of log-spaced sigma values
 #'   evaluated per covariate during the prescreen when
 #'   \code{start_strategy = "screen"}. Default: \code{5}.
@@ -417,7 +493,9 @@
 #'   \code{backend = "refit"}; Bayesian targets are unchanged.
 #' @param backend \code{"refit"} (default) preserves the existing model-refit
 #'   optimizer. \code{"profile_glm"} opts into the analytic-profile backend for
-#'   independent Gaussian, Poisson, binomial, and NB2 observations. See the
+#'   independent Gaussian, Poisson, binomial, and NB2 observations. Fit a
+#'   Gaussian model with \code{glm(family = gaussian())}, because this backend
+#'   rejects \code{lm()} fits. See the
 #'   formula, data, and uncertainty contracts in Details. \code{"joint_nb2"}
 #'   jointly estimates kernel parameters, coefficients, and NB2 dispersion,
 #'   including the exact Poisson boundary. It requires an NB2 log-link model.
@@ -668,6 +746,8 @@
 #' preparation row IDs and raw buffers, without binned summaries.
 #' The two analytic GLM backends require a smooth kernel,
 #' and a \code{glm} or \code{MASS::glm.nb} object retaining its model frame.
+#' Fit Gaussian models with \code{glm(family = gaussian())}, because an
+#' \code{lm()} fit is rejected.
 #' For \code{"profile_glm"}, supported links are Gaussian identity, Poisson log, binomial logit, and
 #' NB2 log. NB2 has variance \eqn{\mu + \mu^2/\theta}; theta is estimated
 #' alongside kernel parameters, even when the initial GLM used a fixed theta.
@@ -1050,7 +1130,6 @@
 #' @importFrom stats optim
 #' @importFrom parallel clusterEvalQ makeCluster setDefaultCluster stopCluster makeForkCluster clusterExport parLapply
 #' @importFrom crayon %+% green red bold blue
-#' @importFrom pscl zeroinfl
 multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
                              join_by = NULL,
@@ -1540,6 +1619,23 @@ multiScale_optim <- function(fitted_mod,
         "The fitted model uses %d of %d prepared observations. Check the initial model's missing-data handling before comparing fits.",
         fitted_n, prepared_n
       ), call. = FALSE)
+    }
+
+    # A search that never left its start reports the starts as estimates.
+    start_stall <- .msr_start_stall_diagnostic(
+      opt_results = opt_results,
+      start = par,
+      lower = lwr,
+      upper = uppr,
+      unit_conv = kernel_inputs$unit_conv,
+      covariates = r_vars,
+      hard_only = all(r_vars %in% hard_radius),
+      screened = !user_supplied_par && identical(start_strategy, "screen"),
+      default_start = !user_supplied_par && identical(start_strategy, "single")
+    )
+    if (!is.null(start_stall)) {
+      out$diagnostics$start_stall <- start_stall
+      warning(start_stall$message, call. = FALSE)
     }
 
     if (isTRUE(max_dist_diag$triggered)) {

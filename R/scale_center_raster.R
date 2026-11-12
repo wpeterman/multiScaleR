@@ -5,7 +5,7 @@
 #' @param r A `terra::SpatRaster` containing covariate layers to be scaled. All layer names must match those used in the `multiScaleR` model.
 #' @param multiScaleR A `multiScaleR` object created using `kernel_prep` or `multiScale_optim`.
 #' @param clamp Logical. If `TRUE`, scaled values are clamped to the covariate range in the model data.
-#' @param pct_mx Numeric. If `clamp` is `TRUE`, this value specifies the amount (percentage; positive or negative) by which to expand/contract the min/max range when clamping. Default = 0.
+#' @param pct_mx Numeric greater than -0.5 and no larger than 0.99. If `clamp` is `TRUE`, each clamping limit moves outward by `pct_mx` times the observed range of that covariate at the survey points: `lower = min - pct_mx * (max - min)` and `upper = max + pct_mx * (max - min)`. For example, a covariate observed from -1 to 3 is clamped to -1.4 and 3.4 with `pct_mx = 0.1`, and to -0.6 and 2.6 with `pct_mx = -0.1`. Default = 0 (the observed range).
 #'
 #' @return A `terra::SpatRaster` with each layer scaled and optionally clamped.
 #' @keywords internal
@@ -18,10 +18,7 @@ scale_center_raster <- function(r,
   }
   validate_multiScaleR_input(multiScaleR)
   validate_scalar_logical(clamp, "clamp")
-  validate_scalar_numeric(pct_mx,
-                          "pct_mx",
-                          lower = -0.99,
-                          upper = 0.99)
+  validate_pct_mx(pct_mx)
 
   covs <- names(r)
   if(!is.list(multiScaleR$scl_params) ||
@@ -76,8 +73,14 @@ scale_center_raster <- function(r,
       stop("Original model data needed for clamping do not contain all raster layers in `r`.")
     }
     # Nonspatial site keys or factors must not coerce numeric raster columns.
-    min_vals <- vapply(dat[covs], min, numeric(1)) * (pct_mx + 1)
-    max_vals <- vapply(dat[covs], max, numeric(1)) * (pct_mx + 1)
+    min_vals <- vapply(dat[covs], min, numeric(1))
+    max_vals <- vapply(dat[covs], max, numeric(1))
+    # Move each limit by a fraction of the observed range. Multiplying the
+    # limits themselves by (1 + pct_mx) moved them the wrong way for negative
+    # values and by unequal amounts when the range was not anchored at zero.
+    pad <- pct_mx * (max_vals - min_vals)
+    min_vals <- min_vals - pad
+    max_vals <- max_vals + pad
 
     for(i in 1:length(covs)){
       lyr <- as.character(covs[[i]])
@@ -96,4 +99,25 @@ scale_center_raster <- function(r,
   }
   r_ <- rast(r_)
   return(r_)
+}
+
+#' Validate the clamping expansion fraction
+#'
+#' `pct_mx` moves each clamping limit by `pct_mx` times the observed covariate
+#' range, so values of -0.5 or less would make the lower limit meet or pass the
+#' upper limit.
+#'
+#' @param pct_mx Value to validate.
+#' @return `NULL`, invisibly. Called for its error.
+#' @keywords internal
+#' @noRd
+validate_pct_mx <- function(pct_mx) {
+  validate_scalar_numeric(pct_mx, "pct_mx")
+  if (pct_mx <= -0.5 || pct_mx > 0.99) {
+    stop("`pct_mx` must be greater than -0.5 and no larger than 0.99. ",
+         "Each clamping limit moves by `pct_mx` times the observed range, ",
+         "so -0.5 or less leaves no interval between the lower and upper limits.",
+         call. = FALSE)
+  }
+  invisible(NULL)
 }

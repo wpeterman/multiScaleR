@@ -11,7 +11,7 @@
 #' @param model A fitted \code{multiScaleR} object from \code{\link{multiScale_optim}}.
 #'   When provided, scale distances and 95\% confidence intervals are returned for
 #'   all optimized covariates. When omitted, \code{sigma}, \code{kernel}, and
-#'   (for \code{expow}) \code{beta} must be supplied via \code{...}.
+#'   (for \code{expow}) \code{shape} must be supplied via \code{...}.
 #' @param prob Numeric between 0 and 1 (exclusive). Cumulative proportion
 #'   used to define the distance. Default: \code{0.9}. The proportion refers
 #'   to weight along a line for \code{dimension = "1d"} and weight on a plane
@@ -36,9 +36,12 @@
 #'       \code{"gaussian"}, \code{"exp"} (negative exponential),
 #'       \code{"fixed"} (fixed-radius buffer), or \code{"expow"} (exponential
 #'       power). Required when \code{model} is not provided.}
-#'     \item{\code{beta}}{Numeric (positive). Shape parameter for the exponential
+#'     \item{\code{shape}}{Numeric (positive). Shape parameter for the exponential
 #'       power kernel. Required when \code{kernel = "expow"} and \code{model} is
 #'       not provided. Ignored for all other kernels.}
+#'     \item{\code{beta}}{Deprecated. Former name of \code{shape}, still
+#'       accepted for one release with a warning. Supplying both \code{shape}
+#'       and \code{beta} with different values is an error.}
 #'   }
 #'
 #' @return
@@ -110,8 +113,8 @@
 #'   \item \strong{Fixed buffer}: \code{sigma * prob} (the fraction of
 #'     the buffer radius).
 #'   \item \strong{Exponential power}:
-#'     \code{sigma * qgamma(prob, shape = 1 / beta)^(1 / beta)}; both
-#'     \code{sigma} and \code{beta} (shape) must be specified.
+#'     \code{sigma * qgamma(prob, shape = 1 / shape)^(1 / shape)}; both
+#'     \code{sigma} and \code{shape} must be specified.
 #' }
 #' In two dimensions:
 #' \itemize{
@@ -121,7 +124,7 @@
 #'   \item \strong{Fixed buffer}: \code{sigma * sqrt(prob)}, the radius of the
 #'     circle holding \code{prob} of the buffer's area.
 #'   \item \strong{Exponential power}:
-#'     \code{sigma * qgamma(prob, shape = 2 / beta)^(1 / beta)}.
+#'     \code{sigma * qgamma(prob, shape = 2 / shape)^(1 / shape)}.
 #' }
 #' Both definitions describe the ideal continuous kernel. They do not account
 #' for truncation at \code{max_D}, raster boundaries, missing cells, or cell
@@ -134,8 +137,8 @@
 #' Hessian-based standard errors (or profile-likelihood intervals when
 #' \code{\link{profile_sigma}} has been run and stored on the object). Each
 #' limit of sigma is converted to a distance with the same formula.
-#' For exponential-power kernels, beta is held at its fitted estimate during
-#' this conversion; the limits do not include uncertainty in beta or in
+#' For exponential-power kernels, the shape is held at its fitted estimate during
+#' this conversion; the limits do not include uncertainty in the shape or in
 #' site-specific retained weight.
 #'
 #' \code{summary()} of a fitted model reports both distances; see
@@ -169,7 +172,7 @@
 #' kernel_dist(model = opt, prob = 0.95)
 #' kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
 #' kernel_dist(sigma = 100, prob = 0.975, kernel = "exp")
-#' kernel_dist(sigma = 100, prob = 0.95, kernel = "expow", beta = 1.5)
+#' kernel_dist(sigma = 100, prob = 0.95, kernel = "expow", shape = 1.5)
 #' kernel_dist(sigma = 100, kernel = "fixed")
 #' }
 #'
@@ -338,7 +341,10 @@ kernel_dist <- function(model,
     return(dist_out)
   } else if(length(param_list) >= 1){
     sig_ <- param_list$sigma
-    shp_ <- param_list$beta
+    # `shape` is the current name; `beta` is a deprecated alias (one release).
+    # Exact names only, so `$` partial matching cannot pick up another argument.
+    shp_arg <- .msr_resolve_shape(param_list[["shape"]], param_list[["beta"]])
+    shp_ <- shp_arg$shape
     kern <- param_list$kernel
 
     if(is.null(sig_)){
@@ -354,7 +360,8 @@ kernel_dist <- function(model,
     }
 
     if (kern == "expow") {
-      validate_scalar_numeric(shp_, "beta", positive = TRUE)
+      # Name the argument the caller actually used.
+      validate_scalar_numeric(shp_, shp_arg$name, positive = TRUE)
     }
 
     # d <- seq(1, round(sig_*1000,0), length.out = round(sig_*1000,0))
@@ -446,4 +453,29 @@ k_dist <- function(sigma, prob = 0.95, kernel = c("gaussian", "exp", "expow", "f
     # Proportion of mass in 1D uniform kernel: step function
     return(sigma * (prob))  # Assume sigma is the full extent
   }
+}
+
+
+#' Resolve the exponential-power shape from `shape` and its deprecated alias
+#'
+#' `beta` was the public name of the exponential-power shape in
+#' `kernel_dist()` and `plot_kernel()`. It collides with the usual symbol for
+#' regression coefficients, so `shape` replaces it. `beta` remains accepted
+#' for one release.
+#'
+#' @param shape Value supplied as `shape`, or `NULL`.
+#' @param beta Value supplied as the deprecated `beta`, or `NULL`.
+#' @return A list with `shape` (the value to use, possibly `NULL`) and `name`
+#'   (the argument name the caller used, for error messages).
+#' @keywords internal
+#' @noRd
+.msr_resolve_shape <- function(shape = NULL, beta = NULL) {
+  if (is.null(beta)) return(list(shape = shape, name = "shape"))
+  if (!is.null(shape) && !isTRUE(all.equal(shape, beta))) {
+    stop("`shape` and the deprecated `beta` were both supplied with different ",
+         "values. Supply only `shape`.", call. = FALSE)
+  }
+  warning("`beta` is deprecated in favor of `shape` and will be removed in a ",
+          "future release. Use `shape` instead.", call. = FALSE)
+  list(shape = beta, name = if (is.null(shape)) "beta" else "shape")
 }

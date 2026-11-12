@@ -24,142 +24,128 @@ knitr::opts_chunk$set(
   message  = FALSE
 )
 
-pkg_extdata <- function(...) {
-  src_path <- normalizePath(file.path("..", "inst", "extdata", ...),
-                            winslash = "/",
-                            mustWork = FALSE)
-  if (file.exists(src_path)) {
-    return(src_path)
-  }
-
-  inst_path <- system.file("extdata", ..., package = "multiScaleR")
-  if (nzchar(inst_path) && file.exists(inst_path)) {
-    return(inst_path)
-  }
-
-  stop("Could not locate required extdata file: ", paste(..., collapse = "/"))
+# Slow steps (optimization, likelihood profiles, raster projection) are stored
+# in the package so the vignette builds quickly. The text shows the real calls.
+# Regenerate the stored results with data-raw/generate_vignette_cache.R.
+cache_file <- file.path("..", "inst", "extdata", "vignette_cache.rds")
+if (!file.exists(cache_file)) {
+  cache_file <- system.file("extdata", "vignette_cache.rds",
+                            package = "multiScaleR")
 }
-
-vignette_cache <- readRDS(pkg_extdata("vignette_cache.rds"))
+vignette_cache <- readRDS(cache_file)
 ```
 
-# What is multiScaleR?
+# What multiScaleR does
 
-`multiScaleR` estimates the spatial scale at which landscape variables influence
-ecological responses measured at field survey locations. Rather than testing
-a fixed set of buffer radii, the package fits a distance-weighted kernel function
-to the landscape data and estimates the kernel width, σ (sigma), directly as a
-parameter of your regression model. The result is a scale-of-effect estimate
-with a standard error and confidence interval, returned alongside the familiar
-regression coefficients.
+`multiScaleR` estimates the scale of effect, or the distance over which a
+landscape variable influences an ecological response measured at survey
+locations. You do not test a fixed set of buffer radii. Instead, the package
+weights the landscape around each survey point with a distance-decay kernel and
+estimates the kernel width, sigma, as a parameter of your regression model. You
+get a scale estimate with a standard error and confidence interval, alongside
+the familiar regression coefficients.
 
-This guide walks through a minimal working example to get you up and running.
-For a comparison of inferential targets and prediction uncertainty, see
-`vignette("inference-contracts", package = "multiScaleR")`.
-For conceptual background, full model-selection workflows, alternative kernel
-functions, and integration with `unmarked`, see
-`vignette("multiScaleR_Guide", package = "multiScaleR")`. For guidance on
-spatial projection and clamping, see
-`vignette("spatial_projection_clamping", package = "multiScaleR")`. For
-explicit derived covariates such as edge density, landscape shape index, and
-Shannon diversity, see
-`vignette("landscape_metric_covariates", package = "multiScaleR")`.
+This guide takes about ten minutes. It fits one count model to data bundled
+with the package and shows how to read every result. It assumes you can fit a
+generalized linear model with `glm()` and have used `terra` to read a raster.
+When you finish, the table in [Where to go next] points to the vignette for
+your next question.
 
----
-
-# Installation
-
-For Bayesian estimation of shared, covariate-dependent, or partially pooled
-scales, see `vignette("bayesian-scales", package = "multiScaleR")`. The workflow
-below introduces the existing likelihood-based scale optimization.
+# Install the package
 
 ```{r install, eval = FALSE}
 install.packages("multiScaleR")
 ```
 
----
+# The workflow in four steps
 
-# The Core Workflow
+Every `multiScaleR` analysis follows the same four steps.
 
-Every `multiScaleR` analysis follows four steps:
-
-1. **Prepare inputs** with `kernel_prep()`: extracts distance-weighted raster
-   values at each sample point and stores the information needed for optimization.
-2. **Fit an initial model**: use any supported regression function (`glm`,
-   `lme4`, `gls`, `pscl::zeroinfl`, `unmarked`, etc.) with the kernel-weighted
-   covariate values from step 1.
-3. **Optimize scales of effect** with `multiScale_optim()`: simultaneously
-   estimates σ for each spatial covariate and updates regression coefficients
-   by maximum likelihood.
-4. **Examine and visualize results**: `summary()`, `plot()`,
+1. **Prepare the inputs** with `kernel_prep()`. This extracts the raster values
+   around each survey point and stores what the optimizer needs.
+2. **Fit a starting model** with an ordinary regression function such as
+   `glm()`. The model formula and family carry through to the next step.
+3. **Estimate the scales of effect** with `multiScale_optim()`. This finds the
+   sigma for each landscape covariate and the regression coefficients that
+   together maximize the model likelihood.
+4. **Read and map the results** with `summary()`, `plot()`,
    `plot_marginal_effects()`, `profile_sigma()`, and `kernel_scale.raster()`.
 
----
+# Work through an example
 
-# A Complete Example
+## Load the data
 
-## Load the package and data
-
-`multiScaleR` ships with a simulated data set of Poisson counts at 100 survey
-locations and three landscape raster layers.
+The package includes a simulated data set of counts at 100 survey locations and
+a raster with three landscape layers.
 
 ```{r load-data}
-data("landscape_counts")
+data("landscape_counts")   # data frame: counts and one site-level covariate
 dat <- landscape_counts
 
-data("surv_pts")
-pts <- vect(surv_pts)
+data("surv_pts")           # survey locations (an sf object from the package)
+pts <- vect(surv_pts)      # convert to a terra SpatVector
 
-land_rast <- rast(pkg_extdata("landscape.tif"))
+# Three landscape layers on one grid, in meters
+land_rast <- rast(system.file("extdata", "landscape.tif",
+                              package = "multiScaleR"))
 ```
 
-The `landscape_counts` data frame contains counts and a site-level covariate
-(`site`). The raster stack has three layers: `land1` (binary habitat),
-`land2` (continuous), and `land3` (continuous). Counts were simulated with
-`land1` (σ = 250 m, β = −0.5) and `land2` (σ = 500 m, β = 0.7) as true
-predictors; `land3` has no effect.
+The counts were simulated from known values, which lets you check each estimate
+against the truth later in this guide.
 
-```{r plot-data, fig.cap = "***Landscape rasters with survey locations.***"}
+| Quantity | True value |
+|:---------|:-----------|
+| Scale of effect (sigma) for `land1`, a binary habitat layer | 250 m |
+| Scale of effect (sigma) for `land2`, a continuous layer | 500 m |
+| Effect of `land1` on log expected count | -0.5 |
+| Effect of `land2` on log expected count | 0.7 |
+| Effect of `site`, a covariate measured at the survey point | 0.3 |
+| `land3`, a continuous layer | No effect |
+
+```{r plot-data, fig.cap = "***The three landscape layers, and the survey points over `land1`.***"}
 plot(land_rast)
 plot(land_rast$land1, main = "land1 with survey points")
-points(pts, pch = 19, cex = 0.6, col = 'red')
+points(pts, pch = 19, cex = 0.6, col = "red")
 ```
 
-## Prepare inputs with `kernel_prep()`
+## Prepare the kernel inputs
 
-If observations span years with different land-cover maps, use
-`kernel_prep_by_group()` to assign each observation its year's map and estimate
-one pooled relationship. See `vignette("year-specific-rasters", package =
-"multiScaleR")` for a complete example.
-
-`kernel_prep()` extracts raster values within `max_D` meters of each survey
-point and computes initial distance-weighted covariate values. Set `max_D`
-to a value that comfortably exceeds the scale of effect you expect. If
-optimization later warns that σ is near `max_D`, re-run `kernel_prep()` with
-a larger value.
+`kernel_prep()` extracts the raster values within `max_D` map units of each
+survey point and computes a first set of distance-weighted covariate values.
+The map units here are meters.
 
 ```{r kernel-prep}
 kernel_inputs <- kernel_prep(
-  pts          = pts,
-  raster_stack = land_rast,
-  max_D        = 1700,
-  kernel       = "gaussian",
+  pts          = pts,          # survey locations
+  raster_stack = land_rast,    # landscape layers to summarize
+  max_D        = 1700,         # largest distance (m) considered around a point
+  kernel       = "gaussian",   # shape of the distance-decay function
   verbose      = FALSE
 )
 ```
 
-Combine the kernel-weighted covariate values with the response data:
+**Choosing `max_D`:** Set `max_D` to a distance you are confident exceeds the
+true scale of effect. If you are unsure, err toward a larger value, because the
+optimizer can only search within that distance. The cost is computation, since
+a larger `max_D` means more raster cells to process. If `multiScale_optim()`
+later warns that a sigma estimate is close to `max_D`, increase `max_D` and run
+`kernel_prep()` again.
+
+The kernel-weighted covariates are in `kernel_inputs$kernel_dat`, one row per
+survey point. They are centered and scaled, so each has a mean of zero and a
+standard deviation of one. Combine them with the response data.
 
 ```{r build-df}
 df <- data.frame(dat, kernel_inputs$kernel_dat)
+head(df, 3)
 ```
 
-## Fit an initial model
+## Fit a starting model
 
-Fit the regression model you intend to optimize. The formula and family you
-specify here are inherited by `multiScale_optim()`, so get the model structure
-right before optimizing. The coefficient values at this stage are only starting
-values.
+Fit the regression model you intend to optimize. `multiScale_optim()` inherits
+the formula and family from this model, so settle the model structure here. The
+coefficients at this stage are only starting values, because the landscape
+covariates were weighted with a first guess at sigma.
 
 ```{r fit-mod}
 mod <- glm(counts ~ site + land1 + land2,
@@ -167,228 +153,286 @@ mod <- glm(counts ~ site + land1 + land2,
            data   = df)
 ```
 
-## Optimize scales of effect
+## Estimate the scales of effect
 
-`multiScale_optim()` searches over σ values for each raster layer while
-simultaneously updating regression coefficients to maximize the model
-likelihood. Parallelization with `n_cores` can speed up expensive refits, but
-requires additional memory. Requests exceeding the estimated RAM-based worker
-limit now stop before screened starts or worker creation, rather than merely
-warning. Use `n_cores = 1` for serial execution. For kernel-only inputs, you can
-also rebuild the original `kernel_prep()` call with
-`bin = TRUE, store_cell_data = FALSE` and recheck the estimate. Landscape and
-surface metrics cannot use this lean mode.
-
-```{r parallel-memory-check, eval=FALSE}
-# The fitted model contributes to the payload copied to workers.
-ram <- estimate_multiscale_ram(kernel_inputs, fitted_mod = mod, n_cores = 3)
-print(ram)
-ram$component_bytes
-```
-
-The guard does not automatically reduce the requested count. Recommendations
-are estimates, not guarantees of sufficient memory, including when the limit
-is one. If RAM detection or estimation fails, the guard does not block the run.
-See the memory guidance in `vignette("multiScaleR_Guide", package = "multiScaleR")`.
+`multiScale_optim()` searches over sigma for each landscape covariate, refits
+the regression at each candidate, and keeps the combination with the highest
+likelihood.
 
 ```{r optim, eval = FALSE}
-opt <- multiScaleR::multiScale_optim(fitted_mod    = mod,
-                                     kernel_inputs = kernel_inputs)
+opt <- multiScale_optim(fitted_mod    = mod,
+                        kernel_inputs = kernel_inputs)
 ```
 
 ```{r load-cached-opt, include = FALSE}
 opt <- vignette_cache$quickstart$opt
+# The stored fit was produced by this same call under different object names.
+# Show the call as it is written above.
+opt$call <- quote(multiScale_optim(fitted_mod = mod,
+                                   kernel_inputs = kernel_inputs))
 ```
 
-If optimization is sensitive to the initial σ values, use the screened start
-strategy. This first scouts a small set of σ candidates, then launches one full
-optimization from the best candidate. It is most helpful when models have
-multiple landscape covariates, weak scale signal, or evidence that a single
-starting value is settling on a local optimum. The marginal σ scans are serial,
-but the short screening attempts also use `n_cores` when you request parallel
-optimization. On Windows, that means screened starts use PSOCK workers in the
-same way as the full optimization, so the same `refit_fn` serialization advice
-applies.
+Larger problems can run in parallel with `n_cores`, which needs more memory.
+`estimate_multiscale_ram()` reports how much. If a model has several landscape
+covariates and the result seems sensitive to its starting values, see the
+screened-start option in `vignette("multiScaleR_Guide", package = "multiScaleR")`.
 
-```{r optim-screened-start, eval = FALSE}
-set.seed(1)
-opt_screen <- multiScaleR::multiScale_optim(
-  fitted_mod = mod,
-  kernel_inputs = kernel_inputs,
-  start_strategy = "screen",
-  screen_n_sigma = 4,
-  screen_n_jitter = 2,
-  screen_maxit = 5
-)
-```
-
-```{r load-opt, include = FALSE}
-# load(pkg_extdata("opt2.RData"))
-# opt <- opt2
-```
-
-## Examine results
-
-`summary()` reports the estimated σ and its standard error and 95% confidence
-interval for each spatial covariate, followed by the standard regression
-summary. By default, confidence intervals are computed using the delta method.
-For more reliable bounds when the likelihood surface is asymmetric (e.g., when
-σ is near `max_D` or sample size is small), pass `profile = TRUE`.
+## Read the summary
 
 ```{r summary}
 summary(opt)
 ```
 
-The true simulated values (σ = 250 m for `land1`, σ = 500 m for `land2`)
-should fall within the reported confidence intervals.
+**How to read the `summary()` output:** The output has four parts.
 
-## Visualize kernel decay and covariate effects
+- **Optimized Scale of Effect.** One row per landscape covariate, with the
+  estimated sigma in map units (meters here), its standard error, and a 95%
+  confidence interval.
+- **Optimized Scale of Effect, Distance.** Sigma is a kernel parameter, not a
+  radius. This block converts it to an effective distance. The first table,
+  marked "selected", gives the radius of the circle that holds 90% of the
+  kernel weight. Report this distance when you describe how far the landscape
+  effect extends. The second table is an older, line-based definition kept for
+  comparison.
+- **Fitted Model Summary.** The regression table from the final model. For this
+  Poisson model the coefficients are on the log scale, so exponentiate them to
+  get a multiplicative change in the expected count.
+- **Follow-up recommendation.** Starting values and a `max_D` to reuse if you
+  refit the model.
 
-`plot()` shows cell weight decreasing with distance. Its vertical line now
-marks the radius containing 90% of ideal kernel weight on a plane (2D), matching
-`kernel_dist(opt)` and the selected `summary(opt)$opt_dist`. For a Gaussian
-kernel this radius is about 2.15 sigma, not sigma itself. The curve is not the
-total weight in concentric rings, so the area under it to the marker is not 90%.
-The realized share can differ when `max_D`, raster edges, missing cells, or
-cell geometry restrict the landscape.
+The lines below pull those quantities out of the fitted object.
 
-**Changed reporting default:** Versions through 0.7.3 used line-based (1D)
-markers. Use `dimension = "1d"` in `plot()`, `plot_kernel()`, `kernel_dist()`,
-or `summary()` to restore that definition (about 1.65 sigma at 90% for a
-Gaussian). This does not change the fitted model. Summaries retain both tables
-as `opt_dist_1d` and `opt_dist_2d`; `opt_dist` and `opt_distance` follow the
-selected dimension. Stored optimization diagnostics and computational cutoffs
-remain on their historical 1D definition.
+```{r read-summary}
+est     <- summary(opt)$opt_scale          # sigma, SE, and 95% interval (m)
+dist90  <- kernel_dist(opt)                # radius holding 90% of kernel weight (m)
+effects <- exp(coef(opt$opt_mod))          # multiplicative change in expected count
 
-```{r plot-kernel, fig.cap = "***Distance-decay of kernel weight for each covariate.***"}
+round(dist90)
+round(effects, 2)
+```
+
+Three statements follow from these numbers.
+
+- The estimated sigma for `land1` is `r round(est["land1", "Mean"])` m. A
+  Gaussian kernel of that width places 90% of its weight within
+  `r round(dist90["land1", "Mean"])` m of a survey point, so habitat within
+  roughly that distance shapes the count.
+- The estimated sigma for `land2` is `r round(est["land2", "Mean"])` m, an
+  effective distance of `r round(dist90["land2", "Mean"])` m. `land2` acts over
+  about twice the distance of `land1`.
+- The landscape covariates are standardized, so each coefficient describes a
+  change of one standard deviation. A one standard deviation increase in
+  kernel-weighted `land1` multiplies the expected count by
+  `r round(effects["land1"], 2)`, a decrease of
+  `r round(100 * (1 - effects["land1"]))`%. The same increase in `land2`
+  multiplies it by `r round(effects["land2"], 2)`, an increase of
+  `r round(100 * (effects["land2"] - 1))`%.
+
+Because the data are simulated, you can compare each estimate with its true
+value.
+
+```{r truth-table}
+ci_beta <- confint.default(opt$opt_mod)    # Wald 95% intervals, log scale
+check <- data.frame(
+  Parameter = c("sigma, land1 (m)", "sigma, land2 (m)",
+                "effect of land1", "effect of land2", "effect of site"),
+  Truth     = c(250, 500, -0.5, 0.7, 0.3),
+  Estimate  = c(est[, "Mean"], coef(opt$opt_mod)[c("land1", "land2", "site")]),
+  Lower     = c(est[, "2.5%"], ci_beta[c("land1", "land2", "site"), 1]),
+  Upper     = c(est[, "97.5%"], ci_beta[c("land1", "land2", "site"), 2])
+)
+# Does each 95% interval contain the value used to simulate the data?
+check$Covered <- check$Truth >= check$Lower & check$Truth <= check$Upper
+knitr::kable(check, digits = 2, row.names = FALSE)
+```
+
+**How to read the table:** `Covered` is `TRUE` when the 95% interval contains
+the true value. One simulated data set cannot show that the intervals are
+reliable in general, but it does show what recovery looks like when the model
+matches the process that generated the data.
+
+> **What this means for your study.** Report the effective distance, not sigma
+> alone, and say which weight it refers to (90% by default). The coefficient
+> standard errors in the regression table treat the estimated sigma values as
+> known. `vignette("inference-contracts", package = "multiScaleR")` explains
+> what that leaves out and when it matters.
+
+By default, the sigma intervals come from the optimizer's standard errors (the
+delta method). When the sample is small or an estimate sits near `max_D`, request
+profile-likelihood intervals with `summary(opt, profile = TRUE)`. They take
+longer to compute and do not assume a symmetric likelihood.
+
+## Plot the kernels and the covariate effects
+
+```{r plot-kernel, fig.cap = "***Kernel weight against distance for each landscape covariate.***"}
 plot(opt)
 ```
 
-```{r original-kernel-distance, eval=FALSE}
-# Keep the original distance definition when reproducing older reports.
-plot(opt, dimension = "1d")
-kernel_dist(opt, dimension = "1d")
-summary(opt, dimension = "1d")
+**How to read these plots:** Each curve shows how the weight given to a raster
+cell declines with its distance from the survey point. The dashed line marks
+the effective distance from `summary()`, the radius that holds 90% of the
+kernel weight, and the gray band is its 95% confidence interval. The three
+lines of text under each panel repeat sigma, that radius, and its interval. A
+curve that falls quickly means the response depends on nearby landscape. A
+curve that falls slowly means distant landscape still counts.
+
+The text under each panel is useful while you explore a fit, but a figure for a
+manuscript or a slide usually reads better without it. Set `add_label = FALSE`
+to draw the same panels with no text beneath them. The dashed line and the gray
+band stay.
+
+```{r plot-kernel-plain, fig.cap = "***The same kernel plots without the text under each panel.***"}
+plot(opt, add_label = FALSE)
 ```
 
-`plot_marginal_effects()` shows the estimated effect of each covariate on the
-response, holding all other covariates at their mean values.
+Versions through 0.7.3 reported a line-based distance, which is shorter (about
+1.65 sigma at 90% for a Gaussian kernel, against about 2.15 sigma for the
+circle). Set `dimension = "1d"` in `summary()`, `plot()`, or `kernel_dist()` to
+reproduce those earlier values. The fitted model is the same either way.
 
-```{r marginal, fig.cap = "***Marginal effects of each spatial covariate on counts.***"}
+```{r marginal, fig.cap = "***Estimated effect of each covariate on the expected count.***"}
 plot_marginal_effects(opt)
 ```
 
-## Diagnose the likelihood surface
+**How to read these plots:** Each panel shows the expected count across the
+observed range of one covariate, with the other covariates held at their means.
+The horizontal axis is in the covariate's own units. For `land1`, a binary
+habitat layer, that is the kernel-weighted proportion of habitat around a
+survey point. The shaded band is a 95% confidence band for the expected count.
+The band treats the estimated scales as known, so it does not include
+uncertainty in sigma. Set `add_label = TRUE` if you want that reminder printed
+under each panel.
 
-`profile_sigma()` evaluates AICc (or log-likelihood) across the sigma search
-range for each covariate, holding all other sigmas at their optimized values.
-A clear trough centered near the optimized sigma confirms a well-identified
-scale of effect; a flat or monotone profile indicates the data do not
-strongly constrain sigma for that variable.
+## Check that each scale is well identified
 
-You can parallelize this step with `n_cores`. A practical rule is to use up to
-the number of scaled surfaces (spatial covariates), which is often the most
-efficient setting when computer resources permit.
+`profile_sigma()` refits the model across a range of sigma values for one
+covariate at a time, holding the other scales at their estimates.
 
-```{r profile, fig.cap = "***AICc profile across sigma. Red dashed line marks optimized sigma.***"}
-n_profile_cores <- min(length(opt$scale_est$Mean),
-                       max(1L, parallel::detectCores(logical = FALSE)))
+```{r profile-call, eval = FALSE}
+prof <- profile_sigma(opt, n_pts = 15)   # 15 sigma values per covariate
+plot(prof)
+```
+
+```{r profile, echo = FALSE, fig.cap = "***AICc across candidate sigma values. The dashed line marks the estimate.***"}
 prof <- vignette_cache$quickstart$prof
 plot(prof)
 ```
 
-For a deeper explanation of how to interpret the profile and when to prefer
-profile-likelihood CIs over delta-method CIs, see
-`vignette("multiScaleR_Guide", package = "multiScaleR")`.
+**How to read these plots:** Lower AICc means better support. A clear trough
+near the dashed line means the data identify that scale well. A flat profile,
+or one that keeps falling toward the edge of the search range, means the data
+say little about that scale, and its interval should be read with caution.
 
-## Project the fitted model to the landscape
+## Map the fitted model
 
-`kernel_scale.raster()` applies the optimized kernel to the full raster extent
-and, with `scale_center = TRUE`, standardizes the result using the same
-centering and scaling used during model fitting. The output can be passed
-directly to `terra::predict()`.
+`kernel_scale.raster()` applies each fitted kernel to the whole raster. With
+`scale_center = TRUE` it also standardizes the result with the mean and
+standard deviation used in fitting, so the layers can go straight into
+`terra::predict()`.
 
-```{r project, fig.cap = "***Kernel-smoothed raster layers at optimized scales.***"}
+```{r project-call, eval = FALSE}
+r_scaled <- kernel_scale.raster(raster_stack = land_rast,
+                                multiScaleR  = opt,     # the fitted object
+                                scale_center = TRUE,    # same scaling as the model
+                                clamp        = TRUE)    # stay within the fitted range
+
+# Expected count in every raster cell
+pred <- terra::predict(r_scaled, opt$opt_mod, type = "response")
+```
+
+```{r project, echo = FALSE, fig.cap = "***Landscape layers smoothed at their estimated scales, in standard deviation units.***"}
 r_scaled <- terra::unwrap(vignette_cache$quickstart$r_scaled)
 plot(r_scaled)
 ```
 
-```{r predict, fig.cap = "***Predicted counts across the landscape.***"}
+```{r predict, echo = FALSE, fig.cap = "***Expected count across the landscape, with survey points.***"}
 pred <- terra::unwrap(vignette_cache$quickstart$pred)
-plot(pred, main = "Predicted counts")
-plot(surv_pts, add = T, col = 'red')
+plot(pred, main = "Expected count")
+points(pts, pch = 19, cex = 0.5, col = "red")
 ```
 
-The nature of this toy example and simulated data is such that predicted counts go to zero at low levels of `land2`. In this example that is most of the border region. This results is simply an artifact of the small landscape and large scale of effect. 
+**How to read these plots:** The first figure shows each landscape layer after
+kernel weighting. Its values are in standard deviation units of the data used
+to fit the model, so zero is the average survey point. The second figure is the
+expected count per cell from the fitted model. With `clamp = TRUE`, cells whose
+covariate values fall outside the range seen at the survey points are held at
+the nearest observed value, which keeps the model from extrapolating.
 
----
+Expected counts fall toward zero near the map border in this example. That
+pattern reflects a small landscape combined with a large scale of effect for
+`land2`, not an ecological result.
+`vignette("spatial_projection_clamping", package = "multiScaleR")` covers
+projection beyond the sampled conditions in detail.
 
-# Quick-Reference: Full Workflow
+# Quick reference
+
+The full workflow in one block.
 
 ```{r full-workflow, eval = FALSE}
 library(multiScaleR)
 library(terra)
 
-# 1. Load data
+# 1. Load the data
 data("landscape_counts"); data("surv_pts")
-pts      <- vect(surv_pts)
-land_rast <- rast(pkg_extdata("landscape.tif"))
+pts       <- vect(surv_pts)
+land_rast <- rast(system.file("extdata", "landscape.tif",
+                              package = "multiScaleR"))
 
-# 2. Prepare kernel inputs
+# 2. Prepare the kernel inputs
 kernel_inputs <- kernel_prep(pts = pts, raster_stack = land_rast,
                              max_D = 1700, kernel = "gaussian")
 
-# 3. Fit initial model
+# 3. Fit a starting model
 df  <- data.frame(landscape_counts, kernel_inputs$kernel_dat)
-mod <- glm(counts ~ land1 + land2, family = poisson(), data = df)
+mod <- glm(counts ~ site + land1 + land2, family = poisson(), data = df)
 
-# 4. Optimize scales of effect
-opt <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs,
-                        n_cores = 2)
+# 4. Estimate the scales of effect
+opt <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs)
 
-# Optional: screen candidate starts before the full optimization when a model
-# is sensitive to starting values.
-set.seed(1)
-opt_screen <- multiScale_optim(fitted_mod = mod,
-                               kernel_inputs = kernel_inputs,
-                               start_strategy = "screen",
-                               screen_n_sigma = 4,
-                               screen_n_jitter = 2,
-                               screen_maxit = 5)
+# 5. Read the results
+summary(opt)                   # sigma, effective distance, regression table
+summary(opt, profile = TRUE)   # profile-likelihood intervals for sigma (slower)
+kernel_dist(opt)               # radius holding 90% of the kernel weight
+exp(coef(opt$opt_mod))         # multiplicative change in expected count
+plot(opt)                      # kernel weight against distance
+plot(opt, add_label = FALSE)   # the same plot without the text beneath it
+plot_marginal_effects(opt)     # expected count across each covariate
+plot(profile_sigma(opt))       # AICc across sigma: is each scale identified?
 
-# 5. Summarize and visualize
-summary(opt)                        # sigma estimates + regression table
-summary(opt, profile = TRUE)        # profile-likelihood CIs (slower)
-plot(opt)                           # kernel decay curves
-plot_marginal_effects(opt)          # covariate effect plots
-prof <- profile_sigma(opt)          # AICc/LL surface across sigma space
-plot(prof)                          # plot profile with optimized sigma marked
-
-# Optional: profile in parallel. Using up to the number of scaled surfaces
-# is often the most efficient when resources allow.
-n_profile_cores <- min(length(opt$scale_est$Mean),
-                       max(1L, parallel::detectCores(logical = FALSE)))
-prof_parallel <- profile_sigma(opt, n_cores = n_profile_cores)
-
-# 6. Project to landscape
+# 6. Map the fitted model
 r_scaled <- kernel_scale.raster(land_rast, multiScaleR = opt,
                                 scale_center = TRUE, clamp = TRUE)
-terra::predict(r_scaled, opt$opt_mod, type = "response")
+pred <- terra::predict(r_scaled, opt$opt_mod, type = "response")
 ```
 
----
+## Summary of key functions
 
-# Learn More
+| Function | Purpose |
+|:---------|:--------|
+| `kernel_prep()` | Extract raster values around each survey point and prepare the optimizer inputs |
+| `multiScale_optim()` | Estimate sigma for each landscape covariate together with the regression coefficients |
+| `summary()` | Report sigma, the effective distance, and the regression table |
+| `kernel_dist()` | Convert sigma to the distance that holds a chosen share of the kernel weight |
+| `plot()` | Draw kernel weight against distance |
+| `plot_marginal_effects()` | Draw the expected response across each covariate |
+| `profile_sigma()` | Check how well the data identify each scale |
+| `kernel_scale.raster()` | Apply the fitted kernels to a raster for mapping and prediction |
 
-- **Feature compatibility**:
-  `vignette("feature-compatibility", package = "multiScaleR")` connects means,
-  surface and landscape metrics to fitting, plotting, prediction, and model
-  comparison, including checked raster scenarios.
-- **Full user guide**: `vignette("multiScaleR_Guide", package = "multiScaleR")`
-  covers kernel selection, model comparison with AIC/BIC, optimization with
-  `unmarked`, zero-inflated models, and simulation tools.
+# Where to go next
 
-- **Spatial projection and clamping**:
-  `vignette("spatial_projection_clamping", package = "multiScaleR")` explains
-  what happens when model predictions are extended beyond the sampled
-  environmental range and how `clamp` and `pct_mx` control that behavior.
+| If you want to | Read |
+|:---------------|:-----|
+| Understand kernels, intervals, and model selection in depth, or fit `unmarked` models | `vignette("multiScaleR_Guide", package = "multiScaleR")` |
+| Map predictions beyond the conditions you sampled | `vignette("spatial_projection_clamping", package = "multiScaleR")` |
+| Use land-cover composition or configuration, such as edge density or Shannon diversity | `vignette("landscape_metric_covariates", package = "multiScaleR")` |
+| Use the roughness or texture of a continuous surface | `vignette("surface_metric_covariates", package = "multiScaleR")` |
+| Analyze surveys from several years, each with its own map | `vignette("year-specific-rasters", package = "multiScaleR")` |
+| Combine covariate types and choose a fitting method | `vignette("feature-compatibility", package = "multiScaleR")` |
+| Compare models by how well they predict held-out data | `vignette("cross-validation", package = "multiScaleR")` |
+| Know what an interval includes and what it leaves out | `vignette("inference-contracts", package = "multiScaleR")` |
+| Fit step-selection models to animal movement data | `vignette("step-selection", package = "multiScaleR")` |
+| Account for spatial autocorrelation with a spatial field | `vignette("spatial-response-fields", package = "multiScaleR")` |
+| Fit distance-removal models to point-count data | `vignette("distance-removal-audits", package = "multiScaleR")` |
+| Let the scale of effect vary among years in a Bayesian model | `vignette("bayesian-scales", package = "multiScaleR")` |
+| Predict new sites or years from a Bayesian fit | `vignette("bayesian-prediction", package = "multiScaleR")` |
+| Choose and check a faster Bayesian approximation | `vignette("bayesian-computation", package = "multiScaleR")` |

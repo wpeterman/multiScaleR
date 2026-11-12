@@ -152,7 +152,6 @@ test_that("explicit component auditing preserves strict admission and neutral so
   s <- path_component_fixture("gaussian", "gaussian", TRUE, "tied", "canonical")
   p <- private_sq_parameters(s); p$scale_z <- p$response_z <- numeric()
   expect_error(.msr_factorized_limit_audit(s, p, 100), "Weighted SQ")
-  expect_error(.msr_factorized_adfun(s, p), "Weighted SQ")
   expect_error(.msr_factorized_fit(s), "Weighted SQ")
   expect_error(.msr_factorized_audit_density(s, ad = TRUE), "ordinary numeric")
   bad <- s; bad$priors <- list(beta = 1)
@@ -163,4 +162,8 @@ test_that("explicit component auditing preserves strict admission and neutral so
   expect_error(.msr_factorized_limit_component_audit(bad, p, 100), "metadata")
   expect_error(.msr_factorized_limit_component_audit(s, p, Inf), "finite numeric candidate")
   expect_identical(names(formals(.msr_factorized_limit_audit)), c("spec", "parameters", "candidate_nll"))
+
+  # The AD function needs the suggested RTMB package before it reaches this guard.
+  skip_if_not_installed("RTMB")
+  expect_error(.msr_factorized_adfun(s, p), "Weighted SQ")
 })

@@ -138,7 +138,7 @@ test_that("scalar count means survive snapshots, checked rasters and raw-referen
   reference <- dat; row.names(reference) <- row.names(model$model)
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   curves <- plot_marginal_effects(object, reference_data = reference, link = TRUE,
-    component = 1, length.out = 5)
+    component = 1, length.out = 5, add_label = TRUE)
   curve_data <- dat[rep(1L, 5), , drop = FALSE]
   for (name in names(curve_data)) if (is.numeric(dat[[name]])) curve_data[[name]] <- mean(dat[[name]])
   curve_data$z <- seq(min(dat$z), max(dat$z), length.out = 5)

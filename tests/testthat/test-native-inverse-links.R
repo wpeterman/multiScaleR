@@ -41,7 +41,7 @@ check_native_gamma_compatibility <- function(kind) {
     -2 * as.numeric(logLik(model)) + log(nrow(f$data)) * (native_k + 2), tolerance = 1e-9)
 
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
-  plots <- plot_marginal_effects(f$object, length.out = 7)
+  plots <- plot_marginal_effects(f$object, length.out = 7, add_label = TRUE)
   grid <- as.data.frame(lapply(f$data[c("mean", "rough", "fixed", "z")], function(x) rep(mean(x), 7)))
   grid$rough <- seq(min(f$data$rough), max(f$data$rough), length.out = 7)
   native <- if (kind == "glm") predict(model, grid, type = "link", se.fit = TRUE) else
@@ -89,7 +89,7 @@ test_that("plots retain native fitted values when inverse-link confidence limits
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   warnings <- character()
   plots <- withCallingHandlers(with_mocked_bindings(
-    plot_marginal_effects(f$object, length.out = 7),
+    plot_marginal_effects(f$object, length.out = 7, add_label = TRUE),
     predict = function(object, newdata, ...) list(fit = rep(1, nrow(newdata)),
       se.fit = rep(1, nrow(newdata)))), warning = function(w) {
         warnings <<- c(warnings, conditionMessage(w))

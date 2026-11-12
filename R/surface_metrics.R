@@ -833,7 +833,7 @@
     weights[!support] <- 0
     return(weights)
   }
-  mx <- kernel_dist(kernel = kernel, sigma = sigma, beta = shape, prob = pct_wt,
+  mx <- kernel_dist(kernel = kernel, sigma = sigma, shape = shape, prob = pct_wt,
                     dimension = "1d")
   r_res <- terra::res(raster)[1]
   focal_d <- ceiling(mx / r_res) * 2

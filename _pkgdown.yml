@@ -127,7 +127,6 @@ reference:
       - expand_gdr_intervals
       - gdr_start_values
       - make_gdr_refitter
-      - audit_gdr_integration
       - fit_gdr_response_field
       - response_field_geometry
       - "`unmarkedFitGDRField-class`"
@@ -145,7 +144,6 @@ reference:
       - sim_dat
       - sim_dat_unmarked
       - sim_dat_gdr
-      - score_simulation
   - title: Example data
     contents:
       - count_data

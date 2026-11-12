@@ -17,7 +17,7 @@ test_that("kernel distance helpers match expected formulas", {
     tolerance = 1e-8
   )
 
-  expect_true(kernel_dist(sigma = 10, kernel = "expow", beta = 2, prob = 0.9) > 0)
+  expect_true(kernel_dist(sigma = 10, kernel = "expow", shape = 2, prob = 0.9) > 0)
 })
 
 test_that("kernel distance helpers validate arguments", {

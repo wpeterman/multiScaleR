@@ -64,19 +64,23 @@
 #' \code{vignette("feature-compatibility", package = "multiScaleR")} for the
 #' feature and inference-method matrix.
 #'   This does not tie their fitted scales or reuse results across evaluations.
-#' @param base Positive numeric (not equal to 1). Logarithm base used by every
-#'   entropy-based metric: the diversity metrics (\code{"shdi"}, \code{"shei"},
-#'   \code{"msidi"}, \code{"msiei"}) and the information-theory metrics
-#'   (\code{"ent"}, \code{"condent"}, \code{"joinent"}, \code{"mutinf"}).
+#' @param base Positive numeric (not equal to 1). Logarithm base used by the
+#'   Shannon metrics (\code{"shdi"}, \code{"shei"}) and the information-theory
+#'   metrics (\code{"ent"}, \code{"condent"}, \code{"joinent"}, \code{"mutinf"}).
 #'   Default: \code{exp(1)} (natural log, so entropies are in nats). Use
 #'   \code{2} for bits or \code{10} for Hartley units. To reproduce the
 #'   information-theory values reported by FRAGSTATS and the \code{landscapemetrics}
 #'   package, set \code{base = 2}. The base cancels in the ratio metrics
-#'   (\code{"relmutinf"}, \code{"iji"}), so they are unaffected by it.
-#' @param classes_max Optional positive numeric. Maximum number of possible
-#'   patch types in the landscape, used only for relative patch richness
-#'   (\code{"rpr"}). If \code{NULL} (default), the observed number of classes
-#'   within each buffer is used as the denominator.
+#'   (\code{"shei"}, \code{"relmutinf"}, \code{"iji"}), so they are unaffected
+#'   by it. The modified Simpson metrics (\code{"msidi"}, \code{"msiei"}) always
+#'   use the natural log, as FRAGSTATS and \code{landscapemetrics} define them,
+#'   so \code{landscape_var()} warns when a non-default \code{base} is supplied
+#'   with either metric and ignores it.
+#' @param classes_max Positive numeric. Maximum number of possible patch types
+#'   in the landscape. Required for relative patch richness (\code{"rpr"}),
+#'   where it is the denominator, and unused by every other metric. The
+#'   observed class count is not substituted when it is missing, so
+#'   \code{landscape_var()} stops if \code{"rpr"} is requested without it.
 #' @param class Optional integer-like scalar. The focal class for the class-level
 #'   metrics (\code{"clumpy"}, \code{"pland"}, \code{"ca"}), which describe one
 #'   category rather than the whole landscape. It must match one of the integer
@@ -146,12 +150,14 @@
 #'   \item{\code{"sidi"}}{Simpson diversity index.}
 #'   \item{\code{"siei"}}{Simpson evenness index. Can be uninformative for
 #'     optimized scales when local evenness is uniform across sample points.}
-#'   \item{\code{"msidi"}}{Modified Simpson diversity index.}
+#'   \item{\code{"msidi"}}{Modified Simpson diversity index, always computed
+#'     with the natural log.}
 #'   \item{\code{"msiei"}}{Modified Simpson evenness index. Can be uninformative
 #'     for optimized scales when local evenness is uniform across sample points.}
 #'   \item{\code{"pr"}}{Patch richness (number of distinct classes).}
 #'   \item{\code{"prd"}}{Patch richness density (pr per 100 ha).}
-#'   \item{\code{"rpr"}}{Relative patch richness (pr / classes_max * 100).}
+#'   \item{\code{"rpr"}}{Relative patch richness (pr / classes_max * 100).
+#'     Requires \code{classes_max}.}
 #'   \item{\code{"ta"}}{Total area of the buffer (ha).}
 #' }
 #'
@@ -463,6 +469,46 @@ landscape_var <- function(source,
   }
   if (!is.null(classes_max)) {
     validate_scalar_numeric(classes_max, "classes_max", positive = TRUE)
+  }
+
+  # Modified Simpson diversity is -ln(sum(p^2)) by definition (FRAGSTATS and
+  # landscapemetrics offer no base choice), so the metric code never applies
+  # `base` to it. Warn instead of silently ignoring a requested base, and store
+  # the natural log so the specification records what is actually computed.
+  if (metric %in% c("msidi", "msiei") && !isTRUE(all.equal(base, exp(1)))) {
+    warning(
+      sprintf("`base` does not apply to `%s`, which always uses the natural log; ignoring `base = %s`.",
+              metric, format(base)),
+      call. = FALSE
+    )
+    base <- exp(1)
+  }
+
+  # Only the entropy metrics use `base`. Shannon evenness, contagion, IJI and
+  # relative mutual information are ratios of logarithms, so every base gives
+  # the same value. The remaining metrics take no logarithm, so a requested
+  # base would have no effect. Say so, as for the modified Simpson metrics.
+  base_free <- setdiff(.msr_landscape_metrics(),
+                       c("shdi", "shei", "ent", "condent", "joinent", "mutinf",
+                         "relmutinf", "iji", "contag", "msidi", "msiei"))
+  if (metric %in% base_free && !isTRUE(all.equal(base, exp(1)))) {
+    warning(
+      sprintf("`base` does not apply to `%s`, so `base = %s` is ignored.",
+              metric, format(base)),
+      call. = FALSE
+    )
+    base <- exp(1)
+  }
+
+  # Relative patch richness has no defined value without the maximum class
+  # count: the metric code returns NA, which previously surfaced later as an
+  # unrelated "all NA" error in kernel_prep(). Fail here, where the covariate
+  # is defined and the missing argument can be named.
+  if (metric == "rpr" && is.null(classes_max)) {
+    stop(
+      "`classes_max` is required for relative patch richness (`rpr`): supply the maximum number of classes possible in the landscape.",
+      call. = FALSE
+    )
   }
 
   # The class-level metrics (clumpy, pland, ca) describe a single focal class and
@@ -1102,7 +1148,7 @@ print.multiScaleR_vars <- function(x, ...) {
   mx <- kernel_dist(kernel = kernel,
                     dimension = "1d",
                     sigma = sigma,
-                    beta = shape,
+                    shape = shape,
                     prob = pct_wt)
 
   r_res <- terra::res(raster)[1]

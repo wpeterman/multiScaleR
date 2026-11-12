@@ -2,7 +2,7 @@ test_that("native GLM marginal effects preserve factors, contrasts, and spatial 
   f <- refit_spatial_fixture()
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
-  plots <- expect_no_warning(plot_marginal_effects(f$object, length.out = 7))
+  plots <- expect_no_warning(plot_marginal_effects(f$object, length.out = 7, add_label = TRUE))
   expect_identical(as.character(plots$group$data$x), c("a", "b", "c"))
   vars <- c("mean", "rough", "fixed", "group", "z", "exposure")
   defaults <- lapply(f$data[vars], function(v)
@@ -16,6 +16,11 @@ test_that("native GLM marginal effects preserve factors, contrasts, and spatial 
   expect_equal(plots$rough$data$x, nd$rough * f$object$scl_params$sd[["rough"]] +
     f$object$scl_params$mean[["rough"]], tolerance = 1e-12)
   expect_match(plots$rough$labels$caption, "condition on.*spatial scales")
+  # Captions are opt-in: the default draws the same curves without one.
+  plain <- plot_marginal_effects(f$object, length.out = 7)
+  expect_null(plain$rough$labels$caption)
+  expect_equal(plain$rough$data, plots$rough$data)
+  expect_error(plot_marginal_effects(f$object, add_label = NA), "add_label")
   nd <- as.data.frame(lapply(defaults, rep, times = 3))
   nd$group <- factor(c("a", "b", "c"), levels = levels(f$data$group))
   expect_equal(plots$group$data$fit,
@@ -33,7 +38,7 @@ test_that("glmmTMB curves use its full response target and zero random effects",
   f$object$opt_mod <- model
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
-  plots <- expect_no_warning(plot_marginal_effects(f$object, length.out = 7))
+  plots <- expect_no_warning(plot_marginal_effects(f$object, length.out = 7, add_label = TRUE))
   vars <- c("mean", "rough", "fixed", "group", "z", "site")
   defaults <- lapply(f$data[vars], function(v)
     if (is.numeric(v)) mean(v) else v[1])

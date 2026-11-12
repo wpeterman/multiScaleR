@@ -215,7 +215,7 @@ test_that("Gamma and NB BAM curves keep conditional means and raw reference axes
     source <- entry$data[variables]
     for (link in c(FALSE, TRUE)) {
       plots <- suppressMessages(plot_marginal_effects(object, length.out = 7L,
-        reference_data = reference, link = link))
+        reference_data = reference, link = link, add_label = TRUE))
       expect_true(attr(plots, "reference_data_contract")$native_design_and_offsets_verified)
       # Single-component native curves retain their existing caption contract;
       # structured output-column contracts belong to multi-component curves.

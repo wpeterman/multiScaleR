@@ -13,11 +13,11 @@
 #'   same units as the projection used with \code{\link{kernel_prep}} (e.g.,
 #'   meters when using a metric CRS). Controls the width of the kernel: larger
 #'   values spread influence over greater distances.
-#' @param beta Positive numeric. Shape parameter for the exponential power
+#' @param shape Positive numeric. Shape parameter for the exponential power
 #'   kernel (\code{kernel = "expow"}). Controls kernel shape: values near 1
 #'   approximate a Laplace (double-exponential) shape; values near 2 approximate
 #'   Gaussian; larger values approach a flat-top (platykurtic) shape. Typical
-#'   range is 1–50. Ignored for all other kernel types. Default: \code{NULL}.
+#'   range is 1 to 50. Ignored for all other kernel types. Default: \code{NULL}.
 #' @param kernel Character. The kernel function to visualize. One of:
 #'   \describe{
 #'     \item{\code{"gaussian"}}{Gaussian (normal) decay; weights follow a
@@ -27,7 +27,7 @@
 #'     \item{\code{"fixed"}}{Fixed-radius step function; all distances up to
 #'       \code{sigma} receive equal weight.}
 #'     \item{\code{"expow"}}{Exponential power kernel parameterized by
-#'       \code{sigma} and \code{beta}.}
+#'       \code{sigma} and \code{shape}.}
 #'   }
 #' @param scale_dist Logical. If \code{TRUE} (default), a vertical dashed line
 #'   marks the distance enclosing \code{prob} of kernel weight under the
@@ -39,6 +39,9 @@
 #'   \code{prob} of ideal kernel weight on a plane. \code{"1d"} restores the
 #'   original distance enclosing that proportion along a line through the point.
 #' @param ... Not used.
+#' @param beta Deprecated. Former name of \code{shape}, still accepted for one
+#'   release with a warning. Supplying both \code{shape} and \code{beta} with
+#'   different values is an error.
 #'
 #' @return A \code{ggplot2} object showing kernel weight (y-axis) as a function
 #'   of distance in map units (x-axis), returned for display or customization.
@@ -78,7 +81,7 @@
 #'             kernel = 'fixed')
 #' plot_kernel(prob = 0.95,
 #'             sigma = 100,
-#'             beta = 2.5,
+#'             shape = 2.5,
 #'             kernel = 'expow')
 #' ## Original line-based definition
 #' plot_kernel(sigma = 100, kernel = 'gaussian', dimension = '1d')
@@ -89,18 +92,22 @@
 #' @importFrom ggplot2 aes annotate geom_line geom_vline ggplot xlab ylab theme_light geom_rect ggtitle
 plot_kernel <- function(prob = 0.9,
                         sigma,
-                        beta = NULL,
+                        shape = NULL,
                         kernel,
                         scale_dist = TRUE,
                         add_label = TRUE,
                         dimension = c("2d", "1d"),
-                        ...) {
+                        ...,
+                        beta = NULL) {
   dimension <- match.arg(dimension)
   validate_scalar_numeric(prob, "prob", lower = 0, upper = 1,
                           inclusive_lower = FALSE, inclusive_upper = FALSE)
 
   sig_ <- sigma
-  shp_ <- beta
+  # `shape` keeps the third position that `beta` held, so positional calls
+  # are unaffected; `beta` is a deprecated alias (one release).
+  shp_arg <- .msr_resolve_shape(shape, beta)
+  shp_ <- shp_arg$shape
   kern <- kernel
 
   if(is.null(sig_)){
@@ -112,10 +119,10 @@ plot_kernel <- function(prob = 0.9,
   validate_scalar_numeric(sig_, "sigma", positive = TRUE)
   kern <- match.arg(kern, c("gaussian", "exp", "expow", "fixed"))
   if(kern == 'expow' & is.null(shp_)){
-    stop('\nBoth a `sigma` and `beta` parameter must be specified when using the `expow` kernel; See Details\n')
+    stop('\nBoth a `sigma` and `shape` (formerly `beta`) parameter must be specified when using the `expow` kernel; See Details\n')
   }
 
-  if (kern == "expow") validate_scalar_numeric(shp_, "beta", positive = TRUE)
+  if (kern == "expow") validate_scalar_numeric(shp_, shp_arg$name, positive = TRUE)
   mx <- k_dist(sigma = sig_, prob = max(0.999, prob), kernel = kern,
                 beta = shp_, dimension = dimension)
   if (kern == "fixed") mx <- sig_ * 1.1

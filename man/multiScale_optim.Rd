@@ -56,7 +56,11 @@ provide a finite positive placeholder when supplying \code{par}.}
 \code{par = NULL}: \code{"single"} (default) uses one shared default
 start, while \code{"screen"} performs a low-cost prescreen of sigma
 values and short screening optimizations before launching one full
-optimization.}
+optimization. Use \code{"screen"} or supply \code{par} when every
+optimized scale is a hard radius, as under \code{kernel = "fixed"}. The
+gradient search cannot leave a single start on that stepped likelihood.
+A refit search that returns its starting values gives a warning and
+records \code{start_stall} in \code{\link{diagnostics}}.}
 
 \item{screen_n_sigma}{Positive integer. Number of log-spaced sigma values
 evaluated per covariate during the prescreen when
@@ -104,7 +108,9 @@ path is insufficient. See Details.}
 
 \item{backend}{\code{"refit"} (default) preserves the existing model-refit
 optimizer. \code{"profile_glm"} opts into the analytic-profile backend for
-independent Gaussian, Poisson, binomial, and NB2 observations. See the
+independent Gaussian, Poisson, binomial, and NB2 observations. Fit a
+Gaussian model with \code{glm(family = gaussian())}, because this backend
+rejects \code{lm()} fits. See the
 formula, data, and uncertainty contracts in Details. \code{"joint_nb2"}
 jointly estimates kernel parameters, coefficients, and NB2 dispersion,
 including the exact Poisson boundary. It requires an NB2 log-link model.
@@ -374,6 +380,8 @@ Kernel means require \code{bin = TRUE}; surface-only models need explicit
 preparation row IDs and raw buffers, without binned summaries.
 The two analytic GLM backends require a smooth kernel,
 and a \code{glm} or \code{MASS::glm.nb} object retaining its model frame.
+Fit Gaussian models with \code{glm(family = gaussian())}, because an
+\code{lm()} fit is rejected.
 For \code{"profile_glm"}, supported links are Gaussian identity, Poisson log, binomial logit, and
 NB2 log. NB2 has variance \eqn{\mu + \mu^2/\theta}; theta is estimated
 alongside kernel parameters, even when the initial GLM used a fixed theta.

@@ -51,10 +51,15 @@
 #'   the observed covariate range from the model fitting data, preventing
 #'   extrapolation beyond the training range. Only active when
 #'   \code{scale_center = TRUE}. Default: \code{FALSE}.
-#' @param pct_mx Numeric between -0.99 and 0.99. When \code{clamp = TRUE},
-#'   expands (\code{> 0}) or contracts (\code{< 0}) the clamping range
-#'   relative to the observed min/max by this proportion. Default: \code{0}
-#'   (exact training range).
+#' @param pct_mx Numeric greater than -0.5 and no larger than 0.99. When
+#'   \code{clamp = TRUE}, each clamping limit moves outward by \code{pct_mx}
+#'   times the range of that covariate observed at the survey points:
+#'   \code{lower = min - pct_mx * (max - min)} and
+#'   \code{upper = max + pct_mx * (max - min)}, on the standardized scale used
+#'   for clamping. For example, a covariate observed from -1 to 3 is clamped to
+#'   -1.4 and 3.4 with \code{pct_mx = 0.1}, and to -0.6 and 2.6 with
+#'   \code{pct_mx = -0.1}. Negative values move the limits inward. Default:
+#'   \code{0} (exact training range).
 #' @param na.rm Logical. If \code{TRUE} (default), \code{NA} cells are excluded
 #'   from the kernel-weighted mean calculation. If \code{FALSE}, any window
 #'   containing a \code{NA} cell will produce a \code{NA} output.
@@ -267,10 +272,7 @@ kernel_scale.raster <- function(raster_stack,
                           upper = 1,
                           inclusive_lower = FALSE,
                           inclusive_upper = FALSE)
-  validate_scalar_numeric(pct_mx,
-                          "pct_mx",
-                          lower = -0.99,
-                          upper = 0.99)
+  validate_pct_mx(pct_mx)
 
   if(!is.null(multiScaleR)){
     validate_multiScaleR_input(multiScaleR)
@@ -506,7 +508,7 @@ kernel_scale.raster <- function(raster_stack,
     mx <- kernel_dist(kernel = kernel,
                       dimension = "1d",
                       sigma = sigma[i],
-                      beta = shape[i],
+                      shape = shape[i],
                       prob = pct_wt)
 
     r_res <- res(raster_stack)[1]

@@ -52,7 +52,7 @@ test_that("native field effects retain zero-field contracts and guarded joint fi
   f <- extended_response_field_fixture("nbinom2", "mat")
   path <- tempfile(fileext = ".pdf"); on.exit(unlink(path), add = TRUE)
   grDevices::pdf(path); on.exit(grDevices::dev.off(), add = TRUE)
-  curves <- plot_marginal_effects(f$object, length.out = 5L)
+  curves <- plot_marginal_effects(f$object, length.out = 5L, add_label = TRUE)
   expect_true(all(c("mean", "rough", "z") %in% names(curves)))
   contract <- attr(curves, "prediction_contract")
   expect_identical(contract$integration$random_effects, "set_to_zero_not_integrated")
@@ -118,7 +118,7 @@ test_that("ordinary lme4 curves attach the same explicit zero-effect contract", 
   model <- f$object$opt_mod <- lme4::lmer(y ~ mean + rough + fixed + z + (1 | site),
     data = f$data, REML = FALSE)
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
-  curves <- plot_marginal_effects(f$object, length.out = 5L)
+  curves <- plot_marginal_effects(f$object, length.out = 5L, add_label = TRUE)
   contract <- attr(curves, "prediction_contract")
   expect_identical(contract$integration$random_effects, "set_to_zero_not_integrated")
   expect_true("observation_noise" %in% contract$uncertainty$omitted)

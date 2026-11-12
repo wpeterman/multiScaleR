@@ -370,7 +370,8 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
 #'   records. \code{TRUE} retains the selected training fit per fold in memory.
 #' @return A \code{multiScaleR_cv} result for the selection procedure, with
 #'   \code{selection} metadata containing the criterion, tie policy, candidate
-#'   names, chosen model and native training table per fold, including original
+#'   names, the scoring metrics kept (\code{metrics}) and left out
+#'   (\code{metrics_dropped}), chosen model and native training table per fold, including original
 #'   parameter penalties, and \code{candidate_settings} with each candidate's
 #'   controls. Shared output settings inherit the first candidate, identified
 #'   by \code{settings$controls_from}; use \code{candidate_settings} for the
@@ -382,8 +383,14 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
 #'   are retained. Failed selection makes pooled scores \code{NA}.
 #' @details Inputs must retain native training-selection records via
 #'   \code{keep_selection = TRUE} or full fold fits via \code{keep_fits = TRUE},
-#'   share compatible likelihood targets and splits, and record the same scoring
-#'   metrics. NB2/Poisson candidates may share a count target. Gamma/Gaussian
+#'   share compatible likelihood targets and splits, and record at least one
+#'   scoring metric in common. The selection result is scored on the metrics
+#'   that every candidate recorded. For example, a default Poisson candidate
+#'   records \code{"deviance"} but a default NB2 candidate does not, so their
+#'   selection result keeps \code{"rmse"}, \code{"mae"} and
+#'   \code{"neg_log_score"}. \code{selection$metrics} lists the metrics kept
+#'   and \code{selection$metrics_dropped} those left out. NB2/Poisson
+#'   candidates may share a count target. Gamma/Gaussian
 #'   candidates may share a continuous target using RMSE/MAE. Density scores
 #'   cannot compare different observation measures. Other canonical family/link
 #'   and conditional-choice guards are unchanged.
@@ -432,7 +439,16 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
   if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_field_cv")))
     return(.msr_field_select_cv(mod_list, criterion, ties, keep_fits))
   signature <- .msr_cv_comparison(mod_list)
-  first <- mod_list[[1L]]; metrics <- first$settings$metrics; folds <- first$folds
+  first <- mod_list[[1L]]; folds <- first$folds
+  # Score the selection procedure on the metrics every candidate recorded.
+  # Default metric sets differ by family (Poisson adds `deviance`; NB2 and
+  # Gamma do not), so requiring identical sets rejected the default
+  # Poisson-versus-NB2 comparison. Candidates with identical sets are unaffected.
+  candidate_metrics <- lapply(mod_list, function(x) x$settings$metrics)
+  metrics <- Reduce(intersect, candidate_metrics)
+  if (!length(metrics))
+    stop("Candidate results share no scoring metric; rerun cross-validation with a common `metrics` set.", call. = FALSE)
+  dropped <- setdiff(unique(unlist(candidate_metrics, use.names = FALSE)), metrics)
   choice <- inherits(first, "multiScaleR_choice_cv")
   distribution <- any(vapply(mod_list, inherits, logical(1), "multiScaleR_distribution_cv"))
   all_fits <- all(vapply(mod_list, function(x) !is.null(x$fits), logical(1)))
@@ -443,8 +459,8 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
       stop("Retain every training fit when supplying fits.", call. = FALSE)
     if (!is.null(x$selection_records) && !has_records)
       stop("Retain every training selection record when supplying records.", call. = FALSE)
-    if (!setequal(metrics, x$settings$metrics) || (!has_fits && !has_records))
-      stop("Candidate results must share metrics and retain every training fit or selection record: use keep_fits = TRUE or keep_selection = TRUE.", call. = FALSE)
+    if (!has_fits && !has_records)
+      stop("Candidate results must retain every training fit or selection record: use keep_fits = TRUE or keep_selection = TRUE.", call. = FALSE)
     if (keep_fits && !has_fits)
       stop("Selected full fits require keep_fits = TRUE in every candidate; selection records cannot reconstruct fits.", call. = FALSE)
     out <- stats::setNames(vector("list", length(folds)), names(folds))
@@ -471,6 +487,7 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
   if (distribution) output$distribution <- list()
   selected_settings <- list()
   selection <- list(criterion = criterion, ties = ties, candidates = names(mod_list),
+    metrics = metrics, metrics_dropped = dropped,
     candidate_settings = lapply(mod_list, `[[`, "settings"),
     chosen = stats::setNames(rep(NA_character_, length(folds)), names(folds)), tables = list(),
     candidate_warnings = lapply(mod_list, `[[`, "warnings"), candidate_diagnostics = lapply(mod_list, `[[`, "diagnostics"))
@@ -497,6 +514,9 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
     selection$chosen[name] <- winner
     x <- if (is.null(error)) mod_list[[winner]] else first
     pred <- if (distribution) .msr_cv_distribution_rows(x, name) else x$predictions[x$predictions$fold == name, , drop = FALSE]
+    # Remove recorded losses outside the shared set so folds won by different
+    # candidates keep identical prediction columns.
+    pred[intersect(dropped, names(pred))] <- NULL
     if (is.null(error)) pred <- .msr_cv_score(pred, .msr_cv_fold_settings(x, name)$family, metrics)
     if (!is.null(error)) {
       pred$prediction <- NA_real_; pred$eligible <- FALSE
@@ -523,6 +543,7 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
   output <- .msr_cv_finish(output, folds, names(first$assessment_counts), first$settings$family, metrics)
   output$targets <- signature$targets; output$selection <- selection
   output$settings <- first$settings
+  output$settings$metrics <- metrics
   output$settings$backend <- "training_selection"
   output$settings$controls_from <- names(mod_list)[1L]
   output$settings$selection_uncertainty <- "not_integrated"

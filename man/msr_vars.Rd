@@ -47,20 +47,24 @@ as a free parameter and optimized alongside the model. When supplied, the
 metric is computed at this fixed radius and no scale optimization is
 performed for this covariate.}
 
-\item{base}{Positive numeric (not equal to 1). Logarithm base used by every
-entropy-based metric: the diversity metrics (\code{"shdi"}, \code{"shei"},
-\code{"msidi"}, \code{"msiei"}) and the information-theory metrics
-(\code{"ent"}, \code{"condent"}, \code{"joinent"}, \code{"mutinf"}).
+\item{base}{Positive numeric (not equal to 1). Logarithm base used by the
+Shannon metrics (\code{"shdi"}, \code{"shei"}) and the information-theory
+metrics (\code{"ent"}, \code{"condent"}, \code{"joinent"}, \code{"mutinf"}).
 Default: \code{exp(1)} (natural log, so entropies are in nats). Use
 \code{2} for bits or \code{10} for Hartley units. To reproduce the
 information-theory values reported by FRAGSTATS and the \code{landscapemetrics}
 package, set \code{base = 2}. The base cancels in the ratio metrics
-(\code{"relmutinf"}, \code{"iji"}), so they are unaffected by it.}
+(\code{"shei"}, \code{"relmutinf"}, \code{"iji"}), so they are unaffected
+by it. The modified Simpson metrics (\code{"msidi"}, \code{"msiei"}) always
+use the natural log, as FRAGSTATS and \code{landscapemetrics} define them,
+so \code{landscape_var()} warns when a non-default \code{base} is supplied
+with either metric and ignores it.}
 
-\item{classes_max}{Optional positive numeric. Maximum number of possible
-patch types in the landscape, used only for relative patch richness
-(\code{"rpr"}). If \code{NULL} (default), the observed number of classes
-within each buffer is used as the denominator.}
+\item{classes_max}{Positive numeric. Maximum number of possible patch types
+in the landscape. Required for relative patch richness (\code{"rpr"}),
+where it is the denominator, and unused by every other metric. The
+observed class count is not substituted when it is missing, so
+\code{landscape_var()} stops if \code{"rpr"} is requested without it.}
 
 \item{class}{Optional integer-like scalar. The focal class for the class-level
 metrics (\code{"clumpy"}, \code{"pland"}, \code{"ca"}), which describe one
@@ -175,12 +179,14 @@ Composition metrics (require a categorical raster):
   \item{\code{"sidi"}}{Simpson diversity index.}
   \item{\code{"siei"}}{Simpson evenness index. Can be uninformative for
     optimized scales when local evenness is uniform across sample points.}
-  \item{\code{"msidi"}}{Modified Simpson diversity index.}
+  \item{\code{"msidi"}}{Modified Simpson diversity index, always computed
+    with the natural log.}
   \item{\code{"msiei"}}{Modified Simpson evenness index. Can be uninformative
     for optimized scales when local evenness is uniform across sample points.}
   \item{\code{"pr"}}{Patch richness (number of distinct classes).}
   \item{\code{"prd"}}{Patch richness density (pr per 100 ha).}
-  \item{\code{"rpr"}}{Relative patch richness (pr / classes_max * 100).}
+  \item{\code{"rpr"}}{Relative patch richness (pr / classes_max * 100).
+    Requires \code{classes_max}.}
   \item{\code{"ta"}}{Total area of the buffer (ha).}
 }
 

@@ -55,7 +55,7 @@ test_that("HLfit plots transform native link-scale uncertainty and preserve vari
   for (family in c("gaussian", "poisson")) {
     f <- spamm_native_fixture(family)
     model <- f$object$opt_mod
-    plots <- plot_marginal_effects(f$object, length.out = 7)
+    plots <- plot_marginal_effects(f$object, length.out = 7, add_label = TRUE)
     nd <- as.data.frame(lapply(f$data[c("mean", "rough", "fixed", "z")],
       function(x) rep(mean(x), 7)))
     nd$rough <- seq(min(f$data$rough), max(f$data$rough), length.out = 7)

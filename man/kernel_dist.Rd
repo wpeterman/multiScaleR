@@ -10,7 +10,7 @@ kernel_dist(model, prob = 0.9, dimension = c("2d", "1d"), ...)
 \item{model}{A fitted \code{multiScaleR} object from \code{\link{multiScale_optim}}.
 When provided, scale distances and 95\% confidence intervals are returned for
 all optimized covariates. When omitted, \code{sigma}, \code{kernel}, and
-(for \code{expow}) \code{beta} must be supplied via \code{...}.}
+(for \code{expow}) \code{shape} must be supplied via \code{...}.}
 
 \item{prob}{Numeric between 0 and 1 (exclusive). Cumulative proportion
 used to define the distance. Default: \code{0.9}. The proportion refers
@@ -38,9 +38,12 @@ area under the kernel curve along a transect through the point. See Details.}
     \code{"gaussian"}, \code{"exp"} (negative exponential),
     \code{"fixed"} (fixed-radius buffer), or \code{"expow"} (exponential
     power). Required when \code{model} is not provided.}
-  \item{\code{beta}}{Numeric (positive). Shape parameter for the exponential
+  \item{\code{shape}}{Numeric (positive). Shape parameter for the exponential
     power kernel. Required when \code{kernel = "expow"} and \code{model} is
     not provided. Ignored for all other kernels.}
+  \item{\code{beta}}{Deprecated. Former name of \code{shape}, still
+    accepted for one release with a warning. Supplying both \code{shape}
+    and \code{beta} with different values is an error.}
 }}
 }
 \value{
@@ -121,8 +124,8 @@ associated with kernel weighting, or compare with values defined on the plane
   \item \strong{Fixed buffer}: \code{sigma * prob} (the fraction of
     the buffer radius).
   \item \strong{Exponential power}:
-    \code{sigma * qgamma(prob, shape = 1 / beta)^(1 / beta)}; both
-    \code{sigma} and \code{beta} (shape) must be specified.
+    \code{sigma * qgamma(prob, shape = 1 / shape)^(1 / shape)}; both
+    \code{sigma} and \code{shape} must be specified.
 }
 In two dimensions:
 \itemize{
@@ -132,7 +135,7 @@ In two dimensions:
   \item \strong{Fixed buffer}: \code{sigma * sqrt(prob)}, the radius of the
     circle holding \code{prob} of the buffer's area.
   \item \strong{Exponential power}:
-    \code{sigma * qgamma(prob, shape = 2 / beta)^(1 / beta)}.
+    \code{sigma * qgamma(prob, shape = 2 / shape)^(1 / shape)}.
 }
 Both definitions describe the ideal continuous kernel. They do not account
 for truncation at \code{max_D}, raster boundaries, missing cells, or cell
@@ -145,8 +148,8 @@ Confidence intervals for the fitted \code{model} case are derived from the
 Hessian-based standard errors (or profile-likelihood intervals when
 \code{\link{profile_sigma}} has been run and stored on the object). Each
 limit of sigma is converted to a distance with the same formula.
-For exponential-power kernels, beta is held at its fitted estimate during
-this conversion; the limits do not include uncertainty in beta or in
+For exponential-power kernels, the shape is held at its fitted estimate during
+this conversion; the limits do not include uncertainty in the shape or in
 site-specific retained weight.
 
 \code{summary()} of a fitted model reports both distances; see
@@ -179,7 +182,7 @@ kernel_dist(model = opt, dimension = "1d")   # original distance along a line
 kernel_dist(model = opt, prob = 0.95)
 kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
 kernel_dist(sigma = 100, prob = 0.975, kernel = "exp")
-kernel_dist(sigma = 100, prob = 0.95, kernel = "expow", beta = 1.5)
+kernel_dist(sigma = 100, prob = 0.95, kernel = "expow", shape = 1.5)
 kernel_dist(sigma = 100, kernel = "fixed")
 }
 

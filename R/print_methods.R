@@ -197,6 +197,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
         " of ", x$diagnostics$sample_size$prepared_n,
         " prepared observations entered the fitted model.\n", sep = "")
   }
+  .msr_print_start_stall(x$diagnostics)
   .msr_print_next_run(x$next_run)
   invisible(x)
 }
@@ -468,6 +469,7 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
         " of ", x$diagnostics$sample_size$prepared_n,
         " prepared observations entered the fitted model.\n", sep = "")
   }
+  .msr_print_start_stall(x$diagnostics)
   .msr_print_next_run(x$next_run)
   invisible(x)
 }
@@ -506,6 +508,16 @@ print.multiScaleR_data <- function(x, ...){
   cat("\nUnit Conversion:\n")
   cat(x$unit_conv)
   invisible(x)
+}
+
+# A refit search that never left its starting values reports them as
+# estimates. Repeat the stored explanation wherever the fit is reported.
+.msr_print_start_stall <- function(diagnostics) {
+  stall <- diagnostics$start_stall
+  if (isTRUE(stall$triggered)) {
+    cat(red("\n WARNING!!!\n", stall$message, "\n\n"))
+  }
+  invisible(NULL)
 }
 
 # Print only on explicit reporting, or when the fit's verbose switch permits it.

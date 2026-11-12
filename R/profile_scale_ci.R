@@ -30,6 +30,14 @@ scale_ci_table <- function(object,
     return(tab)
   }
 
+  # The step-selection backend withholds scale uncertainty by design, so it
+  # has no interval to profile. profile_sigma() still draws the likelihood.
+  if (identical(object$backend, "conditional_logit") && isTRUE(profile))
+    stop("Profile intervals for sigma are not available for conditional_logit ",
+         "fits, because step-selection scale uncertainty is not calibrated. ",
+         "Use profile_sigma() to view the log-likelihood across sigma.",
+         call. = FALSE)
+
   if (.msr_analytic_backend(object)) {
     tab <- .msr_profile_wald_table(object)
     if (isTRUE(profile)) {

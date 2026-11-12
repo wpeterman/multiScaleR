@@ -93,6 +93,15 @@ instead of returning an artificial flat profile. Keep the model formula and
 data available to the stored model call, or provide a working
 \code{refit_fn} to \code{\link{multiScale_optim}}.
 
+Fits from \code{backend = "profile_glm"}, \code{"joint_nb2"} and
+\code{"conditional_logit"} profile serially, and every sigma value must lie
+within the fitted bounds (\code{min_D} to \code{max_D}). For a
+\code{"conditional_logit"} fit, each grid value is the log-likelihood of a
+native \code{survival::coxph()} refit at that sigma, with the coefficients
+refit and every other scale held at its estimate. That backend withholds
+scale uncertainty, so \code{summary(fit, profile = TRUE)} returns no profile
+interval for it. The grid describes the likelihood surface only.
+
 Log-spacing concentrates evaluation points at smaller sigma values where the
 likelihood surface often changes more rapidly, and spaces them out at larger
 sigma values where the surface tends to be flatter.

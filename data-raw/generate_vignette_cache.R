@@ -69,9 +69,9 @@ pred <- terra::predict(r_scaled, opt2$opt_mod, type = "response")
 landcover <- classify(
   land_rast$land2,
   rcl = matrix(
-    c(-Inf, -0.5, 1,
-      -0.5,  0.5, 2,
-      0.5,  Inf, 3),
+    c(-Inf, 0.45, 1,   # land2 ranges 0 to 1; these breaks give three classes
+      0.45, 0.55, 2,
+      0.55,  Inf, 3),
     ncol = 3,
     byrow = TRUE
   )

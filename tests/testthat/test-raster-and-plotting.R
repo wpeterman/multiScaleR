@@ -130,17 +130,20 @@ test_that("plot.multiScaleR includes the dimensional definition in its caption",
 
 test_that("plot_marginal_effects covers unmarked and zeroinfl models", {
   unmark <- make_unmarked_fixture()
-  zi <- make_zeroinfl_fixture()
 
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
 
   unmark_plots <- plot_marginal_effects(unmark$obj, type = "state", length.out = 5)
-  zi_plots <- expect_no_warning(plot_marginal_effects(zi$obj, length.out = 5))
-
   expect_length(unmark_plots, 2)
-  expect_length(zi_plots, 1)
   expect_error(plot_marginal_effects(unmark$obj, type = NULL, length.out = 5), "must be specified")
+
+  # pscl is a suggested package; the unmarked checks above run without it.
+  if (requireNamespace("pscl", quietly = TRUE)) {
+    zi <- make_zeroinfl_fixture()
+    zi_plots <- expect_no_warning(plot_marginal_effects(zi$obj, length.out = 5))
+    expect_length(zi_plots, 1)
+  }
 })
 
 test_that("plot_marginal_effects uses nested analysis models for wrapped clogit fits", {
