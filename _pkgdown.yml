@@ -103,6 +103,8 @@ reference:
       - cross_validate_glm
       - cross_validate_clogit
       - cross_validate_field
+      - cross_validate_mixed
+      - cross_validate_bayes
       - cv_tab
       - select_cv
       - grouped_cv_folds

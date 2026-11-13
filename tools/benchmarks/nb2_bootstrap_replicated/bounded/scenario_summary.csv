@@ -1,0 +1,4 @@
+"scenario","planned","attempted","available","accepted","rejected","unavailable","mc_ambiguous","p_at_cutoff","nominal_rate","nominal_lower","nominal_upper","returned_acceptance_rate","returned_acceptance_lower","returned_acceptance_upper","certain_accept","certain_reject","sensitivity_min","sensitivity_max","paired_attempted","paired_failed","seconds_total","seconds_median"
+"interior",8,8,8,8,0,0,1,0,1,0.630583352447181,1,1,0.630583352447181,1,7,0,0.875,1,392,0,740.79,92.525
+"weak",8,8,8,6,2,0,2,1,0.75,0.349144205587176,0.968145973750056,0.75,0.349144205587176,0.968145973750056,6,0,0.75,1,392,0,560.79,64.655
+"near_bound",8,8,8,7,1,0,2,0,0.875,0.473490329124793,0.996840276468748,0.875,0.473490329124793,0.996840276468748,6,0,0.75,1,392,0,347.42,42.1450000000001

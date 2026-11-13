@@ -1,0 +1,13 @@
+"family","scenario","replicate","seed","id","true_sigma","method","status","reason","sigma","nll","native_gap","grid_excess","wald_90_covers","alpha_zero","profile_accepts_truth","bootstrap_accepts_truth","bootstrap_p","bootstrap_ambiguous"
+"nbinom2","interior",1,950100,"nbinom2-interior-01",240,"joint_nb2","fitted",NA,228.537352270399,173.887712343856,NA,NA,NA,FALSE,TRUE,TRUE,0.85,FALSE
+"nbinom2","weak",1,950200,"nbinom2-weak-01",240,"joint_nb2","fitted",NA,800,184.120906013602,NA,NA,NA,FALSE,TRUE,TRUE,0.2,TRUE
+"nbinom2","near_bound",1,950300,"nbinom2-near_bound-01",730,"joint_nb2","fitted",NA,715.791421000065,173.742169094536,NA,NA,NA,TRUE,TRUE,TRUE,0.9,FALSE
+"nbinom2","interior",2,950400,"nbinom2-interior-02",240,"joint_nb2","fitted",NA,275.761030528344,192.622084369162,NA,NA,NA,FALSE,TRUE,TRUE,0.5,FALSE
+"nbinom2","weak",2,950500,"nbinom2-weak-02",240,"joint_nb2","fitted",NA,394.860695902466,178.065070061883,NA,NA,NA,FALSE,TRUE,TRUE,0.3,FALSE
+"nbinom2","near_bound",2,950600,"nbinom2-near_bound-02",730,"joint_nb2","fitted",NA,800,167.606127269458,NA,NA,NA,TRUE,TRUE,TRUE,0.5,FALSE
+"nbinom2","interior",3,950700,"nbinom2-interior-03",240,"joint_nb2","fitted",NA,265.575315585782,170.796161451116,NA,NA,NA,FALSE,TRUE,TRUE,0.55,FALSE
+"nbinom2","weak",3,950800,"nbinom2-weak-03",240,"joint_nb2","fitted",NA,307.147984057111,165.445993981815,NA,NA,NA,FALSE,TRUE,TRUE,0.65,FALSE
+"nbinom2","near_bound",3,950900,"nbinom2-near_bound-03",730,"joint_nb2","fitted",NA,713.510762292651,179.464546827189,NA,NA,NA,FALSE,TRUE,TRUE,0.95,FALSE
+"nbinom2","interior",4,951000,"nbinom2-interior-04",240,"joint_nb2","fitted",NA,218.888369755936,166.01955629715,NA,NA,NA,FALSE,TRUE,TRUE,0.45,FALSE
+"nbinom2","weak",4,951100,"nbinom2-weak-04",240,"joint_nb2","fitted",NA,113.074800438487,174.806011077241,NA,NA,NA,FALSE,FALSE,FALSE,0.1,TRUE
+"nbinom2","near_bound",4,951200,"nbinom2-near_bound-04",730,"joint_nb2","fitted",NA,686.701624587043,170.675828333832,NA,NA,NA,TRUE,TRUE,TRUE,0.8,FALSE

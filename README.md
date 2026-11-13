@@ -3,7 +3,7 @@
 
 # multiScaleR <img src="man/figures/logo.png" align="right" height="150"/>
 
-README last updated: 2026-11-11
+README last updated: 2026-11-12
 
 <!-- Status badges. Kept in a table (not a "badges: start/end" block) so that
      pkgdown shows them on the home page instead of moving them to the sidebar. -->
@@ -12,6 +12,7 @@ README last updated: 2026-11-11
 |----|----|----|----|
 | [![R-CMD-check](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml/badge.svg)](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml) | [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) | [![CRAN status](https://www.r-pkg.org/badges/version/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
 | [![codecov](https://codecov.io/gh/wpeterman/multiScaleR/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/multiScaleR) | [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![DOI](https://img.shields.io/badge/DOI-10.1007/s10980--025--02267--x-yellow.svg)](https://doi.org/10.1007/s10980-025-02267-x) |
+| [![r-universe checks](https://wpeterman.r-universe.dev/multiScaleR/badges/checks)](https://wpeterman.r-universe.dev/multiScaleR) | [![r-universe version](https://wpeterman.r-universe.dev/multiScaleR/badges/version)](https://wpeterman.r-universe.dev/multiScaleR) |  |  |
 
 ## Overview
 
@@ -28,6 +29,21 @@ Install the CRAN release with:
 ``` r
 install.packages("multiScaleR")
 ```
+
+Install the latest build from R-universe with:
+
+``` r
+install.packages(
+  "multiScaleR",
+  repos = c("https://wpeterman.r-universe.dev", "https://cloud.r-project.org")
+)
+```
+
+R-universe rebuilds multiScaleR from the `master` branch on GitHub
+whenever that branch changes. This version can therefore be newer than
+the CRAN release. R-universe provides precompiled Windows and macOS
+binaries with the vignettes already built, so this route does not
+require Rtools.
 
 If installing from GitHub on Windows, you may need Rtools to compile the
 package from source. Choose the Rtools release that matches your version
@@ -54,9 +70,9 @@ explain the main workflows.
 ## Bayesian scale estimation
 
 Estimate one shared scale per landscape predictor or model scales as a
-function of measured covariates and groups. Use `method = "slice"` for full
-posterior sampling without a Stan toolchain. Install `posterior` to assess
-chain mixing and simulation precision.
+function of measured covariates and groups. Use `method = "slice"` for
+full posterior sampling without a Stan toolchain. Install `posterior` to
+assess chain mixing and simulation precision.
 
 ``` r
 check_bayes_setup(method = "slice")
@@ -76,19 +92,20 @@ plot(fit)
 The vignette displays actual fitted results from an artificial
 annual-map example, including shared and independent controls,
 predictive checks and prior sensitivity. Compact stored draws let you
-read it without rerunning MCMC. NUTS sampling uses RTMB,
-tmbstan, rstan, and posterior. Preparation can be checked
-without them using `method = "prepare"`. `predict_scales()` predicts
-scales for unobserved years. `predict()` and `simulate()` accept new
-observations and matching prepared landscapes, with explicit choices for
-new year and site effects. Read
-`vignette("bayesian-prediction", package = "multiScaleR")` for a worked
-forecast, shared group effects and joint totals. Future responses
-require a response formula that supports unseen years; a fixed year
-factor cannot supply a new coefficient. Approximation methods remain
-experimental, and numerical convergence does not establish interval
-accuracy. For the alternative computations, actual matched outputs and
-interpretation of their numerical checks, read
+read it without rerunning MCMC. NUTS sampling uses RTMB, tmbstan, rstan,
+and posterior. Preparation can be checked without them using
+`method = "prepare"`. `predict_scales()` predicts scales for unobserved
+years. `predict()` and `simulate()` accept new observations and matching
+prepared landscapes, with explicit choices for new year and site
+effects. Read `vignette("bayesian-prediction", package = "multiScaleR")`
+for a worked forecast, shared group effects and joint totals. Future
+responses require a response formula that supports unseen years; a fixed
+year factor cannot supply a new coefficient. Both importance-corrected
+proposals have simulation evidence across Gaussian, Poisson, grouped
+binomial, and NB2 responses with one annually varying scale. The
+computation vignette describes the evaluated response random-effect
+designs and the limits of this evidence. For computation options,
+results and their numerical checks, read
 `vignette("bayesian-computation", package = "multiScaleR")`.
 
 ## Kernel distance reporting

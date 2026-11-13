@@ -28,6 +28,8 @@ test_that("expected public helpers remain exported", {
     "cross_validate_glm",
     "cross_validate_field",
     "cross_validate_clogit",
+    "cross_validate_mixed",
+    "cross_validate_bayes",
     "cv_tab",
     "grouped_cv_folds",
     "spatial_cv_folds",

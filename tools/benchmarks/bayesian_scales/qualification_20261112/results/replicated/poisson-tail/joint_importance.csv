@@ -1,0 +1,4 @@
+"case","method","eligible","order","neg_log_score"
+"poisson-repeated-20","joint_importance",TRUE,24,15.2102960255383
+"poisson-repeated-20","joint_importance",TRUE,48,15.2099134125874
+"poisson-repeated-20","joint_importance",TRUE,72,15.2099368721458

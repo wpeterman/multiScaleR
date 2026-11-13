@@ -86,6 +86,21 @@ test_that("bootstrap refits are reproducible, audit failures, and preserve RNG",
   expect_error(scale_inference(bad), "NB2 with one spatial")
 })
 
+test_that("bootstrap p-values at the cutoff reject on the confidence-level axis", {
+  f <- profile_glm_fixture(n = 80)
+  x <- suppressWarnings(profile_glm_fit(f))
+  local_mocked_bindings(.msr_scale_bootstrap = function(...) {
+    data.frame(lr = c(1e6, rep(0, 18)), ok = TRUE)
+  })
+  result <- scale_inference(x, sigma_values = 50, level = .90, bootstrap = 19,
+    bootstrap_values = 50, seed = 71, n_starts = 2)
+  row <- result$grid[which.min(abs(result$grid$sigma - 50)), , drop = FALSE]
+  expect_gt(row$lr, 1e-8)
+  expect_equal(row$bootstrap_p, .10)
+  expect_false(row$bootstrap_accept)
+  expect_true(row$mc_ambiguous)
+})
+
 test_that("failed bootstrap pairs remain visible and dispersion cache is exact", {
   f <- profile_glm_fixture(n = 60)
   x <- suppressWarnings(profile_glm_fit(f))

@@ -159,20 +159,39 @@ in the upper prior tail. Set `control = list(max_grid = 257)` for a more
 demanding integration check. Increasing `laplace_draws` only reduces simulation
 error in the summaries. It cannot fix an inaccurate conditional Gaussian.
 
-This implementation integrates exactly one scale-group SD, such as the
+Uncorrected marginal Laplace remains an exploratory approximation. It
+integrates exactly one scale-group SD, such as the
 between-year SD in `~1 + (1 | year)`. Any response-site SD remains in the
 conditional Gaussian approximation. Multiple scale-group SDs are not yet
 supported by this method. It implements single-SD conditional Laplace integration. Numerical grid convergence does not
 establish calibration, particularly with weak effects or multiple posterior
 modes. Compare important results with NUTS.
 
+### Assess the uncorrected approximations
+
+A separate simulation compared both uncorrected methods with full NUTS on
+12 datasets across Gaussian annual, Gaussian repeated-site, and NB2
+repeated-site designs. All 12 joint Laplace fits passed their numerical
+checks. Ten of the 12 uncorrected marginal fits passed. Among matched fits
+with estimable Monte Carlo error, annual-scale probabilities differed from
+NUTS by more than both 0.05 and five combined Monte Carlo standard errors
+in 49 of 87 joint and 39 of 71 marginal comparisons. Joint Laplace also
+gave wider between-year SD intervals, with median width 1.51 to 1.61 times
+the NUTS width across designs.
+
+Use these fits to explore model structure and diagnose where the local
+approximation changes scale inference. Confirm scale probabilities,
+intervals, and pooling with full posterior sampling before interpreting
+them. The source repository contains the simulation and all fit outcomes
+under `tools/benchmarks/bayesian_scales/uncorrected_laplace_20261112/`.
+
 ## Correct conditional skewness with importance sampling
 
 The SD grid can be accurate while conditional Gaussian annual intervals remain
-too narrow. An experimental correction uses the marginal approximation to
-propose parameter vectors, then weights each vector by the full posterior
-density divided by its actual proposal density. It targets the same posterior
-as NUTS. It does not multiply intervals by a fitted coverage adjustment.
+too narrow. Importance correction uses the marginal approximation to propose
+parameter vectors, then weights each vector by the full posterior density
+divided by its actual proposal density. It targets the same posterior as NUTS.
+The simulation below evaluates the numerical performance of this correction.
 
 ```{r marginal-importance, eval=FALSE}
 corrected_fit <- multiScale_bayes(
@@ -217,11 +236,10 @@ importance correction and diagnostic thresholds apply. This is an efficiency
 choice: heavier tails can improve reliability but can also spend more
 candidates in regions with little posterior mass. Check all diagnostics and
 compare independent seeds before relying on the resulting intervals.
-For difficult joint scale and response-coefficient geometry, an experimental
-alternative is `conditional_beta = TRUE`. It draws response coefficients
-conditional on each proposed set of scales and response random effects. For
-Gaussian responses this conditional is exact. The other families use a local
-Student t proposal; full importance ratios still target the same posterior.
+Use `conditional_beta = TRUE` to draw response coefficients conditional on
+each proposed set of scales and response random effects. For Gaussian
+responses this conditional is exact. The other families use a local Student t
+proposal, and the full importance ratios target the same posterior.
 A defensive component samples latent-scale parameters from the existing model
 priors. This improves support without changing those priors.
 
@@ -264,6 +282,66 @@ samples quickly. Repeated-site models and weakly identified scales can still
 be difficult. More than one response grouping term uses a joint proposal whose
 reliability needs separate validation. The default `correction = "none"`
 preserves the original marginal behavior.
+
+## Assess the importance-corrected proposals
+
+We compared both importance proposals with NUTS on 48 independently simulated
+datasets. Each dataset had a Gaussian response, a Gaussian kernel, one habitat
+coefficient, and a scale that varied over three years. The response model
+included an offset. The simulation used 18 training observations and held out
+three responses, two of which shared a new scale year. Parameters were drawn
+from the fitting priors before simulating the responses. The model had no
+response random effects.
+
+| Computation | Fits passing diagnostics | Median absolute scale probability difference from NUTS | Largest absolute difference |
+|:--|--:|--:|--:|
+| NUTS | 48 of 48 | | |
+| Joint importance proposal | 48 of 48 | 0.0038 | 0.020 |
+| Conditional coefficient proposal | 48 of 48 | 0.0034 | 0.023 |
+
+The comparison used the probabilities of scales below 150 and 350 map units
+in each observed year. Each proposal had 287 comparisons with estimable Monte
+Carlo precision. Central 90% interval coverage ranged from 83% to 92% across
+the habitat coefficient, first-year log distance and between-year scale SD.
+The 95% binomial intervals around those estimates all included 90%. Median
+joint held-out log-score differences were below 0.001, with a largest
+difference of 0.375 in a single block. Refined integration over the new-year
+effect and a longer independent NUTS run reduced the discrepancy in that
+block. The original score remains in the comparison.
+
+### Additional response families and repeated-site models
+
+The broader study used 48 independent datasets in each of eight designs.
+The annual models used a Gaussian kernel and one scale-group SD. The
+repeated-site models used an exponential kernel, a trend in scale and an
+additional site response intercept. All designs used one habitat predictor.
+
+| Response | Annual NUTS / joint / conditional | Repeated-site NUTS / joint / conditional |
+|:--|:--|:--|
+| Gaussian | 48 / 48 / 48 | 48 / 48 / 47 |
+| Poisson | 46 / 48 / 48 | 48 / 48 / 48 |
+| Grouped binomial | 48 / 48 / 48 | 48 / 48 / 48 |
+| NB2 | 48 / 48 / 48 | 48 / 46 / 48 |
+
+Each entry counts eligible fits out of 48. None of the 5,282 paired
+fitted-scale probabilities with estimable Monte Carlo error differed by
+more than both 0.05 and five combined standard errors. The largest absolute
+difference was 0.033. For the repeated-site NB2 model, the joint proposal
+fell below the study's planned eligibility threshold. The conditional
+coefficient proposal met that threshold. The annual Poisson comparison uses
+46 eligible NUTS references.
+
+The intervals and predictive scores had different behavior. In the
+repeated-site Poisson panel, 90% first-year scale intervals covered 38 of 48
+NUTS datasets and 39 of 48 for each proposal. One held-out Poisson block
+also showed a much larger score difference than the other blocks.
+Integrating both shared new effects reduced the difference. Two independent
+NUTS fits still differed by 0.17 nats on that block after integration.
+Use the fit diagnostics and Monte Carlo precision for the quantity you
+need. The results apply to the simulated model structures and priors. More
+complex structures require additional evidence. The package source includes
+the simulator, fit records and assessment code in
+`tools/benchmarks/bayesian_scales/qualification_20261112/`.
 
 ## Compare actual computations of the worked example
 

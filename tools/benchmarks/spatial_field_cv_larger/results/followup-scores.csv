@@ -1,0 +1,5 @@
+"id","reason","draws_per_chain","temperatures","primary_loss","primary_mcse","primary_resolved","fitted_loss","n_assessment","loss","loss_mcse","minimum_overlap","max_rhat","message","warnings","resolved"
+"larger_015","unresolved_score",3200,9,12.085350828466,0.075176901566105,FALSE,12.2441350335384,4,12.1696461216885,0.045901990848339,0.127290585625299,1.00482958812309,"","",TRUE
+"larger_016","resolved_tail_replication",3200,9,14.7519986485518,0.0320009024892755,TRUE,14.9326027965131,4,14.8372627840078,0.0291486072772483,0.306235904438964,1.00393958315588,"","",TRUE
+"larger_019","unresolved_moments",6400,1,12.8687875728878,0.0465583907835462,TRUE,12.8884246091849,6,NA,NA,NA,1.00138838507952,"","",FALSE
+"larger_020","unresolved_moments",6400,1,9.48488834453692,0.0308929161772882,TRUE,9.48924282895253,6,NA,NA,NA,1.00125885605478,"","",FALSE

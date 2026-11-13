@@ -38,6 +38,10 @@ examining the assessment outcomes.
 | `spatial_cv_folds()` | Keep whole projected grid blocks, optionally joined by groups |
 | `cross_validate()` | Refit spatial scales and GLM coefficients within each fold |
 | `cross_validate_glm()` | Fit ordinary GLM reference or null models within each fold |
+| `cross_validate_clogit()` | Score the used alternative in each complete choice set |
+| `cross_validate_mixed()` | Predict new observations from existing or new groups |
+| `cross_validate_field()` | Score joint blocks of responses that share a spatial field |
+| `cross_validate_bayes()` | Refit posterior models and score held-out predictive blocks |
 | `cv_tab()` | Compare pooled or per-fold held-out prediction scores |
 | `select_cv()` | Evaluate model selection using training-only AIC, AICc or BIC |
 
@@ -63,8 +67,8 @@ exclusions. Both vectors must be nonempty, disjoint character IDs within a split
 
 The GLM scoring adapters support Gaussian, Poisson, binomial, NB2 and Gamma
 targets. Complete matched choice sets use the separate conditional-choice
-adapter described below. Mixed, GAM, unmarked and Bayesian scoring require
-their own qualified predictive targets and adapters.
+adapter described below. Choose the mixed, field, or Bayesian function when
+predictions must average over effects shared by several observations.
 
 # Use projected spatial blocks and a training buffer
 
@@ -513,14 +517,146 @@ and use outer assessment if these results tune the candidate set or selection
 rule. These point scores integrate no parameter/selection uncertainty and
 provide no observation intervals or calibration certificate.
 
-# Gaussian spatial response fields
+## Estimate a landscape metric radius in each training fold
 
-Use `cross_validate_field()` when a Gaussian response model needs a spatial
+A landscape metric such as Shannon diversity changes when a raster cell enters
+the circular neighborhood. Supply a grid in map units to refit the conditional
+choice model at those radii. Choose the grid before examining assessment
+outcomes. The radius that gives the highest eligible training likelihood can
+differ across folds.
+
+This example reuses the complete choice sets and assigns synthetic endpoints to
+a categorical map. The coordinate unit is meters. The endpoints and map
+illustrate the calculation and carry no ecological interpretation.
+
+```{r choice-radius-profile}
+if (requireNamespace("survival", quietly = TRUE)) {
+  cover <- terra::rast(nrows = 50, ncols = 50, xmin = 0, xmax = 1000,
+                       ymin = 0, ymax = 1000, crs = "EPSG:32617")
+  cells <- terra::xyFromCell(cover, seq_len(terra::ncell(cover)))
+  terra::values(cover) <- 1 + (floor(cells[, 1] / 75) +
+                               floor(cells[, 2] / 95)^2) %% 3
+  names(cover) <- "cover"
+  i <- seq_len(nrow(choices))
+  endpoints <- sf::st_as_sf(
+    data.frame(x = 180 + (i * 47) %% 640, y = 180 + (i * 79) %% 640,
+               row.names = rownames(choices)),
+    coords = c("x", "y"), crs = 32617
+  )
+  # A 100 m preparation radius initializes each training model.
+  # Omitting radius in landscape_var() leaves it free for the grid search.
+  choice_inputs <- kernel_prep(
+    pts = endpoints, raster_stack = cover, max_D = 240, sigma = 100,
+    scale_vars = msr_vars(diversity = landscape_var("cover", metric = "shdi")),
+    store_cell_data = TRUE, verbose = FALSE
+  )
+  stopifnot(identical(rownames(choice_inputs$kernel_dat), rownames(choices)))
+  choice_radius_cv <- cross_validate_clogit(
+    used ~ diversity + strata(step), choices, choice_folds,
+    kernel_inputs = choice_inputs, backend = "refit",
+    optim_args = list(radius_grid = c(40, 80, 140, 200)),
+    keep_selection = TRUE
+  )
+  choice_radius_cv$diagnostics$fold1$scale$radius_profile
+  choice_radius_cv$summary
+}
+```
+
+**How to read these results:** Each row of the radius profile reports the native
+training log-likelihood at one candidate, or the reason the refit failed.
+`selected` marks the radius used for the fold's held-out predictions. The
+assessment score still averages loss over complete choice sets. For each
+assessment alternative, diversity is calculated at the selected radius and
+standardized using the training mean and SD. The chosen radius contributes one
+parameter to the training model's information criteria. A flat stretch of the
+profile indicates little or no likelihood difference among those candidates.
+
+For several hard-radius predictors, pass a named list in `optim_args`. For
+example, use `radius_grid = list(diversity = c(80, 140, 200), edge = c(80, 160))`
+when both `diversity` and `edge` occur in the formula and were prepared as
+optimized metrics. Each fold fits all six combinations. If the formula also
+includes a smooth kernel predictor, its bandwidth and any exponential-power
+shape are reestimated for every combination using the training alternatives.
+The held-out sets use the complete selected parameter vector.
+See `vignette("landscape_metric_covariates", package = "multiScaleR")` for a
+full-data example and guidance on choosing radii.
+
+# Predict for existing or new groups
+
+Use `cross_validate_mixed()` for repeated observations with group-level effects,
+such as surveys within sites. Prediction for a new site averages over the fitted
+distribution of site effects. Prediction for an existing site also uses that
+site's analysis responses to learn its effect. The split plan determines which
+question the CV score answers.
+
+The example uses a simulated count and one random intercept per site. Hold out
+whole sites to evaluate transfer to new sites. For revisits, hold out the last
+two surveys at each site and train on the earlier surveys.
+
+```{r mixed-cv}
+if (requireNamespace("glmmTMB", quietly = TRUE)) {
+  set.seed(10)
+  site <- factor(rep(letters[1:18], each = 8))
+  habitat <- rnorm(length(site))
+  site_effect <- rnorm(nlevels(site), sd = 0.7)[site]
+  surveys <- data.frame(site, habitat, visit = rep(1:8, nlevels(site)),
+                        count = rpois(length(site), exp(0.9 + 0.4 * habitat + site_effect)))
+  ids <- rownames(surveys)
+  new_sites <- grouped_cv_folds(surveys$site, k = 3, ids = ids)
+  later_visits <- list(later = list(analysis = ids[surveys$visit <= 6],
+                                  assessment = ids[surveys$visit > 6]))
+
+  # New sites have no analysis responses in the same fold.
+  new_cv <- cross_validate_mixed(count ~ habitat + (1 | site), surveys, new_sites,
+                                family = "poisson", prediction = "new_group")
+  # Earlier visits inform the effect of each site during revisit prediction.
+  revisit_cv <- cross_validate_mixed(count ~ habitat + (1 | site), surveys, later_visits,
+                                    family = "poisson", prediction = "existing_group")
+
+  new_cv$summary
+  revisit_cv$summary
+  new_cv$joint_scores$fold1
+}
+```
+
+The prediction column gives the expected count
+after averaging over the site effect. For each assessment site, the joint log
+score accounts for the same unknown effect across all held-out visits.
+`joint_scores` lists that site's contribution, and the pooled negative log
+score divides their sum by the number of assessment rows. Lower is better.
+RMSE uses the integrated response means. Compare candidates using the same
+split and prediction target.
+
+Gaussian models use exact conditioning and can include numeric random slopes
+within one group, such as `(1 + habitat | site)`. Poisson, binomial, NB2, and
+Gamma models use adaptive integration over one random intercept. Binomial means
+are success probabilities. With grouped binomial responses, the Brier score
+averages over trials and the joint score uses each row's success and failure
+counts. Regression and variance parameters stay at their training ML estimates.
+These scores include observation variability through the response distribution.
+
+Supply raw-cell `kernel_inputs` to estimate ecological scales separately in
+each analysis split. The fitted normalization and supported formula
+transformations are then applied to assessment rows. Use `cv_tab()` to compare
+complete results on the same groups and splits. Use `select_cv()` to evaluate a
+predeclared training-only selection rule. Native covariance parameters and
+ecological scales count in the information criterion. The estimated group
+realizations are integrated out. Inspect `fold_results` and `errors` before
+ranking the models.
+
+# Spatial response fields
+
+Use `cross_validate_field()` when a response model needs a spatial
 field as well as fixed predictors. It estimates the response correlation range,
-field SD, observation SD and regression coefficients inside each training fold.
-The initial native glmmTMB route supports exponential and Gaussian correlation,
-one shared field, constant observation dispersion and maximum likelihood.
+field SD and regression coefficients inside each training fold. Gaussian, NB2
+and Gamma models also estimate an observation dispersion parameter. Both
+exponential and Gaussian correlation are available for one shared latent field.
 Keep repeated surveys at a response-field location together in the split.
+
+## Gaussian responses
+
+The default `family = "gaussian"` uses exact conditional Gaussian integration
+at the parameters estimated in each training fold.
 
 The following template uses caller-supplied raw predictors and projected points.
 The response-field coordinates can differ from ecological predictor focal
@@ -571,8 +707,162 @@ Compact training records always support AIC/AICc/BIC selection for these field
 results. They count native regression, range and variance parameters plus
 estimated ecological scales, while integrated field realizations add no penalty.
 Choosing a model from held-out ranks still needs independent outer assessment.
-The adapter estimates no Matern shape, additional random effects or paired GDR
-field score. Those routes retain separate qualification guards.
+
+## Count, binary and positive responses
+
+Choose the family for the observed response. Use an exposure offset with a log
+link when the expected response scales in proportion to sampling effort.
+
+| `family` | Observations | Link | Estimated observation parameter |
+|:--|:--|:--|:--|
+| `"poisson"` | Nonnegative integer counts | Log | None |
+| `"nbinom2"` | Nonnegative integer counts | Log | NB2 size |
+| `"binomial"` | Numeric zero/one outcomes | Logit | None |
+| `"Gamma"` | Positive continuous values | Log | Gamma shape |
+
+This example holds out two groups of locations in one assessment block. Three
+surveys share one field state at each location. For a study, use several splits
+that match the distance and spatial configuration of the intended predictions.
+
+```{r poisson-field-cv, eval=requireNamespace("glmmTMB", quietly=TRUE) && requireNamespace("TMB", quietly=TRUE)}
+set.seed(412)
+locations <- as.matrix(expand.grid(x = seq(0, 70, by = 10), y = seq(0, 60, by = 10)))
+site <- rep(seq_len(nrow(locations)), each = 3)
+xy <- locations[site, , drop = FALSE]
+K <- 1.3^2 * exp(-as.matrix(dist(locations)) / 25)
+field <- drop(t(chol(K)) %*% rnorm(nrow(locations)))
+d <- data.frame(habitat = rnorm(nrow(xy)),
+  exposure = exp(runif(nrow(xy), -.3, .3)))
+eta <- .4 + .5 * d$habitat + log(d$exposure) + field[site]
+d$count <- rpois(nrow(d), exp(eta))
+rownames(d) <- rownames(xy) <- sprintf("visit_%03d", seq_len(nrow(xy)))
+
+# Hold out every visit at the selected locations.
+assessment <- rownames(d)[site %in% c(1:3, 33:35)]
+count_folds <- list(block = list(
+  analysis = setdiff(rownames(d), assessment), assessment = assessment))
+count_cv <- cross_validate_field(count ~ habitat + offset(log(exposure)),
+  d, xy, count_folds, crs = 32617, family = "poisson",
+  audit_dir = tempfile("count-field-cv-"))
+count_cv$summary
+count_cv$joint_scores$block[c("analysis_log_density", "combined_log_density",
+  "neg_log_score")]
+head(count_cv$predictions[c("observed", "prediction", "observation_predictive_SE")])
+```
+
+**How to read these results:** The joint loss is the analysis log marginal
+likelihood minus the combined analysis-and-assessment log marginal likelihood.
+Both calculations hold the training estimates fixed and integrate the field by
+Laplace approximation. This accounts for shared field states when scoring
+repeated visits. The analysis likelihood is checked against the native fit. For
+a discrete family, the approximation must also yield a block probability at
+most one within numerical roundoff.
+
+The response mean and predictive SD use the field distribution conditional
+on analysis outcomes. Bernoulli predictions average probabilities over a
+Gaussian approximation to the field. With a log link, the first two response
+moments use tilted analysis likelihoods. The algorithm shifts the latent
+Gaussian prior toward the part of the distribution that contributes most to
+each moment, then reuses the training covariance factor to integrate the
+shifted likelihood. Two latent solves per distinct assessment location supply
+the mean and variance. The response-scale predictive SD includes both field
+variation and observation noise. The two field variance components describe
+the local Gaussian approximation on the linear-predictor scale. Coefficient,
+range, dispersion and ecological-scale estimates are held fixed.
+
+A numerical comparison against independent quadrature used one to three
+field locations. The largest joint score discrepancy across 1,152
+non-Gaussian cases was 0.0483 nats per assessment observation. A direct
+Gaussian approximation to the field gave relative response-mean errors as
+large as 75% for Poisson and 50% for NB2 in sparse, strongly correlated
+cases. The tilted calculation reduced the largest relative mean errors to
+3.7% for Poisson and 4.2% for NB2 on those simulation designs. These results
+characterize small-field numerical accuracy at known parameters.
+
+A second study compared the approximation with an independent posterior
+simulation for 28 fields of 12 or 22 locations, also at known parameters.
+The median joint score discrepancy was 0.0011 nats per observation among
+the 27 cases with sufficiently precise initial references. A sparse NB2
+case gave a discrepancy of 0.045 nats per observation. A longer independent
+run confirmed the direction and estimated a difference of 0.024 nats per
+observation. If candidate scores differ on this scale, their ranking can
+be sensitive to the approximation. These simulations address score and
+moment accuracy at known parameters. Predictive calibration after fitting
+and accuracy for other field sizes and configurations remain open.
+
+To compare Poisson and NB2, reuse the same count column, coordinates and
+folds. `cv_tab()` ranks held-out joint masses, and `select_cv()` can compare
+the two families using training likelihoods and parameter counts. Non-Gaussian
+fits choose the best likelihood among eligible deterministic starts. Read the
+audit records to see which starts converged and whether the estimates agreed.
+
+# Refit Bayesian models inside the folds
+
+Use `cross_validate_bayes()` to integrate uncertainty in coefficients,
+ecological scales, and group effects when predicting held-out responses. The
+function refits the posterior on each analysis split. It then predicts with
+joint draws from that fit. A new year or site gets one sampled deviation per
+joint vector, shared by its observations. Observations from a site already
+seen in training use the site's fitted posterior effect.
+
+This template uses a static habitat map and repeated surveys. Prepare the
+raster once per site and retain the raw cells so representative bin distances
+can be rebuilt in each analysis split. The survey data have one row per visit
+and columns `site_id`, `year`, and `count`. The row names of `site_points`
+match `site_id`, while the survey row names identify individual visits.
+
+```{r bayes-cv-template, eval=FALSE}
+inputs <- kernel_prep(site_points, habitat_map, max_D = 1200, sigma = 250,
+  bin = TRUE, store_cell_data = TRUE)
+# Forecast each listed year using only observations from earlier years.
+future_years <- c(2024L, 2025L)
+folds <- setNames(lapply(future_years, function(year) {
+  list(analysis = rownames(surveys)[surveys$year < year],
+       assessment = rownames(surveys)[surveys$year == year])
+}), future_years)
+
+shared <- cross_validate_bayes(count ~ habitat + (1 | site_id), surveys,
+  inputs, folds, row_id = "site_id", family = "nbinom2",
+  priors = list(scale_median = 250), seed = 345)
+varying <- cross_validate_bayes(count ~ habitat + (1 | site_id), surveys,
+  inputs, folds, row_id = "site_id", family = "nbinom2",
+  scales = list(habitat = ~1 + (1 | year)),
+  priors = list(scale_median = 250), seed = 345)
+varying$fold_results
+varying$prediction_contracts[["2025"]]$new_groups
+cv_tab(list(shared = shared, varying = varying), metric = "neg_log_score")
+```
+
+**How to read these results:** The negative log score is computed from one
+joint posterior predictive density per held-out year in this example. It is
+reported per assessment observation, with smaller scores indicating higher
+predictive density on the same folds and blocks. The joint score averages
+the product of observation densities over coherent draws. Adding the scores
+of separate marginal predictions answers a different question. For distinct
+assessment units, supply a column in `assessment_group` to define one joint
+block per unit in each fold.
+
+The default uses one new-effect simulation per posterior vector. A rare
+combination of held-out responses can place most of its predictive density
+in a small range of new effects, especially with concentrated posterior
+weights. To check Monte Carlo stability, keep the seed and fitting settings
+fixed and rerun with larger `new_group_draws`.
+
+For a new-site assessment, use `grouped_cv_folds(surveys$site_id, k = 5,
+ids = rownames(surveys))`. This holds out the site's observations together.
+The same prepared point may appear in training and assessment if the design
+intentionally predicts another visit at a known site. For annual maps, use
+the site-year key for preparation and retain separate visit row names for
+the fold plan. See `vignette("bayesian-scales", package = "multiScaleR")`
+for formula, prior, and sampler diagnostics.
+
+Inspect `fold_results`, `diagnostics`, and `errors` before comparing models.
+The default slice sampler needs no optional sampler package. Install
+`posterior` to inspect its chain checks. Use `method = "sample"` for NUTS.
+Approximate methods retain their own diagnostics. A failed fold remains
+visible, and `cv_tab()` requires complete results on matching assessment
+targets. Bayesian scores use the posterior predictive distribution, so
+`select_cv()` does not apply a training information criterion to them.
 
 # Keep outputs proportionate to the task
 
@@ -602,5 +892,5 @@ rasters or arrays of fit objects as intermediate checkpoints.
 For inference-target and interval distinctions, see
 `vignette("inference-contracts", package = "multiScaleR")`. For likelihood-based
 model comparison, see `?aic_tab` and `?bic_tab`. Function help for `?cross_validate`,
-`?spatial_cv_folds`, `?cv_tab` and `?select_cv` gives the complete input and
-result contracts.
+`?cross_validate_mixed`, `?cross_validate_field`, `?cross_validate_bayes`, and
+`?cv_tab` describes the input and result contracts.

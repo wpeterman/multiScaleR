@@ -9,6 +9,7 @@ cv_tab(mod_list, metric, by_fold = FALSE)
 \arguments{
 \item{mod_list}{Uniquely named list of complete \code{multiScaleR_cv} results.
 Use identical explicit folds and response/weight definitions for every model.
+Bayesian posterior predictive results use \code{\link{cv_tab}}.
 Complete \code{\link{cross_validate_clogit}} results compare only with the
 same conditional-choice target, complete sets and native partial method.}
 
@@ -53,11 +54,14 @@ There is no added complexity penalty, Akaike weight or model probability.
   Choosing a model or tuning rule from pooled CV results requires independent
   assessment or an outer validation layer to evaluate that choice.
 
-Complete \code{\link{cross_validate_field}} results compare their
-  separately qualified Gaussian joint block densities. Those scores include
-  conditional field covariance and observation noise at training estimates,
-  without parameter or ecological-scale uncertainty. They cannot be mixed
-  with independent GLM row-density targets. All failures remain explicit.
+Complete \code{\link{cross_validate_field}} results compare joint
+  assessment densities or masses for matching response and split targets.
+  Poisson and NB2 share a count target. These scores integrate field
+  dependence and observation noise at training estimates. Compare these
+  results with other joint field scores using the same observations and
+  coordinates.
+  Complete \code{\link{cross_validate_mixed}} results compare matching
+  group targets. Their log scores use one joint density per held-out group.
 }
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)

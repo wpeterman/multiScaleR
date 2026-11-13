@@ -20,7 +20,8 @@ multiScale_optim(
   refit_fn = NULL,
   backend = c("refit", "profile_glm", "joint_nb2", "joint_mixed", "conditional_logit"),
   profile_control = list(),
-  covariate_transform = c("candidate", "raw")
+  covariate_transform = c("candidate", "raw"),
+  radius_grid = NULL
 )
 }
 \arguments{
@@ -186,6 +187,15 @@ prediction. Fit the initial model in those units, including any fixed
 spline knots. This changes neither upstream surface/reference normalization
 nor fixed-metric fallback transforms. Raw mode currently requires
 \code{backend = "refit"}; Bayesian targets are unchanged.}
+
+\item{radius_grid}{With \code{backend = "refit"}, an optional named list
+of candidate radius vectors, one for each optimized hard-radius predictor.
+For a single hard radius, supply the vector directly or name it in a list.
+Each vector needs at least two distinct radii in the original map units,
+between \code{kernel_inputs$min_D} and \code{kernel_inputs$max_D}.
+The fit evaluates all combinations and reoptimizes any smooth kernel
+bandwidths and shapes at each combination. The default \code{NULL}
+uses the selected backend's usual optimizer.}
 }
 \value{
 A list of class \code{"multiScaleR"} containing:
@@ -205,7 +215,11 @@ A list of class \code{"multiScaleR"} containing:
     or \code{optimParallel::optimParallel}, including \code{par},
     \code{value} (negative log-likelihood), \code{hessian}, and convergence
     codes. Also contains \code{par_unscale} (sigma values back on the
-    projection scale) and \code{hessian_unscale}.}
+    projection scale) and \code{hessian_unscale}. For a declared radius
+    grid, this list describes the selected combination. The Hessian covers
+    only the smooth parameters at those fixed radii, with \code{NA} for
+    hard-radius rows and columns and any inactive shape.
+    See \code{diagnostics(fit)$radius_profile} for all candidates.}
   \item{\code{opt_mod}}{The refitted model at the optimized sigma values.
     This is the model object to use for inference, prediction, and
     \code{\link{plot_marginal_effects}}.}
@@ -296,11 +310,12 @@ Fixed-radius metrics can be supplied as fixed predictors. Their original
 prepared numeric columns must be retained in the native model frame.
 New predictions require these columns explicitly unless
 \code{include_fixed = TRUE} verifies and reuses their original normalization.
-Optimization of hard-radius
-landscape/surface metrics, adaptive dynamic bases, arbitrary or
+Within the analytic conditional-logistic backend, hard-radius landscape
+and surface metrics with estimated radii, adaptive dynamic bases, arbitrary or
 nondifferentiable functions, fixed context inside a dynamic expression, and
 kernel-dependent offsets remain unsupported. Kernel-only scalar arithmetic
 and supported smooth base functions use the shared response contract.
+
 A quoted choice-set ID is still one bare variable; special-call text inside
 a quoted predictor name is not interpreted as a Cox special term.
 
@@ -333,6 +348,30 @@ coefficient covariance conditions on the selected scales and does not correct
 temporal dependence. Movement terms must match the available-step proposal;
 the backend does not add them, validate a sampling interval, or calibrate
 population inference. Keep available steps fixed throughout optimization.
+
+For a hard-radius likelihood profile, supply \code{radius_grid} to the
+native refit backend. Landscape metrics and unweighted surface metrics use
+hard radii. All optimized predictors use hard radii under \code{kernel = "fixed"}.
+At each radius combination, the model refits its coefficients and any
+native nuisance parameters using the same observations. When Gaussian,
+exponential, or exponential-power kernels supply smooth predictors, a
+bounded optimizer starts independently at each combination and refits all
+smooth bandwidths and applicable shapes. Set \code{par} to provide the
+first smooth start using the usual parameter layout.
+
+The largest eligible native log-likelihood determines the selected
+combination. Exact ties favor the smallest radii in model predictor order.
+Inspect failed combinations and likelihood plateaus in the diagnostic table.
+Hard radii have no Hessian SE or confidence interval. Available smooth
+standard errors and Wald limits condition on the selected hard radii.
+
+The grid uses serial native refits of ordinary \code{lm()}, \code{glm()},
+\code{MASS::glm.nb()} or complete one-case conditional-logistic models with a
+retained model frame. Fixed predictors, including fixed metrics, can accompany
+the optimized predictors. Retain raw cells and matching model row IDs, and
+omit \code{join_by}, custom refitters, and start screening. For step
+selection, supply one case and at least one available alternative per
+stratum, with unweighted, unpenalized native likelihood.
 
 The opt-in \code{backend = "joint_mixed"} requires optional packages RTMB,
 TMB, and glmmTMB. It jointly estimates kernel scales and model parameters,
@@ -377,11 +416,13 @@ and a \code{glm} or \code{MASS::glm.nb} object retaining its model frame.
 For \code{"profile_glm"}, supported links are Gaussian identity, Poisson log, binomial logit, and
 NB2 log. NB2 has variance \eqn{\mu + \mu^2/\theta}; theta is estimated
 alongside kernel parameters, even when the initial GLM used a fixed theta.
-This backend is experimental. Development simulations found scale-interval
-undercoverage even among fits passing curvature checks. For single-kernel
-NB2 models, \code{\link{scale_inference}} examines the full likelihood range
-and optionally supplies bootstrap calibration; neither method guarantees
-reliable inference under weak identification.
+Independent native likelihoods verify the fitted objective in simulations
+of the supported GLM families. The finite theta limit differs from the exact
+Poisson face handled by \code{"joint_nb2"}. Scale-interval calibration
+remains experimental. Simulations found Wald undercoverage even among fits
+passing curvature checks. For single-kernel NB2 models,
+\code{\link{scale_inference}} examines the full likelihood range and can
+assess individual scale values with a parametric bootstrap.
 For \code{"profile_glm"}, regression coefficients are solved by IRLS at each candidate. A full-rank
 NB2 fit whose iterations fail receives a coefficient-likelihood refinement
 using the analytic score and observed information. Gaussian residual

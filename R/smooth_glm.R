@@ -1,4 +1,4 @@
-# Experimental matrix interface for independent observations. Supported links:
+# Matrix interface for independent observations. Supported links:
 # Gaussian identity, Poisson/NB2 log, and binomial logit. X_fixed includes any
 # intercept. Weights multiply log likelihoods (frequency/case weights), not
 # Gaussian precision weights. The fitting sample must already be fixed.
@@ -166,7 +166,7 @@
                     (mu - y) / (1 + mu / theta)))
 }
 
-# Use the same convergence screen for both experimental backends. At a bound,
+# Use the same convergence screen for both analytic GLM backends. At a bound,
 # only a gradient pointing toward an allowed decrease violates stationarity.
 .msr_projected_gradient <- function(par, gradient, lower, upper, tolerance = 1e-7) {
   g <- gradient

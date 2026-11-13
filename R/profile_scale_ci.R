@@ -49,6 +49,9 @@ scale_ci_table <- function(object,
   methods <- ifelse(is.finite(tab$SE), "wald", "unavailable")
   names(methods) <- row.names(tab)
 
+  if (isTRUE(profile) && !is.null(object$diagnostics$radius_profile))
+    stop("Profile intervals are unavailable for a declared radius_grid. Inspect diagnostics(object)$radius_profile.", call. = FALSE)
+
   if (!isTRUE(profile)) {
     attr(tab, "interval_method") <- methods
     return(tab)

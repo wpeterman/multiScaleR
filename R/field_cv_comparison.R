@@ -5,6 +5,16 @@
   "training", "selection_records", "diagnostics", "warnings", "errors",
   "prediction_contracts", "targets", "coordinates", "folds", "settings", "selection")]
 
+.msr_field_cv_outcome <- function(family) {
+  if (family %in% c("poisson", "nbinom2")) "count" else family
+}
+
+.msr_field_cv_score_unit <- function(family, metric) {
+  if (metric != "neg_log_score") "response" else
+    if (family %in% c("count", "poisson", "nbinom2", "binomial")) "joint_block_mass_per_observation" else
+      "joint_block_density_per_observation"
+}
+
 .msr_field_cv_metric <- function(x, metric, fold = NULL) {
   p <- x$predictions
   if (!is.null(fold)) p <- p[p$fold == fold, , drop = FALSE]
@@ -12,8 +22,7 @@
   value <- if (metric == "rmse") sqrt(mean(p$squared_error)) else
     if (metric == "mae") mean(p$absolute_error) else
       sum(vapply(x$joint_scores[groups], function(v) v$neg_log_score, 0)) / nrow(p)
-  list(estimate = value, n = nrow(p), unit = if (metric == "neg_log_score")
-    "joint_block_density_per_observation" else "response")
+  list(estimate = value, n = nrow(p), unit = .msr_field_cv_score_unit(x$settings$family, metric))
 }
 
 .msr_field_cv_finish <- function(x, ids) {
@@ -23,8 +32,8 @@
   x$assessment_counts <- stats::setNames(tabulate(match(x$predictions$row_id, ids), length(ids)), ids)
   x$summary <- do.call(rbind, lapply(x$settings$metrics, function(metric) {
     value <- if (x$complete) .msr_field_cv_metric(x, metric) else
-      list(estimate = NA_real_, n = nrow(x$predictions), unit = if (metric == "neg_log_score")
-        "joint_block_density_per_observation" else "response")
+      list(estimate = NA_real_, n = nrow(x$predictions),
+        unit = .msr_field_cv_score_unit(x$settings$family, metric))
     data.frame(metric = metric, estimate = value$estimate, n_assessment = value$n,
       unit = value$unit, complete = x$complete)
   }))
@@ -43,8 +52,13 @@
       stop("Compare complete matching spatial-field CV targets; failed folds and independent GLM scores cannot be mixed or dropped.", call. = FALSE)
     if (!identical(x$integrity_sha256, .msr_gdr_hash(.msr_field_cv_payload(x))))
       stop("Recorded field CV targets, controls, scores or training metadata changed.", call. = FALSE)
-    if (!identical(x$settings$family, "gaussian") ||
-        !identical(x$settings$prediction_target, "held_out_Gaussian_response_joint_block") ||
+    family <- x$settings$family
+    gaussian <- identical(family, "gaussian")
+    target <- if (gaussian) "held_out_Gaussian_response_joint_block" else "held_out_Laplace_response_joint_block"
+    families <- c("gaussian", "poisson", "binomial", "nbinom2", "Gamma",
+      if (identical(x$settings$backend, "training_selection")) "count")
+    if (length(family) != 1L || !family %in% families ||
+        !identical(x$settings$prediction_target, target) ||
         !identical(x$settings$parameter_uncertainty, "not_integrated") ||
         !identical(x$settings$ecological_scale_uncertainty, "not_integrated") ||
         !isTRUE(x$settings$observation_noise_included))
@@ -64,12 +78,32 @@
           !isTRUE(all.equal(p$absolute_error, abs(p$observed - p$prediction), tolerance = 0)))
         stop("Recorded field assessment rows or mean losses disagree with targets.", call. = FALSE)
       j <- x$joint_scores[[name]]
-      if (!is.list(j) || !identical(j$n, nrow(p)) || !is.finite(j$quadratic) || j$quadratic < 0 ||
-          !is.finite(j$log_determinant) || !is.finite(j$neg_log_score) ||
-          !isTRUE(all.equal(j$neg_log_score,
-            .5 * (j$n * log(2 * pi) + j$log_determinant + j$quadratic), tolerance = 0)))
-        stop("Recorded joint Gaussian block density is inconsistent.", call. = FALSE)
+      if (!is.list(j) || !identical(j$n, nrow(p)) || !is.finite(j$neg_log_score))
+        stop("Recorded field joint block score is missing or invalid.", call. = FALSE)
       d <- x$selection_records[[name]]
+      if (gaussian) {
+        if (!is.finite(j$quadratic) || j$quadratic < 0 || !is.finite(j$log_determinant) ||
+            !isTRUE(all.equal(j$neg_log_score,
+              .5 * (j$n * log(2 * pi) + j$log_determinant + j$quadratic), tolerance = 0)))
+          stop("Recorded joint Gaussian block density is inconsistent.", call. = FALSE)
+      } else {
+        fold_family <- if (is.null(x$settings$fold_settings)) family else
+          x$settings$fold_settings[[name]]$family
+        if (length(fold_family) != 1L ||
+            !identical(.msr_field_cv_outcome(fold_family), .msr_field_cv_outcome(family)))
+          stop("Recorded field CV fold family disagrees with its response target.", call. = FALSE)
+        difference <- j$analysis_log_density - j$combined_log_density
+        roundoff <- 128 * .Machine$double.eps * max(1, abs(j$analysis_log_density),
+          abs(j$combined_log_density))
+        discrete <- fold_family %in% c("poisson", "nbinom2", "binomial")
+        if (!identical(j$method, "Laplace_marginal_likelihood_ratio") || !is.finite(difference) ||
+            !is.finite(j$native_analysis_log_density_gap) ||
+            !isTRUE(all.equal(j$native_analysis_log_density_gap,
+              abs(j$analysis_log_density - d$logLik), tolerance = 0)) ||
+            (discrete && (difference < -roundoff || j$neg_log_score < 0)) ||
+            !identical(j$neg_log_score, if (discrete) max(0, difference) else difference))
+          stop("Recorded joint Laplace block score is inconsistent.", call. = FALSE)
+      }
       if (!is.list(d) || !identical(d$training_ids, split$analysis) ||
           !identical(d$training_response_sha256, .msr_gdr_hash(t$observed[match(split$analysis, t$row_id)])) ||
           !identical(d$training_coordinate_sha256,
@@ -86,10 +120,11 @@
     attributes(folds) <- list(names = names(folds))
     targets <- t[match(used, t$row_id), , drop = FALSE]; rownames(targets) <- NULL
     coordinates <- xy[match(used, xy$row_id), , drop = FALSE]; rownames(coordinates) <- NULL
-    list(folds = folds, targets = targets, coordinates = coordinates, crs = x$settings$crs)
+    list(folds = folds, targets = targets, coordinates = coordinates, crs = x$settings$crs,
+      outcome = .msr_field_cv_outcome(family), link = x$settings$link, prediction_target = target)
   })
   if (!all(vapply(signatures, identical, logical(1), signatures[[1L]])))
-    stop("Field CV comparison requires identical splits, observations and projected coordinates.", call. = FALSE)
+    stop("Field CV comparison requires matching response targets, splits, observations and projected coordinates.", call. = FALSE)
   invisible(signatures[[1L]])
 }
 
@@ -154,7 +189,8 @@
       for (item in c("joint_scores", "training", "selection_records", "diagnostics", "prediction_contracts"))
         out[[item]][name] <- x[[item]][name]
       if (keep_fits) out$fits[name] <- x$fits[name]
-      selected_settings[name] <- list(x$settings)
+      selected_settings[name] <- list(if (is.null(x$settings$fold_settings))
+        x$settings else x$settings$fold_settings[[name]])
     }
     out$predictions[[name]] <- pred
     out$fold_results[[name]] <- data.frame(fold = name, n_analysis = length(first$folds[[name]]$analysis),
@@ -164,6 +200,8 @@
   out$selection <- selection; out$targets <- first$targets; out$coordinates <- first$coordinates
   out$folds <- first$folds; out$settings <- first$settings
   out$settings$backend <- "training_selection"; out$settings$covariance <- "per_fold_training_selection"
+  families <- unique(vapply(mod_list, function(x) x$settings$family, ""))
+  if (length(families) > 1L) out$settings$family <- "count"
   out$settings$fold_settings <- selected_settings; out$settings$selection_uncertainty <- "not_integrated"
   .msr_field_cv_finish(out, first$targets$row_id)
 }

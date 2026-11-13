@@ -176,7 +176,10 @@ logLik.msr_cv_choice_null <- function(object, ...) {
 #'   \code{NULL} fits an ordinary native reference. Otherwise scales and learned
 #'   normalization/bin references are refit only on analysis rows.
 #' @param backend Spatial backend, \code{"conditional_logit"} (default) or
-#'   \code{"refit"}. Existing kernel, metric and numerical-admission guards apply.
+#'   \code{"refit"}. Pass \code{radius_grid} through \code{optim_args} with
+#'   \code{"refit"} to profile hard radii and any smooth scales in each
+#'   training split.
+#'   Existing kernel, metric and numerical-admission guards apply.
 #' @param method Native one-case partial-likelihood method, \code{"exact"}
 #'   (default), \code{"efron"} or \code{"breslow"}.
 #' @param cox_control Named native \code{survival::coxph.control()} settings.
@@ -274,6 +277,8 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
       any(!names(cox_control) %in% names(formals(survival::coxph.control))))
     stop("cox_control must be a named coxph.control() list.", call. = FALSE)
   cox_control <- do.call(survival::coxph.control, cox_control)
+  if (!is.null(optim_args$radius_grid) && (is.null(inputs) || backend != "refit"))
+    stop("Choice radius_grid requires kernel_inputs and backend = 'refit'.", call. = FALSE)
   actual_backend <- if (is.null(inputs)) "clogit" else backend
   covariate_transform <- .msr_cv_covariate_transform(optim_args, backend, !is.null(inputs))
   settings <- list(family = "conditional_choice", link = "softmax", method = method, backend = actual_backend,
@@ -322,7 +327,7 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
       fit <- .msr_cv_prediction_metadata(fit, training, if (is.null(inputs)) NULL else train)
       if (is.null(inputs)) pred$linear_predictor <- .msr_choice_lp(fit, assessment) else {
         assess <- .msr_cv_inputs(inputs, split$assessment, covariates, if (is.null(train$binned)) NULL else train$binned$cv_reference)
-        raw <- .msr_cv_initial_values(assess)
+        raw <- .msr_cv_initial_values(assess, fit)
         assess$kernel_dat <- as.data.frame(sweep(sweep(raw, 2L, center), 2L, spread, "/"), optional = TRUE); assess$scl_params <- train$scl_params
         for (nm in covariates) assessment[[nm]] <- assess$kernel_dat[[nm]]
         if (backend == "conditional_logit") pred$linear_predictor <- as.numeric(stats::predict(fit, assessment,
@@ -333,7 +338,11 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
       }
       stage <- "scoring"; pred <- .msr_choice_score(pred, "neg_log_score"); NULL
     }, warning = function(w) { messages <<- c(messages, conditionMessage(w)); invokeRestart("muffleWarning") }),
-      error = function(e) list(stage = stage, message = conditionMessage(e), start_results = e$start_results))
+      error = function(e) {
+        result <- list(stage = stage, message = conditionMessage(e), start_results = e$start_results)
+        if (!is.null(e$radius_profile)) result$radius_profile <- e$radius_profile
+        result
+      })
     complete <- is.null(error)
     if (!complete) {
       pred$linear_predictor <- pred$prediction <- pred$log_probability <- pred$neg_log_score <- NA_real_; pred$eligible <- FALSE

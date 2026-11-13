@@ -375,6 +375,12 @@ trial totals; future response columns are ignored and never determine them.
 
 ## Check predictions before using them
 
+To assess prediction for excluded observations or groups, use
+`cross_validate_bayes()` with explicit analysis and assessment splits. Each
+fold refits the posterior and computes a joint predictive log score for
+the held-out observations. See
+`vignette("cross-validation", package = "multiScaleR")` for the workflow.
+
 Prediction propagates the fitted posterior; it does not repair failed
 sampling, inaccurate approximation, or a misspecified observation model.
 All supported inference methods use their retained complete joint vectors.

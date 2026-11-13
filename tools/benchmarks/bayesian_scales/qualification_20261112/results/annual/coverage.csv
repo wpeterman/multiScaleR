@@ -1,0 +1,10 @@
+"family","design","method","quantity","n","coverage_90","lower_95","upper_95"
+"gaussian","annual","conditional_beta","beta",48,0.833333333333333,0.69777758647012,0.925189139600407
+"gaussian","annual","joint_importance","beta",48,0.854166666666667,0.722361659977972,0.939295530633363
+"gaussian","annual","nuts","beta",48,0.854166666666667,0.722361659977972,0.939295530633363
+"gaussian","annual","conditional_beta","log_distance",48,0.916666666666667,0.800171985800619,0.976826504863239
+"gaussian","annual","joint_importance","log_distance",48,0.916666666666667,0.800171985800619,0.976826504863239
+"gaussian","annual","nuts","log_distance",48,0.916666666666667,0.800171985800619,0.976826504863239
+"gaussian","annual","conditional_beta","scale_sd",48,0.916666666666667,0.800171985800619,0.976826504863239
+"gaussian","annual","joint_importance","scale_sd",48,0.916666666666667,0.800171985800619,0.976826504863239
+"gaussian","annual","nuts","scale_sd",48,0.895833333333333,0.773422338716236,0.965301877878804

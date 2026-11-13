@@ -2,8 +2,9 @@
 #'
 #' Examine the full allowed scale range of an NB2 fit with one spatial predictor, retain
 #' separate likelihood regions, and optionally calibrate likelihood-ratio
-#' tests by parametric bootstrap. This experimental diagnostic does not change
-#' the fitted object or the default optimizer and uncertainty methods.
+#' tests by parametric bootstrap. The likelihood profile and the bootstrap
+#' decision retain their numerical audits. Bootstrap confidence-set calibration
+#' remains experimental. The diagnostic preserves the fitted object.
 #'
 #' @param object A \code{multiScaleR} fit from \code{backend = "profile_glm"}
 #'   or \code{backend = "joint_nb2"},
@@ -236,9 +237,11 @@ scale_inference <- function(object, sigma_values = NULL, level = .95,
       records[[length(records) + 1L]] <- z
       tail <- .msr_bootstrap_tail(z$lr, lr[i], level)
       grid[i, c("bootstrap_p", "mc_lower", "mc_upper")] <- tail
-      grid$bootstrap_accept[i] <- tail["p"] > 1 - level
-      grid$mc_ambiguous[i] <- tail["mc_lower"] <= 1 - level &&
-        tail["mc_upper"] > 1 - level
+      # Compare complements on the supplied confidence-level axis. Computing
+      # 1 - level can round below a p-value exactly at the rejection cutoff.
+      grid$bootstrap_accept[i] <- 1 - tail["p"] < level
+      grid$mc_ambiguous[i] <- 1 - tail["mc_lower"] >= level &&
+        1 - tail["mc_upper"] < level
     }
   }
   records <- if (length(records)) do.call(rbind, records) else data.frame()

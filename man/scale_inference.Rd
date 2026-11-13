@@ -85,8 +85,9 @@ A list of class \code{msr_scale_inference} with:
 \description{
 Examine the full allowed scale range of an NB2 fit with one spatial predictor, retain
 separate likelihood regions, and optionally calibrate likelihood-ratio
-tests by parametric bootstrap. This experimental diagnostic does not change
-the fitted object or the default optimizer and uncertainty methods.
+tests by parametric bootstrap. The likelihood profile and the bootstrap
+decision retain their numerical audits. Bootstrap confidence-set calibration
+remains experimental. The diagnostic preserves the fitted object.
 }
 \details{
 Coefficients and NB2 theta are reestimated at every constrained scale.

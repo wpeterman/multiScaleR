@@ -185,10 +185,11 @@ group name does not introduce an estimated correlation between their scales.
 
 NUTS and slice sampling can fit multiple scale-group SDs. The marginal approximation currently
 integrates exactly one scale-group SD and rejects models with more than one.
-Additional response random intercepts are distinct from this limit. Broad
-simulation evidence is strongest for one landscape predictor with annual
-pooling and Gaussian kernels; a valid formula is not itself evidence of good
-identification or interval calibration for a more complex model.
+Additional response random intercepts are distinct from this limit. The
+simulation studies used one landscape predictor with annual pooling. They
+included Gaussian and exponential kernels. Identification and interval
+calibration can depend on the model design and how much information the data
+provide about the scales.
 
 The response can be Gaussian, Poisson, binomial or negative binomial, with the
 documented links. Binomial data can use successes and failures. Gaussian and
@@ -716,6 +717,7 @@ the computation, not the likelihood or priors:
 | Method | What it computes | Main limitation |
 |---|---|---|
 | `method = "sample"` | Joint posterior sampling by NUTS | Requires full-chain checks and adequate simulation precision |
+| `method = "slice"` | Joint posterior sampling by slice sampling | Check mixing of both scale and response parameters |
 | `method = "laplace"` | One local Gaussian approximation | Can miss skewness and dependence on a weakly identified SD |
 | `method = "marginal"` | Numerical integration of one scale-group SD with conditional Gaussian approximations | Grid convergence does not establish accurate annual intervals |
 | Marginal with `correction = "importance"` | Full-target weighting of proposed parameter vectors | Poor proposal coverage can make estimates unstable despite a large candidate count |
@@ -723,8 +725,10 @@ the computation, not the likelihood or priors:
 For formulas, controls, actual comparison outputs and interpretation of each
 numerical flag, read `vignette("bayesian-computation", package = "multiScaleR")`.
 The marginal approximation integrates exactly one scale-group SD in total.
-Use full sampling for models with more scale-group SDs. A returned fit or a
-passed numerical flag does not by itself establish adequate calibration.
+Use full sampling for models with more scale-group SDs. Importance-corrected
+marginal fits have simulation evidence for four response families with
+one annually varying scale. The computation vignette describes the test
+designs, numerical eligibility and probability comparisons with NUTS.
 
 ## Distinguish distance uncertainty from population variation
 

@@ -65,9 +65,9 @@
 #' effects set to zero. New-location controls retain their native meaning.
 #' Coordinate units are not inferred from factor labels. The field range is
 #' distinct from ecological kernel scale; kernel uncertainty is not included.
-#' Metadata identification never establishes fit eligibility. The current
-#' layout is qualified against glmmTMB1.1.14; other versions are labeled
-#' unqualified rather than silently interpreted. Coordinate-aware response-field
+#' Metadata identification checks the provider's registered covariance codes
+#' and the fitted block layout. This metadata describes prediction conditioning.
+#' Coordinate-aware response-field
 #' maps additionally record \code{geometry}: projected CRS/units, native column
 #' names/shared group, reference/context hashes, serial batch size and memory
 #' budget. Cell centers supply coordinates; the working-memory estimate is
@@ -116,11 +116,15 @@
 #' \code{"selection_by_request"} identifies that capability description.
 #' None of these fields certifies finite SEs, covariance eligibility, or calibration.
 #'
-#' Gaussian spatial-field CV records a joint assessment-response component.
-#' It integrates the conditional Gaussian field and includes observation noise
-#' at fitted training parameters, with no coefficient, range/SD, ecological-scale
-#' or selection uncertainty integration. Its predictive SD is distinct from
-#' native mean-prediction SEs. Its metadata never upgrades an ineligible fit.
+#' Spatial-field CV records a joint assessment-response component. It uses
+#' exact Gaussian conditioning for Gaussian responses and the Laplace
+#' marginal likelihood ratio for other responses. Both include observation
+#' noise and conditional field variation at fitted training parameters.
+#' Log-link response moments use exponentially tilted Laplace ratios and
+#' Bernoulli moments use a Gaussian approximation. The predictive SD
+#' describes observation variation. For non-Gaussian responses, the contract
+#' identifies field variance on the linear-predictor scale and observation
+#' variance on the response scale.
 #'
 #' Contracts describe the original prediction call. Ordinary data-frame
 #' subsetting can retain its attributes; it does not recompute the contract for

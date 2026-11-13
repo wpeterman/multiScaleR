@@ -1,3 +1,30 @@
+multiScaleR 0.7.37
+
+* multiScaleR is now available from R-universe at
+  <https://wpeterman.r-universe.dev>, with precompiled Windows and macOS binaries.
+
+* Profile hard-radius predictors jointly over a declared grid using native
+  linear, generalized linear, or complete-set conditional-logistic refits.
+  Reestimate smooth bandwidths and exponential-power shapes at each
+  combination. Use the same search inside training folds and inspect each
+  candidate likelihood.
+
+* Add mixed-model cross-validation for existing and new groups, with
+  training-only ecological scale fitting and joint held-out group scores.
+
+* Extend spatial response-field CV to Poisson, binary, NB2, and Gamma models.
+  Score held-out blocks jointly, use tilted Laplace moments for log-link
+  predictions, and compare Poisson and NB2 count models on matching folds.
+
+* Add fold-wise Bayesian scale refits and joint posterior predictive scores
+  for observed and unseen groups, including weighted importance correction.
+
+* Document replicated validation of Bayesian importance corrections and
+  the limits of uncorrected Laplace approximations.
+
+* Apply the intended rejection rule when an NB2 bootstrap p-value equals the
+  requested cutoff.
+
 multiScaleR 0.7.36
 
 * Add private GDR likelihood references for finite shared abundance across

@@ -67,7 +67,7 @@ plots show the full radius in both dimensional definitions.
 | Kernel mean | Gaussian, exponential, exponential-power, or fixed kernel | Supported smooth kernels under the chosen backend's contract | Gaussian or exponential |
 | Weighted surface SQ | Gaussian, exponential, exponential-power, or fixed kernel | Gaussian or exponential, including mixtures with means | Gaussian or exponential, alone or with means |
 | Weighted SA, skewness, or kurtosis | Gaussian, exponential, or exponential-power | Not implemented | Not implemented |
-| Estimated hard-radius surface or landscape metric | Supported, including mixtures with exponential-power means | Not implemented for the discontinuous radius | Not implemented |
+| Estimated hard-radius surface or landscape metric | Supported, including mixtures with exponential-power means. A declared radius grid profiles hard radii jointly and reestimates smooth bandwidths and shapes in ordinary linear, generalized linear, and one-case conditional-logistic models. | Not implemented for the discontinuous radius | Not implemented |
 | Fixed-radius metric | Prepared once and used as a native predictor | Ordinary numeric predictor with verified original preparation | Ordinary numeric predictor with verified original preparation |
 
 The analytic rows include `profile_glm`, `joint_nb2`, `conditional_logit`, and
@@ -91,6 +91,11 @@ Exponential-power means are supported by the profile GLM/NB2 machinery;
 the conditional-logistic, joint mixed, and Bayesian adapters require Gaussian or exponential
 kernels. Analytic and Bayesian kernel means require distance bins. Weighted SQ
 also needs retained raw cells, matching source definitions, and explicit row IDs.
+A declared `radius_grid` in the native refit backend reestimates coefficients
+and smooth scales for every combination of hard radii and retains the full
+likelihood table. Available smooth-scale Wald limits condition on the chosen
+radii. The landscape-metric and cross-validation vignettes show how to inspect
+that table for a full-data fit and for training choice sets.
 
 
 ### Fixed-knot spline responses during a scale search
@@ -862,10 +867,10 @@ backend's existing guards. Training-only theta/Gamma dispersion and normalized
 log scores preserve fixed/estimated nuisance counts and native coefficient SE
 conventions. NB2/Poisson count comparisons and Gamma continuous comparisons
 retain likelihood-measure guards. Selected folds record their actual family and
-nuisance parameters. This GLM route does not add
-GAM, mixed-model, unmarked or Bayesian scoring. The separate conditional-choice
-route is described below. See
-`vignette("inference-contracts", package = "multiScaleR")` for the workflow.
+nuisance parameters. Use `cross_validate_mixed()` for existing or new groups,
+`cross_validate_field()` for joint spatial-response blocks, and
+`cross_validate_bayes()` for posterior predictive blocks. See
+`vignette("cross-validation", package = "multiScaleR")` for worked examples.
 
 `grouped_cv_folds()` and `spatial_cv_folds()` generate compatible whole-unit
 splits, with optional spatial training buffers and shared-group block joining.

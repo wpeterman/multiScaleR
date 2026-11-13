@@ -120,8 +120,14 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
   if (length(hard_radius)) {
     cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ".\n", sep = "")
     cat("Hard-radius effects change in steps as cells enter the buffer. ")
-    cat("Hessian standard errors are omitted; use `summary(x, profile = TRUE)` ")
-    cat("for profile-likelihood limits.\n")
+    if (is.null(x$diagnostics$radius_profile)) {
+      cat("Hessian standard errors are omitted; use `summary(x, profile = TRUE)` ")
+      cat("for profile-likelihood limits.\n")
+    } else {
+      cat("Inspect the candidate likelihoods in the radius_profile diagnostics table.\n")
+      if (any(x$diagnostics$refit_hessian$active))
+        cat("Smooth standard errors and Wald limits condition on the selected hard radii.\n")
+    }
   }
   .msr_print_refit_bounds(x$diagnostics)
   scale_ci_method <- attr(x$opt_scale, "interval_method")
@@ -405,8 +411,12 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
   print(display_scale)
   .msr_print_refit_bounds(display_fit$diagnostics)
   if (length(hard_radius)) {
-    cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "),
-        ". Use `summary(x, profile = TRUE)` for radius intervals.\n", sep = "")
+    cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ". ", sep = "")
+    if (is.null(x$diagnostics$radius_profile)) {
+      cat("Use `summary(x, profile = TRUE)` for radius intervals.\n")
+    } else {
+      cat("Use `diagnostics(x)$radius_profile` for candidate likelihoods.\n")
+    }
   }
 
   if(x$kernel_inputs$kernel == 'expow'){

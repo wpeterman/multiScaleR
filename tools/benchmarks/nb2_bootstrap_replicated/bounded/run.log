@@ -1,0 +1,68 @@
+2026-11-12 18:58:32 starting interior-01 
+2026-11-12 19:00:36 finished interior-01 accepted p = 0.3 ambiguous = FALSE paired failures = 0 seconds = 124.53 
+2026-11-12 19:00:36 starting weak-01 
+2026-11-12 19:02:19 finished weak-01 rejected p = 0.1 ambiguous = TRUE paired failures = 0 seconds = 102.51 
+2026-11-12 19:02:19 starting near_bound-01 
+2026-11-12 19:03:06 finished near_bound-01 accepted p = 0.78 ambiguous = FALSE paired failures = 0 seconds = 47.18 
+2026-11-12 19:03:06 starting interior-02 
+2026-11-12 19:04:39 finished interior-02 accepted p = 0.48 ambiguous = FALSE paired failures = 0 seconds = 93.15 
+2026-11-12 19:04:39 starting weak-02 
+2026-11-12 19:05:50 finished weak-02 accepted p = 0.74 ambiguous = FALSE paired failures = 0 seconds = 70.81 
+2026-11-12 19:05:50 starting near_bound-02 
+2026-11-12 19:06:23 finished near_bound-02 accepted p = 0.54 ambiguous = FALSE paired failures = 0 seconds = 32.66 
+2026-11-12 19:06:23 starting interior-03 
+2026-11-12 19:07:43 finished interior-03 accepted p = 0.42 ambiguous = FALSE paired failures = 0 seconds = 80.14 
+2026-11-12 19:07:43 starting weak-03 
+2026-11-12 19:09:01 finished weak-03 rejected p = 0.08 ambiguous = TRUE paired failures = 0 seconds = 78.44 
+2026-11-12 19:09:01 starting near_bound-03 
+2026-11-12 19:09:58 finished near_bound-03 accepted p = 0.98 ambiguous = FALSE paired failures = 0 seconds = 56.31 
+2026-11-12 19:09:58 starting interior-04 
+2026-11-12 19:11:30 finished interior-04 accepted p = 0.88 ambiguous = FALSE paired failures = 0 seconds = 92.59 
+2026-11-12 19:11:30 starting weak-04 
+2026-11-12 19:12:35 finished weak-04 accepted p = 0.28 ambiguous = FALSE paired failures = 0 seconds = 64.37 
+2026-11-12 19:12:35 starting near_bound-04 
+2026-11-12 19:13:11 finished near_bound-04 rejected p = 0.06 ambiguous = TRUE paired failures = 0 seconds = 36.52 
+2026-11-12 19:13:11 starting interior-05 
+2026-11-12 19:14:44 finished interior-05 accepted p = 0.26 ambiguous = FALSE paired failures = 0 seconds = 92.46 
+2026-11-12 19:14:44 starting weak-05 
+2026-11-12 19:15:47 finished weak-05 accepted p = 0.24 ambiguous = FALSE paired failures = 0 seconds = 63.01 
+2026-11-12 19:15:47 starting near_bound-05 
+2026-11-12 19:16:37 finished near_bound-05 accepted p = 0.12 ambiguous = TRUE paired failures = 0 seconds = 50.26 
+2026-11-12 19:16:37 starting interior-06 
+2026-11-12 19:18:11 finished interior-06 accepted p = 0.48 ambiguous = FALSE paired failures = 0 seconds = 93.63 
+2026-11-12 19:18:11 starting weak-06 
+2026-11-12 19:19:11 finished weak-06 accepted p = 0.48 ambiguous = FALSE paired failures = 0 seconds = 60.57 
+2026-11-12 19:19:11 starting near_bound-06 
+2026-11-12 19:19:40 finished near_bound-06 accepted p = 0.44 ambiguous = FALSE paired failures = 0 seconds = 28.95 
+2026-11-12 19:19:40 starting interior-07 
+2026-11-12 19:21:04 finished interior-07 accepted p = 0.16 ambiguous = TRUE paired failures = 0 seconds = 83.77 
+2026-11-12 19:21:04 starting weak-07 
+2026-11-12 19:22:09 finished weak-07 accepted p = 0.66 ambiguous = FALSE paired failures = 0 seconds = 64.94 
+2026-11-12 19:22:09 starting near_bound-07 
+2026-11-12 19:23:07 finished near_bound-07 accepted p = 0.94 ambiguous = FALSE paired failures = 0 seconds = 58.43 
+2026-11-12 19:23:07 starting interior-08 
+2026-11-12 19:24:28 finished interior-08 accepted p = 0.78 ambiguous = FALSE paired failures = 0 seconds = 80.52 
+2026-11-12 19:24:28 starting weak-08 
+2026-11-12 19:25:24 finished weak-08 accepted p = 0.46 ambiguous = FALSE paired failures = 0 seconds = 56.14 
+2026-11-12 19:25:24 starting near_bound-08 
+2026-11-12 19:26:01 finished near_bound-08 accepted p = 0.68 ambiguous = FALSE paired failures = 0 seconds = 37.11 
+   scenario planned attempted available accepted rejected unavailable
+   interior       8         8         8        8        0           0
+       weak       8         8         8        6        2           0
+ near_bound       8         8         8        7        1           0
+ mc_ambiguous p_at_cutoff nominal_rate nominal_lower nominal_upper
+            1           0        1.000     0.6305834     1.0000000
+            2           1        0.750     0.3491442     0.9681460
+            2           0        0.875     0.4734903     0.9968403
+ returned_acceptance_rate returned_acceptance_lower returned_acceptance_upper
+                    1.000                 0.6305834                 1.0000000
+                    0.750                 0.3491442                 0.9681460
+                    0.875                 0.4734903                 0.9968403
+ certain_accept certain_reject sensitivity_min sensitivity_max paired_attempted
+              7              0           0.875               1              392
+              6              0           0.750               1              392
+              6              0           0.750               1              392
+ paired_failed seconds_total seconds_median
+             0        740.79         92.525
+             0        560.79         64.655
+             0        347.42         42.145

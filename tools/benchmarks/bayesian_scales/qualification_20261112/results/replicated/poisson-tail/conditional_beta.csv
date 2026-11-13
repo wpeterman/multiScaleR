@@ -1,0 +1,4 @@
+"case","method","eligible","order","neg_log_score"
+"poisson-repeated-20","conditional_beta",TRUE,24,15.0342316345489
+"poisson-repeated-20","conditional_beta",TRUE,48,15.0297832760514
+"poisson-repeated-20","conditional_beta",TRUE,72,15.0294673321011

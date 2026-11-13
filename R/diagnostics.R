@@ -45,6 +45,17 @@
 #'     This is a numerical support flag, not a test of identification or a
 #'     calibrated confidence limit. Native coefficient covariance and parameter
 #'     counts are unchanged.}
+#'   \item{\code{radius_profile}}{For a declared radius grid, one row per
+#'     combination. \code{radius}, or one \code{radius:<predictor>} column per
+#'     hard radius, uses map units. Any \code{sigma:<predictor>} and
+#'     \code{shape:<predictor>} columns hold the reoptimized smooth bandwidths
+#'     in map units and unitless shapes, respectively. The table also reports
+#'     native \code{log_likelihood}, \code{status} (scored or failed), any
+#'     failure \code{message}, and a logical \code{selected} flag. With smooth
+#'     predictors, \code{smooth_starts} holds a table of optimizer and
+#'     convergence diagnostics for each combination that reached the
+#'     smooth search. An all-failed search carries the profile table on the
+#'     error condition.}
 #'   \item{\code{profile_glm}}{Present for both opt-in analytic GLM backends.
 #'     Includes \code{uncertainty_available}, explanatory \code{reasons},
 #'     \code{weak_identifiability}, \code{boundary}, \code{condition_number},

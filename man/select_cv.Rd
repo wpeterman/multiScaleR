@@ -14,6 +14,7 @@ select_cv(
 \arguments{
 \item{mod_list}{Uniquely named list of complete \code{multiScaleR_cv} results.
 Use identical explicit folds and response/weight definitions for every model.
+Bayesian posterior predictive results use \code{\link{cv_tab}}.
 Complete \code{\link{cross_validate_clogit}} results compare only with the
 same conditional-choice target, complete sets and native partial method.}
 
@@ -77,12 +78,14 @@ Assessment outcomes and CV scores never choose the winner inside a fold.
   test set or outer validation layer. Selection does not integrate parameter
   or selection uncertainty, add intervals or establish calibration.
 
-Complete Gaussian spatial-field CV candidates also support
-  training-only selection using their compact native ML likelihood/count
-  records. Native coefficients, field SD, estimated range and observation SD
-  keep their parameter penalties; integrated states add zero. Selected joint
-  block scores retain their original uncertainty scope. No assessment score
-  enters the training criterion, and failed candidates cannot be dropped.
+Complete spatial-field CV candidates also support training-only
+  selection using compact native ML likelihood and parameter counts.
+  Native coefficients, field SD, estimated range and any observation
+  dispersion parameter keep their penalties. Integrated states add zero.
+  The held-out joint block score uses the model selected by the training
+  criterion in that fold.
+  Mixed-model CV candidates use compact native ML likelihoods and include
+  their covariance and ecological-scale parameters in training penalties.
 }
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)

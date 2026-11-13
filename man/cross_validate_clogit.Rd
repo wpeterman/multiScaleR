@@ -37,7 +37,10 @@ Use whole-animal groups when assessment concerns transfer to new animals.}
 normalization/bin references are refit only on analysis rows.}
 
 \item{backend}{Spatial backend, \code{"conditional_logit"} (default) or
-\code{"refit"}. Existing kernel, metric and numerical-admission guards apply.}
+\code{"refit"}. Pass \code{radius_grid} through \code{optim_args} with
+\code{"refit"} to profile hard radii and any smooth scales in each
+training split.
+Existing kernel, metric and numerical-admission guards apply.}
 
 \item{method}{Native one-case partial-likelihood method, \code{"exact"}
 (default), \code{"efron"} or \code{"breslow"}.}
@@ -45,7 +48,11 @@ normalization/bin references are refit only on analysis rows.}
 \item{cox_control}{Named native \code{survival::coxph.control()} settings.}
 
 \item{optim_args}{Named list of additional \code{multiScale_optim()} controls,
-such as \code{par} or \code{profile_control}. With spatial native refits,
+such as \code{par} or \code{profile_control}. To profile hard radii
+jointly with any smooth bandwidths or shapes in each training split,
+supply \code{radius_grid} with the native refit backend.
+The preparation radius must yield finite values with positive training
+spread for the initial fit. With spatial native refits,
 \code{covariate_transform = "raw"} keeps optimized predictors in their
 kernel/metric units for both initial training fits and later prediction.
 Fixed-metric transforms still use training rows only. Defaults preserve that backend's

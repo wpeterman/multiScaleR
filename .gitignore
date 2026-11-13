@@ -13,3 +13,15 @@ src/*.dll
 /doc/
 /Meta/
 docs/
+
+# Raw outputs of the 2026-11-12 studies, kept out of git history to limit
+# repository size. Each study's scripts and seeds regenerate them.
+/tools/benchmarks/spatial_field_cv_quadrature/results/tilted-moments.csv
+/tools/benchmarks/bayesian_scales/qualification_20261112/results/replicated/fit-records.zip
+/tools/benchmarks/bayesian_scales/qualification_20261112/results/replicated/probabilities.csv
+/tools/benchmarks/spatial_field_cv_quadrature/results/predictions.csv
+/tools/benchmarks/spatial_field_cv_quadrature/results/tilted-means.csv
+/tools/benchmarks/spatial_field_cv_quadrature/results/scenarios.csv
+/tools/benchmarks/mixed_cv_replicated/row-results.csv
+/tools/benchmarks/bayesian_scales/qualification_20261112/results/replicated/ranks.csv
+/tools/benchmarks/mixed_cv_replicated/group-results.csv

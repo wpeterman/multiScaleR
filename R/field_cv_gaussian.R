@@ -10,12 +10,12 @@
 
 .msr_field_cv_provider <- function() {
   if (!requireNamespace("glmmTMB", quietly = TRUE) ||
-      !requireNamespace("TMB", quietly = TRUE) ||
-      as.character(getNamespaceVersion("glmmTMB")) != "1.1.14" ||
-      as.character(getNamespaceVersion("TMB")) != "1.9.25")
-    stop("Spatial-field CV requires qualified glmmTMB 1.1.14 and TMB 1.9.25.", call. = FALSE)
+      !requireNamespace("TMB", quietly = TRUE))
+    stop("Spatial-field CV requires the glmmTMB and TMB packages.", call. = FALSE)
   dll <- getLoadedDLLs()[["glmmTMB"]][["path"]]
-  list(glmmTMB = "1.1.14", TMB = "1.9.25", DLL_sha256 = digest::digest(file = dll, algo = "sha256"),
+  list(glmmTMB = as.character(getNamespaceVersion("glmmTMB")),
+    TMB = as.character(getNamespaceVersion("TMB")),
+    DLL_sha256 = digest::digest(file = dll, algo = "sha256"),
     R_sha256 = digest::digest(file = file.path(find.package("glmmTMB"), "R", "glmmTMB.rdb"), algo = "sha256"))
 }
 
@@ -30,7 +30,7 @@
   isTRUE(tryCatch({chol(x); TRUE}, error = function(e) FALSE))
 
 .msr_field_cv_fit <- function(formula, data, xy, covariance, control, audit_dir,
-    max_memory_mb, provider) {
+    max_memory_mb, provider, family = "gaussian") {
   if (!identical(provider, .msr_field_cv_provider()))
     stop("The native spatial-field provider changed during CV.", call. = FALSE)
   X <- stats::model.matrix(formula, data)
@@ -41,9 +41,15 @@
   if (nrow(nodes) < 3L) stop("Range estimation requires at least three distinct training locations.", call. = FALSE)
   reference_range <- stats::median(distance[distance > 0])
   response <- stats::model.response(stats::model.frame(formula, data, na.action = stats::na.fail))
-  reference_sd <- stats::sd(response)
-  if (!is.finite(reference_sd) || reference_sd <= 0)
-    stop("Training responses need positive finite variation for field/observation SD estimation.", call. = FALSE)
+  response_sd <- stats::sd(response)
+  if (!is.finite(response_sd) || response_sd <= 0)
+    stop("Training responses need positive finite variation for field estimation.", call. = FALSE)
+  reference_sd <- if (family == "gaussian") response_sd else 1
+  family_call <- switch(family, gaussian = quote(stats::gaussian()), poisson = quote(stats::poisson()),
+    binomial = quote(stats::binomial()), nbinom2 = quote(glmmTMB::nbinom2()),
+    Gamma = quote(stats::Gamma(link = "log")))
+  native_family <- eval(family_call)
+  nuisance <- if (family %in% c("gaussian", "nbinom2", "Gamma")) 3L else 2L
   native_data <- data
   native_data$.msr_field_position <- glmmTMB::numFactor(xy)
   native_data$.msr_field_group <- factor(rep("shared", nrow(data)))
@@ -55,6 +61,7 @@
     training_rows = nrow(data), training_ids_sha256 = .msr_gdr_hash(rownames(data)),
     training_sha256 = .msr_gdr_hash(data),
     coordinates_sha256 = .msr_gdr_hash(xy), control = control, attempts = list())
+  if (family != "gaussian") record$family <- family
   on.exit(.msr_gdr_atomic_audit(record, audit))
   .msr_gdr_atomic_audit(record, sub("[.]rds$", "-request.rds", audit))
   selected <- NULL; values <- numeric(2L); points <- list(); eligible <- logical(2L)
@@ -64,7 +71,7 @@
       theta_start = log(c(reference_sd, reference_range) * multiplier))
     started <- proc.time()[["elapsed"]]
     fit <- tryCatch(withCallingHandlers(glmmTMB::glmmTMB(native_formula,
-      data = native_data, family = stats::gaussian(), REML = FALSE,
+      data = native_data, family = native_family, REML = FALSE,
       start = list(theta = attempt$theta_start), na.action = stats::na.fail, se = FALSE,
       control = glmmTMB::glmmTMBControl(parallel = 1L, rank_check = "stop", optCtrl = control)),
       warning = function(w) {attempt$warnings <<- c(attempt$warnings, conditionMessage(w)); invokeRestart("muffleWarning")}),
@@ -74,7 +81,9 @@
         attempt$construction_optimization_seconds <- proc.time()[["elapsed"]] - started
         # A completed numeric point survives an interruption during sdreport.
         # It is explicitly inference-ineligible and contains no model or tape.
-        checkpoint <- structure(list(type = "Gaussian_field_optimizer_point",
+        point_type <- if (family == "gaussian") "Gaussian_field_optimizer_point" else
+          paste0(family, "_field_optimizer_point")
+        checkpoint <- structure(list(type = point_type,
           inference_eligible = FALSE, provider = provider, fixed = fit$fit$par,
           value = fit$fit$objective, convergence = fit$fit$convergence,
           coordinate_order = names(fit$fit$par), training_sha256 = record$training_sha256,
@@ -91,7 +100,7 @@
         fit$call[[1L]] <- quote(glmmTMB::glmmTMB)
         fit$call$formula <- native_formula
         fit$call$data <- native_data
-        fit$call$family <- quote(stats::gaussian())
+        fit$call$family <- family_call
         fit$call$start <- list(theta = attempt$theta_start)
         fit$call$control <- glmmTMB::glmmTMBControl(parallel = 1L, rank_check = "stop", optCtrl = control)
         fit$call$se <- TRUE
@@ -117,7 +126,7 @@
         latent <- length(fit$obj$env$random)
         attempt$coordinate_layout_verified <- latent == nrow(nodes) &&
           attempt$native_K == attempt$fixed_coordinates &&
-          attempt$native_K == length(glmmTMB::fixef(fit)$cond) + 3L &&
+          attempt$native_K == length(glmmTMB::fixef(fit)$cond) + nuisance &&
           identical(dim(report$cov.fixed), rep(attempt$fixed_coordinates, 2L)) &&
           identical(dim(report$jointPrecision), rep(attempt$fixed_coordinates + latent, 2L)) &&
           identical(dim(precision), rep(latent, 2L))
@@ -129,7 +138,7 @@
           attempt$maximum_score < 1e-3
         values[i] <- fit$fit$objective; points[[i]] <- fit$fit$par
         eligible[i] <- attempt$eligible
-        if (is.null(selected) || values[i] < selected$fit$objective) selected <- fit
+        if (eligible[i] && (is.null(selected) || values[i] < selected$fit$objective)) selected <- fit
         attempt$status <- "returned"
       }, warning = function(w) {attempt$warnings <<- c(attempt$warnings, conditionMessage(w)); invokeRestart("muffleWarning")}),
         error = function(e) {attempt$error <<- conditionMessage(e)})
@@ -140,16 +149,22 @@
     fit <- NULL
     gc(verbose = FALSE)
   }
-  if (!all(eligible)) {
+  if (!any(eligible) || (family == "gaussian" && !all(eligible))) {
     record$status <- "failed"
-    stop("Every declared spatial-field training start must pass convergence, score and full curvature gates; inspect audit_dir.", call. = FALSE)
+    stop(if (family == "gaussian")
+      "Every declared spatial-field training start must pass convergence, score and full curvature gates; inspect audit_dir." else
+      "No spatial-field training start passed convergence, score and full curvature checks; inspect audit_dir.",
+      call. = FALSE)
   }
-  record$NLL_gap <- abs(diff(values))
-  record$coordinate_gap <- max(abs(points[[1L]] - points[[2L]]))
-  if (record$NLL_gap > 1e-5 || record$coordinate_gap > 1e-3) {
-    record$status <- "start_disagreement"
-    stop("Declared spatial-field training starts disagree; retain the failed fold.", call. = FALSE)
+  if (all(eligible)) {
+    record$NLL_gap <- abs(diff(values))
+    record$coordinate_gap <- max(abs(points[[1L]] - points[[2L]]))
+    if (family == "gaussian" && (record$NLL_gap > 1e-5 || record$coordinate_gap > 1e-3)) {
+      record$status <- "start_disagreement"
+      stop("Declared spatial-field training starts disagree; retain the failed fold.", call. = FALSE)
+    }
   }
+  if (family != "gaussian") record$selected_start <- which.min(replace(values, !eligible, Inf))
   record$status <- "returned"; record$audit_file <- audit
   attr(selected, "msr_field_cv_diagnostics") <- record
   selected

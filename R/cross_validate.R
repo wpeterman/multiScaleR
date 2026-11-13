@@ -125,11 +125,24 @@
   out
 }
 
-.msr_cv_initial_values <- function(inputs) {
+.msr_cv_initial_values <- function(inputs, fit = NULL) {
   specs <- inputs$scale_vars
+  sigma <- inputs$sigma
+  shape <- inputs$shape
+  if (!is.null(fit$diagnostics$radius_profile)) {
+    # CV preparation can order predictors differently from the native formula.
+    # Use the selected coordinates by name and preserve fitted hard cutoffs.
+    optimized <- specs$covariate[specs$optimize]
+    fitted_names <- rownames(fit$scale_est)
+    idx <- match(optimized, fitted_names)
+    if (anyNA(idx))
+      stop("The assessment predictors do not match the fitted radius grid.", call. = FALSE)
+    sigma <- fit$optim_results$par[idx] * (fit$kernel_inputs$unit_conv / inputs$unit_conv)
+    if (inputs$kernel == "expow") shape <- fit$optim_results$par[length(fitted_names) + idx]
+  }
   value <- matrix(vapply(seq_along(inputs$d_list), function(i)
     .msr_eval_scale_vars(inputs$d_list[[i]], inputs$raw_cov[[i]], specs,
-      inputs$sigma, inputs$shape, inputs$kernel, inputs$unit_conv,
+      sigma, shape, inputs$kernel, inputs$unit_conv,
       inputs$resolution, inputs$n_cols), numeric(nrow(specs))),
     nrow = length(inputs$d_list), ncol = nrow(specs), byrow = TRUE)
   dimnames(value) <- list(rownames(inputs$kernel_dat), specs$covariate)
@@ -256,7 +269,11 @@
 #'   two-column response, separately from frequency weights; weighted proportions
 #'   are not accepted. A backend may impose stricter native weight requirements.
 #' @param optim_args Named list of additional \code{multiScale_optim()} controls,
-#'   such as \code{par} or \code{profile_control}. With spatial native refits,
+#'   such as \code{par} or \code{profile_control}. To profile hard radii
+#'   jointly with any smooth bandwidths or shapes in each training split,
+#'   supply \code{radius_grid} with the native refit backend.
+#'   The preparation radius must yield finite values with positive training
+#'   spread for the initial fit. With spatial native refits,
 #'   \code{covariate_transform = "raw"} keeps optimized predictors in their
 #'   kernel/metric units for both initial training fits and later prediction.
 #'   Fixed-metric transforms still use training rows only. Defaults preserve that backend's
@@ -400,7 +417,7 @@
 #' before ranking models. Partial fold scores remain available for diagnosis,
 #' while an incomplete pooled summary stays \code{NA}. This stage does not
 #' score GAMs, mixed, unmarked or Bayesian fits. Use \code{\link{cross_validate_field}}
-#' for the separately qualified Gaussian spatial-field workflow. See
+#' for joint spatial-field scoring with Gaussian, count, binary or positive responses. See
 #' \code{\link{grouped_cv_folds}} and \code{\link{spatial_cv_folds}} for
 #' deterministic whole-group and spatial-grid fold construction.
 #' NB2 and Gamma held-out negative log scores use complete normalized densities
@@ -564,7 +581,7 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
       fit <- .msr_cv_prediction_metadata(fit, training_data, train)
       assess <- .msr_cv_inputs(inputs, split$assessment, covariates,
         if (is.null(train$binned)) NULL else train$binned$cv_reference)
-      raw_assess <- .msr_cv_initial_values(assess)
+      raw_assess <- .msr_cv_initial_values(assess, fit)
       assess$kernel_dat <- as.data.frame(sweep(sweep(raw_assess, 2L, center), 2L, spread, "/"), optional = TRUE)
       assess$scl_params <- train$scl_params
       assessment_data <- data[ti, , drop = FALSE]
@@ -581,7 +598,11 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
       NULL
     }, warning = function(w) {
       messages <<- c(messages, conditionMessage(w)); invokeRestart("muffleWarning")
-    }), error = function(e) list(stage = stage, message = conditionMessage(e)))
+    }), error = function(e) {
+      result <- list(stage = stage, message = conditionMessage(e))
+      if (!is.null(e$radius_profile)) result$radius_profile <- e$radius_profile
+      result
+    })
     complete <- is.null(error)
     if (!complete) {
       pred$prediction <- NA_real_; pred$eligible <- FALSE

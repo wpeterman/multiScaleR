@@ -1,0 +1,5 @@
+"case","method","passed","primary_mc_score","quadrature_64","quadrature_128","quadrature_256"
+"gaussian-annual-33","nuts",TRUE,8.98378640507733,8.76777603988577,8.76465575896397,8.76505902145789
+"gaussian-annual-33","joint_importance",TRUE,8.6087911757785,8.73812520137433,8.74117471924446,8.74033629637524
+"gaussian-annual-33","conditional_beta",TRUE,8.6166405672338,8.69652643392992,8.69602233155461,8.69565659137674
+"gaussian-annual-33","nuts_independent",TRUE,NA,8.7067641365343,8.70516480556343,8.70499476127544

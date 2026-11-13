@@ -172,7 +172,7 @@
         pred$prediction <- as.numeric(stats::predict(.msr_native_fixed_metadata(fit), newdata = assessment, type = "response"))
       } else {
         assess <- .msr_cv_inputs(inputs, split$assessment, covariates, if (is.null(train$binned)) NULL else train$binned$cv_reference)
-        raw <- .msr_cv_initial_values(assess)
+        raw <- .msr_cv_initial_values(assess, fit)
         assess$kernel_dat <- as.data.frame(sweep(sweep(raw, 2L, center), 2L, spread, "/"), optional = TRUE)
         assess$scl_params <- train$scl_params
         for (nm in covariates) assessment[[nm]] <- assess$kernel_dat[[nm]]
@@ -187,7 +187,11 @@
       pred$theta <- nuisance$theta; pred$dispersion <- nuisance$dispersion; pred$poisson_limit <- nuisance$poisson_limit
       stage <- "scoring"; pred <- .msr_cv_distribution_score(pred, metrics); NULL
     }, warning = function(w) { messages <<- c(messages, conditionMessage(w)); invokeRestart("muffleWarning") }),
-      error = function(e) list(stage = stage, message = conditionMessage(e), start_results = e$start_results))
+      error = function(e) {
+        result <- list(stage = stage, message = conditionMessage(e), start_results = e$start_results)
+        if (!is.null(e$radius_profile)) result$radius_profile <- e$radius_profile
+        result
+      })
     complete <- is.null(error)
     if (!complete) {
       pred$prediction <- NA_real_; pred$eligible <- FALSE

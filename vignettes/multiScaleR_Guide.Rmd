@@ -61,9 +61,9 @@ With advanced coding skills, Bayesian analytical frameworks can be used to estim
 - Functions to simulate rasters and response data facilitate power analysis and methods testing.
 
 For stacked observations and partially pooled annual landscape scales, see
-`vignette("bayesian-scales", package = "multiScaleR")`. That experimental
-workflow estimates scale and response parameters jointly and includes a fitted
-example, optional-software setup checks, posterior plots and prior sensitivity.
+`vignette("bayesian-scales", package = "multiScaleR")`. The workflow
+estimates scale and response parameters jointly and includes a fitted example,
+optional-software setup checks, posterior plots and prior sensitivity.
 
 `multiScaleR` supports models of class `glm`, `glm.nb`, `nlme` (including `gls`), `lme4`, and many `unmarkedFit` classes. For `unmarked`, a raster covariate being optimized must be a static site covariate, and the fitted class must support refitting with updated data. Other model classes may work when they provide a suitable `update` method and are supported by [insight](https://CRAN.R-project.org/package=insight). Let me know if you encounter issues or would like to see support for other model classes.
 

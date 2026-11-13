@@ -1,4 +1,4 @@
-# Internal, experimental smooth-kernel engine. Preparation fixes the fitting
+# Internal smooth-kernel engine. Preparation fixes the fitting
 # rows and parameter order once. Counts refer to finite cells, including zeros.
 # These helpers do not change the public optimization backend.
 .msr_prepare_kernel_engine <- function(binned, covariates = names(binned$vsum),

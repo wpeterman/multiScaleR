@@ -462,6 +462,87 @@ adjacencies, or nearly identical evenness at all sample points. In that case,
 use a larger radius, increase `max_D`, or choose a more stable diversity,
 entropy, or edge metric.
 
+## Profile one hard radius on a declared grid
+
+A hard radius changes the metric in steps as cells enter the buffer. You can
+search explicit radii with the native refit backend. Start with one optimized
+hard-radius predictor to see how the likelihood changes. Choose radii that span the neighborhood sizes
+relevant to your study and lie inside the prepared extraction range. Retain the
+raw cells so each fit can recalculate the metric.
+
+```{r fit-radius-grid, eval = FALSE}
+radius_inputs <- kernel_prep(
+  pts = pts, raster_stack = metric_rasters, max_D = 1200, sigma = 500,
+  scale_vars = msr_vars(diversity = landscape_var("landcover", metric = "shdi")),
+  store_cell_data = TRUE, verbose = FALSE
+)
+radius_data <- data.frame(dat, radius_inputs$kernel_dat)
+initial_radius <- glm(counts ~ site + diversity, family = poisson(),
+                      data = radius_data)
+radius_fit <- multiScale_optim(
+  initial_radius, radius_inputs, backend = "refit",
+  radius_grid = c(250, 500, 750, 1000), verbose = FALSE
+)
+diagnostics(radius_fit)$radius_profile
+radius_fit$scale_est
+```
+
+**How to read these results:** The profile shows how well the same response
+model fits after its coefficients are refitted at each radius. `scale_est`
+reports the best eligible candidate in map units. Inspect the full table for
+failed candidates, plateaus, or a best radius at an end of the grid. Those
+patterns can show where the search is unresolved. The grid supplies likelihood
+values and a selected radius. Radius SEs and confidence limits are unavailable
+for this fit.
+
+## Profile several radii with a smooth kernel
+
+The best radius for one predictor can depend on the radius used for another.
+Pass a named list when the model has several optimized hard radii. The names
+match the model predictors defined in `msr_vars()`. The fit evaluates every
+combination, so two vectors of length three give nine fits to compare. If
+you include a smooth kernel mean, its bandwidth can change across those nine
+combinations. An exponential-power kernel also reestimates the shape of each
+smooth predictor at every combination.
+
+```{r fit-joint-radius-grid, eval = FALSE}
+joint_inputs <- kernel_prep(
+  pts = pts, raster_stack = metric_rasters, max_D = 1200,
+  sigma = c(500, 500, 400),
+  scale_vars = msr_vars(
+    diversity = landscape_var("landcover", metric = "shdi"),
+    edge = landscape_var("land1", metric = "ed"),
+    forest = kernel_var("land1")
+  ),
+  store_cell_data = TRUE, verbose = FALSE
+)
+joint_data <- data.frame(dat, joint_inputs$kernel_dat)
+initial_joint <- glm(counts ~ site + diversity + edge + forest,
+                     family = poisson(), data = joint_data)
+joint_fit <- multiScale_optim(
+  initial_joint, joint_inputs, backend = "refit",
+  radius_grid = list(diversity = c(250, 500, 750),
+                     edge = c(300, 500, 900)),
+  verbose = FALSE
+)
+joint_profile <- diagnostics(joint_fit)$radius_profile
+# The selected row contains the two radii and the refitted forest bandwidth.
+joint_profile[joint_profile$selected,
+              c("radius:diversity", "radius:edge", "sigma:forest", "log_likelihood")]
+```
+
+**How to read these results:** Each row describes one combination of radii.
+Compare the fitted bandwidths as well as the log-likelihoods. If the
+bandwidth changes across rows with similar support, the model may have
+difficulty distinguishing the two scale processes. The smooth bandwidth SE,
+when available, treats both selected hard radii as fixed.
+
+For a conditional-logistic step-selection model, fit the initial model with
+`model = TRUE` and include one used alternative and at least one available
+alternative in each stratum. Pass that model to the same grid search. To assess
+the resulting predictions, repeat radius selection within complete training
+choice sets as shown in `vignette("cross-validation", package = "multiScaleR")`.
+
 ---
 
 # Practical guidance

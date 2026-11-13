@@ -71,7 +71,11 @@ two-column response, separately from frequency weights; weighted proportions
 are not accepted. A backend may impose stricter native weight requirements.}
 
 \item{optim_args}{Named list of additional \code{multiScale_optim()} controls,
-such as \code{par} or \code{profile_control}. With spatial native refits,
+such as \code{par} or \code{profile_control}. To profile hard radii
+jointly with any smooth bandwidths or shapes in each training split,
+supply \code{radius_grid} with the native refit backend.
+The preparation radius must yield finite values with positive training
+spread for the initial fit. With spatial native refits,
 \code{covariate_transform = "raw"} keeps optimized predictors in their
 kernel/metric units for both initial training fits and later prediction.
 Fixed-metric transforms still use training rows only. Defaults preserve that backend's
@@ -234,7 +238,7 @@ Read \code{complete} first. Inspect failed folds and original diagnostics
 before ranking models. Partial fold scores remain available for diagnosis,
 while an incomplete pooled summary stays \code{NA}. This stage does not
 score GAMs, mixed, unmarked or Bayesian fits. Use \code{\link{cross_validate_field}}
-for the separately qualified Gaussian spatial-field workflow. See
+for joint spatial-field scoring with Gaussian, count, binary or positive responses. See
 \code{\link{grouped_cv_folds}} and \code{\link{spatial_cv_folds}} for
 deterministic whole-group and spatial-grid fold construction.
 NB2 and Gamma held-out negative log scores use complete normalized densities

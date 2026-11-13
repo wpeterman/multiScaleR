@@ -18,8 +18,8 @@
 }
 \arguments{
 \item{object}{A \code{multiScaleR} fit using \code{backend = "profile_glm"}
-or \code{backend = "joint_nb2"}, or an experimental
-\code{backend = "joint_mixed"} fit.
+or \code{backend = "joint_nb2"}, or a
+\code{backend = "joint_mixed"} fit with native conditional prediction.
 Also accepts \code{backend = "conditional_logit"} and native-refit fits.}
 
 \item{newdata}{A data frame containing fixed covariates and formula offset

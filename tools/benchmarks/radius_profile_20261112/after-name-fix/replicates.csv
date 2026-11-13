@@ -1,0 +1,13 @@
+"scenario","seed","true_sigma","true_shape","package_seconds","initial_native_loglik_gap","package_status","package_warnings","package_selected_candidate","reference_selected_candidate","selected_loglik_gap","selected_sigma","selected_shape","selected_sigma_se","selected_shape_se","curvature_status","active_boundary"
+"gaussian_interior",1401,104,NA,0.950000000000001,1.4210854715202e-14,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_interior",1402,104,NA,1.21,0,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_interior",1403,104,NA,0.42,0,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_lower_bound",1401,15,NA,0.529999999999999,1.4210854715202e-14,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_lower_bound",1402,15,NA,0.42,0,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_lower_bound",1403,15,NA,0.42,2.8421709430404e-14,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_flat",1401,104,NA,0.4,1.4210854715202e-14,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_flat",1402,104,NA,0.469999999999999,1.4210854715202e-14,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"gaussian_flat",1403,104,NA,0.419999999999998,0,"failed","",NA,6,NA,NA,NA,NA,NA,NA,NA
+"choice_expow",1401,104,2.5,10.11,3.5527136788005e-15,"selected","",6,6,-3.5527136788005e-15,159.305282937451,5.22970317053962,13.9084514027033,3.05978419729252,"available",FALSE
+"choice_expow",1402,104,2.5,9.78,7.105427357601e-15,"selected","",6,6,1.77635683940025e-15,139.494118806726,3.49632680097752,73.7153983709923,7.83876463951485,"available",FALSE
+"choice_expow",1403,104,2.5,5.72,7.105427357601e-15,"selected","",6,6,-3.5527136788005e-15,74.2346392193951,1.26728737750674,75.8535412125469,1.4855374943353,"available",FALSE

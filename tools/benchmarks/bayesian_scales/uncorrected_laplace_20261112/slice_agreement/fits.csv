@@ -1,0 +1,5 @@
+"case","family","design","status","elapsed","error"
+"gaussian-annual-01","gaussian","annual","eligible",61.82,NA
+"gaussian-annual-02","gaussian","annual","eligible",59.85,NA
+"nbinom2-repeated-01","nbinom2","repeated","eligible",69,NA
+"nbinom2-repeated-02","nbinom2","repeated","eligible",58.44,NA

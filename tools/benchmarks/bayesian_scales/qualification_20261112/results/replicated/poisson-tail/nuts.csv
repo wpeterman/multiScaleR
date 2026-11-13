@@ -1,0 +1,4 @@
+"case","method","eligible","order","neg_log_score"
+"poisson-repeated-20","nuts",TRUE,24,15.0300146687781
+"poisson-repeated-20","nuts",TRUE,48,15.0294411395157
+"poisson-repeated-20","nuts",TRUE,72,15.0295078557472

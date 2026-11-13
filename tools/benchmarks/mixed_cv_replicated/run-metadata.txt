@@ -1,0 +1,9 @@
+date UTC 2026-11-12 23:27:24 UTC
+R 4.6.1
+glmmTMB 1.1.14
+TMB 1.9.21
+          R/cross_validate_mixed.R               R/mixed_cv_density.R 
+"9ff0777a604737271274c538b27724e2" "73925475c8990e1ed78201f45ef2df2e" 
+           R/mixed_cv_comparison.R 
+"27e82390c3ae2e6fbca0dc3d35bd1335" 
+benchmark MD5 9b436f8ec67fbeb63a8f265ed5d8e1c5

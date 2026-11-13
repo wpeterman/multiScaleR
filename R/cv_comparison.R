@@ -253,6 +253,7 @@ cross_validate_glm <- function(formula, data, folds,
 #'
 #' @param mod_list Uniquely named list of complete \code{multiScaleR_cv} results.
 #'   Use identical explicit folds and response/weight definitions for every model.
+#'   Bayesian posterior predictive results use \code{\link{cv_tab}}.
 #'   Complete \code{\link{cross_validate_clogit}} results compare only with the
 #'   same conditional-choice target, complete sets and native partial method.
 #' @param metric One recorded score, selected explicitly: \code{"rmse"},
@@ -293,19 +294,26 @@ cross_validate_glm <- function(formula, data, folds,
 #' cv_tab(candidates, metric = "neg_log_score")
 #' @seealso \code{\link{cross_validate}}, \code{\link{cross_validate_glm}},
 #'   \code{\link{select_cv}}, \code{\link{aic_tab}}
-#' @details Complete \code{\link{cross_validate_field}} results compare their
-#'   separately qualified Gaussian joint block densities. Those scores include
-#'   conditional field covariance and observation noise at training estimates,
-#'   without parameter or ecological-scale uncertainty. They cannot be mixed
-#'   with independent GLM row-density targets. All failures remain explicit.
+#' @details Complete \code{\link{cross_validate_field}} results compare joint
+#'   assessment densities or masses for matching response and split targets.
+#'   Poisson and NB2 share a count target. These scores integrate field
+#'   dependence and observation noise at training estimates. Compare these
+#'   results with other joint field scores using the same observations and
+#'   coordinates.
+#'   Complete \code{\link{cross_validate_mixed}} results compare matching
+#'   group targets. Their log scores use one joint density per held-out group.
 #' @export
 cv_tab <- function(mod_list, metric, by_fold = FALSE) {
   validate_scalar_logical(by_fold, "by_fold")
   if (!is.character(metric) || length(metric) != 1L || is.na(metric) ||
       !metric %in% c("rmse", "mae", "neg_log_score", "deviance", "brier"))
     stop("Select one supported metric explicitly.", call. = FALSE)
+  if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_bayes_cv")))
+    return(.msr_bayes_cv_tab(mod_list, metric, by_fold))
   if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_field_cv")))
     return(.msr_field_cv_tab(mod_list, metric, by_fold))
+  if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_mixed_cv")))
+    return(.msr_mixed_cv_tab(mod_list, metric, by_fold))
   .msr_cv_comparison(mod_list, metric)
   groups <- if (by_fold) names(mod_list[[1L]]$folds) else "pooled"
   tables <- lapply(groups, function(fold) {
@@ -418,19 +426,25 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
 #' selected$selection$chosen
 #' @seealso \code{\link{cv_tab}}, \code{\link{cross_validate}},
 #'   \code{\link{cross_validate_glm}}, \code{\link{aic_tab}}, \code{\link{bic_tab}}
-#' @details Complete Gaussian spatial-field CV candidates also support
-#'   training-only selection using their compact native ML likelihood/count
-#'   records. Native coefficients, field SD, estimated range and observation SD
-#'   keep their parameter penalties; integrated states add zero. Selected joint
-#'   block scores retain their original uncertainty scope. No assessment score
-#'   enters the training criterion, and failed candidates cannot be dropped.
+#' @details Complete spatial-field CV candidates also support training-only
+#'   selection using compact native ML likelihood and parameter counts.
+#'   Native coefficients, field SD, estimated range and any observation
+#'   dispersion parameter keep their penalties. Integrated states add zero.
+#'   The held-out joint block score uses the model selected by the training
+#'   criterion in that fold.
+#'   Mixed-model CV candidates use compact native ML likelihoods and include
+#'   their covariance and ecological-scale parameters in training penalties.
 #' @export
 select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
     ties = c("error", "first"), keep_fits = FALSE) {
   criterion <- match.arg(criterion); ties <- match.arg(ties)
   validate_scalar_logical(keep_fits, "keep_fits")
+  if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_bayes_cv")))
+    stop("Bayesian CV has no training ML selection criterion. Compare predictive scores with cv_tab().", call. = FALSE)
   if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_field_cv")))
     return(.msr_field_select_cv(mod_list, criterion, ties, keep_fits))
+  if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_mixed_cv")))
+    return(.msr_mixed_select_cv(mod_list, criterion, ties, keep_fits))
   signature <- .msr_cv_comparison(mod_list)
   first <- mod_list[[1L]]; metrics <- first$settings$metrics; folds <- first$folds
   choice <- inherits(first, "multiScaleR_choice_cv")
