@@ -1,3 +1,12 @@
+multiScaleR 0.7.41
+
+* The stored annual example, `inst/extdata/bayesian-annual-example.rds`, now
+  keeps only the `pooled` fit that the vignettes and help examples use. The
+  `shared`, `independent`, and prior-sensitivity fits remain summarized in
+  its `fit_info`, `comparison`, and `sensitivity` tables. The file shrinks
+  from 2.8 MB to 0.6 MB, which keeps the package closer to CRAN's size
+  guidance.
+
 multiScaleR 0.7.40
 
 * Keep the experimental labels that 0.7.39 had dropped from the code: the

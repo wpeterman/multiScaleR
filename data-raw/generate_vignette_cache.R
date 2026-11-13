@@ -17,6 +17,7 @@
 # distance-removal      v12-distance-removal       cache-distance-removal.rds       ~15 s
 # bayesian-scales       v13-bayesian-scales        cache-bayesian-scales.rds        ~1 min
 # bayesian-computation  v15-bayesian-computation   cache-bayesian-computation.rds   several min
+# slim-annual-example   v09, v13, v14, v15         bayesian-annual-example.rds      ~5 s
 #
 # Every file is xz compressed. Check the built tarball size after a rebuild,
 # because CRAN asks that packages stay under 5 MB.
@@ -495,6 +496,18 @@ sections[["bayesian-computation"]] <- quote({
   )
 
   save_cache(cache, "cache-bayesian-computation.rds")
+})
+
+# ---- slim the stored annual example (bayesian-annual-example.rds) -----------
+# The annual example was fitted outside this script. It once held five fits,
+# but every vignette, example, and test reads only fits$pooled. The fit_info,
+# comparison, and sensitivity tables keep the summaries of the other four, so
+# drop their draws to keep the package small. Run after replacing the file.
+sections[["slim-annual-example"]] <- quote({
+  path <- file.path("inst", "extdata", "bayesian-annual-example.rds")
+  example <- readRDS(path)
+  example$fits <- example$fits["pooled"]
+  saveRDS(example, path, compress = "xz")
 })
 
 # ---- run the requested sections ---------------------------------------------
