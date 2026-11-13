@@ -115,7 +115,7 @@
 #'   This changes sampling efficiency, not priors or diagnostic thresholds;
 #'   heavier tails can also require more candidates.
 #'   \code{conditional_beta = FALSE} retains the joint response-coefficient
-#'   proposal. \code{TRUE} proposes those coefficients conditional on each
+#'   proposal. Experimental \code{TRUE} proposes those coefficients conditional on each
 #'   candidate's scales and response random effects. Gaussian conditionals are
 #'   exact. The other families use a normalized Student t proposal with
 #'   7 degrees of freedom. A fixed 20 percent latent-prior defensive component
@@ -329,9 +329,9 @@
 #' A continuous half-normal group-SD prior has no point mass at zero. A positive
 #' central credible interval is therefore not a test of the exact zero-variance
 #' model. Compare shared scales and scientifically meaningful variation instead.
-#' Numerical accuracy depends on the response, scale design, and computation
-#' method. Interval calibration for general ecological datasets remains
-#' unestablished.
+#' This interface is experimental. Numerical accuracy depends on the response,
+#' scale design, and computation method. Interval calibration for general
+#' ecological datasets remains unestablished.
 #'
 #' Slice sampling alternates among blocks of parameters in the full posterior.
 #' For Gaussian responses, it draws regression coefficients from their exact

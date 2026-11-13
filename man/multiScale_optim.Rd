@@ -426,9 +426,9 @@ NB2 log. NB2 has variance \eqn{\mu + \mu^2/\theta}; theta is estimated
 alongside kernel parameters, even when the initial GLM used a fixed theta.
 Independent native likelihoods verify the fitted objective in simulations
 of the supported GLM families. The finite theta limit differs from the exact
-Poisson face handled by \code{"joint_nb2"}. Scale-interval calibration
-remains experimental. Simulations found Wald undercoverage even among fits
-passing curvature checks. For single-kernel NB2 models,
+Poisson face handled by \code{"joint_nb2"}. This backend is experimental,
+and its scale-interval calibration is not established. Simulations found
+Wald undercoverage even among fits passing curvature checks. For single-kernel NB2 models,
 \code{\link{scale_inference}} examines the full likelihood range and can
 assess individual scale values with a parametric bootstrap.
 For \code{"profile_glm"}, regression coefficients are solved by IRLS at each candidate. A full-rank

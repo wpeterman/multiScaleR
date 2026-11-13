@@ -1,3 +1,10 @@
+multiScaleR 0.7.40
+
+* Keep the experimental labels that 0.7.39 had dropped from the code: the
+  printed header of a Bayesian fit, the help for `multiScale_bayes()` and its
+  `conditional_beta` proposal, the analytic GLM backends, `joint_mixed`
+  predictions, and `scale_inference()`.
+
 multiScaleR 0.7.39
 
 * `multiScale_optim(backend = "refit", radius_grid = )` refits a model at the

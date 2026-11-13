@@ -2,9 +2,10 @@
 #'
 #' Examine the full allowed scale range of an NB2 fit with one spatial predictor, retain
 #' separate likelihood regions, and optionally calibrate likelihood-ratio
-#' tests by parametric bootstrap. The likelihood profile and the bootstrap
-#' decision retain their numerical audits. Bootstrap confidence-set calibration
-#' remains experimental. The diagnostic preserves the fitted object.
+#' tests by parametric bootstrap. This diagnostic is experimental. The
+#' likelihood profile and the bootstrap decision retain their numerical audits,
+#' and bootstrap confidence-set calibration is not established. The diagnostic
+#' preserves the fitted object.
 #'
 #' @param object A \code{multiScaleR} fit from \code{backend = "profile_glm"}
 #'   or \code{backend = "joint_nb2"},

@@ -212,7 +212,7 @@ summary.multiScaleR_bayes <- function(object, ...) {
 #' @export
 print.multiScaleR_bayes <- function(x, ...) {
   if (length(list(...))) stop("Unused print arguments.", call. = FALSE)
-  cat("Bayesian landscape-scale model\n")
+  cat("Experimental Bayesian landscape-scale model\n")
   cat("Inference:", x$inference, "\n")
   cat("Family:", x$specification$family,
       "| observations:", length(x$specification$y), "\n")
