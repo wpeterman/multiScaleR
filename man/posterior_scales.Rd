@@ -88,6 +88,6 @@ posterior_scales(fit, scale = "log")[c("group", "mean", "sd")]
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{plot.multiScaleR_bayes}},
   \code{\link{diagnose_bayes_scales}};
-  \code{vignette("bayesian-scales", package = "multiScaleR")} and
-  \code{vignette("bayesian-computation", package = "multiScaleR")}.
+  \code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
+  \code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
 }

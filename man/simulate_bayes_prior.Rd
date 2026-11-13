@@ -84,5 +84,5 @@ exp(apply(prior$log_scales$habitat, 1, stats::quantile, c(.025, .5, .975)))
 \seealso{
 \code{\link{multiScale_bayes}},
   \code{\link{simulate.multiScaleR_bayes}},
-  \code{vignette("bayesian-scales", package = "multiScaleR")}.
+  \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }

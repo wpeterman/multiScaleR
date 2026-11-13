@@ -56,7 +56,7 @@
 #'   identifying the replicate instead of clipping values or replacing a draw.
 #' @seealso \code{\link{multiScale_bayes}},
 #'   \code{\link{simulate.multiScaleR_bayes}},
-#'   \code{vignette("bayesian-scales", package = "multiScaleR")}.
+#'   \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))

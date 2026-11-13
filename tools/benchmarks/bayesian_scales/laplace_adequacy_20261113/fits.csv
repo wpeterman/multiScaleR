@@ -1,0 +1,106 @@
+"case","scenario","family","replicate","seed","method","status","error","warnings","elapsed","audit_available","audit_passed","pareto_k","importance_ess","audit_reason"
+"gaussian_shared_narrow-01","gaussian_shared_narrow","gaussian",1,1130500,"nuts","eligible",NA,"",10.3,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-01","gaussian_shared_narrow","gaussian",1,1130500,"laplace","eligible",NA,"",25.49,TRUE,TRUE,-0.95289543583033,47774.708484438,""
+"gaussian_shared_narrow-01","gaussian_shared_narrow","gaussian",1,1130500,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-02","gaussian_shared_narrow","gaussian",2,1130600,"nuts","eligible",NA,"",9.02,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-02","gaussian_shared_narrow","gaussian",2,1130600,"laplace","eligible",NA,"",25.47,TRUE,TRUE,-0.877079449933555,46701.7807798009,""
+"gaussian_shared_narrow-02","gaussian_shared_narrow","gaussian",2,1130600,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-03","gaussian_shared_narrow","gaussian",3,1130700,"nuts","eligible",NA,"",5.89,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-03","gaussian_shared_narrow","gaussian",3,1130700,"laplace","eligible",NA,"",23.05,TRUE,TRUE,-0.827414141501982,45338.5484843819,""
+"gaussian_shared_narrow-03","gaussian_shared_narrow","gaussian",3,1130700,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-04","gaussian_shared_narrow","gaussian",4,1130800,"nuts","eligible",NA,"",6.06,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-04","gaussian_shared_narrow","gaussian",4,1130800,"laplace","eligible",NA,"",22.84,TRUE,TRUE,-0.937695659282541,45620.3044824579,""
+"gaussian_shared_narrow-04","gaussian_shared_narrow","gaussian",4,1130800,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-05","gaussian_shared_narrow","gaussian",5,1130900,"nuts","eligible",NA,"",8.76000000000001,NA,NA,NA,NA,NA
+"gaussian_shared_narrow-05","gaussian_shared_narrow","gaussian",5,1130900,"laplace","eligible",NA,"",20.33,TRUE,TRUE,-0.913414526165081,45562.2105135726,""
+"gaussian_shared_narrow-05","gaussian_shared_narrow","gaussian",5,1130900,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_broad-01","gaussian_shared_broad","gaussian",1,1131000,"nuts","eligible",NA,"",3.41,NA,NA,NA,NA,NA
+"gaussian_shared_broad-01","gaussian_shared_broad","gaussian",1,1131000,"laplace","eligible",NA,"",19.34,TRUE,TRUE,-0.942527782916053,39319.2190533915,""
+"gaussian_shared_broad-01","gaussian_shared_broad","gaussian",1,1131000,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_broad-02","gaussian_shared_broad","gaussian",2,1131100,"nuts","eligible",NA,"",2.72999999999999,NA,NA,NA,NA,NA
+"gaussian_shared_broad-02","gaussian_shared_broad","gaussian",2,1131100,"laplace","eligible",NA,"",18.75,TRUE,TRUE,-0.294733829468027,36494.9376650503,""
+"gaussian_shared_broad-02","gaussian_shared_broad","gaussian",2,1131100,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_broad-03","gaussian_shared_broad","gaussian",3,1131200,"nuts","eligible",NA,"",2.61999999999999,NA,NA,NA,NA,NA
+"gaussian_shared_broad-03","gaussian_shared_broad","gaussian",3,1131200,"laplace","eligible",NA,"",17.89,TRUE,TRUE,-0.884349484746319,43384.0183956021,""
+"gaussian_shared_broad-03","gaussian_shared_broad","gaussian",3,1131200,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_broad-04","gaussian_shared_broad","gaussian",4,1131300,"nuts","eligible",NA,"",2.47,NA,NA,NA,NA,NA
+"gaussian_shared_broad-04","gaussian_shared_broad","gaussian",4,1131300,"laplace","eligible",NA,"",19.27,TRUE,TRUE,-0.908436680282899,45033.0522773072,""
+"gaussian_shared_broad-04","gaussian_shared_broad","gaussian",4,1131300,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_shared_broad-05","gaussian_shared_broad","gaussian",5,1131400,"nuts","eligible",NA,"",2.97,NA,NA,NA,NA,NA
+"gaussian_shared_broad-05","gaussian_shared_broad","gaussian",5,1131400,"laplace","eligible",NA,"",19.17,TRUE,TRUE,-0.882129572313892,45932.5778148151,""
+"gaussian_shared_broad-05","gaussian_shared_broad","gaussian",5,1131400,"marginal","outside_scope",NA,"",NA,NA,NA,NA,NA,NA
+"gaussian_annual_weak-01","gaussian_annual_weak","gaussian",1,1131500,"nuts","eligible",NA,"",12.74,NA,NA,NA,NA,NA
+"gaussian_annual_weak-01","gaussian_annual_weak","gaussian",1,1131500,"laplace","rejected",NA,"Laplace approximation found competing posterior modes; inspect diagnostics and compare with full Bayesian sampling.",22.54,TRUE,TRUE,-0.621783928736489,10015.144141639," The original approximation did not pass its fit diagnostics."
+"gaussian_annual_weak-01","gaussian_annual_weak","gaussian",1,1131500,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",21.47,TRUE,TRUE,-0.68423250943545,21064.3626716756," The original approximation did not pass its fit diagnostics."
+"gaussian_annual_weak-02","gaussian_annual_weak","gaussian",2,1131600,"nuts","eligible",NA,"",13.81,NA,NA,NA,NA,NA
+"gaussian_annual_weak-02","gaussian_annual_weak","gaussian",2,1131600,"laplace","rejected",NA,"Laplace approximation found competing posterior modes; inspect diagnostics and compare with full Bayesian sampling.",22.36,TRUE,TRUE,-0.513127913570777,5544.47842047245," The original approximation did not pass its fit diagnostics."
+"gaussian_annual_weak-02","gaussian_annual_weak","gaussian",2,1131600,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",22.57,TRUE,TRUE,-0.668195578919458,9519.02542730375," The original approximation did not pass its fit diagnostics."
+"gaussian_annual_weak-03","gaussian_annual_weak","gaussian",3,1131700,"nuts","eligible",NA,"",11.81,NA,NA,NA,NA,NA
+"gaussian_annual_weak-03","gaussian_annual_weak","gaussian",3,1131700,"laplace","eligible",NA,"",20.22,TRUE,TRUE,-0.167923640836636,22697.437877027,""
+"gaussian_annual_weak-03","gaussian_annual_weak","gaussian",3,1131700,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",21.44,TRUE,TRUE,0.143735068002822,27027.3675795729," The original approximation did not pass its fit diagnostics."
+"gaussian_annual_weak-04","gaussian_annual_weak","gaussian",4,1131800,"nuts","eligible",NA,"",10.96,NA,NA,NA,NA,NA
+"gaussian_annual_weak-04","gaussian_annual_weak","gaussian",4,1131800,"laplace","eligible",NA,"",20.42,TRUE,TRUE,-0.353959236383064,11866.8737921087,""
+"gaussian_annual_weak-04","gaussian_annual_weak","gaussian",4,1131800,"marginal","eligible",NA,"",20.22,TRUE,TRUE,-0.327589137912507,16734.4052159323,""
+"gaussian_annual_weak-05","gaussian_annual_weak","gaussian",5,1131900,"nuts","eligible",NA,"",17.64,NA,NA,NA,NA,NA
+"gaussian_annual_weak-05","gaussian_annual_weak","gaussian",5,1131900,"laplace","rejected",NA,"Laplace approximation found competing posterior modes; inspect diagnostics and compare with full Bayesian sampling.",19.7,TRUE,TRUE,-0.408459352947563,5783.49687689939," The original approximation did not pass its fit diagnostics."
+"gaussian_annual_weak-05","gaussian_annual_weak","gaussian",5,1131900,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",22.27,TRUE,TRUE,-0.402593469670378,6297.59324521072," The original approximation did not pass its fit diagnostics."
+"gaussian_annual_informative-01","gaussian_annual_informative","gaussian",1,1132000,"nuts","eligible",NA,"",97.5,NA,NA,NA,NA,NA
+"gaussian_annual_informative-01","gaussian_annual_informative","gaussian",1,1132000,"laplace","eligible",NA,"",30.55,TRUE,FALSE,0.865634029565804,94.9172585524512,"The reference did not pass the posterior importance overlap checks."
+"gaussian_annual_informative-01","gaussian_annual_informative","gaussian",1,1132000,"marginal","eligible",NA,"",29.62,TRUE,TRUE,0.525420185869869,26805.327012266,""
+"gaussian_annual_informative-02","gaussian_annual_informative","gaussian",2,1132100,"nuts","eligible",NA,"",237.85,NA,NA,NA,NA,NA
+"gaussian_annual_informative-02","gaussian_annual_informative","gaussian",2,1132100,"laplace","eligible",NA,"",26.77,TRUE,FALSE,0.873027755945411,452.374315447657,"The reference did not pass the posterior importance overlap checks."
+"gaussian_annual_informative-02","gaussian_annual_informative","gaussian",2,1132100,"marginal","eligible",NA,"",27.0600000000001,TRUE,TRUE,0.567113633181723,21945.1904632588,""
+"gaussian_annual_informative-03","gaussian_annual_informative","gaussian",3,1132200,"nuts","eligible",NA,"",93.7,NA,NA,NA,NA,NA
+"gaussian_annual_informative-03","gaussian_annual_informative","gaussian",3,1132200,"laplace","eligible",NA,"",27.36,TRUE,FALSE,0.962641291461954,60.0177342817308,"The reference did not pass the posterior importance overlap checks."
+"gaussian_annual_informative-03","gaussian_annual_informative","gaussian",3,1132200,"marginal","eligible",NA,"",27.11,TRUE,TRUE,0.454016023545577,14501.4309857024,""
+"gaussian_annual_informative-04","gaussian_annual_informative","gaussian",4,1132300,"nuts","eligible",NA,"",89.8,NA,NA,NA,NA,NA
+"gaussian_annual_informative-04","gaussian_annual_informative","gaussian",4,1132300,"laplace","eligible",NA,"",26.9100000000001,TRUE,FALSE,0.755388673567363,1195.46365691418,"The reference did not pass the posterior importance overlap checks."
+"gaussian_annual_informative-04","gaussian_annual_informative","gaussian",4,1132300,"marginal","eligible",NA,"",27.66,TRUE,TRUE,0.467455081343982,21506.684643991,""
+"gaussian_annual_informative-05","gaussian_annual_informative","gaussian",5,1132400,"nuts","eligible",NA,"",111.93,NA,NA,NA,NA,NA
+"gaussian_annual_informative-05","gaussian_annual_informative","gaussian",5,1132400,"laplace","eligible",NA,"",27.01,TRUE,FALSE,0.832467271309269,193.174237996775,"The reference did not pass the posterior importance overlap checks."
+"gaussian_annual_informative-05","gaussian_annual_informative","gaussian",5,1132400,"marginal","eligible",NA,"",28.33,TRUE,TRUE,0.396994889756652,28465.3051104144,""
+"gaussian_repeated_funnel-01","gaussian_repeated_funnel","gaussian",1,1132500,"nuts","eligible",NA,"",28.14,NA,NA,NA,NA,NA
+"gaussian_repeated_funnel-01","gaussian_repeated_funnel","gaussian",1,1132500,"laplace","eligible",NA,"",22.64,TRUE,FALSE,1.57233202135,8.4357023572916,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-01","gaussian_repeated_funnel","gaussian",1,1132500,"marginal","eligible",NA,"",23.01,TRUE,FALSE,1.18794565237733,45.4176138335691,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-02","gaussian_repeated_funnel","gaussian",2,1132600,"nuts","eligible",NA,"",37.29,NA,NA,NA,NA,NA
+"gaussian_repeated_funnel-02","gaussian_repeated_funnel","gaussian",2,1132600,"laplace","eligible",NA,"",22.4400000000001,TRUE,FALSE,1.60776621270267,4.69202505507335,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-02","gaussian_repeated_funnel","gaussian",2,1132600,"marginal","eligible",NA,"",24.5799999999999,TRUE,FALSE,1.12242082576889,48.5166385882244,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-03","gaussian_repeated_funnel","gaussian",3,1132700,"nuts","eligible",NA,"",44.9499999999999,NA,NA,NA,NA,NA
+"gaussian_repeated_funnel-03","gaussian_repeated_funnel","gaussian",3,1132700,"laplace","eligible",NA,"",24.71,TRUE,FALSE,1.48382741152493,16.9262661989736,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-03","gaussian_repeated_funnel","gaussian",3,1132700,"marginal","eligible",NA,"",27.22,TRUE,FALSE,0.910847590054844,78.6956373504702,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-04","gaussian_repeated_funnel","gaussian",4,1132800,"nuts","eligible",NA,"",42.79,NA,NA,NA,NA,NA
+"gaussian_repeated_funnel-04","gaussian_repeated_funnel","gaussian",4,1132800,"laplace","eligible",NA,"",22.13,TRUE,FALSE,1.59315078640655,17.9157172244659,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-04","gaussian_repeated_funnel","gaussian",4,1132800,"marginal","eligible",NA,"",29,TRUE,FALSE,1.01852567274232,55.7060454086164,"The reference did not pass the posterior importance overlap checks."
+"gaussian_repeated_funnel-05","gaussian_repeated_funnel","gaussian",5,1132900,"nuts","eligible",NA,"",39.85,NA,NA,NA,NA,NA
+"gaussian_repeated_funnel-05","gaussian_repeated_funnel","gaussian",5,1132900,"laplace","rejected",NA,"Laplace approximation found competing posterior modes; inspect diagnostics and compare with full Bayesian sampling.",22.4399999999999,TRUE,FALSE,1.37731360876047,1.37717996953262,"The reference did not pass the posterior importance overlap checks. The original approximation did not pass its fit diagnostics."
+"gaussian_repeated_funnel-05","gaussian_repeated_funnel","gaussian",5,1132900,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",24.4100000000001,TRUE,FALSE,0.993697778511775,46.6777067877168,"The reference did not pass the posterior importance overlap checks. The original approximation did not pass its fit diagnostics."
+"nb2_annual-01","nb2_annual","nbinom2",1,1133000,"nuts","eligible",NA,"",69.26,NA,NA,NA,NA,NA
+"nb2_annual-01","nb2_annual","nbinom2",1,1133000,"laplace","eligible",NA,"",49.84,TRUE,TRUE,0.0082135423014882,2920.89872878086,""
+"nb2_annual-01","nb2_annual","nbinom2",1,1133000,"marginal","eligible",NA,"",48.8000000000001,TRUE,TRUE,0.246772928617771,14491.7635813785,""
+"nb2_annual-02","nb2_annual","nbinom2",2,1133100,"nuts","eligible",NA,"",89.59,NA,NA,NA,NA,NA
+"nb2_annual-02","nb2_annual","nbinom2",2,1133100,"laplace","eligible",NA,"",55.6599999999999,TRUE,TRUE,0.289053281001764,7269.26339900696,""
+"nb2_annual-02","nb2_annual","nbinom2",2,1133100,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",58.8600000000001,TRUE,TRUE,0.361005671294029,14777.5915503699," The original approximation did not pass its fit diagnostics."
+"nb2_annual-03","nb2_annual","nbinom2",3,1133200,"nuts","eligible",NA,"",70.8599999999999,NA,NA,NA,NA,NA
+"nb2_annual-03","nb2_annual","nbinom2",3,1133200,"laplace","eligible",NA,"",57.0900000000001,TRUE,TRUE,0.153554947222771,2894.79926538979,""
+"nb2_annual-03","nb2_annual","nbinom2",3,1133200,"marginal","eligible",NA,"",57.99,TRUE,TRUE,0.461624562011686,30518.0121089169,""
+"nb2_annual-04","nb2_annual","nbinom2",4,1133300,"nuts","eligible",NA,"",79.4300000000001,NA,NA,NA,NA,NA
+"nb2_annual-04","nb2_annual","nbinom2",4,1133300,"laplace","eligible",NA,"",58.98,TRUE,TRUE,0.348461995675431,4920.23386927957,""
+"nb2_annual-04","nb2_annual","nbinom2",4,1133300,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",61.47,TRUE,TRUE,0.377207977812814,16076.3453466702," The original approximation did not pass its fit diagnostics."
+"nb2_annual-05","nb2_annual","nbinom2",5,1133400,"nuts","eligible",NA,"",62.1799999999998,NA,NA,NA,NA,NA
+"nb2_annual-05","nb2_annual","nbinom2",5,1133400,"laplace","eligible",NA,"",61.2800000000002,TRUE,TRUE,-0.191649339173149,4288.08103700704,""
+"nb2_annual-05","nb2_annual","nbinom2",5,1133400,"marginal","eligible",NA,"",61.54,TRUE,TRUE,0.115521692738584,26097.8831179374,""
+"nb2_repeated_broad-01","nb2_repeated_broad","nbinom2",1,1133500,"nuts","eligible",NA,"",49.5,NA,NA,NA,NA,NA
+"nb2_repeated_broad-01","nb2_repeated_broad","nbinom2",1,1133500,"laplace","eligible",NA,"",55.3599999999999,TRUE,FALSE,0.308625952540211,1287.42151698511,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-01","nb2_repeated_broad","nbinom2",1,1133500,"marginal","rejected",NA,"Marginal Laplace numerical checks need attention; inspect grid convergence, conditional modes, and tail mass.",65.0800000000002,TRUE,TRUE,0.299506672475072,1579.71254508676," The original approximation did not pass its fit diagnostics."
+"nb2_repeated_broad-02","nb2_repeated_broad","nbinom2",2,1133600,"nuts","eligible",NA,"",39.1599999999999,NA,NA,NA,NA,NA
+"nb2_repeated_broad-02","nb2_repeated_broad","nbinom2",2,1133600,"laplace","eligible",NA,"",56.1400000000001,TRUE,FALSE,0.433363045548876,635.762846555556,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-02","nb2_repeated_broad","nbinom2",2,1133600,"marginal","eligible",NA,"",66.97,TRUE,FALSE,0.295031029361931,1755.27306214697,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-03","nb2_repeated_broad","nbinom2",3,1133700,"nuts","eligible",NA,"",50.1299999999999,NA,NA,NA,NA,NA
+"nb2_repeated_broad-03","nb2_repeated_broad","nbinom2",3,1133700,"laplace","eligible",NA,"",59.7,TRUE,FALSE,0.660696712367139,365.320369176039,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-03","nb2_repeated_broad","nbinom2",3,1133700,"marginal","eligible",NA,"",62.28,TRUE,FALSE,0.670501252760565,551.001860806772,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-04","nb2_repeated_broad","nbinom2",4,1133800,"nuts","eligible",NA,"",46.78,NA,NA,NA,NA,NA
+"nb2_repeated_broad-04","nb2_repeated_broad","nbinom2",4,1133800,"laplace","eligible",NA,"",59.54,TRUE,FALSE,0.675259131255486,126.447041741619,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-04","nb2_repeated_broad","nbinom2",4,1133800,"marginal","eligible",NA,"",62.1300000000001,TRUE,FALSE,0.482865119133884,1374.63239319741,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-05","nb2_repeated_broad","nbinom2",5,1133900,"nuts","eligible",NA,"",51.8500000000001,NA,NA,NA,NA,NA
+"nb2_repeated_broad-05","nb2_repeated_broad","nbinom2",5,1133900,"laplace","eligible",NA,"",64.25,TRUE,FALSE,0.817928663754443,165.186583466897,"The reference did not pass the posterior importance overlap checks."
+"nb2_repeated_broad-05","nb2_repeated_broad","nbinom2",5,1133900,"marginal","eligible",NA,"",66.53,TRUE,FALSE,0.828413034862302,122.918563579898,"The reference did not pass the posterior importance overlap checks."

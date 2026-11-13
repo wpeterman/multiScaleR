@@ -73,7 +73,8 @@ test_that("conditional fixed metadata retains original native expression identit
           if (qualified) "stats::poly(z,2)" else "poly(z,2)"
         form <- as.formula(paste("case_ ~ hab * group +", expr,
           "+ offset(log(exposure)) + strata(choice)"), env = asNamespace("survival"))
-        model <- survival::clogit(form, data = dat, model = TRUE, x = TRUE, y = TRUE)
+        model <- survival::clogit(form, data = dat, model = TRUE, x = TRUE, y = TRUE,
+          na.action = stats::na.fail)
         contract <- .msr_clogit_contract(model, f$inputs)
         contract$objective <- list(engine = contract$engine, X_fixed = contract$X_fixed,
           offset = contract$offset, response_design = contract$response_design)

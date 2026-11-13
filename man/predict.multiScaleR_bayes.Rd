@@ -175,5 +175,5 @@ predict(fit, new_surveys, kernel_inputs = example$inputs,
 \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
   \code{\link{prediction_contract}},
   \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
-  \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+  \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 }

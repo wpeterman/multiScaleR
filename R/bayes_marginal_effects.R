@@ -1,7 +1,8 @@
 # Posterior regression curves at hypothetical covariate values. Spatial
 # covariates use the retained fixed reference transformation, not a new scale
 # or landscape extraction per draw. These are not spatial prediction maps.
-.msr_bayes_marginal_effects <- function(object, ylab, length.out, draws) {
+.msr_bayes_marginal_effects <- function(object, ylab, length.out, draws,
+                                        add_label = FALSE) {
   x <- NULL # ggplot resolves the x column in its supplied data frame.
   validate_character_scalar(ylab, "ylab")
   validate_scalar_numeric(length.out, "length.out", integerish = TRUE, positive = TRUE)
@@ -44,6 +45,7 @@
     "Response random effects are zero, not integrated. Observation noise is excluded.")
   if (isFALSE(object$diagnostics$passed)) caption <- paste(caption, "Fit checks need attention.")
   else if (!isTRUE(object$diagnostics$passed)) caption <- paste(caption, "Stored fit checks unavailable.")
+  if (!add_label) caption <- NULL # captions are opt-in
   plots <- stats::setNames(lapply(panels, function(nm) {
     value <- reference[[nm]]
     grid <- if (is.numeric(value)) seq(min(value, na.rm = TRUE), max(value, na.rm = TRUE),

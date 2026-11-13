@@ -129,7 +129,8 @@
 #' different extrapolation questions. A full-rank basis does not establish a
 #' converged fit, ecological threshold, response shape or calibrated uncertainty.
 #' @seealso [make_gdr_refitter()], [validate_unmarked_data()]
-#' @export
+#' @keywords internal
+#' @noRd
 audit_gdr_integration <- function(model, cutoffs = NULL, design = FALSE, design_data = NULL) {
   validate_scalar_logical(design, "design")
   if (!is.null(design_data) && (!isTRUE(design) || !is.data.frame(design_data) ||

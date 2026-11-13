@@ -1,4 +1,4 @@
-# Reproduce the artificial data used in vignette("bayesian-scales").
+# Reproduce the artificial data used in vignette("v13-bayesian-scales").
 # The seed controls maps, site effects and NB2 responses. This script does not
 # fit a model or write files. Distances are in projected map units (meters).
 make_bayesian_annual_data <- function() {

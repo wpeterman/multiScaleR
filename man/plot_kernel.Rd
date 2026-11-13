@@ -7,12 +7,13 @@
 plot_kernel(
   prob = 0.9,
   sigma,
-  beta = NULL,
+  shape = NULL,
   kernel,
   scale_dist = TRUE,
   add_label = TRUE,
   dimension = c("2d", "1d"),
-  ...
+  ...,
+  beta = NULL
 )
 }
 \arguments{
@@ -25,11 +26,11 @@ same units as the projection used with \code{\link{kernel_prep}} (e.g.,
 meters when using a metric CRS). Controls the width of the kernel: larger
 values spread influence over greater distances.}
 
-\item{beta}{Positive numeric. Shape parameter for the exponential power
+\item{shape}{Positive numeric. Shape parameter for the exponential power
 kernel (\code{kernel = "expow"}). Controls kernel shape: values near 1
 approximate a Laplace (double-exponential) shape; values near 2 approximate
 Gaussian; larger values approach a flat-top (platykurtic) shape. Typical
-range is 1–50. Ignored for all other kernel types. Default: \code{NULL}.}
+range is 1 to 50. Ignored for all other kernel types. Default: \code{NULL}.}
 
 \item{kernel}{Character. The kernel function to visualize. One of:
 \describe{
@@ -40,7 +41,7 @@ range is 1–50. Ignored for all other kernel types. Default: \code{NULL}.}
   \item{\code{"fixed"}}{Fixed-radius step function; all distances up to
     \code{sigma} receive equal weight.}
   \item{\code{"expow"}}{Exponential power kernel parameterized by
-    \code{sigma} and \code{beta}.}
+    \code{sigma} and \code{shape}.}
 }}
 
 \item{scale_dist}{Logical. If \code{TRUE} (default), a vertical dashed line
@@ -56,6 +57,10 @@ plot. Requires \code{scale_dist = TRUE}.}
 original distance enclosing that proportion along a line through the point.}
 
 \item{...}{Not used.}
+
+\item{beta}{Deprecated. Former name of \code{shape}, still accepted for one
+release with a warning. Supplying both \code{shape} and \code{beta} with
+different values is an error.}
 }
 \value{
 A \code{ggplot2} object showing kernel weight (y-axis) as a function
@@ -103,7 +108,7 @@ plot_kernel(prob = 0.95,
             kernel = 'fixed')
 plot_kernel(prob = 0.95,
             sigma = 100,
-            beta = 2.5,
+            shape = 2.5,
             kernel = 'expow')
 ## Original line-based definition
 plot_kernel(sigma = 100, kernel = 'gaussian', dimension = '1d')

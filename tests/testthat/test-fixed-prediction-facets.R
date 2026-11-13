@@ -108,7 +108,8 @@ test_that("conditional raw and retained routes share frozen public predictions",
   dat$choice <- rep(seq_len(nrow(dat) / 3L), each = 3L)
   env <- new.env(parent = asNamespace("survival")); env$dat <- dat
   env$form <- as.formula("case_ ~ hab + group + base::scale(z) + offset(log(exposure)) + strata(choice)", env = env)
-  model <- evalq(survival::clogit(form, data = dat, model = TRUE, x = TRUE, y = TRUE), env)
+  model <- evalq(survival::clogit(form, data = dat, model = TRUE, x = TRUE, y = TRUE,
+    na.action = stats::na.fail), env)
   raw <- .msr_clogit_contract(model, f$inputs)
   expect_identical(raw$native_data_mode, "raw_variables")
   saved <- model; saved$call$data <- quote(unavailable_original_data)

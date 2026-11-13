@@ -50,7 +50,8 @@
 #' attempts <- data.frame(replicate = 1:3, target = "density", units = "birds/km2",
 #'   truth = 0.4, estimate = log(c(0.2, 0.4, 0.6)), eligible = TRUE)
 #' score_simulation(attempts, input_scale = "log")$summary
-#' @export
+#' @keywords internal
+#' @noRd
 score_simulation <- function(estimates, input_scale, level = 0.95) {
   required <- c("replicate", "target", "units", "truth", "estimate", "eligible")
   if (!is.data.frame(estimates) || !nrow(estimates) ||
@@ -147,9 +148,8 @@ score_simulation <- function(estimates, input_scale, level = 0.95) {
     input_scale = input_scale, level = level), class = "msr_simulation_score")
 }
 
-#' @rdname score_simulation
-#' @param x An object returned by `score_simulation()`.
-#' @param ... Further arguments passed to the data-frame print method.
+# Print method for the internal simulation score object.
+#' @noRd
 #' @export
 print.msr_simulation_score <- function(x, ...) {
   cat("Response-scale simulation scores (", x$input_scale, " input)\n", sep = "")

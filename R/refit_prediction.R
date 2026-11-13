@@ -241,6 +241,32 @@
   .msr_native_prediction_rows(object, newdata, type, se.fit, dots)
 }
 
+# glmmTMB stops with "subscript out of bounds" when a spatial response field
+# (exp, gau or mat covariance) meets positions or groups it was not fitted at
+# and allow.new.levels is not TRUE. Name the two supported routes before the
+# native call. A supplied re.form leaves the choice of effects to the user.
+.msr_check_new_field_positions <- function(model, newdata, dots) {
+  if (!inherits(model, "glmmTMB") || !is.data.frame(newdata) ||
+      isTRUE(dots[["allow.new.levels"]]) || !is.null(dots[["re.form"]]))
+    return(invisible(NULL))
+  blocks <- model$modelInfo$reStruc$condReStruc
+  code <- vapply(blocks, function(x) if (is.numeric(x$blockCode) &&
+    length(x$blockCode) == 1L) as.integer(x$blockCode) else NA_integer_, 1L)
+  for (term in names(blocks)[code %in% c(5L, 6L, 7L)]) {
+    variables <- all.vars(tryCatch(str2lang(term), error = function(e) NULL))
+    for (v in intersect(variables, intersect(names(newdata), names(model$frame)))) {
+      unseen <- setdiff(unique(as.character(newdata[[v]])),
+                        unique(as.character(model$frame[[v]])))
+      if (length(unseen))
+        stop("newdata has ", length(unseen), " value(s) of `", v, "` that the ",
+             "fitted spatial field (", term, ") did not include. Set ",
+             "allow.new.levels = TRUE to predict the field at new positions, or ",
+             "re.form = NA to set the field to zero.", call. = FALSE)
+    }
+  }
+  invisible(NULL)
+}
+
 # Shared native target for prepared point rows and checked raster chunks.
 .msr_native_prediction_rows <- function(object, newdata, type, se.fit, dots = list(),
     unmarked_predictor = NULL) {
@@ -298,6 +324,7 @@
     absent <- setdiff(required, names(newdata))
     if (length(absent)) stop("newdata must explicitly contain formula variables: ",
       paste(absent, collapse = ", "), call. = FALSE)
+    .msr_check_new_field_positions(model, newdata, dots)
   }
   args <- c(list(object = model, type = type), dots)
   if (!is.null(newdata)) args$newdata <- newdata

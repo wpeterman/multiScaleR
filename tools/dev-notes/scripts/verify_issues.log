@@ -1,0 +1,127 @@
+
+### A. default refit fit: is there a `backend` element?  [0.2s]
+  'backend' %in% names(fit): FALSE  value: NULL 
+
+### B1. fixed kernel, default start  [0.1s]
+      Mean SE
+land1  415 NA
+land2  415 NA
+  logLik: -175.0376 
+
+### B2. fixed kernel, start_strategy = 'screen'  [0.6s]
+          Mean SE
+land1 409.6570 NA
+land2 724.1225 NA
+  logLik: -154.6263 
+
+### C0. profile_glm fit  [0.1s]
+
+### C1. profile_sigma(profile_glm fit) with defaults  [0.0s]
+  ERROR: profile_glm sigma values must remain within the fitted bounds. 
+
+### C2. profile_sigma(profile_glm fit, sigma_range = c(100, 600))  [0.0s]
+
+### C3. profile_sigma(default refit fit) with defaults  [0.0s]
+
+### D1. profile_glm with lm()  [0.0s]
+  ERROR: profile_glm requires a glm or MASS::glm.nb fit with model = TRUE. 
+
+### D2. profile_glm with glm(gaussian)  [0.0s]
+
+### E0a. Poisson CV, default metrics  [1.5s]
+
+### E0b. NB2 CV, default metrics  [1.5s]
+  Poisson metrics: rmse mae neg_log_score deviance  NB2 metrics: rmse mae neg_log_score 
+
+### E1. select_cv(mixed Poisson + NB2, defaults)  [0.0s]
+  ERROR: Distribution CV supports rmse, mae and neg_log_score. 
+
+### E2. select_cv after matching Poisson metrics  [0.0s]
+
+  default kernel_prep store_cell_data formal: TRUE 
+
+### E3. cross_validate with default kernel_prep() inputs  [1.4s]
+  complete: TRUE 
+
+### E4. kernel_prep(store_cell_data = FALSE)  [1.3s]
+
+### E5. cross_validate with store_cell_data = FALSE inputs  [0.0s]
+  ERROR: CV requires matching kernel_prep() row IDs and stored cell-level inputs; use store_cell_data = TRUE. 
+
+### F. msr_vars: base on msidi; rpr without classes_max
+
+### F1. msidi default base  [0.3s]
+
+### F2. msidi base = 2  [0.2s]
+  identical raw values: TRUE  centers: 0.7305408 0.7305408 
+
+### F3. shdi default base  [0.2s]
+
+### F4. shdi base = 2  [0.3s]
+  shdi centers: 0.8377864 1.20867 
+
+### F5. rpr without classes_max  [0.3s]
+  ERROR: Cannot scale `kernel_prep()` covariates: covariate `m` is all NA. 
+
+### F6. rpr with classes_max = 3  [0.2s]
+  ERROR: Cannot scale `kernel_prep()` covariates: covariate `m` has zero variance. 
+
+### G. plot_kernel dashed-line colour by kernel
+  gaussian : layer colours = black, red 
+  exp : layer colours = black, red 
+  expow : layer colours = black, red 
+  fixed : layer colours = black, red 
+
+### H. user-name paths in shipped rds files
+  bayesian-annual-example.rds : lines with a Users path = 1 
+    e.g. .. ..- attr(*, "names")= chr [1:64] "C:/Users/<name>/.codex/scratch/msrtail20261024-source/R/aic_tab.R" "C:/Users/<name>/.codex/scratch/msrt 
+  bayesian-computation-example.rds : lines with a Users path = 0 
+  bayesian-prediction-example.rds : lines with a Users path = 0 
+  opt_umf_p.rds : lines with a Users path = 0 
+  vignette_cache.rds : lines with a Users path = 0 
+
+### I. land2 value range: 0 to 1 
+
+### J. conditional_logit
+Conditional logit: 6/6 starts passed native audits; scale SEs withheld.
+         Mean 2.5% 97.5%
+forest 323.83   NA    NA
+  sigma SE: NA 
+
+### J1. profile_sigma(conditional_logit fit)  [0.0s]
+  ERROR: Could not profile `forest`: Could not recover the original model data needed to refit the model during optimization. Refit the model with an explicit `data = ...` argument and try again. 
+  WARNINGS: first element used of 'length.out' argument | Failed to extract model data needed for refitting: argument is not a valid model 
+
+### J2. summary(conditional_logit fit, profile = TRUE)  [0.4s]
+  ERROR: Profile-likelihood intervals could not be computed: The fitted object lacks information needed for profiling. 
+
+### J3. conditional_logit with fixed-knot ns()  [0.0s]
+  ERROR: Native dynamic spline frame does not match its fixed basis recipe. 
+
+### J4. conditional_logit with fixed-knot splines::bs()  [0.0s]
+  ERROR: Native dynamic spline frame does not match its fixed basis recipe. 
+
+### K. glmmTMB spatial field
+  'backend' in cached field fit: FALSE 
+
+### K1. response_field_geometry(real field fit)  [0.0s]
+  ERROR: Use a native glmmTMB multiScaleR refit result. 
+
+### K2. same, after setting fit$backend <- 'refit' by hand  [0.0s]
+
+### K3. predict at new positions, no allow.new.levels  [0.0s]
+  ERROR: subscript out of bounds 
+
+### K4. predict at new positions, allow.new.levels = TRUE  [0.1s]
+
+### K5. glmmTMB field starting model with DEFAULT starts  [0.4s]
+  WARNINGS: Model convergence problem; non-positive-definite Hessian matrix. See vignette('troubleshooting') 
+  starting model pdHess: FALSE  theta: -0.743 0 
+
+### K6. multiScale_optim on that default-start model  [10.0s]
+  WARNINGS: Model convergence problem; non-positive-definite Hessian matrix. See vignette('troubleshooting') 
+      Mean SE
+land1  415 NA
+land2  415 NA
+
+DONE

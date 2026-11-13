@@ -34,3 +34,4 @@
 ^docs$
 ^pkgdown$
 ^codecov\.yml$
+^tools/dev-notes$

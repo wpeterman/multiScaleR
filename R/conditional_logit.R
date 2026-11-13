@@ -140,7 +140,13 @@ terms.msr_clogit_frame_formula <- function(x, ...) {
   # prediction metadata. A malformed native design must still be rejected.
   if (length(attr(tt, "predvars")) != length(attr(tt, "variables")))
     stop("Cannot recover saved prediction transformations from Cox terms.", call. = FALSE)
-  tt <- .msr_fixed_prediction_terms(tt, m$model)
+  # Keep the retained fit immutable and use its original prediction recipe.
+  m <- .msr_native_fixed_metadata(m)
+  tt <- stats::terms(m)
+  if (.msr_needs_fixed_metadata(tt))
+    stop("Cox fitting did not retain the original prediction transformations. ",
+      "Fit complete choice sets with na.action = stats::na.fail, or precompute the transformed predictor.",
+      call. = FALSE)
   # Rebuild prediction terms on the retained data: drop.terms() can leave Cox
   # predvars pointing at a removed strata term instead of a formula offset.
   offsets <- vapply(attr(tt, "offset"), function(i)
@@ -148,8 +154,14 @@ terms.msr_clogit_frame_formula <- function(x, ...) {
   pred_formula <- stats::reformulate(c(labels[-sg], offsets),
     intercept = attr(tt, "intercept") == 1L, env = environment(tt))
   pred_terms <- .msr_clogit_prediction_terms(tt, pred_formula)
+  if (.msr_needs_nested_metadata(pred_terms)) {
+    m <- .msr_native_fixed_metadata(m, nested = TRUE)
+    tt <- stats::terms(m)
+    pred_terms <- .msr_clogit_prediction_terms(tt, pred_formula)
+  }
+  frame <- if (products) .msr_cox_spline_frame(tt, m$model, covs) else m$model
   response_design <- if (products) .msr_compile_response_design(pred_terms,
-    .msr_response_frame_subset(tt, m$model, pred_terms), covs, colnames(X), m$contrasts) else NULL
+    .msr_response_frame_subset(tt, frame, pred_terms), covs, colnames(X), m$contrasts) else NULL
   if (!is.null(response_design))
     fixed <- response_design$columns[lengths(response_design$dependence) == 0L]
   out <- list(model = m, data = dat, frame = m$model, covariates = covs,
@@ -253,11 +265,15 @@ terms.msr_clogit_frame_formula <- function(x, ...) {
   if (frame_mode) {
     fit$terms <- stats::terms(contract$model)
     fit$formula <- stats::formula(contract$model)
-    attr(fit$model, "terms") <- fit$terms
+  } else {
+    original <- stats::terms(contract$model)
+    variables <- attr(fit$terms, "variables")
+    if (!identical(variables, attr(original, "variables")))
+      stop("Native Cox refit changed the fitted prediction expressions.", call. = FALSE)
+    attr(fit$terms, "predvars") <- attr(original, "predvars")
   }
   # The returned native model must use the same fixed training transformation
   # as wrapper predictions. Learned kernel-dependent bases remain inadmissible.
-  fit$terms <- .msr_fixed_prediction_terms(fit$terms, contract$frame)
   attr(fit$model, "terms") <- fit$terms
   fit$call$formula <- stats::formula(contract$model)
   fit$call$method <- contract$model$method

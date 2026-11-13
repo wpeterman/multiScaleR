@@ -5,7 +5,7 @@
 }
 
 .msr_gdr_field_geometry <- function(object, coords, crs, batch_size, max_memory_mb) {
-  if (!identical(object$backend, "refit"))
+  if (!.msr_refit_backend_fit(object))
     stop("Use a native GDR response-field multiScaleR refit result.", call. = FALSE)
   field <- .msr_gdr_field_guard(object$opt_mod)
   validate_scalar_numeric(batch_size, "batch_size", positive = TRUE, integerish = TRUE)

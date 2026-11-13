@@ -129,6 +129,21 @@ when its tail estimate exceeds \code{1 - level}; the ambiguity flag is
 separate. Any failed bootstrap pair makes that scale's calibration missing.
 Only unit observation weights are currently supported for bootstrap.
 
+A simulation with 32 datasets per scenario and 99 bootstrap draws per
+test compared the bootstrap and chi-squared decisions at the known
+generating scale. In the interior NB2 scenario, both included the
+generating scale in 24 of 32 datasets and agreed on every decision.
+The exact 95 percent binomial interval for inclusion was 0.566 to 0.885.
+This measures pointwise inclusion in that simulation design. Coverage
+of the returned finite-grid sets is a separate target.
+
+In a separate 48-dataset simulation, all full-grid sets were available.
+Their coverage changed with the grid even when the bootstrap decisions
+at shared nodes were held fixed. A singleton component contains only
+its accepted scale. Its outside brackets record adjacent rejected
+nodes. \code{vignette("v09-estimates-and-intervals", package = "multiScaleR")}
+summarizes the simulation results.
+
 These are plug-in parametric bootstrap tests for independent observations,
 not exact tests with known nuisance parameters. Neither bootstrap nor
 positive curvature guarantees calibrated coverage under weak identification

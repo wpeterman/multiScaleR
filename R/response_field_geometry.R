@@ -13,6 +13,13 @@
   stop("Use a known projected CRS with two horizontal dimensions and declared linear units.", call. = FALSE)
 }
 
+# The default refit backend stores no `backend` element on its result. Only
+# the opt-in backends name themselves. Treat a missing element as the refit
+# backend, as the refit Hessian code does.
+.msr_refit_backend_fit <- function(object) {
+  is.null(object$backend) || identical(object$backend, "refit")
+}
+
 # Bind a field descriptor to the retained fit without retaining a model or tape.
 .msr_response_field_binding <- function(object) {
   model <- .analysis_model(object$opt_mod)
@@ -114,7 +121,8 @@ response_field_geometry <- function(object, coords, crs, batch_size = 128L,
                                     max_memory_mb = 512) {
   if (inherits(object, "multiScaleR") && methods::is(object$opt_mod, "unmarkedFitGDRField"))
     return(.msr_gdr_field_geometry(object, coords, crs, batch_size, max_memory_mb))
-  if (!inherits(object, "multiScaleR") || !identical(object$backend, "refit"))
+  if (!inherits(object, "multiScaleR") || !.msr_refit_backend_fit(object) ||
+      !inherits(.analysis_model(object$opt_mod), "glmmTMB"))
     stop("Use a native glmmTMB multiScaleR refit result.", call. = FALSE)
   model <- .analysis_model(object$opt_mod)
   fields <- .msr_glmmTMB_response_fields(model)

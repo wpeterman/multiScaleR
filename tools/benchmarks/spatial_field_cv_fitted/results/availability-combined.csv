@@ -1,0 +1,10 @@
+"family","design","attempted","fitted_scored","generating_scored","paired_scored","availability","lower","upper","failed_initial_fit","failed_prediction","failed_other","one_eligible_start","two_eligible_starts","returned_start_disagreement"
+"gaussian","buffered_transfer",40,38,40,38,0.95,0.830803136040582,0.993886353400649,2,0,0,0,38,0
+"nbinom2","buffered_transfer",40,38,40,38,0.95,0.830803136040582,0.993886353400649,2,0,0,6,32,0
+"poisson","buffered_transfer",40,39,40,39,0.975,0.868414141517234,0.999367255067951,1,0,0,0,39,1
+"gaussian","interpolation",40,39,40,39,0.975,0.868414141517234,0.999367255067951,1,0,0,0,39,0
+"nbinom2","interpolation",40,36,40,36,0.9,0.7633626001239,0.972074584705781,4,0,0,3,33,3
+"poisson","interpolation",40,40,40,40,1,0.911902697121198,1,0,0,0,0,40,3
+"gaussian","sparse_strong",40,38,40,38,0.95,0.830803136040582,0.993886353400649,2,0,0,0,38,0
+"nbinom2","sparse_strong",40,34,40,34,0.85,0.701647333160423,0.942897741845474,6,0,0,11,23,7
+"poisson","sparse_strong",40,39,40,39,0.975,0.868414141517234,0.999367255067951,1,0,0,1,38,7

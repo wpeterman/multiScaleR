@@ -1,0 +1,2 @@
+"id","family","design","replicate","method","public_status","reference_status","n_assessment","public_loss","reference_loss","reference_loss_mcse","max_rhat","overlap","message","warnings"
+"fit_003","nbinom2","interpolation",1,"generating","scored","resolved",24,69.9785318713447,70.0418322667208,0.047781580458521,1.00944360783708,0.238150984632485,"",""

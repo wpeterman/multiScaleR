@@ -1,0 +1,34 @@
+diff --git a/vignettes/inference-contracts.Rmd b/vignettes/inference-contracts.Rmd
+--- a/vignettes/inference-contracts.Rmd
++++ b/vignettes/inference-contracts.Rmd
+@@ -126,14 +126,22 @@ Many weak-effect or near-bound fits had no Wald interval. A passed
+ curvature check supports a local approximation. The simulation does not
+ establish interval calibration for either backend.
+ 
+-For the NB2 pointwise bootstrap test at nominal level 0.90, the generating
+-scale was included in 8 of 8 interior, 6 of 8 weak-effect, and 7 of 8
+-near-bound Poisson-limit datasets. All 1,176 paired refits completed. The
+-bootstrap Monte Carlo limits crossed the rejection cutoff in five cases,
+-including all three nominal rejections. These small groups of simulations
+-leave substantial uncertainty about inclusion rates. Testing the known
+-generating scale also leaves the coverage of finite-grid confidence sets
+-unresolved.
++A follow-up simulation tested the known NB2 generating scale at nominal
++level 0.90 on 32 datasets per scenario. All 9,504 paired bootstrap refits
++completed with 99 draws per dataset. In the interior scenario, both the
++bootstrap and chi-squared likelihood-ratio tests included the generating
++scale in 24 of 32 datasets. They agreed on every decision. The exact 95%
++binomial interval for inclusion was 0.566 to 0.885.
++
++In the weak-effect scenario, the bootstrap included 27 of 32 generating
++scales and the chi-squared test included 26. One dataset was included only
++by the bootstrap. Near the upper bound under the Poisson limit, the
++bootstrap included 27 of 32 and the chi-squared test included 29. Two
++datasets were included only by the chi-squared test. The bootstrap
++Monte Carlo limits crossed the rejection cutoff in four interior, five
++weak-effect, and five near-bound datasets. These are paired comparisons
++of pointwise inclusion. Coverage of the returned finite-grid sets also
++depends on the grid and its accepted components.
+ 
+ The `joint_mixed` assessment returned 53 of 54 random-intercept fits for
+ Poisson, NB2, and zero-inflated Poisson responses. The independent native

@@ -1,0 +1,192 @@
+2026-11-13 00:45:54 point starting interior-01 
+2026-11-13 00:47:08 point finished interior-01 point_complete seconds 73.8 grid covered point TRUE error 
+2026-11-13 00:47:08 point starting weak-01 
+2026-11-13 00:48:09 point finished weak-01 point_complete seconds 61 grid covered point TRUE error 
+2026-11-13 00:48:09 point starting near_bound-01 
+2026-11-13 00:48:45 point finished near_bound-01 point_complete seconds 36.19 grid covered point TRUE error 
+2026-11-13 00:48:45 point starting interior-02 
+2026-11-13 00:50:11 point finished interior-02 point_complete seconds 86.32 grid covered point TRUE error 
+2026-11-13 00:50:11 point starting weak-02 
+2026-11-13 00:51:09 point finished weak-02 point_complete seconds 57.96 grid covered point TRUE error 
+2026-11-13 00:51:09 point starting near_bound-02 
+2026-11-13 00:51:54 point finished near_bound-02 point_complete seconds 44.91 grid covered point FALSE error 
+2026-11-13 00:51:54 point starting interior-03 
+2026-11-13 00:53:08 point finished interior-03 point_complete seconds 74.02 grid covered point TRUE error 
+2026-11-13 00:53:08 point starting weak-03 
+2026-11-13 00:54:08 point finished weak-03 point_complete seconds 59.94 grid covered point TRUE error 
+2026-11-13 00:54:08 point starting near_bound-03 
+2026-11-13 00:54:55 point finished near_bound-03 point_complete seconds 47.41 grid covered point FALSE error 
+2026-11-13 00:54:55 point starting interior-04 
+2026-11-13 00:56:20 point finished interior-04 point_complete seconds 84.22 grid covered point TRUE error 
+2026-11-13 00:56:20 point starting weak-04 
+2026-11-13 00:57:25 point finished weak-04 point_complete seconds 65.67 grid covered point TRUE error 
+2026-11-13 00:57:25 point starting near_bound-04 
+2026-11-13 00:58:13 point finished near_bound-04 point_complete seconds 47.78 grid covered point FALSE error 
+2026-11-13 00:58:13 point starting interior-05 
+2026-11-13 00:59:22 point finished interior-05 point_complete seconds 69.09 grid covered point TRUE error 
+2026-11-13 00:59:22 point starting weak-05 
+2026-11-13 01:00:14 point finished weak-05 point_complete seconds 52.22 grid covered point TRUE error 
+2026-11-13 01:00:14 point starting near_bound-05 
+2026-11-13 01:00:52 point finished near_bound-05 point_complete seconds 37.86 grid covered point TRUE error 
+2026-11-13 01:00:52 point starting interior-06 
+2026-11-13 01:02:06 point finished interior-06 point_complete seconds 74.15 grid covered point TRUE error 
+2026-11-13 01:02:06 point starting weak-06 
+2026-11-13 01:03:12 point finished weak-06 point_complete seconds 65.26 grid covered point TRUE error 
+2026-11-13 01:03:12 point starting near_bound-06 
+2026-11-13 01:03:47 point finished near_bound-06 point_complete seconds 35.22 grid covered point TRUE error 
+2026-11-13 01:03:47 point starting interior-07 
+2026-11-13 01:05:09 point finished interior-07 point_complete seconds 81.69 grid covered point TRUE error 
+2026-11-13 01:05:09 point starting weak-07 
+2026-11-13 01:06:07 point finished weak-07 point_complete seconds 58.5 grid covered point TRUE error 
+2026-11-13 01:06:07 point starting near_bound-07 
+2026-11-13 01:06:46 point finished near_bound-07 point_complete seconds 38.83 grid covered point TRUE error 
+2026-11-13 01:06:46 point starting interior-08 
+2026-11-13 01:07:59 point finished interior-08 point_complete seconds 73.06 grid covered point TRUE error 
+2026-11-13 01:07:59 point starting weak-08 
+2026-11-13 01:09:03 point finished weak-08 point_complete seconds 63.74 grid covered point TRUE error 
+2026-11-13 01:09:03 point starting near_bound-08 
+2026-11-13 01:09:33 point finished near_bound-08 point_complete seconds 30.41 grid covered point TRUE error 
+2026-11-13 01:09:33 point starting interior-09 
+2026-11-13 01:10:54 point finished interior-09 point_complete seconds 80.76 grid covered point FALSE error 
+2026-11-13 01:10:54 point starting weak-09 
+2026-11-13 01:12:10 point finished weak-09 point_complete seconds 76.25 grid covered point TRUE error 
+2026-11-13 01:12:10 point starting near_bound-09 
+2026-11-13 01:12:59 point finished near_bound-09 point_complete seconds 48.86 grid covered point TRUE error 
+2026-11-13 01:12:59 point starting interior-10 
+2026-11-13 01:14:26 point finished interior-10 point_complete seconds 86.85 grid covered point TRUE error 
+2026-11-13 01:14:26 point starting weak-10 
+2026-11-13 01:15:45 point finished weak-10 point_complete seconds 78.49 grid covered point TRUE error 
+2026-11-13 01:15:45 point starting near_bound-10 
+2026-11-13 01:16:25 point finished near_bound-10 point_complete seconds 40.83 grid covered point TRUE error 
+2026-11-13 01:16:25 point starting interior-11 
+2026-11-13 01:17:49 point finished interior-11 point_complete seconds 83.29 grid covered point FALSE error 
+2026-11-13 01:17:49 point starting weak-11 
+2026-11-13 01:19:13 point finished weak-11 point_complete seconds 84.69 grid covered point TRUE error 
+2026-11-13 01:19:13 point starting near_bound-11 
+2026-11-13 01:20:01 point finished near_bound-11 point_complete seconds 47.6 grid covered point TRUE error 
+2026-11-13 01:20:01 point starting interior-12 
+2026-11-13 01:21:37 point finished interior-12 point_complete seconds 96.26 grid covered point TRUE error 
+2026-11-13 01:21:37 point starting weak-12 
+2026-11-13 01:22:55 point finished weak-12 point_complete seconds 77.97 grid covered point TRUE error 
+2026-11-13 01:22:55 point starting near_bound-12 
+2026-11-13 01:23:49 point finished near_bound-12 point_complete seconds 54.01 grid covered point TRUE error 
+2026-11-13 01:23:49 point starting interior-13 
+2026-11-13 01:25:30 point finished interior-13 point_complete seconds 100.33 grid covered point TRUE error 
+2026-11-13 01:25:30 point starting weak-13 
+2026-11-13 01:26:48 point finished weak-13 point_complete seconds 77.89 grid covered point TRUE error 
+2026-11-13 01:26:48 point starting near_bound-13 
+2026-11-13 01:27:38 point finished near_bound-13 point_complete seconds 50.04 grid covered point FALSE error 
+2026-11-13 01:27:38 point starting interior-14 
+2026-11-13 01:29:34 point finished interior-14 point_complete seconds 116.15 grid covered point TRUE error 
+2026-11-13 01:29:34 point starting weak-14 
+2026-11-13 01:31:08 point finished weak-14 point_complete seconds 94.4 grid covered point TRUE error 
+2026-11-13 01:31:08 point starting near_bound-14 
+2026-11-13 01:32:18 point finished near_bound-14 point_complete seconds 69.41 grid covered point TRUE error 
+2026-11-13 01:32:18 point starting interior-15 
+2026-11-13 01:33:53 point finished interior-15 point_complete seconds 95.1 grid covered point FALSE error 
+2026-11-13 01:33:53 point starting weak-15 
+2026-11-13 01:35:03 point finished weak-15 point_complete seconds 70.17 grid covered point TRUE error 
+2026-11-13 01:35:03 point starting near_bound-15 
+2026-11-13 01:35:43 point finished near_bound-15 point_complete seconds 39.72 grid covered point TRUE error 
+2026-11-13 01:35:43 point starting interior-16 
+2026-11-13 01:37:24 point finished interior-16 point_complete seconds 101.52 grid covered point TRUE error 
+2026-11-13 01:37:24 point starting weak-16 
+2026-11-13 01:38:47 point finished weak-16 point_complete seconds 83.03 grid covered point TRUE error 
+2026-11-13 01:38:47 point starting near_bound-16 
+2026-11-13 01:39:34 point finished near_bound-16 point_complete seconds 46.36 grid covered point TRUE error 
+2026-11-13 01:39:34 point starting interior-17 
+2026-11-13 01:41:26 point finished interior-17 point_complete seconds 112.19 grid covered point TRUE error 
+2026-11-13 01:41:26 point starting weak-17 
+2026-11-13 01:42:52 point finished weak-17 point_complete seconds 86.01 grid covered point TRUE error 
+2026-11-13 01:42:52 point starting near_bound-17 
+2026-11-13 01:43:33 point finished near_bound-17 point_complete seconds 41.14 grid covered point TRUE error 
+2026-11-13 01:43:33 point starting interior-18 
+2026-11-13 01:45:08 point finished interior-18 point_complete seconds 94.73 grid covered point FALSE error 
+2026-11-13 01:45:08 point starting weak-18 
+2026-11-13 01:46:36 point finished weak-18 point_complete seconds 88.58 grid covered point TRUE error 
+2026-11-13 01:46:36 point starting near_bound-18 
+2026-11-13 01:47:24 point finished near_bound-18 point_complete seconds 47.53 grid covered point TRUE error 
+2026-11-13 01:47:24 point starting interior-19 
+2026-11-13 01:48:54 point finished interior-19 point_complete seconds 90.13 grid covered point TRUE error 
+2026-11-13 01:48:54 point starting weak-19 
+2026-11-13 01:49:58 point finished weak-19 point_complete seconds 63.72 grid covered point FALSE error 
+2026-11-13 01:49:58 point starting near_bound-19 
+2026-11-13 01:50:50 point finished near_bound-19 point_complete seconds 51.97 grid covered point TRUE error 
+2026-11-13 01:50:50 point starting interior-20 
+2026-11-13 01:52:11 point finished interior-20 point_complete seconds 81.01 grid covered point FALSE error 
+2026-11-13 01:52:11 point starting weak-20 
+2026-11-13 01:53:13 point finished weak-20 point_complete seconds 62.1 grid covered point TRUE error 
+2026-11-13 01:53:13 point starting near_bound-20 
+2026-11-13 01:53:49 point finished near_bound-20 point_complete seconds 36.02 grid covered point TRUE error 
+2026-11-13 01:53:49 point starting interior-21 
+2026-11-13 01:55:08 point finished interior-21 point_complete seconds 79.1 grid covered point TRUE error 
+2026-11-13 01:55:08 point starting weak-21 
+2026-11-13 01:56:13 point finished weak-21 point_complete seconds 65.22 grid covered point TRUE error 
+2026-11-13 01:56:13 point starting near_bound-21 
+2026-11-13 01:57:04 point finished near_bound-21 point_complete seconds 50.64 grid covered point FALSE error 
+2026-11-13 01:57:04 point starting interior-22 
+2026-11-13 01:58:15 point finished interior-22 point_complete seconds 71.19 grid covered point TRUE error 
+2026-11-13 01:58:15 point starting weak-22 
+2026-11-13 01:59:13 point finished weak-22 point_complete seconds 58.28 grid covered point FALSE error 
+2026-11-13 01:59:13 point starting near_bound-22 
+2026-11-13 01:59:53 point finished near_bound-22 point_complete seconds 39.83 grid covered point TRUE error 
+2026-11-13 01:59:53 point starting interior-23 
+2026-11-13 02:01:10 point finished interior-23 point_complete seconds 77.08 grid covered point TRUE error 
+2026-11-13 02:01:10 point starting weak-23 
+2026-11-13 02:02:05 point finished weak-23 point_complete seconds 54.83 grid covered point TRUE error 
+2026-11-13 02:02:05 point starting near_bound-23 
+2026-11-13 02:02:34 point finished near_bound-23 point_complete seconds 28.77 grid covered point TRUE error 
+2026-11-13 02:02:34 point starting interior-24 
+2026-11-13 02:03:39 point finished interior-24 point_complete seconds 65.01 grid covered point FALSE error 
+2026-11-13 02:03:39 point starting weak-24 
+2026-11-13 02:04:44 point finished weak-24 point_complete seconds 65.06 grid covered point TRUE error 
+2026-11-13 02:04:44 point starting near_bound-24 
+2026-11-13 02:05:19 point finished near_bound-24 point_complete seconds 35.24 grid covered point TRUE error 
+2026-11-13 02:05:19 point starting interior-25 
+2026-11-13 02:06:36 point finished interior-25 point_complete seconds 76.41 grid covered point TRUE error 
+2026-11-13 02:06:36 point starting weak-25 
+2026-11-13 02:07:31 point finished weak-25 point_complete seconds 55.66 grid covered point FALSE error 
+2026-11-13 02:07:31 point starting near_bound-25 
+2026-11-13 02:08:05 point finished near_bound-25 point_complete seconds 33.42 grid covered point TRUE error 
+2026-11-13 02:08:05 point starting interior-26 
+2026-11-13 02:09:21 point finished interior-26 point_complete seconds 76.39 grid covered point TRUE error 
+2026-11-13 02:09:21 point starting weak-26 
+2026-11-13 02:10:16 point finished weak-26 point_complete seconds 54.68 grid covered point FALSE error 
+2026-11-13 02:10:16 point starting near_bound-26 
+2026-11-13 02:10:51 point finished near_bound-26 point_complete seconds 35.06 grid covered point TRUE error 
+2026-11-13 02:10:51 point starting interior-27 
+2026-11-13 02:12:09 point finished interior-27 point_complete seconds 77.65 grid covered point FALSE error 
+2026-11-13 02:12:09 point starting weak-27 
+2026-11-13 02:13:09 point finished weak-27 point_complete seconds 60.11 grid covered point FALSE error 
+2026-11-13 02:13:09 point starting near_bound-27 
+2026-11-13 02:13:59 point finished near_bound-27 point_complete seconds 50.2 grid covered point TRUE error 
+2026-11-13 02:13:59 point starting interior-28 
+2026-11-13 02:15:14 point finished interior-28 point_complete seconds 75.62 grid covered point TRUE error 
+2026-11-13 02:15:14 point starting weak-28 
+2026-11-13 02:16:14 point finished weak-28 point_complete seconds 59.5 grid covered point TRUE error 
+2026-11-13 02:16:14 point starting near_bound-28 
+2026-11-13 02:16:51 point finished near_bound-28 point_complete seconds 37.22 grid covered point TRUE error 
+2026-11-13 02:16:51 point starting interior-29 
+2026-11-13 02:18:08 point finished interior-29 point_complete seconds 76.5 grid covered point TRUE error 
+2026-11-13 02:18:08 point starting weak-29 
+2026-11-13 02:19:10 point finished weak-29 point_complete seconds 62.36 grid covered point TRUE error 
+2026-11-13 02:19:10 point starting near_bound-29 
+2026-11-13 02:20:08 point finished near_bound-29 point_complete seconds 58 grid covered point TRUE error 
+2026-11-13 02:20:08 point starting interior-30 
+2026-11-13 02:21:20 point finished interior-30 point_complete seconds 71.72 grid covered point TRUE error 
+2026-11-13 02:21:20 point starting weak-30 
+2026-11-13 02:22:17 point finished weak-30 point_complete seconds 57.13 grid covered point TRUE error 
+2026-11-13 02:22:17 point starting near_bound-30 
+2026-11-13 02:22:53 point finished near_bound-30 point_complete seconds 35.69 grid covered point TRUE error 
+2026-11-13 02:22:53 point starting interior-31 
+2026-11-13 02:24:11 point finished interior-31 point_complete seconds 78.65 grid covered point FALSE error 
+2026-11-13 02:24:11 point starting weak-31 
+2026-11-13 02:25:09 point finished weak-31 point_complete seconds 57.78 grid covered point TRUE error 
+2026-11-13 02:25:09 point starting near_bound-31 
+2026-11-13 02:25:58 point finished near_bound-31 point_complete seconds 48.68 grid covered point TRUE error 
+2026-11-13 02:25:58 point starting interior-32 
+2026-11-13 02:27:17 point finished interior-32 point_complete seconds 78.66 grid covered point TRUE error 
+2026-11-13 02:27:17 point starting weak-32 
+2026-11-13 02:28:20 point finished weak-32 point_complete seconds 63.12 grid covered point TRUE error 
+2026-11-13 02:28:20 point starting near_bound-32 
+2026-11-13 02:28:57 point finished near_bound-32 point_complete seconds 37.28 grid covered point TRUE error 

@@ -16,6 +16,7 @@ This package is for optimizing scales of effect when modeling ecological process
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://wpeterman.github.io/multiScaleR/}
   \item \url{https://github.com/wpeterman/multiScaleR}
   \item Report bugs at \url{https://github.com/wpeterman/multiScaleR/issues}
 }

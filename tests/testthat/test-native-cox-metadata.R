@@ -12,7 +12,7 @@ native_cox_metadata_fixture <- local({
     forms <- list(bare = case ~ mean + rough + scale(exposure) + poly(z, 2) + strata(step),
       qualified = case ~ mean + rough + base::scale(exposure) + stats::poly(z, 2) + strata(step))
     models <- lapply(forms, function(form) survival::clogit(form, data = dat,
-      method = "exact", model = TRUE, x = TRUE, y = TRUE))
+      method = "exact", model = TRUE, x = TRUE, y = TRUE, na.action = stats::na.fail))
     for (model in models) {
       stopifnot(length(coef(model)) == 5L, all(is.finite(coef(model))), is.null(model$fail))
       X <- model$x; score <- numeric(ncol(X)); H <- matrix(0, ncol(X), ncol(X))
@@ -128,4 +128,64 @@ test_that("Cox transformation recovery retains unsupported-structure boundaries"
   unsupported <- model; specials <- attr(unsupported$terms, "specials")
   specials$tt <- 1L; attr(unsupported$terms, "specials") <- specials
   expect_error(.msr_native_fixed_metadata(unsupported), "time-fixed, unpenalized")
+})
+
+test_that("Cox replay checks retained rows before restoring a missing training basis", {
+  skip_if_not_installed("survival")
+  f <- native_cox_metadata_fixture()
+  model <- f$models$qualified
+  column <- "base::scale(exposure)"
+  # Emulate the retained column on providers that omit matrix attributes.
+  attr(model$model[[column]], "scaled:center") <- NULL
+  attr(model$model[[column]], "scaled:scale") <- NULL
+  expect_true(.msr_needs_fixed_metadata(terms(model)))
+  attr(model$terms, ".Environment") <- asNamespace("survival")
+  attr(attr(model$model, "terms"), ".Environment") <- asNamespace("survival")
+  model$call$data <- quote(unavailable_original_cox_training)
+  original <- model
+  damaged <- f$data
+  damaged$exposure[1L] <- damaged$exposure[1L] + .1
+  misaligned <- f$data[rev(seq_len(nrow(f$data))), , drop = FALSE]
+  for (training in list(NULL, damaged, misaligned)) {
+    candidate <- .msr_native_fixed_metadata(model, training = training)
+    expect_true(.msr_needs_fixed_metadata(terms(candidate)))
+  }
+  restored <- .msr_native_fixed_metadata(model, training = f$data)
+  expect_false(.msr_needs_fixed_metadata(terms(restored)))
+  expect_identical(restored$x, model$x)
+  expect_identical(coef(restored), coef(model))
+  expect_identical(restored$var, model$var)
+  expect_identical(restored$loglik, model$loglik)
+  expect_identical(model, original)
+  reference <- f$data
+  row.names(reference) <- row.names(model$model)
+  # These different raw units produce the same scaled exposure values.
+  reference$exposure <- 10 + 2 * reference$exposure
+  object <- f$f$object
+  object$opt_mod <- model
+  expect_error(plot_marginal_effects(object, reference_data = reference),
+    "original nested training learner")
+  nd <- f$data[17L, , drop = FALSE]
+  expect_equal(as.numeric(predict(restored, nd, reference = "zero")),
+    as.numeric(predict(f$models$bare, nd, reference = "zero")), tolerance = 1e-10)
+})
+
+test_that("a complete retained Cox recipe supports nested conditional choice prediction", {
+  skip_if_not_installed("survival")
+  coxph <- survival::coxph
+  f <- profile_glm_fixture()
+  dat <- f$data
+  dat$case_ <- rep(c(1, 0, 0), length.out = nrow(dat))
+  dat$choice <- factor(rep(seq_len(nrow(dat) / 3), each = 3))
+  formula <- as.formula("case_ ~ hab + I(base::scale(z)) + strata(choice)",
+    env = asNamespace("survival"))
+  model <- survival::clogit(formula, dat, model = TRUE, x = TRUE, y = TRUE,
+    na.action = stats::na.fail)
+  contract <- .msr_clogit_contract(model, f$inputs)
+  fit <- .msr_clogit_native(contract, log(.3))
+  nd <- dat[c(4, 12), , drop = FALSE]
+  nd$z <- c(.1, .2)
+  nd$hab <- c(-.3, .5)
+  expected <- coef(fit)[1L] * nd$hab + coef(fit)[2L] * (nd$z - mean(dat$z)) / sd(dat$z)
+  expect_equal(as.numeric(predict(fit, nd, reference = "zero")), expected, tolerance = 1e-10)
 })

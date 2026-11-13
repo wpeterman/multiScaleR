@@ -1,29 +1,157 @@
+multiScaleR 0.7.39
+
+* `multiScale_optim(backend = "refit", radius_grid = )` refits a model at the
+  radii you list for landscape and surface metrics with a hard radius, alone
+  or in combination, and re-estimates any kernel sigma at each. It works for
+  `lm()`, `glm()`, and step-selection models, and inside
+  `cross_validate_clogit()` folds. `diagnostics(fit)$radius_profile` keeps the
+  likelihood of every candidate.
+* `cross_validate_mixed()` cross-validates models with a random intercept,
+  either for new groups or for later visits to known groups, and scores each
+  held-out group jointly.
+* `cv_tab()` and `select_cv()` now name the candidate when a mixed-model CV
+  result is listed with another kind of CV result. The old message blamed
+  unscored folds.
+* `cross_validate_field()` accepts Poisson, negative binomial, binary, and
+  Gamma responses as well as Gaussian ones.
+* `cross_validate_bayes()` refits a Bayesian model in every fold and scores
+  the held-out rows with the posterior predictive density.
+* `diagnose_bayes_laplace()` checks a scale probability from an uncorrected
+  Laplace or marginal fit against a reweighted reference. Expect many
+  results to be unresolved.
+* `scale_inference()` now rejects a scale when its bootstrap p-value equals
+  the requested cutoff, as documented.
+* Cox and `clogit()` predictions keep fitted scaling and spline recipes with
+  survival 3.8-12. For a `clogit()` or `coxph()` model fitted outside the
+  package with `scale()`, `poly()`, or a spline, set
+  `na.action = stats::na.fail` and `model = TRUE`.
+* Vignettes 04, 07, 08, 09, 10, 14, and 15 cover these additions and
+  summarize the simulation results behind them: interval coverage for sigma,
+  bootstrap sets from `scale_inference()`, step-selection bandwidth recovery,
+  spatial-field and Bayesian cross-validation, and the Bayesian
+  approximations.
+* The package logo carries alt text on the README and website.
+
+Changes since 0.7.4
+-------------------
+A summary for users of the 0.7.4 release. The entries for each version below
+give the details.
+
+New tools
+
+* `multiScale_bayes()` estimates scales of effect in a Bayesian model, with
+  shared, covariate-dependent, and partially pooled scales. Slice sampling
+  needs no Stan toolchain. `posterior_scales()`, `predict_scales()`,
+  `predict()`, and `simulate()` summarize and predict from a fit, and
+  `check_bayes_setup()`, `simulate_bayes_prior()`, `diagnose_bayes_scales()`,
+  and `diagnose_bayes_probabilities()` check the setup, priors, and chains.
+  `diagnose_bayes_laplace()` checks a scale probability from a fast
+  approximation.
+* `multiScale_optim()` gains opt-in fitting backends: `profile_glm` and
+  `joint_nb2` for GLM and negative binomial models, `joint_mixed` for glmmTMB
+  random-intercept models, and `conditional_logit` for step-selection models
+  fitted with `survival::clogit()` or `amt`. The default `refit` backend is
+  unchanged.
+* Cross-validation re-estimates the scales in every fold:
+  `cross_validate()`, `cross_validate_glm()`, `cross_validate_clogit()`,
+  `cross_validate_mixed()`, `cross_validate_field()`, and
+  `cross_validate_bayes()`, with spatial and grouped folds from
+  `spatial_cv_folds()` and `grouped_cv_folds()`, and comparisons with
+  `cv_tab()` and `select_cv()`.
+* `multiScale_optim(radius_grid = )` compares listed radii for landscape and
+  surface metrics with a hard radius.
+* `predict()` works on fitted objects at survey points, new points, and
+  rasters, and `prepare_prediction()` stores prediction snapshots. Prediction
+  and effect plots cover more model classes, including GAM and BAM, Cox and
+  `clogit`, spaMM, lme4, glmmTMB, and `unmarked` models with factors and
+  repeated site-year rows.
+* glmmTMB spatial response fields can be fitted with the default backend and
+  mapped with `response_field_geometry()`.
+* Distance-removal (GDR) models from `unmarked` gain data checks and
+  preparation (`validate_unmarked_data()`, `prepare_unmarked_data()`,
+  `prepare_gdr_histories()`, `prepare_gdr_intervals()`,
+  `expand_gdr_intervals()`), simulation (`sim_dat_gdr()`), and a spatial
+  abundance field (`fit_gdr_response_field()`, `make_gdr_refitter()`,
+  `gdr_start_values()`).
+* `scale_inference()` examines the scale likelihood of single-kernel NB2
+  models, with optional bootstrap calibration.
+* Landscape and surface metrics at a fixed radius can enter analytic and
+  Bayesian models as fixed predictors. `covariate_transform = "raw"` keeps
+  optimized covariates in their own units with the default backend.
+
+Changes that can affect existing scripts
+
+* `plot_marginal_effects()` captions are off by default.
+* `pct_mx` clamping moves each limit by a share of the observed range, so
+  projected values change when `pct_mx` is not 0.
+* `kernel_dist()` and `plot_kernel()` take `shape` in place of `beta`.
+* `library(multiScaleR)` no longer attaches `sf`.
+* Estimated fixed-kernel scales are reported as hard radii, without Hessian
+  standard errors. Use `summary(fit, profile = TRUE)` for an interval.
+* The vignettes have new names.
+
+Documentation
+
+* Fifteen vignettes in reading order: the quick start and user guide, then
+  covariates and maps, fitting and evaluation, specialized models, and
+  Bayesian estimation. They share one running example where the feature
+  allows, and each explains how to read its output.
+* A package website, https://wpeterman.github.io/multiScaleR/, and a citation
+  file. Binaries are available from R-universe,
+  <https://wpeterman.r-universe.dev>.
+
+multiScaleR 0.7.38
+
+* Number the vignettes in reading order, from `v01-quickstart` to
+  `v15-bayesian-computation`. Their index titles carry the same numbers. Use
+  the new names in `vignette()`, for example
+  `vignette("v02-user-guide", package = "multiScaleR")`.
+* Group the website articles in the same order, point "Get started" at the
+  quick start, and list all fifteen vignettes in the README.
+* Rebuild the Quick Start's stored map. It dated from version 0.7.0 and no
+  longer matched what `kernel_scale.raster()` returns for the same fit.
+
 multiScaleR 0.7.37
 
-* multiScaleR is now available from R-universe at
-  <https://wpeterman.r-universe.dev>, with precompiled Windows and macOS binaries.
-
-* Profile hard-radius predictors jointly over a declared grid using native
-  linear, generalized linear, or complete-set conditional-logistic refits.
-  Reestimate smooth bandwidths and exponential-power shapes at each
-  combination. Use the same search inside training folds and inspect each
-  candidate likelihood.
-
-* Add mixed-model cross-validation for existing and new groups, with
-  training-only ecological scale fitting and joint held-out group scores.
-
-* Extend spatial response-field CV to Poisson, binary, NB2, and Gamma models.
-  Score held-out blocks jointly, use tilted Laplace moments for log-link
-  predictions, and compare Poisson and NB2 count models on matching folds.
-
-* Add fold-wise Bayesian scale refits and joint posterior predictive scores
-  for observed and unseen groups, including weighted importance correction.
-
-* Document replicated validation of Bayesian importance corrections and
-  the limits of uncorrected Laplace approximations.
-
-* Apply the intended rejection rule when an NB2 bootstrap p-value equals the
-  requested cutoff.
+* `plot_marginal_effects()` no longer adds an explanatory caption by default,
+  including for Bayesian fits. Set `add_label = TRUE` to restore it.
+* `pct_mx` in `kernel_scale.raster()` now moves each clamping limit by
+  `pct_mx` times the observed covariate range, as documented. The old code
+  multiplied the limits by `1 + pct_mx`, so projected values change whenever
+  `pct_mx` is not 0. Valid values are now greater than -0.5 and at most 0.99.
+* `kernel_dist()` and `plot_kernel()` take `shape` for the exponential power
+  shape. `beta` still works for one release with a deprecation warning.
+* `select_cv()` compares candidates on the metrics they share, so Poisson and
+  NB2 results compare with default metrics. The result records the metrics
+  used and dropped.
+* `landscape_var()` warns when `base` has no effect on the metric, including
+  `msidi` and `msiei`, which always use the natural log. `rpr` now requires
+  `classes_max`.
+* `multiScale_optim()` warns when the default refit search returns its
+  starting values, names the remedy, and records `start_stall` in
+  `diagnostics()`. `print()` and `summary()` repeat it. Fixed-buffer kernels
+  stall this way from the default start. Use `start_strategy = "screen"` or
+  supply `par`. Estimates are unchanged.
+* Fixed-knot `ns()` and `bs()` terms now fit with
+  `backend = "conditional_logit"` from an ordinary `clogit(model = TRUE)` fit.
+* `response_field_geometry()` accepts default-backend fits, so coordinate-aware
+  maps of glmmTMB and GDR response fields work on real fits.
+* Predicting a glmmTMB response field at new positions without
+  `allow.new.levels = TRUE` now gives a message naming that argument and
+  `re.form = NA`.
+* `profile_sigma()` defaults now work on `profile_glm` and `joint_nb2` fits.
+  `profile_sigma()` also profiles `conditional_logit` fits with native refits.
+  `summary(profile = TRUE)` on those fits stops with a clear message, because
+  the backend withholds scale uncertainty.
+* `audit_gdr_integration()` and `score_simulation()` are no longer exported.
+  `vcov()` still works on fits, but `vcov.multiScaleR()` is no longer exported
+  by name.
+* `sf` moved from Depends to Imports, so `library(multiScaleR)` no longer
+  attaches it. Scripts that call `sf` functions directly need `library(sf)`.
+  `pscl` moved to Suggests.
+* Rewrite the 13 vignettes around one running example with interpretation
+  notes and restriction tables, and add vignettes on step-selection models and
+  glmmTMB spatial response fields. Slow fits load from stored results.
 
 multiScaleR 0.7.36
 

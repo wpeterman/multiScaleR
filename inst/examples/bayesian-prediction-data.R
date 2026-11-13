@@ -1,5 +1,5 @@
 # Reproduce the small artificial future landscape scenario used in
-# vignette("bayesian-prediction"). No fitting, random sampling or file writing.
+# vignette("v14-bayesian-prediction"). No fitting, random sampling or file writing.
 # This is a scenario derived from existing bin means, not a landscape forecast.
 make_bayesian_prediction_scenario <- function(annual = NULL) {
   if (is.null(annual)) annual <- readRDS(system.file("extdata",

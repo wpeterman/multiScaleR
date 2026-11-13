@@ -91,8 +91,9 @@ PSOCK = FALSE. Native fit/tape objects are not sent to fit workers.
 
 Estimated ranges, other GDR mixtures/keys, annual availability, spatial CV,
 field simulation and profile intervals require separate qualification.
-Ordinary update is guarded; retain the audited refitter. See the inference
-contracts vignette for the supported scope and uncertainty interpretation.
+Ordinary update is guarded; retain the audited refitter. See
+\code{vignette("v12-distance-removal", package = "multiScaleR")} for a
+worked example and the supported scope.
 }
 \examples{
 # coords must be in exactly the retained survey order, with a known CRS.

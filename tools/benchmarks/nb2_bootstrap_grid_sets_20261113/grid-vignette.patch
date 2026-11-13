@@ -1,0 +1,30 @@
+diff --git a/vignettes/inference-contracts.Rmd b/vignettes/inference-contracts.Rmd
+--- a/vignettes/inference-contracts.Rmd
++++ b/vignettes/inference-contracts.Rmd
+@@ -185,6 +185,26 @@
+ `upper_bound_limited = TRUE`. The interval includes 800 map units and
+ excludes the generating scale of 730. Use `bootstrap_values` to check
+ a particular off-grid scale directly and inspect its Monte Carlo limits.
++
++A separate simulation used 16 datasets per scenario and 99 bootstrap draws
++at each node. All 48 fits returned a finite-grid set. The generating scale
++lay between fixed grid nodes. Set coverage was 6, 15, and 12 of 16 for the
++interior, weak-effect, and near-bound scenarios, respectively. The exact
++95% interval for interior coverage was 0.152 to 0.646. On the same
++datasets, a separately seeded test at the generating scale included it in
++13, 15, and 15 of 16, respectively. In 10 datasets, the direct test
++included the generating scale and the returned set excluded it. This
++paired comparison reflects both grid resolution and the finite number of
++draws in each run. In the interior scenario the decisions differed in 7 of
++16 datasets (exact 95% interval 0.198 to 0.701). Each interior set had one
++component and only two or three accepted nodes.
++
++Removing nodes and keeping the 99-draw decisions at the shared nodes gave
++coverage of 1, 14, and 5 of 16 for these datasets. The fine grid used nine
++fixed nodes and included the fitted optimum. It returned the entire search
++range in 11 of 16 weak-effect datasets. The simulation and refit audits
++are in `tools/benchmarks/nb2_bootstrap_grid_sets_20261113/` in the source
++checkout.
+ 
+ ### Joint mixed-effects point estimation
+ 

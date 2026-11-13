@@ -89,12 +89,7 @@ diagnose_bayes_probabilities <- function(object, thresholds,
   if (!inherits(object, "multiScaleR_bayes"))
     stop("object must be a multiScaleR_bayes fit.", call. = FALSE)
   scale <- match.arg(scale)
-  if (!is.list(thresholds) || !length(thresholds) || is.null(names(thresholds)) ||
-      anyNA(names(thresholds)) || any(!nzchar(names(thresholds))) || anyDuplicated(names(thresholds)) ||
-      !all(names(thresholds) %in% object$specification$covariates) ||
-      any(vapply(thresholds, function(x) !is.numeric(x) || is.complex(x) || !is.null(dim(x)) || !length(x) ||
-        any(!is.finite(x)) || anyDuplicated(x) > 0L || (scale == "distance" && any(x <= 0)), TRUE)))
-    stop("thresholds must uniquely name fitted kernel predictors with distinct finite numeric thresholds; distance thresholds must be positive.", call. = FALSE)
+  .msr_bayes_validate_probability_thresholds(thresholds, object$specification, scale)
   if (!is.null(mcse_target)) {
     if (!is.null(dim(mcse_target)) || is.complex(mcse_target))
       stop("mcse_target must be a numeric scalar strictly between zero and one.", call. = FALSE)
@@ -175,4 +170,13 @@ diagnose_bayes_probabilities <- function(object, thresholds,
   rownames(out$probabilities) <- rownames(out$chain_probabilities) <- NULL
   out$available <- TRUE
   out
+}
+
+.msr_bayes_validate_probability_thresholds <- function(thresholds, specification, scale) {
+  if (!is.list(thresholds) || !length(thresholds) || is.null(names(thresholds)) ||
+      anyNA(names(thresholds)) || any(!nzchar(names(thresholds))) || anyDuplicated(names(thresholds)) ||
+      !all(names(thresholds) %in% specification$covariates) ||
+      any(vapply(thresholds, function(x) !is.numeric(x) || is.complex(x) || !is.null(dim(x)) || !length(x) ||
+        any(!is.finite(x)) || anyDuplicated(x) > 0L || (scale == "distance" && any(x <= 0)), TRUE)))
+    stop("thresholds must uniquely name fitted kernel predictors with distinct finite numeric thresholds; distance thresholds must be positive.", call. = FALSE)
 }

@@ -1,0 +1,603 @@
+---
+title: "12. Fit Distance-Removal Models with Scales of Effect"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{12. Fit Distance-Removal Models with Scales of Effect}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+library(multiScaleR)
+library(terra)
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 6.5,
+  fig.height = 4.25,
+  warning  = FALSE,
+  message  = FALSE
+)
+
+# The spatial abundance field section shows its calls without running them,
+# because those functions need specific versions of unmarked and TMB. Its
+# printed table comes from the `distance-removal` section of
+# data-raw/generate_vignette_cache.R.
+cache_file <- file.path("..", "inst", "extdata",
+                        "cache-distance-removal.rds")
+if (!file.exists(cache_file)) {
+  cache_file <- system.file("extdata", "cache-distance-removal.rds",
+                            package = "multiScaleR")
+}
+field <- readRDS(cache_file)$field
+```
+
+# What this vignette covers
+
+In a distance-removal point count, the observer records how far away each bird
+was and the part of the count in which it was first detected. Those two records
+let a model separate how many birds were present from how many the observer
+missed. This vignette shows how to estimate the scale of effect of a landscape
+covariate on bird density inside such a model, fitted with
+`unmarked::gdistremoval()`.
+
+You will simulate a survey with known values, prepare the data, fit the model,
+estimate the scale of effect, and read the abundance, availability, and
+detection results. The last section lists what is not supported yet. Read
+`vignette("v01-quickstart", package = "multiScaleR")` first, because this vignette
+builds on its four steps. Experience with `unmarked` helps but is not required.
+
+# Know what data the model needs
+
+`unmarked` stores a distance-removal survey in an `unmarkedFrameGDR` object.
+A detected bird is removed from further counting, so only its first detection
+is used.
+
+| Input | Argument | Contents |
+|:------|:---------|:---------|
+| Distance table | `yDistance` | One row per survey and one column per distance band. Each entry counts the birds first detected in that band |
+| Removal table | `yRemoval` | One row per survey and one column per time interval. Each entry counts the birds first detected in that interval |
+| Distance bands | `dist.breaks`, `unitsIn` | Band boundaries starting at zero. The last boundary is the survey radius |
+| Time intervals | `period.lengths` | Length of each interval |
+| Site covariates | `siteCovs` | One row per survey, including the kernel-weighted landscape covariates |
+
+Both tables describe the same birds, so the two rows for a survey must have the
+same total. The model has four components, and each takes its own formula.
+
+| Component | Formula argument | `type` | What it estimates | Link |
+|:----------|:-----------------|:-------|:------------------|:-----|
+| Abundance | `lambdaformula` | `"lambda"` | Bird density, or abundance per survey circle | Log |
+| Availability | `phiformula` | `"phi"` | Probability that a bird is available during a visit. Estimated only when points are visited more than once | Logit |
+| Removal | `removalformula` | `"rem"` | Probability, per unit of time, that a bird present is first detected | Logit |
+| Distance | `distanceformula` | `"dist"` | Scale of the detection function, or how quickly detection falls with distance | Log |
+
+`multiScaleR` estimates a scale of effect for a landscape covariate in any
+component the model estimates. The example below visits each point once. Its
+removal component therefore carries the information about how readily birds
+reveal themselves.
+
+# Simulate a survey with a known scale of effect
+
+The running count example from the Quick Start does not fit this model, so this
+vignette simulates point counts on the same landscape with `sim_dat_gdr()`.
+
+```{r load-data}
+data("surv_pts")                 # 100 survey locations (an sf object)
+pts <- vect(surv_pts)            # convert to a terra SpatVector
+
+# Binary habitat layer on a 20 m grid, in meters
+land1 <- rast(system.file("extdata", "landscape.tif",
+                          package = "multiScaleR"))[["land1"]]
+
+# Step 1 of every analysis: extract the raster around each survey point
+kernel_inputs <- kernel_prep(pts = pts, raster_stack = land1,
+                             max_D = 1700, kernel = "gaussian",
+                             verbose = FALSE)
+```
+
+Density at each point depends on habitat weighted with a Gaussian kernel of
+sigma = 250 m, the true scale of effect. The comments give the other true
+values.
+
+```{r simulate}
+# Habitat smoothed at the true scale, then standardized (mean 0, SD 1)
+land1_250 <- kernel_scale.raster(raster_stack = land1, sigma = 250,
+                                 kernel = "gaussian", verbose = FALSE)
+hab_true  <- as.numeric(scale(terra::extract(land1_250, pts, ID = FALSE)[, 1]))
+
+sim <- sim_dat_gdr(
+  density          = exp(log(400) + 0.5 * hab_true),  # birds per square km
+  distance_scale   = 40,                # half-normal detection scale (m)
+  removal          = 0.2,               # chance per minute of a first detection
+  dist_breaks      = c(0, 25, 50, 75),  # three bands within a 75 m radius
+  interval_lengths = c(2, 3, 5),        # a 10-minute count in three intervals
+  interval_units   = "minutes",
+  site_covs        = kernel_inputs$kernel_dat,   # covariates for the model
+  event_keys       = data.frame(survey = paste0("pt", 1:100)),
+  seed             = 2
+)
+umf <- sim$observed              # the unmarkedFrameGDR to analyze
+
+head(umf@yDistance, 3)           # birds by distance band
+head(umf@yRemoval, 3)            # the same birds by time interval
+sim$truth[1:3, c("expected_density", "expected_abundance",
+                 "realized_abundance", "realized_observed")]
+```
+
+**How to read the output:** Each row is one survey point. The first two tables
+are the data an observer would hand you, and their row totals match. The third
+table is the truth behind them. `expected_density` is in birds per square
+kilometer. Multiplying it by the area of the 75 m circle (0.0177 square
+kilometers) gives `expected_abundance`, the expected number of birds in the
+circle. `realized_abundance` is the number simulated there, and
+`realized_observed` is the number detected. Under these settings an observer
+detects about `r round(100 * sim$truth$observation_probability[1])`% of the
+birds present.
+
+# Prepare your own records
+
+## Turn bird records into the two count tables
+
+Field data usually arrive as one record per bird. `prepare_gdr_histories()`
+converts those records to the two tables. It finds each bird's first detection
+before it applies the survey radius, so a bird first detected beyond the radius
+does not enter the count when it later moves closer.
+
+```{r histories}
+# Where each column of the record matrix sits: 2 time intervals by 3 distance
+# bands (0-25 m, 25-75 m, and beyond the 75 m radius)
+cell_map <- expand.grid(interval = 1:2, distance_bin = 1:3)
+cell_map$column <- paste0("cell", 1:6)
+
+# One row per bird, with a 1 where the bird was recorded
+records <- matrix(0, nrow = 3, ncol = 6, dimnames = list(NULL, cell_map$column))
+records[1, "cell1"] <- 1                 # interval 1, 0-25 m
+records[2, "cell4"] <- 1                 # interval 2, 25-75 m
+records[3, c("cell5", "cell2")] <- 1     # beyond 75 m first, then 0-25 m
+
+linked <- prepare_gdr_histories(
+  histories    = records,
+  history_keys = data.frame(survey = c("a", "a", "b"),
+                            bird   = c("one", "two", "one")),
+  event_keys   = data.frame(survey = c("a", "b", "c")),   # every survey done
+  event_id = "survey", individual_id = "bird", cell_map = cell_map,
+  dist_breaks = c(0, 25, 75, Inf), radius = 75, units_in = "m",
+  interval_lengths = c(5, 5), interval_units = "minutes",
+  surveyed = c(TRUE, TRUE, TRUE)         # survey c found no birds
+)
+
+linked$first[, c(".history_row", "first_interval", "first_distance_bin",
+                 "status")]
+linked$yDistance
+linked$yRemoval
+
+# The two tables go straight into an unmarked frame
+toy_umf <- unmarked::unmarkedFrameGDR(
+  yDistance = linked$yDistance, yRemoval = linked$yRemoval,
+  dist.breaks = c(0, 25, 75), unitsIn = "m", period.lengths = c(5, 5)
+)
+```
+
+**How to read the output:** `first` has one row per bird and `status` says what
+happened to it. The two birds at survey `a` are kept. The bird at survey `b`
+was first detected beyond 75 m, so it is left out, and survey `b` becomes a
+count of zero. Survey `c` was completed with no birds, which is also a zero.
+Mark a point that nobody visited with `surveyed = FALSE`, and its counts become
+missing instead.
+
+## Check that the records line up with the surveys
+
+`validate_unmarked_data()` checks a frame against a table of survey
+identifiers before you fit anything.
+
+```{r validate}
+checked <- validate_unmarked_data(
+  object = umf, event_keys = sim$event_keys, event_id = "survey",
+  interval_units = "minutes",
+  effort = rep(10, 100)               # minutes surveyed at each point
+)
+checked$valid                         # TRUE: no errors were found
+nrow(checked$findings)                # number of errors and warnings
+```
+
+**How to read the output:** `valid` is `TRUE` when the check finds no errors,
+such as a survey identifier used twice or distance and removal totals that
+disagree. `findings` lists each problem with the survey it belongs to. Supply
+`effort` so that a count of zero from a completed survey is not confused with a
+survey that never took place.
+
+## Add covariates for the time intervals
+
+A removal formula reads its covariates from a table with one row per survey and
+time interval. `expand_gdr_intervals()` copies the site covariates you name
+into that table and adds the interval number.
+
+```{r intervals}
+umf_obs <- umf
+# Who ran each count: a covariate recorded once per survey
+unmarked::siteCovs(umf_obs)$observer <- factor(rep(c("Ann", "Bob"), times = 50))
+
+expanded <- expand_gdr_intervals(
+  object = umf_obs, event_keys = sim$event_keys, event_id = "survey",
+  interval_units  = "minutes",
+  site_covariates = c(rem_observer = "observer")   # new name = source column
+)
+head(unmarked::obsCovs(expanded$data), 4)
+```
+
+**How to read the output:** The first survey now has three rows, one for each
+interval. With `expanded$data` as the model data, `removalformula =
+~ rem_observer` lets the removal probability differ between observers, and
+`~ I(interval == 1)` lets the first interval differ from the rest. Give the
+copy a new name, as here. A landscape covariate whose scale you estimate must
+not share its name with a column in this table. For covariates that change from
+one interval to the next, use `prepare_gdr_intervals()`.
+
+# Estimate the scale of effect
+
+## Fit a starting model
+
+Start with the model you intend to optimize, fitted with
+`unmarked::gdistremoval()`. Its landscape covariate comes from
+`kernel_inputs$kernel_dat`, which `sim_dat_gdr()` stored in `siteCovs` above.
+
+```{r fit-mod}
+mod <- unmarked::gdistremoval(
+  lambdaformula   = ~ land1,      # density depends on the landscape covariate
+  removalformula  = ~ 1,          # one removal probability
+  distanceformula = ~ 1,          # one distance scale
+  data     = umf,
+  keyfun   = "halfnorm",          # half-normal detection function
+  mixture  = "P",                 # Poisson abundance
+  output   = "density",           # report density instead of abundance
+  unitsOut = "kmsq",              # birds per square km
+  K        = 60,                  # largest abundance considered at a point
+  starts   = c(log(400), 0, log(40), qlogis(0.2))  # link-scale starting values
+)
+```
+
+**Choosing `K` and `starts`:** `K` is the largest number of birds the
+likelihood considers at one point. Set it well above the largest plausible
+abundance. The most birds present at any point in this simulation is
+`r max(sim$truth$realized_abundance)`. The starting values follow the order of
+the coefficients, here the density intercept, the `land1` effect, the distance
+scale, and the removal probability, each on its link scale. They are optional,
+but supply them when you can. One trial data set for this vignette, fitted
+without them, returned a distance scale of tens of thousands of meters. Check
+that the distance scale is a plausible number of meters before you continue.
+
+## Run the optimizer
+
+```{r optim}
+opt <- multiScale_optim(fitted_mod    = mod,
+                        kernel_inputs = kernel_inputs,
+                        n_cores       = 1,
+                        verbose       = FALSE)
+```
+
+The optimizer refits the whole distance-removal model at each candidate sigma,
+which takes 10 to 20 seconds here.
+
+# Read the results
+
+## Read the scale of effect
+
+```{r summary}
+summary(opt)
+```
+
+**How to read the `summary()` output:** The first two blocks are the same as
+for any `multiScaleR` fit. The estimated sigma for `land1` is
+`r round(summary(opt)$opt_scale["land1", "Mean"])` m, and a Gaussian kernel of
+that width holds 90% of its weight within
+`r round(kernel_dist(opt)["land1", "Mean"])` m of a survey point. The fitted
+model summary then has one block per component, labeled with its link scale.
+
+## Read the abundance, removal, and distance components
+
+`unmarked::predict()` returns each component on its natural scale.
+
+```{r components}
+fit <- opt$opt_mod                 # the model refitted at the estimated scale
+
+dens <- unmarked::predict(fit, type = "lambda")   # one row per survey point
+dsig <- unmarked::predict(fit, type = "dist")     # one row per survey point
+prem <- unmarked::predict(fit, type = "rem")      # one row per point and interval
+
+# First survey point
+rbind(density = dens[1, ], distance = dsig[1, ], removal = prem[1, ])
+
+# Turn the two detection components into probabilities for a 10-minute count
+p_near  <- 2 * dsig$Predicted[1]^2 / 75^2 *
+  (1 - exp(-75^2 / (2 * dsig$Predicted[1]^2)))    # average over the 75 m circle
+p_heard <- 1 - (1 - prem$Predicted[1])^10         # detected at least once
+round(c(distance = p_near, removal = p_heard, both = p_near * p_heard), 2)
+```
+
+**How to read the output:** The `density` row is in birds per square kilometer.
+Multiply by 0.0177 to get expected birds in the 75 m circle, about
+`r round(dens$Predicted[1] * pi * 0.075^2, 1)` at this point. The `distance`
+row is the scale of the half-normal detection function, in meters. Averaged
+over the circle, that scale gives a `r round(100 * p_near)`% chance of
+detecting a bird that reveals itself. The `removal` row is the chance per
+minute that a bird present is first detected, or `r round(100 * p_heard)`% over
+ten minutes. Their product, about `r round(100 * p_near * p_heard)`%, is the
+share of birds an observer records. The standard errors and limits in these
+rows treat the estimated sigma as known.
+
+Because the data are simulated, you can compare the estimates with the truth.
+
+```{r truth-table}
+est     <- summary(opt)$opt_scale                    # sigma and 95% limits (m)
+b       <- unmarked::coef(fit)                       # link-scale coefficients
+ci_lam  <- unmarked::confint(fit, type = "lambda")   # Wald limits, log scale
+ci_dist <- unmarked::confint(fit, type = "dist")     # log scale
+ci_rem  <- unmarked::confint(fit, type = "rem")      # logit scale
+
+check <- data.frame(
+  Parameter = c("Scale of effect, sigma (m)", "Density at average habitat",
+                "Effect of land1 (log scale)", "Distance scale (m)",
+                "Removal probability per minute"),
+  Truth     = c(250, 400, 0.5, 40, 0.2),
+  Estimate  = c(est[1, "Mean"], exp(b[1]), b[2], exp(b[3]), plogis(b[4])),
+  Lower     = c(est[1, "2.5%"], exp(ci_lam[1, 1]), ci_lam[2, 1],
+                exp(ci_dist[1, 1]), plogis(ci_rem[1, 1])),
+  Upper     = c(est[1, "97.5%"], exp(ci_lam[1, 2]), ci_lam[2, 2],
+                exp(ci_dist[1, 2]), plogis(ci_rem[1, 2]))
+)
+# Does each 95% interval contain the value used to simulate the data?
+check$Covered <- check$Truth >= check$Lower & check$Truth <= check$Upper
+knitr::kable(check, digits = 2, row.names = FALSE)
+```
+
+**How to read the table:** Density is back-transformed with `exp()` and the
+removal probability with `plogis()`, while the `land1` effect stays on the log
+scale. Its estimate of `r round(b[2], 2)` means that a one standard deviation increase
+in kernel-weighted habitat multiplies density by `r round(exp(b[2]), 2)`.
+`Covered` is `TRUE` when the 95% interval contains the true value. A single
+simulated data set shows what recovery looks like. It cannot show that the
+intervals are reliable in general.
+
+> **What this means for your study.** Report density with its units and the
+> survey radius, and report the effective distance for the scale of effect.
+> Say that the coefficient intervals are conditional on the estimated scale.
+> `vignette("v09-estimates-and-intervals", package = "multiScaleR")` explains what that
+> leaves out.
+
+## Plot the kernel and the density response
+
+```{r plot-kernel, fig.cap = "***Kernel weight against distance for `land1`.***"}
+plot(opt)
+```
+
+```{r marginal, fig.cap = "***Estimated density across the observed range of kernel-weighted `land1`.***"}
+plot_marginal_effects(opt, type = "lambda",
+                      ylab = "Density (birds per square km)")
+```
+
+**How to read these plots:** The first plot shows how the weight given to a
+raster cell declines with distance from the survey point. The dashed line marks
+the radius that holds 90% of the kernel weight, and the gray band is its 95%
+confidence interval. The second plot shows density across the kernel-weighted
+proportion of habitat. Its band treats the estimated scale as known. Set `type`
+to `"rem"` or `"dist"` to plot a covariate in one of those components.
+
+## Map density
+
+```{r map, fig.cap = "***Predicted density, in birds per square kilometer, with survey points.***"}
+# Smooth the raster at the estimated scale, standardized as in the model
+r_scaled <- kernel_scale.raster(raster_stack = land1, multiScaleR = opt,
+                                scale_center = TRUE, clamp = TRUE,
+                                verbose = FALSE)
+
+# Density for every raster cell, with its standard error and 95% limits
+dens_map <- terra::predict(r_scaled, fit, type = "lambda")
+names(dens_map)
+
+plot(dens_map$Predicted, main = "Density (birds per square km)")
+points(pts, pch = 19, cex = 0.5)
+```
+
+**How to read this map:** Each cell holds the density the model expects for a
+count centered there. Detection is already accounted for, so the map shows
+birds present and not birds an observer would record. With `clamp = TRUE`,
+cells with more or less habitat than any survey point are held at the nearest
+observed value.
+
+# Refit from several starting values
+
+A distance-removal likelihood can have more than one local optimum.
+`make_gdr_refitter()` builds a refit function for `multiScale_optim()`. At
+every candidate scale it fits the model from the starting model's coefficients
+and from each extra set of starting values you declare. The search stops with an error
+when the best likelihood comes from a fit that did not converge cleanly, and a
+record of every attempt goes to `audit_dir`.
+
+```{r refitter, eval = FALSE}
+# A second set of starting values, named like the model coefficients
+cold <- unmarked::coef(mod)
+cold[] <- c(log(300), 0, log(30), qlogis(0.4))
+
+refit <- make_gdr_refitter(model = mod, cold_starts = list(cold = cold),
+                           audit_dir = tempfile("gdr-audit-"))
+
+# The same search as before, with every candidate scale fitted from both starts
+opt_checked <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs,
+                                refit_fn = refit, n_cores = 1)
+```
+
+With one extra start the search takes about twice as long. In this example it
+returns the same sigma as the default search, 250 m, so the estimate did not
+depend on where the coefficients started.
+
+# Model spatial correlation among survey blocks
+
+Counts from neighboring areas are often more alike than the covariates explain.
+A random intercept for each block of surveys absorbs that, and
+`fit_gdr_response_field()` goes one step further by letting nearby blocks have
+similar intercepts. The correlation between two blocks falls with the distance
+between them as `exp(-distance / range)`. You supply `range` in map units, and
+the function does not estimate it.
+
+The stored example groups the 100 points into `r field$n_blocks` square blocks
+and simulates block effects with a range of `r field$range` m. Fit the model
+with independent block effects first, then pass it to
+`fit_gdr_response_field()` with a second set of starting values. The simulated
+landscape has no real location, so the EPSG code below is a placeholder. Use
+the code of your own projected coordinates.
+
+```{r field-call, eval = FALSE}
+# Template: an independent random intercept for each block (TMB engine)
+template <- unmarked::gdistremoval(
+  lambdaformula = ~ land1 + (1 | block), removalformula = ~ 1,
+  distanceformula = ~ 1, data = umf_blocks, keyfun = "halfnorm",
+  mixture = "P", output = "density", unitsOut = "kmsq", K = 80, engine = "TMB",
+  starts = c(log(400), 0, log(40), qlogis(0.2), log(0.5))
+)
+
+# Extra starting values, named by parameter block and position
+cold <- c("beta_lambda[1]"   = log(300),      # log density at average habitat
+          "beta_lambda[2]"   = 0,             # land1 effect
+          "beta_dist[1]"     = log(30),       # log distance scale
+          "beta_rem[1]"      = qlogis(0.4),   # logit removal probability
+          "lsigma_lambda[1]" = log(0.3))      # log SD of the block effects
+settings <- list(method = "BFGS", se = TRUE, threads = 1L,
+                 control = list(maxit = 2500L, reltol = 1e-10))
+
+field_fit <- fit_gdr_response_field(
+  model  = template,
+  coords = block_xy,        # one row per survey: the center of its block
+  crs    = 32617,           # EPSG code of the projected coordinates
+  range  = 1500,            # correlation range, in map units (m)
+  cold_starts = list(cold = cold), tmb_settings = settings,
+  audit_dir   = tempfile("gdr-field-audit-")
+)
+```
+
+```{r field-results, echo = FALSE}
+knitr::kable(field$compare, digits = c(0, 0, 2, 2, 1, 1), row.names = FALSE,
+             col.names = c("Model", "Density at average habitat",
+                           "Effect of land1", "SD of block effects",
+                           "Log likelihood", "AIC"))
+```
+
+**How to read the table:** Density is in birds per square kilometer and the SD
+of the block effects is on the log scale. An SD of
+`r round(field$compare$block_sd[2], 2)` means a block one standard deviation
+above average has `r round(exp(field$compare$block_sd[2]), 2)` times the
+typical density. Both models estimate the same number of parameters, because
+the range is supplied. Their AIC values differ by
+`r round(abs(diff(field$compare$AIC)), 1)`, so these data do not favor either
+model.
+
+`unmarked::predict(field_fit, type = "lambda")` returns density with the
+estimated effect of each survey's block. Add `re.form = NA` to set the field to
+zero. That prediction describes a block with no deviation, and it is not an
+average over blocks. To estimate the scale of effect with the field in place,
+build a refit function with `make_gdr_refitter(field_fit, list(cold = cold),
+audit_dir, tmb_settings = settings)` and pass it to `multiScale_optim()` as
+`refit_fn` with `n_cores = 1`. A search of that kind took about seven minutes
+on data like these. `?fit_gdr_response_field` gives the full requirements.
+
+# Current restrictions
+
+| Not supported | What to do instead |
+|:--------------|:-------------------|
+| An `offset()` term in the abundance, availability, removal, or distance formula | No alternative yet. Do not drop an offset your model needs in order to proceed |
+| Zero-inflated abundance (`mixture = "ZIP"`) with `engine = "TMB"` | Use `mixture = "P"` or `"NB"`. A zero-inflated model without random effects can use `engine = "C"` |
+| A scale of effect for a covariate that appears only in the availability formula of a single-visit design, or only in the distance formula with `keyfun = "uniform"` | Those components are not estimated in such models. Put the landscape covariate in a component the model estimates |
+| A landscape covariate with the same name as a column in the yearly or interval covariate tables | Give each its own name, for example with an alias in `expand_gdr_intervals()` |
+| Intervals that include uncertainty in the scale of effect | Report intervals as conditional on the estimated scale |
+| `cross_validate()` for `unmarked` fits | Compare models fitted to the same surveys with `aic_tab()` |
+| `sim_dat_gdr()` for negative binomial or zero-inflated abundance, detection functions other than half-normal, or repeat visits | Simulate those designs with your own code |
+| `make_gdr_refitter()` and `fit_gdr_response_field()` with other package versions. They require `unmarked` 1.5.2, and TMB 1.9.25 for models fitted with `engine = "TMB"` | Use the default refit in `multiScale_optim()`, which has no version requirement |
+| `fit_gdr_response_field()` beyond Poisson abundance, a half-normal detection function, density per square kilometer, one visit per point, a 75 m survey radius, and one random intercept for abundance. The range is not estimated | Fit independent random intercepts with `engine = "TMB"` |
+
+# Quick reference
+
+```{r quick-reference, eval = FALSE}
+library(multiScaleR)
+library(terra)
+
+# 1. Prepare the kernel inputs
+data("surv_pts")
+pts   <- vect(surv_pts)
+land1 <- rast(system.file("extdata", "landscape.tif",
+                          package = "multiScaleR"))[["land1"]]
+kernel_inputs <- kernel_prep(pts = pts, raster_stack = land1,
+                             max_D = 1700, kernel = "gaussian")
+
+# 2. Simulate a survey (or build the frame from your own records)
+land1_250 <- kernel_scale.raster(raster_stack = land1, sigma = 250,
+                                 kernel = "gaussian")
+hab_true  <- as.numeric(scale(terra::extract(land1_250, pts, ID = FALSE)[, 1]))
+sim <- sim_dat_gdr(density = exp(log(400) + 0.5 * hab_true),
+                   distance_scale = 40, removal = 0.2,
+                   dist_breaks = c(0, 25, 50, 75),
+                   interval_lengths = c(2, 3, 5), interval_units = "minutes",
+                   site_covs = kernel_inputs$kernel_dat,
+                   event_keys = data.frame(survey = paste0("pt", 1:100)),
+                   seed = 2)
+umf <- sim$observed
+
+# 3. Check the data
+validate_unmarked_data(object = umf, event_keys = sim$event_keys,
+                       event_id = "survey", interval_units = "minutes",
+                       effort = rep(10, 100))$valid
+
+# 4. Fit a starting model, then estimate the scale of effect
+mod <- unmarked::gdistremoval(lambdaformula = ~ land1, removalformula = ~ 1,
+                              distanceformula = ~ 1, data = umf,
+                              keyfun = "halfnorm", mixture = "P",
+                              output = "density", unitsOut = "kmsq", K = 60,
+                              starts = c(log(400), 0, log(40), qlogis(0.2)))
+opt <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs,
+                        n_cores = 1)
+
+# 5. Read the results
+summary(opt)                                  # sigma, effective distance, model
+fit <- opt$opt_mod
+unmarked::predict(fit, type = "lambda")       # density, birds per square km
+unmarked::predict(fit, type = "dist")         # distance scale, m
+unmarked::predict(fit, type = "rem")          # removal probability per minute
+plot(opt)                                     # kernel weight against distance
+plot_marginal_effects(opt, type = "lambda")   # density across the covariate
+
+# 6. Map density
+r_scaled <- kernel_scale.raster(raster_stack = land1, multiScaleR = opt,
+                                scale_center = TRUE, clamp = TRUE)
+dens_map <- terra::predict(r_scaled, fit, type = "lambda")
+```
+
+## Summary of key functions
+
+| Function | Purpose |
+|:---------|:--------|
+| `sim_dat_gdr()` | Simulate distance-removal surveys and keep the true values |
+| `prepare_gdr_histories()` | Turn one record per bird into the distance and removal tables |
+| `validate_unmarked_data()` | Check a frame against the survey identifiers and effort |
+| `expand_gdr_intervals()` | Copy site or visit covariates into the interval table |
+| `prepare_gdr_intervals()` | Add covariates that differ among time intervals |
+| `multiScale_optim()` | Estimate the scale of effect together with the model coefficients |
+| `plot_marginal_effects()` | Plot a covariate's effect in one component with `type` |
+| `make_gdr_refitter()` | Refit from several starting values at each candidate scale |
+| `fit_gdr_response_field()` | Replace independent block effects with a spatially correlated field |
+| `aic_tab()` | Compare models fitted to the same surveys |
+
+## See also
+
+- **`vignette("v01-quickstart", package = "multiScaleR")`**, the core workflow and
+  how to read a fitted model.
+- **`vignette("v02-user-guide", package = "multiScaleR")`**, other
+  `unmarked` models, kernels, and model selection.
+- **`vignette("v09-estimates-and-intervals", package = "multiScaleR")`**, what an
+  interval includes and what it leaves out.
+- **`vignette("v03-map-predictions", package = "multiScaleR")`**,
+  mapping beyond the conditions you sampled.
+- **`vignette("v06-year-specific-rasters", package = "multiScaleR")`**, surveys
+  from several years, each with its own map.

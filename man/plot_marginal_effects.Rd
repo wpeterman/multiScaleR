@@ -12,7 +12,8 @@ plot_marginal_effects(
   link = FALSE,
   draws = NULL,
   reference_data = NULL,
-  component = NULL
+  component = NULL,
+  add_label = FALSE
 )
 }
 \arguments{
@@ -70,6 +71,12 @@ predictor. With \code{link = TRUE}, select a native response column, whose
 interpretation and number depend on the fitted family.
 For ziplss response curves, select \code{component = 1}: the overall
 expected count combines both linear predictors.}
+
+\item{add_label}{Logical. If \code{TRUE}, a caption below each panel states
+what the plotted limits include, such as conditioning on the selected
+spatial scales or the treatment of random effects. For Bayesian fits the
+caption also reports the number of draws and the stored status of the fit
+checks. Default: \code{FALSE}, which draws the panels without a caption.}
 }
 \value{
 A named list of \code{ggplot2} objects, one per covariate. Plots are
@@ -218,8 +225,13 @@ Missing inputs,
 nonfinite values, unknown levels and mismatches raise an error. Offsets
 supplied outside the formula and unsupported nested learned transformations
 are rejected. Supported native nested calls use a single standard learner's
-original retained attributes. Ambiguous or missing metadata needs
-precomputed training predictors or complete saved prediction calls.
+original retained attributes. The default package refitter can also
+recover supported Cox recipes while the original training rows are
+available. Precompute the predictor if its recipe is ambiguous or
+missing. For native conditional-logistic fits with
+learned predictors, retain the model frame with \code{model = TRUE} and
+fit complete choice sets using \code{na.action = stats::na.fail}. Some
+survival versions discard training attributes when applying omission.
 This verifies observable feature equivalence. It cannot prove
 unique original raw values from a square, polynomial or other many-to-one
 transformation, and it does not refit the model. Cox strata and cluster-only
@@ -259,7 +271,8 @@ Response random effects are zero and observation noise is excluded. Use
 \code{\link{predict.multiScaleR_bayes}} with matched spatial inputs for
 location-specific posterior expectations. A plotted credible interval does
 not establish convergence or calibration; existing fit diagnostics remain
-relevant and their stored status is shown in the caption.
+relevant and their stored status is shown in the caption when
+\code{add_label = TRUE}.
 }
 \examples{
 \donttest{
@@ -283,6 +296,9 @@ plot_marginal_effects(opt, ylab = "Predicted abundance")
 
 ## Finer evaluation grid
 plot_marginal_effects(opt, length.out = 200)
+
+## Add a caption stating what the confidence limits include
+plot_marginal_effects(opt, add_label = TRUE)
 }
 
 }

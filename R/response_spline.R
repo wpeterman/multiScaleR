@@ -119,6 +119,37 @@
   })
 }
 
+# Compare a fixed recipe with the native prediction call stored in the terms
+# (stats::makepredictcall() output). Used only when the model frame no longer
+# carries the basis attributes; any doubt returns FALSE and keeps the error.
+.msr_spline_predvars_match <- function(terms, index, recipe) {
+  predvars <- attr(terms, "predvars")
+  variables <- attr(terms, "variables")
+  if (!is.call(predvars) || length(predvars) != length(variables)) return(FALSE)
+  saved <- predvars[[index + 1L]]
+  type <- .msr_spline_call(saved)
+  if (!identical(type, recipe$type)) return(FALSE)
+  matched <- tryCatch(match.call(getExportedValue("splines", type), saved),
+                      error = function(e) NULL)
+  if (is.null(matched)) return(FALSE)
+  # makepredictcall() embeds numeric vectors; a literal c()/sign call is the
+  # only other accepted form. Nothing from the caller's frame is evaluated.
+  constant <- function(ex) {
+    if (is.call(ex) && all(all.names(ex) %in% c("c", "-", "+")) && !length(all.vars(ex)))
+      ex <- eval(ex, baseenv())
+    if (is.atomic(ex) && !is.object(ex) && (is.numeric(ex) || is.logical(ex))) ex else NULL
+  }
+  knots <- constant(matched$knots)
+  boundary <- constant(matched$Boundary.knots)
+  intercept <- if (is.null(matched$intercept)) FALSE else constant(matched$intercept)
+  degree <- if (is.null(matched$degree)) 3L else constant(matched$degree)
+  is.numeric(knots) && is.numeric(boundary) &&
+    identical(sort(as.numeric(knots)), recipe$knots) &&
+    identical(as.numeric(boundary), recipe$Boundary.knots) &&
+    identical(intercept, recipe$intercept) &&
+    is.numeric(degree) && length(degree) == 1L && degree == 3
+}
+
 # Retain matrix programs once; leaves identify native basis columns rather than
 # inventing new kernel sources or independently optimized spatial scales.
 .msr_compile_spline_design <- function(terms, frame, covariates, columns, contrasts) {
@@ -135,12 +166,23 @@
     value <- frame[[rows[j]]]; recipe <- programs[[j]]$basis_recipe
     if (is.null(recipe)) {
       if (!is.numeric(value) || !is.null(dim(value))) stop("Dynamic expressions must be scalar numeric columns.")
-    } else if (!inherits(value, recipe$type) || !is.matrix(value) ||
-        ncol(value) != widths[j] ||
-        !identical(as.numeric(attr(value, "knots")), recipe$knots) ||
-        !identical(as.numeric(attr(value, "Boundary.knots")), recipe$Boundary.knots) ||
-        !identical(attr(value, "intercept"), recipe$intercept))
-      stop("Native dynamic spline frame does not match its fixed basis recipe.")
+    } else {
+      matches <- inherits(value, recipe$type) &&
+        identical(as.numeric(attr(value, "knots")), recipe$knots) &&
+        identical(as.numeric(attr(value, "Boundary.knots")), recipe$Boundary.knots) &&
+        identical(attr(value, "intercept"), recipe$intercept)
+      # survival::coxph() passes its model frame through na.omit(), whose row
+      # subsetting drops the basis class and knot attributes even when no row
+      # is removed. The saved prediction call was built from those attributes
+      # first, so a bare matrix is checked against that call instead. A frame
+      # that still carries basis attributes must match them directly.
+      if (!matches && !is.object(value) && is.null(attr(value, "knots")) &&
+          is.null(attr(value, "Boundary.knots")))
+        matches <- .msr_spline_predvars_match(terms, rows[j], recipe)
+      if (!matches || !is.matrix(value) || !is.numeric(value) ||
+          ncol(value) != widths[j])
+        stop("Native dynamic spline frame does not match its fixed basis recipe.")
+    }
   }
   X <- stats::model.matrix(terms, frame, contrasts.arg = contrasts)
   if (is.null(columns)) columns <- colnames(X)

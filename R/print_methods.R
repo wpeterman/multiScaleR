@@ -203,6 +203,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
         " of ", x$diagnostics$sample_size$prepared_n,
         " prepared observations entered the fitted model.\n", sep = "")
   }
+  .msr_print_start_stall(x$diagnostics)
   .msr_print_next_run(x$next_run)
   invisible(x)
 }
@@ -251,9 +252,19 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #'   Profiling errors are reported instead of silently returning invalid limits.
 #' @details
 #' For \code{backend = "profile_glm"} or \code{"joint_nb2"}, default scale limits use joint information
-#' on log scales and are omitted when identifiability checks fail. The printed
-#' coefficient summary remains conditional on optimized kernels; use
-#' \code{\link{vcov.multiScaleR}} for joint covariance.
+#' on log scales and are omitted when identifiability checks fail. A returned
+#' Wald interval describes local curvature around the selected optimum and
+#' can extend beyond the searched scale range. Coverage can be below the
+#' nominal level even for an interior fit. Inspect the likelihood over the
+#' admissible range when scale inference matters.
+#'
+#' The analytic \code{profile = TRUE} summary follows the connected likelihood
+#' region around the fitted scale. An endpoint at a search bound is
+#' bound-limited. For a supported one-scale NB2 fit, \code{\link{scale_inference}}
+#' checks the full range and reports detected regions. Compare additional
+#' optimizer starts, including both bounds, if a full-range profile suggests
+#' a competing optimum. The printed coefficient summary remains conditional
+#' on optimized kernels. Use \code{\link{vcov.multiScaleR}} for joint covariance.
 #'
 #' Set \code{dimension = "1d"} to preserve the original \code{opt_dist} and
 #' \code{opt_distance} values in existing scripts. For a dimension-independent
@@ -478,6 +489,7 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
         " of ", x$diagnostics$sample_size$prepared_n,
         " prepared observations entered the fitted model.\n", sep = "")
   }
+  .msr_print_start_stall(x$diagnostics)
   .msr_print_next_run(x$next_run)
   invisible(x)
 }
@@ -516,6 +528,16 @@ print.multiScaleR_data <- function(x, ...){
   cat("\nUnit Conversion:\n")
   cat(x$unit_conv)
   invisible(x)
+}
+
+# A refit search that never left its starting values reports them as
+# estimates. Repeat the stored explanation wherever the fit is reported.
+.msr_print_start_stall <- function(diagnostics) {
+  stall <- diagnostics$start_stall
+  if (isTRUE(stall$triggered)) {
+    cat(red("\n WARNING!!!\n", stall$message, "\n\n"))
+  }
+  invisible(NULL)
 }
 
 # Print only on explicit reporting, or when the fit's verbose switch permits it.

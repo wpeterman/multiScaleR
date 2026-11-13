@@ -96,8 +96,7 @@
 #'   linked histories do not establish the size of an unobserved population.
 #'   Native geometry comparisons convert meters/kilometers to meters only in
 #'   the comparison copy; inputs and native objects remain unchanged.
-#' @seealso [validate_unmarked_data()], [prepare_gdr_intervals()],
-#'   [audit_gdr_integration()]
+#' @seealso [validate_unmarked_data()], [prepare_gdr_intervals()]
 #' @examples
 #' map <- expand.grid(interval = 1:2, distance_bin = 1:3)
 #' map$column <- paste0("cell", 1:6)

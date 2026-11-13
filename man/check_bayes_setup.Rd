@@ -48,7 +48,7 @@ model is fitted, and compiler or sampling performance is not tested.
 Preparation can validate your data and formulas before installing
   sampling software. For installation instructions, including Windows
   toolchain guidance, see
-  \code{vignette("bayesian-scales", package = "multiScaleR")}.
+  \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }
 \examples{
 check_bayes_setup(method = "prepare")

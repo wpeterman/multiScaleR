@@ -161,6 +161,5 @@ prepared$first
 prepared$yRemoval
 }
 \seealso{
-[validate_unmarked_data()], [prepare_gdr_intervals()],
-  [audit_gdr_integration()]
+[validate_unmarked_data()], [prepare_gdr_intervals()]
 }

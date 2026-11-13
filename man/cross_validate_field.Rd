@@ -145,6 +145,14 @@ The field range is a response-correlation distance, separate from ecological
 kernel bandwidth. Use the returned SDs for predictive variation rather than
 interpreting them as native mean-prediction standard errors.
 
+A scored fold has an eligible native fit and a valid numerical score for the
+specified calculation. Assess predictive reliability separately on the
+held-out locations and retain failed folds in the availability denominator.
+In simulations with buffered held-out locations, squared prediction errors
+averaged 1.5 (Gaussian), 2.7 (Poisson), and 1.9 (NB2) times the predicted
+observation variance, against 1 for a calibrated prediction. Treat the
+returned predictive SDs as optimistic when parameters are estimated.
+
 Binning, normalization and supported learned design constants use training
 rows only. Custom cohort-dependent preprocessing must also be learned inside
 each training fold. Native formula evaluation cannot detect external data
@@ -152,8 +160,9 @@ leaked through user-defined functions. No missing rows are silently dropped.
 
 The model contains one shared latent Gaussian field with exponential or
 Gaussian correlation, constant observation dispersion when applicable, and
-maximum-likelihood estimation. See the cross-validation vignette for
-worked examples and interpretation.
+maximum-likelihood estimation.
+\code{vignette("v08-cross-validation", package = "multiScaleR")} explains
+fold design and how to read the scores.
 }
 \examples{
 # Start from raw data and explicit projected points, keeping all repeated

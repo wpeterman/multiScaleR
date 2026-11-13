@@ -46,8 +46,7 @@
   if (inherits(model, "coxph") && (inherits(model, c("coxphms", "coxph.penal")) ||
       length(attr(tt, "specials")$tt)))
     stop("reference_data requires a checked time-fixed, unpenalized native Cox structure.", call. = FALSE)
-  # Cox fits also use their retained prediction terms, without changing any
-  # fitted coefficient, covariance, response, likelihood or diagnostic.
+  # Update prediction calls in a local copy of the native Cox object.
   if (inherits(model, "coxph")) {
     model$terms <- tt
     attr(model$model, "terms") <- tt
@@ -123,8 +122,16 @@
         identical(levels(a), levels(b)) && identical(is.ordered(a), is.ordered(b)))
     identical(a, b)
   }
-  for (nm in names(evaluated)) if (!equivalent(evaluated[[nm]], retained[[nm]]))
-    stop("reference_data does not reproduce the fitted feature: ", nm, call. = FALSE)
+  for (nm in names(evaluated)) {
+    fitted <- retained[[nm]]
+    supplied <- evaluated[[nm]]
+    if (inherits(model, "coxph") && .msr_cox_plain_basis(fitted, supplied)) {
+      fitted <- unclass(fitted)
+      supplied <- unclass(supplied)
+    }
+    if (!equivalent(supplied, fitted))
+      stop("reference_data does not reproduce the fitted feature: ", nm, call. = FALSE)
+  }
   offset <- function(mf) {
     value <- stats::model.offset(mf)
     if (is.null(value)) rep(0, nrow(mf)) else value

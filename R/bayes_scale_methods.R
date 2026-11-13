@@ -92,8 +92,8 @@
 #'   it differs from the between-year population SD in \code{summary(object)}.
 #' @seealso \code{\link{multiScale_bayes}}, \code{\link{plot.multiScaleR_bayes}},
 #'   \code{\link{diagnose_bayes_scales}};
-#'   \code{vignette("bayesian-scales", package = "multiScaleR")} and
-#'   \code{vignette("bayesian-computation", package = "multiScaleR")}.
+#'   \code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
+#'   \code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))
@@ -354,7 +354,7 @@ print.multiScaleR_bayes <- function(x, ...) {
 #' @seealso \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
 #'   \code{\link{prediction_contract}},
 #'   \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
-#'   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+#'   \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))

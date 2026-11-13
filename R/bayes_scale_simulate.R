@@ -41,7 +41,7 @@
 #' @seealso \code{\link{multiScale_bayes}}, \code{\link{simulate_bayes_prior}},
 #'   \code{\link{prediction_contract}},
 #'   \code{\link{predict.multiScaleR_bayes}};
-#'   \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+#'   \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))

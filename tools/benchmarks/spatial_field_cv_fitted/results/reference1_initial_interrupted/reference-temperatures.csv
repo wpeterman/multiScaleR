@@ -1,0 +1,6 @@
+"id","method","temperature","max_rhat","mean_proposals","proposal","proposal_message","proposal_warnings"
+"fit_002","generating",0,1.0072874226884,2.27833333333333,"local_Gaussian","",""
+"fit_002","generating",0.25,1.00730878378871,2.546875,"local_Gaussian","",""
+"fit_002","generating",0.5,1.00624052786001,2.46125,"local_Gaussian","",""
+"fit_002","generating",0.75,1.0089407425676,2.475,"local_Gaussian","",""
+"fit_002","generating",1,1.0049674283044,2.42270833333333,"local_Gaussian","",""

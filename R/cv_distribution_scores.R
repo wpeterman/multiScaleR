@@ -111,7 +111,11 @@
       if (s$family == "gaussian" && any(c(analysis$weight, rows$weight) != 1))
         stop("Gaussian references retain their unit-weight contract.", call. = FALSE)
       rows <- .msr_cv_distribution_rows(x, name)
-      score <- if (is.null(metric)) x$settings$metrics else metric
+      # A Poisson reference records `deviance` by default, which NB2/Gamma
+      # candidates never record and the distribution scorer cannot recompute.
+      # Verify the losses a mixed comparison can share; select_cv() drops the
+      # remainder from its result instead of failing here.
+      score <- if (is.null(metric)) intersect(x$settings$metrics, c("rmse", "mae", "neg_log_score")) else metric
       check <- .msr_cv_distribution_score(rows, score)
       if (!identical(rows$eligible, check$eligible)) stop("Recorded distribution eligibility is inconsistent.", call. = FALSE)
       for (field in score) if (!isTRUE(all.equal(rows[[field]], check[[field]], tolerance = 0, check.attributes = FALSE)))

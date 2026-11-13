@@ -50,7 +50,7 @@
 #'   the original post-warmup draws in iteration and chain order.
 #' @seealso \code{\link{posterior_scales}}, \code{\link{multiScale_bayes}},
 #'   \code{\link{diagnose_bayes_scales}}, \code{\link{simulate.multiScaleR_bayes}},
-#'   and \code{vignette("bayesian-scales", package = "multiScaleR")}.
+#'   and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))

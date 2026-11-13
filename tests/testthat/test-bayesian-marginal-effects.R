@@ -16,7 +16,8 @@ test_that("Bayesian effect curves retain links, offsets, and fixed reference uni
       fit$draws$beta[, match("z", columns)] <- .2
       fit$diagnostics <- list(passed = FALSE)
       before <- fit
-      plots <- expect_no_warning(plot_marginal_effects(fit, length.out = 5))
+      plots <- expect_no_warning(plot_marginal_effects(fit, length.out = 5,
+        add_label = TRUE))
       expect_setequal(names(plots), c("rough", "z", "group"))
       expect_identical(fit, before)
       expect_identical(as.character(plots$group$data$x), c("a", "b", "c"))
@@ -53,7 +54,7 @@ test_that("Bayesian curve draw selection is bounded and explicit", {
   fit <- prepare_bayesian_fixture(f, family = "poisson")
   expect_error(plot_marginal_effects(fit), "no posterior draws")
   fit <- fake_bayesian_draws(fit, n = 1002)
-  plots <- plot_marginal_effects(fit, length.out = 3)
+  plots <- plot_marginal_effects(fit, length.out = 3, add_label = TRUE)
   expect_length(attr(plots, "draw_ids"), 1000)
   expect_match(plots$habitat$labels$caption, "1000 stored coefficient draws")
   selected <- plot_marginal_effects(fit, length.out = 3, draws = 5)

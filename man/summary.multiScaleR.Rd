@@ -55,9 +55,19 @@ Summarizes output from \code{multiScale_optim}.
 }
 \details{
 For \code{backend = "profile_glm"} or \code{"joint_nb2"}, default scale limits use joint information
-on log scales and are omitted when identifiability checks fail. The printed
-coefficient summary remains conditional on optimized kernels; use
-\code{\link{vcov.multiScaleR}} for joint covariance.
+on log scales and are omitted when identifiability checks fail. A returned
+Wald interval describes local curvature around the selected optimum and
+can extend beyond the searched scale range. Coverage can be below the
+nominal level even for an interior fit. Inspect the likelihood over the
+admissible range when scale inference matters.
+
+The analytic \code{profile = TRUE} summary follows the connected likelihood
+region around the fitted scale. An endpoint at a search bound is
+bound-limited. For a supported one-scale NB2 fit, \code{\link{scale_inference}}
+checks the full range and reports detected regions. Compare additional
+optimizer starts, including both bounds, if a full-range profile suggests
+a competing optimum. The printed coefficient summary remains conditional
+on optimized kernels. Use \code{\link{vcov.multiScaleR}} for joint covariance.
 
 Set \code{dimension = "1d"} to preserve the original \code{opt_dist} and
 \code{opt_distance} values in existing scripts. For a dimension-independent

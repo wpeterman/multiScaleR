@@ -1,0 +1,13 @@
+"id","family","design","replicate","method","public_status","reference_status","n_assessment","public_loss","reference_loss","reference_loss_mcse","max_rhat","overlap","message","warnings"
+"fit_003","nbinom2","interpolation",1,"generating","scored","resolved",24,69.9785318713447,70.0418322667208,0.047781580458521,1.00944360783708,0.238150984632485,"",""
+"fit_003","nbinom2","interpolation",1,"fitted","scored","resolved",24,70.9664181161343,70.9330648935652,0.0568195808958469,1.00481195360295,0.233464594537935,"",""
+"fit_006","nbinom2","sparse_strong",1,"generating","scored","resolved",14,19.9375627094664,19.9288965980399,0.0258354031154089,1.00679874935836,0.454336489220137,"",""
+"fit_006","nbinom2","sparse_strong",1,"fitted","scored","resolved",14,21.8301518027602,21.8134627171923,0.0281004553943588,1.00602565803025,0.36982311800141,"",""
+"fit_009","nbinom2","buffered_transfer",1,"generating","scored","resolved",36,71.447407461046,71.4458946000993,0.0503045705939732,1.00529179710354,0.296419440425891,"",""
+"fit_009","nbinom2","buffered_transfer",1,"fitted","scored","resolved",36,70.6973140385829,70.7267499851581,0.0412845848614362,1.00740739567766,0.306835479511346,"",""
+"fit_012","nbinom2","interpolation",2,"generating","scored","resolved",24,47.8719891581736,47.848300828342,0.0210689619586503,1.00975390333044,0.43214424274418,"",""
+"fit_012","nbinom2","interpolation",2,"fitted","scored","resolved",24,46.4801893943727,46.4824381242075,0.0103213492060568,1.00600764346309,0.493549936347952,"",""
+"fit_015","nbinom2","sparse_strong",2,"generating","scored","resolved",14,26.3493055247935,26.2993082711174,0.0462423860536314,1.00626965745667,0.409080937840449,"",""
+"fit_015","nbinom2","sparse_strong",2,"fitted","scored","resolved",14,26.3407454673584,26.2983780118692,0.101945040413708,1.00864218729392,0.183915152747256,"",""
+"fit_018","nbinom2","buffered_transfer",2,"generating","scored","resolved",36,64.7492041661239,64.6568759590472,0.0394891028775541,1.00909054785861,0.287240221806611,"",""
+"fit_018","nbinom2","buffered_transfer",2,"fitted","failed","no_fit",36,NA,NA,NA,NA,NA,"No spatial-field training start passed convergence, score and full curvature checks; inspect audit_dir.",NA

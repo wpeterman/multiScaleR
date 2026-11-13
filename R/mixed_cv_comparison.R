@@ -55,9 +55,15 @@
   if (!is.list(mod_list) || !length(mod_list) || is.null(names(mod_list)) ||
       anyNA(names(mod_list)) || any(!nzchar(names(mod_list))) || anyDuplicated(names(mod_list)))
     stop("Supply uniquely named mixed-model CV candidates.", call. = FALSE)
+  # Joint group scores are not on the footing of the per-observation scores
+  # from the other CV functions. Name any candidate of another type before
+  # checking completeness, so the message states the actual problem.
+  other <- names(mod_list)[!vapply(mod_list, inherits, logical(1), "multiScaleR_mixed_cv")]
+  if (length(other))
+    stop("Compare cross_validate_mixed() results only with each other. Not a mixed-model CV result: ",
+      paste(other, collapse = ", "), ".", call. = FALSE)
   keys <- lapply(mod_list, function(x) {
-    if (!inherits(x, "multiScaleR_mixed_cv") || !isTRUE(x$complete) ||
-        any(x$fold_results$status != "scored"))
+    if (!isTRUE(x$complete) || any(x$fold_results$status != "scored"))
       stop("Compare complete mixed-model CV candidates. Every fold must be scored.", call. = FALSE)
     if (!identical(x$integrity_sha256, .msr_gdr_hash(.msr_mixed_cv_payload(x))))
       stop("Mixed-model CV scores, controls or recorded targets changed.", call. = FALSE)

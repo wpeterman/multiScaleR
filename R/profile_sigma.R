@@ -68,6 +68,15 @@
 #' data available to the stored model call, or provide a working
 #' \code{refit_fn} to \code{\link{multiScale_optim}}.
 #'
+#' Fits from \code{backend = "profile_glm"}, \code{"joint_nb2"} and
+#' \code{"conditional_logit"} profile serially, and every sigma value must lie
+#' within the fitted bounds (\code{min_D} to \code{max_D}). For a
+#' \code{"conditional_logit"} fit, each grid value is the log-likelihood of a
+#' native \code{survival::coxph()} refit at that sigma, with the coefficients
+#' refit and every other scale held at its estimate. That backend withholds
+#' scale uncertainty, so \code{summary(fit, profile = TRUE)} returns no profile
+#' interval for it. The grid describes the likelihood surface only.
+#'
 #' Log-spacing concentrates evaluation points at smaller sigma values where the
 #' likelihood surface often changes more rapidly, and spaces them out at larger
 #' sigma values where the surface tends to be flatter.
@@ -210,19 +219,32 @@ profile_sigma <- function(x,
     } else {
       seq(sigma_range[1], sigma_range[2], length.out = n_pts)
     }
+    # exp(log(x)) can round just outside x (exp(log(20)) < 20). Pin the
+    # endpoints so the default grid stays inside the fitted bounds.
+    sigma_seq[c(1L, n_pts)] <- sigma_range
 
     grid_type <- spacing
   }
   n_grid <- length(sigma_seq)
 
-  if (.msr_analytic_backend(x)) {
+  clogit <- identical(x$backend, "conditional_logit")
+  if (.msr_analytic_backend(x) || clogit) {
     if (!is.null(n_cores) && n_cores > 1L)
-      stop("profile_glm likelihood profiling is serial.", call. = FALSE)
+      stop(x$backend, " likelihood profiling is serial.", call. = FALSE)
     if (any(sigma_seq < min_D | sigma_seq > max_D))
-      stop("profile_glm sigma values must remain within the fitted bounds.", call. = FALSE)
+      stop(sprintf(paste0(
+        "%s profiles need sigma values within the fitted bounds, %s to %s ",
+        "map units. Supply `sigma_values` or `sigma_range` inside them, or ",
+        "omit both to profile the whole fitted range."),
+        x$backend, format(min_D), format(max_D)), call. = FALSE)
+    # A conditional_logit fit has no refit context. Each grid value is a
+    # native clogit refit, with the other scales held at their estimates.
+    profile_ll <- if (clogit) .msr_clogit_profile_loglik(x) else
+      function(j, z) -.msr_profile_at(x, j, z, reoptimize = FALSE)
     profiles <- do.call(rbind, lapply(seq_len(n_covs), function(j) {
-      ll <- -vapply(log(sigma_seq / unit_conv), function(z)
-        .msr_profile_at(x, j, z, reoptimize = FALSE), numeric(1))
+      if (verbose && clogit) cat("Profiling sigma for", covs[j], "\n")
+      ll <- vapply(log(sigma_seq / unit_conv), function(z) profile_ll(j, z),
+        numeric(1))
       data.frame(variable = covs[j], sigma = sigma_seq, LL = ll,
         AICc = if (n > k_total + 1) -2 * ll + 2 * k_total +
           2 * k_total * (k_total + 1) / (n - k_total - 1) else NA_real_)
@@ -463,3 +485,24 @@ plot.sigma_profile <- function(x, ...) {
 }
 
 utils::globalVariables(c("sigma", "y_val"))
+
+
+# Build a profile function for a conditional_logit fit. The fitted result
+# keeps only prediction state, so rebuild the conditional-logit contract from
+# the original model and inputs. The returned function gives the native
+# coxph() log-likelihood, with coefficients refit, at log(sigma / unit_conv)
+# `z` for scale `j` and every other scale at its estimate.
+.msr_clogit_profile_loglik <- function(x) {
+  inputs <- x$kernel_inputs
+  inputs$min_D <- x$min_D
+  inputs$max_D <- x$max_D
+  engine <- x$profile_fit$control$kernel_engine
+  if (is.null(engine)) engine <- "reference"
+  contract <- .msr_clogit_contract(x$fitted_mod_original, inputs, engine)
+  kp_hat <- unname(x$profile_fit$par)
+  function(j, z) {
+    kp <- kp_hat
+    kp[j] <- z
+    as.numeric(stats::logLik(.msr_clogit_native(contract, kp)))
+  }
+}

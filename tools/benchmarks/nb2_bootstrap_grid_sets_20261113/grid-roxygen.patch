@@ -1,0 +1,16 @@
+diff --git a/R/scale_inference.R b/R/scale_inference.R
+--- a/R/scale_inference.R
++++ b/R/scale_inference.R
+@@ -110,6 +110,12 @@
+ #' This measures pointwise inclusion in that simulation design. Coverage
+ #' of the returned finite-grid sets is a separate target.
+ #'
++#' In a separate 48-dataset simulation, all full-grid sets were available.
++#' Their coverage changed with the grid even when the bootstrap decisions
++#' at shared nodes were held fixed. A singleton component contains only
++#' its accepted scale. Its outside brackets record adjacent rejected
++#' nodes. See the inference contracts vignette for the simulation results.
++#'
+ #' These are plug-in parametric bootstrap tests for independent observations,
+ #' not exact tests with known nuisance parameters. Neither bootstrap nor
+ #' positive curvature guarantees calibrated coverage under weak identification

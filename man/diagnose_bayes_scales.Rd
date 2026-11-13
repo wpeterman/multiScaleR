@@ -84,5 +84,5 @@ report$reason
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
   \code{\link{plot.multiScaleR_bayes}}, \code{\link{diagnose_bayes_probabilities}},
-  and \code{vignette("bayesian-scales", package = "multiScaleR")}.
+  and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }

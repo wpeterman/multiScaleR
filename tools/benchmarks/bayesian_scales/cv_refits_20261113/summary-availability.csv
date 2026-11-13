@@ -1,0 +1,17 @@
+"family","generator","model","fold","planned","finite","scored","rejected","failed","pending","replayed","with_reference"
+"gaussian","annual","annual","seen_year_new_site",4,4,4,0,0,0,4,4
+"gaussian","annual","annual","whole_year",4,4,4,0,0,0,4,4
+"gaussian","annual","pooled","seen_year_new_site",4,4,4,0,0,0,4,4
+"gaussian","annual","pooled","whole_year",4,4,4,0,0,0,4,4
+"gaussian","pooled","annual","seen_year_new_site",4,4,4,0,0,0,4,4
+"gaussian","pooled","annual","whole_year",4,4,4,0,0,0,4,4
+"gaussian","pooled","pooled","seen_year_new_site",4,4,4,0,0,0,4,4
+"gaussian","pooled","pooled","whole_year",4,4,4,0,0,0,4,4
+"nbinom2","annual","annual","seen_year_new_site",4,4,4,0,0,0,4,4
+"nbinom2","annual","annual","whole_year",4,4,4,0,0,0,4,4
+"nbinom2","annual","pooled","seen_year_new_site",4,4,4,0,0,0,4,4
+"nbinom2","annual","pooled","whole_year",4,4,4,0,0,0,4,4
+"nbinom2","pooled","annual","seen_year_new_site",4,4,4,0,0,0,4,4
+"nbinom2","pooled","annual","whole_year",4,4,4,0,0,0,4,4
+"nbinom2","pooled","pooled","seen_year_new_site",4,4,4,0,0,0,4,4
+"nbinom2","pooled","pooled","whole_year",4,4,4,0,0,0,4,4

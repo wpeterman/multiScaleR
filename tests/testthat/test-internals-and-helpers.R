@@ -195,20 +195,23 @@ test_that("kernel_scale_fn covers glm, other, unmarked, fallback, and negative s
   expect_true(is.list(glm_obj))
   expect_true(inherits(glm_obj$mod, "glm"))
 
-  zi <- make_zeroinfl_fixture()
-  other_obj <- with_mocked_bindings(
-    multiScaleR:::kernel_scale_fn(
-      par = 40 / fix$kernel_inputs$unit_conv,
-      d_list = fix$kernel_inputs$d_list,
-      cov_df = fix$kernel_inputs$raw_cov,
-      kernel = fix$kernel_inputs$kernel,
-      fitted_mod = zi$mod
-    ),
-    find_predictors = function(x) list("cont1"),
-    get_data = function(x, effects = "all") fix$df,
-    .package = "multiScaleR"
-  )
-  expect_true(is.numeric(other_obj))
+  # pscl is a suggested package; the glm and unmarked checks run without it.
+  if (requireNamespace("pscl", quietly = TRUE)) {
+    zi <- make_zeroinfl_fixture()
+    other_obj <- with_mocked_bindings(
+      multiScaleR:::kernel_scale_fn(
+        par = 40 / fix$kernel_inputs$unit_conv,
+        d_list = fix$kernel_inputs$d_list,
+        cov_df = fix$kernel_inputs$raw_cov,
+        kernel = fix$kernel_inputs$kernel,
+        fitted_mod = zi$mod
+      ),
+      find_predictors = function(x) list("cont1"),
+      get_data = function(x, effects = "all") fix$df,
+      .package = "multiScaleR"
+    )
+    expect_true(is.numeric(other_obj))
+  }
 
   unmark <- make_unmarked_fixture()
   unmarked_obj <- multiScaleR:::kernel_scale_fn(

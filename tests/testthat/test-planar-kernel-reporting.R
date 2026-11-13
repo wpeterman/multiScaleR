@@ -6,7 +6,7 @@ test_that("default and legacy plot markers agree with all kernel definitions", {
   for (kernel in c("gaussian", "exp", "expow", "fixed")) {
     beta <- if (kernel == "expow") 1.5 else NULL
     for (dimension in c("2d", "1d")) {
-      p <- plot_kernel(sigma = 300, kernel = kernel, beta = beta,
+      p <- plot_kernel(sigma = 300, kernel = kernel, shape = beta,
                         dimension = dimension)
       line <- kernel_plot_layer(p, "GeomVline")
       expected <- k_dist(300, prob = 0.9, kernel = kernel, beta = beta,
@@ -19,7 +19,7 @@ test_that("default and legacy plot markers agree with all kernel definitions", {
       expect_gte(max(p$data$dist), expected)
       expect_equal(min(p$data$dist), 0)
     }
-    default <- plot_kernel(sigma = 300, kernel = kernel, beta = beta)
+    default <- plot_kernel(sigma = 300, kernel = kernel, shape = beta)
     expect_equal(default$layers[[kernel_plot_layer(default, "GeomVline")]]$data$xintercept,
                  k_dist(300, prob = 0.9, kernel = kernel, beta = beta, dimension = "2d"))
   }
@@ -29,7 +29,7 @@ test_that("small scales and high-proportion markers are not rounded away or clip
   for (dimension in c("2d", "1d")) {
     for (kernel in c("gaussian", "exp", "expow")) {
       beta <- if (kernel == "expow") 0.5 else NULL
-      p <- plot_kernel(sigma = 0.01, kernel = kernel, beta = beta,
+      p <- plot_kernel(sigma = 0.01, kernel = kernel, shape = beta,
                         prob = 0.99999, dimension = dimension)
       marker <- p$layers[[kernel_plot_layer(p, "GeomVline")]]$data$xintercept
       expect_gt(marker, 0)

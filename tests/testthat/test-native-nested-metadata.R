@@ -263,7 +263,7 @@ test_that("nested conditional choice predictions retain Cox targets and guards",
   bare <- survival::clogit(case ~ mean + rough + scale(exposure) + poly(z, 2) + strata(step),
     dat, method = "exact", model = TRUE, x = TRUE, y = TRUE)
   nested <- survival::clogit(case ~ mean + rough + I(scale(exposure)) + I(poly(z, 2)) + strata(step),
-    dat, method = "exact", model = TRUE, x = TRUE, y = TRUE)
+    dat, method = "exact", model = TRUE, x = TRUE, y = TRUE, na.action = stats::na.fail)
   repaired <- .msr_native_fixed_metadata(nested, nested = TRUE)
   for (name in c("coefficients", "var", "linear.predictors", "loglik", "method", "strata", "iter", "y"))
     expect_identical(repaired[[name]], nested[[name]])

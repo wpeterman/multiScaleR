@@ -607,6 +607,19 @@ kernel_scale_fn <- function(par,
       return(1e6^10)
     }
   } else {
+    analysis <- .analysis_model(mod_u)
+    if (mod_class != "unmarked" && is.null(opt_context$refit_fn) &&
+        inherits(analysis, "coxph")) {
+      # The final raw training rows are still available here. Freeze any
+      # original fixed recipes before the native call's local binding expires.
+      repaired <- .msr_native_fixed_metadata(analysis, training = dat)
+      # Optional nested recovery must preserve the fit when an expression's
+      # attributes cannot identify its training recipe. Prediction can then
+      # report the existing error for that expression.
+      repaired <- tryCatch(.msr_native_fixed_metadata(repaired, nested = TRUE,
+        training = dat), error = function(e) repaired)
+      if (.has_nested_analysis_model(mod_u)) mod_u$model <- repaired else mod_u <- repaired
+    }
     obj <- list(mod = mod_u,
                 scl_params = list(mean = attr(scl_df, "scaled:center"),
                                   sd = attr(scl_df, "scaled:scale")))

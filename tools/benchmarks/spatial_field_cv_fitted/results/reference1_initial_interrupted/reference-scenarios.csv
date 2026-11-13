@@ -1,0 +1,2 @@
+"id","family","design","replicate","method","public_status","reference_status","n_assessment","public_loss","reference_loss","reference_loss_mcse","max_rhat","overlap","message","warnings"
+"fit_002","poisson","interpolation",1,"generating","scored","resolved",24,35.061068753678,34.9787905795751,0.0465695908331549,1.0089407425676,0.328615450286364,"",""

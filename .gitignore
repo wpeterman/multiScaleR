@@ -14,6 +14,19 @@ src/*.dll
 /Meta/
 docs/
 
+# Raw outputs of the 2026-11-13 studies, kept out of git history to limit
+# repository size. Each study's scripts and seeds regenerate them.
+/tools/benchmarks/analytic_wald_intervals/results/metrics.csv
+/tools/benchmarks/analytic_wald_intervals/results/sets.csv
+/tools/benchmarks/analytic_wald_intervals/results/starts.csv.gz
+/tools/benchmarks/conditional_choice_bandwidth_recovery/results/raw-profiles-and-predictions.zip
+/tools/benchmarks/conditional_choice_bandwidth_recovery/results/starts-combined.csv
+/tools/benchmarks/spatial_field_cv_fitted/results/native-audit-index.csv
+/tools/benchmarks/spatial_field_cv_fitted/results/native-audits.zip
+/tools/benchmarks/spatial_field_cv_fitted/results/part1/predictions.csv
+/tools/benchmarks/spatial_field_cv_fitted/results/part2/predictions.csv
+/tools/benchmarks/spatial_field_cv_fitted/results/predictions-combined.csv
+
 # Raw outputs of the 2026-11-12 studies, kept out of git history to limit
 # repository size. Each study's scripts and seeds regenerate them.
 /tools/benchmarks/spatial_field_cv_quadrature/results/tilted-moments.csv

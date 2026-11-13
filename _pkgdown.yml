@@ -15,44 +15,51 @@ navbar:
   components:
     intro:
       text: Get started
-      href: articles/quickstart.html
+      href: articles/v01-quickstart.html
 
-# Vignettes, grouped for the Articles menu and index page.
+# Vignettes, grouped for the Articles menu and index page. The order follows
+# the numbered file names: the quick start, the user guide, then by complexity.
 # Every vignette must be listed here, or pkgdown::check_pkgdown() fails.
 articles:
   - title: Getting started
     navbar: Getting started
     contents:
-      - quickstart
-      - multiScaleR_Guide
-  - title: Covariate types
-    navbar: Covariate types
+      - v01-quickstart
+      - v02-user-guide
+  - title: Covariates and maps
+    navbar: Covariates and maps
     desc: >
-      Scale-dependent covariates beyond the kernel-weighted mean.
+      Map predictions, and use landscape metrics, surface texture, and
+      year-specific rasters as scale-dependent covariates.
     contents:
-      - landscape_metric_covariates
-      - surface_metric_covariates
-  - title: Workflows
-    navbar: Workflows
+      - v03-map-predictions
+      - v04-landscape-metrics
+      - v05-surface-metrics
+      - v06-year-specific-rasters
+  - title: Fitting and evaluation
+    navbar: Fitting and evaluation
+    desc: >
+      Choose a fitting method, cross-validate models, and interpret estimates
+      and intervals.
     contents:
-      - year-specific-rasters
-      - spatial_projection_clamping
-      - cross-validation
+      - v07-fitting-methods
+      - v08-cross-validation
+      - v09-estimates-and-intervals
+  - title: Specialized models
+    navbar: Specialized models
+    desc: >
+      Step-selection models, spatial response fields, and distance-removal
+      surveys.
+    contents:
+      - v10-step-selection
+      - v11-spatial-fields
+      - v12-distance-removal
   - title: Bayesian scale estimation
     navbar: Bayesian scale estimation
     contents:
-      - bayesian-scales
-      - bayesian-computation
-      - bayesian-prediction
-  - title: Technical notes
-    navbar: Technical notes
-    desc: >
-      Definitions of inference targets, feature support across fitting and
-      prediction, and audits for distance-removal models.
-    contents:
-      - inference-contracts
-      - feature-compatibility
-      - distance-removal-audits
+      - v13-bayesian-scales
+      - v14-bayesian-prediction
+      - v15-bayesian-computation
 
 # Function reference, grouped by step in the analysis workflow.
 # Every non-internal help topic must be listed here, or check_pkgdown() fails.
@@ -88,6 +95,7 @@ reference:
       - posterior_scales
       - diagnose_bayes_scales
       - diagnose_bayes_probabilities
+      - diagnose_bayes_laplace
       - plot.multiScaleR_bayes
       - simulate.multiScaleR_bayes
   - title: Summarize and compare models
@@ -129,7 +137,6 @@ reference:
       - expand_gdr_intervals
       - gdr_start_values
       - make_gdr_refitter
-      - audit_gdr_integration
       - fit_gdr_response_field
       - response_field_geometry
       - "`unmarkedFitGDRField-class`"
@@ -147,7 +154,6 @@ reference:
       - sim_dat
       - sim_dat_unmarked
       - sim_dat_gdr
-      - score_simulation
   - title: Example data
     contents:
       - count_data

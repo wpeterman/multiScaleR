@@ -1,0 +1,956 @@
+.analysis_model <- function(model) {
+  if (inherits(model, "fit_clogit") &&
+      is.list(model) &&
+      !is.null(model$model)) {
+    return(model$model)
+  }
+
+  model
+}
+
+
+.has_nested_analysis_model <- function(model) {
+  !identical(.analysis_model(model), model)
+}
+
+
+.model_predictors <- function(model) {
+  # The combined native GAM terms include inputs from every linear predictor.
+  if (inherits(model, "gam") && is.list(model$pterms) &&
+      !inherits(model$pterms, "terms"))
+    return(.msr_active_formula_variables(stats::terms(model)))
+  vars <- tryCatch(
+    unname(unlist(find_predictors(model))),
+    error = function(e) character()
+  )
+
+  if (class(model)[1L] %in% c("lm", "glm", "negbin", "coxph", "clogit")) {
+    # Native terms decide membership; retain the existing recognized order so
+    # predictor discovery does not reorder established spatial parameter blocks.
+    tt <- tryCatch(stats::terms(model), error = function(e) NULL)
+    if (inherits(tt, "terms")) {
+      active <- .msr_active_formula_variables(tt)
+      return(unique(c(intersect(vars, active), setdiff(active, vars))))
+    }
+  }
+  if (length(vars) > 0) {
+    return(vars)
+  }
+
+  formula <- try(stats::formula(model), silent = TRUE)
+  if (inherits(formula, "try-error") || length(formula) < 2) {
+    return(character())
+  }
+
+  response_vars <- if (length(formula) >= 3) {
+    all.vars(formula[[2]])
+  } else {
+    character()
+  }
+  setdiff(all.vars(formula), response_vars)
+}
+
+
+# unmarked fits differ in whether they retain one formula or a list of
+# component formulas. Only variables in the fitted formulas can be optimized.
+.unmarked_model_formulas <- function(model) {
+  if (methods::is(model, "unmarkedFitGDR")) return(.msr_gdr_active_formulas(model))
+  collect_formulas <- function(x) {
+    if (inherits(x, "formula")) return(list(x))
+    if (is.list(x)) return(do.call(c, lapply(x, collect_formulas)))
+    list()
+  }
+  formulas <- list()
+  slots <- methods::slotNames(model)
+  if ("formula" %in% slots) formulas <- c(formulas, list(model@formula))
+  if ("formlist" %in% slots) formulas <- c(formulas, model@formlist)
+  formulas <- collect_formulas(formulas)
+  if (length(formulas) == 0L) {
+    stop("Could not recover formulas from this unmarked model class: ",
+         class(model)[1], call. = FALSE)
+  }
+  formulas
+}
+
+.unmarked_model_predictors <- function(model) {
+  if (methods::is(model, "unmarkedFitGDR")) return(.msr_gdr_model_predictors(model))
+  unique(unlist(lapply(.unmarked_model_formulas(model), all.vars), use.names = FALSE))
+}
+
+# Resolve every model row to exactly one prepared spatial site. The model may
+# repeat site keys (for example, once per year); prepared keys must be unique.
+.unmarked_site_map <- function(site_covs, join_by, n_sites,
+                               prepared_ids = NULL) {
+  if (is.null(join_by)) {
+    if (nrow(site_covs) != n_sites) {
+      stop("The unmarked model has ", nrow(site_covs), " site-covariate rows but ",
+           n_sites, " prepared spatial sites. Supply `join_by` with one key row per prepared site and matching key columns in `siteCovs`.",
+           call. = FALSE)
+    }
+    model_ids <- row.names(site_covs)
+    if (length(prepared_ids) == n_sites && !anyNA(prepared_ids) &&
+        !anyDuplicated(prepared_ids) &&
+        setequal(as.character(prepared_ids), model_ids) &&
+        !identical(as.character(prepared_ids), model_ids)) {
+      stop("Unmarked site-covariate row IDs do not match the prepared spatial site order. Supply `join_by` with explicit site keys.",
+           call. = FALSE)
+    }
+    return(seq_len(n_sites))
+  }
+  if (!is.data.frame(join_by) || ncol(join_by) == 0L || nrow(join_by) != n_sites ||
+      anyDuplicated(names(join_by))) {
+    stop("`join_by` must be a data frame with one or more named key columns and exactly one row per prepared spatial site.",
+         call. = FALSE)
+  }
+  keys <- names(join_by)
+  if (any(!nzchar(keys)) || !all(keys %in% names(site_covs))) {
+    stop("Columns in `join_by` must also be present in the unmarked site covariates.",
+         call. = FALSE)
+  }
+  if (anyNA(join_by) || anyNA(site_covs[keys])) {
+    stop("`join_by` and matching unmarked site-covariate keys cannot contain missing values.",
+         call. = FALSE)
+  }
+  if (anyDuplicated(join_by)) {
+    stop("Each prepared spatial site must have a unique key row in `join_by`.",
+         call. = FALSE)
+  }
+  # merge is used only to calculate indices. It never replaces siteCovs or
+  # changes the row order that must stay paired with the response matrix.
+  temporary <- make.unique(c(keys, ".msr_model_row", ".msr_prepared_row"))
+  model_col <- temporary[length(keys) + 1L]
+  prepared_col <- temporary[length(keys) + 2L]
+  left <- site_covs[keys]
+  left[[model_col]] <- seq_len(nrow(left))
+  right <- join_by
+  right[[prepared_col]] <- seq_len(nrow(right))
+  matched <- merge(left, right, by = keys, sort = FALSE, all.x = TRUE)
+  if (nrow(matched) != nrow(site_covs) || anyNA(matched[[prepared_col]])) {
+    stop("Every unmarked site-covariate key must match exactly one row of `join_by`.",
+         call. = FALSE)
+  }
+  matched[[prepared_col]][order(matched[[model_col]])]
+}
+
+
+.model_data <- function(model, ...) {
+  dat <- suppressWarnings(tryCatch(
+    get_data(model, ...),
+    error = function(e) NULL
+  ))
+  # Some insight/survival combinations rename a saved conditional-logistic
+  # response to `x`. Reconstruct its original name from the retained frame
+  # before accepting data that cannot be used to refit the model.
+  if (inherits(model, "coxph")) {
+    formula <- stats::formula(model)
+    response <- formula[[2L]]
+    # Limit recovery to the constant-time, direct-response contract used by
+    # clogit. Do not invert transformed event times or response expressions.
+    direct_response <- is.call(response) && length(all.vars(response)) == 1L &&
+      is.symbol(response[[length(response)]])
+    required <- all.vars(formula)
+    if (direct_response && (is.null(dat) || !all(required %in% names(dat)))) {
+      recovered <- extract_model_data(model)
+      if (!is.null(recovered) && all(required %in% names(recovered))) {
+        dat <- recovered
+      }
+    }
+  }
+  dat
+}
+
+
+.refit_from_call <- function(model, data) {
+  refit_call <- try(stats::getCall(model), silent = TRUE)
+  if (inherits(refit_call, "try-error") || is.null(refit_call)) {
+    refit_call <- model$call
+  }
+
+  if (is.null(refit_call) || !is.call(refit_call)) {
+    stop("The model does not contain a reusable fitting call.", call. = FALSE)
+  }
+
+  if (!is.null(refit_call$data)) {
+    refit_call$data <- quote(data)
+  }
+
+  fit_fun <- refit_call[[1]]
+  if (is.symbol(fit_fun)) {
+    fun_name <- as.character(fit_fun)
+    pkg <- extract_call_function_package(model)
+    if (is.null(pkg) && inherits(model, c("coxph", "clogit"))) {
+      pkg <- "survival"
+    }
+
+    if (!is.null(pkg) &&
+        requireNamespace(pkg, quietly = TRUE) &&
+        exists(fun_name, envir = asNamespace(pkg), mode = "function",
+               inherits = FALSE)) {
+      refit_call[[1]] <- as.call(
+        list(as.name("::"), as.name(pkg), as.name(fun_name))
+      )
+    }
+  }
+
+  replay_environment <- parent.frame()
+  if (identical(class(model)[1L], "glmmTMB")) {
+    # A reusable native call can contain locally bound family/start/map/control
+    # objects. Resolve them where the retained formula was created, while the
+    # replacement data argument remains bound explicitly for this refit.
+    replay_environment <- environment(stats::formula(model))
+    if (!is.environment(replay_environment))
+      stop("Native glmmTMB refitting requires its retained formula environment.", call. = FALSE)
+  }
+  eval(refit_call, envir = list(data = data), enclos = replay_environment)
+}
+
+
+.update_model_data <- function(model, data) {
+  refit <- try(stats::update(model, data = data), silent = TRUE)
+  if (!inherits(refit, "try-error")) {
+    return(refit)
+  }
+
+  call_refit <- try(.refit_from_call(model, data), silent = TRUE)
+  if (!inherits(call_refit, "try-error")) {
+    if (identical(class(model)[1L], "glmmTMB"))
+      attr(call_refit, "msr_refit_call") <- list(
+        evaluation_scope = "retained_native_formula_environment",
+        initial_update_error = conditionMessage(attr(refit, "condition")))
+    return(call_refit)
+  }
+
+  stop(conditionMessage(attr(refit, "condition")), call. = FALSE)
+}
+
+
+.refit_model <- function(model, data, opt_context) {
+  if (!is.null(opt_context$refit_fn)) {
+    refit <- opt_context$refit_fn(model = model,
+                                  data = data,
+                                  context = opt_context)
+    if (is.null(refit)) {
+      stop("`refit_fn` must return a fitted model object, not NULL.", call. = FALSE)
+    }
+    return(refit)
+  }
+
+  if (identical(opt_context$mod_class, "unmarked")) {
+    return(unmarked::update(model, data = data))
+  }
+
+  if (.has_nested_analysis_model(model)) {
+    model$model <- .update_model_data(.analysis_model(model), data = data)
+    return(model)
+  }
+
+  .update_model_data(model, data = data)
+}
+
+
+.neg_loglik_model <- function(model, mod_class) {
+  -.msr_model_loglik(model)
+}
+
+
+# Build the raw (unscaled) kernel-weighted covariate matrix that `kernel_scale_fn()`
+# refits on. Extracted from `kernel_scale_fn()` so that callers which vary one
+# covariate at a time (notably `profile_sigma()`) can recompute a single column and
+# reuse the rest. `covariates = NULL` computes every model covariate, reproducing
+# the original in-line behavior exactly; a character subset computes only those
+# columns (same rows, same values).
+.msr_kernel_cov_w <- function(par,
+                              d_list,
+                              cov_df,
+                              kernel,
+                              opt_context,
+                              covariates = NULL) {
+  binned <- opt_context$binned
+
+  n_total <- if (!is.null(d_list)) {
+    length(d_list)
+  } else if (!is.null(binned)) {
+    binned$n_points
+  } else {
+    0L
+  }
+
+  eval_idx <- NULL
+  if (!is.null(opt_context$complete_idx)) {
+    eval_idx <- opt_context$complete_idx
+    if (length(eval_idx) == 0 ||
+        anyNA(eval_idx) ||
+        any(eval_idx < 1) ||
+        any(eval_idx > n_total)) {
+      eval_idx <- opt_context$data_idx
+    }
+
+    if (!is.null(eval_idx) && length(eval_idx) > 0 &&
+        !anyNA(eval_idx) &&
+        all(eval_idx >= 1) &&
+        all(eval_idx <= n_total)) {
+      if (!is.null(d_list)) d_list <- d_list[eval_idx]
+      if (!is.null(cov_df)) cov_df <- cov_df[eval_idx]
+    } else {
+      eval_idx <- NULL
+    }
+  }
+
+  n_ind <- if (!is.null(d_list)) {
+    length(d_list)
+  } else if (!is.null(eval_idx)) {
+    length(eval_idx)
+  } else {
+    n_total
+  }
+
+  covs <- opt_context$covs
+  n_covs <- opt_context$n_covs
+  scale_vars <- opt_context$scale_vars
+
+  sigma <- par[seq_len(n_covs)]
+  if (kernel == 'expow') {
+    shape <- par[n_covs + seq_len(n_covs)]
+  } else {
+    shape <- NULL
+  }
+
+  target_covs <- if (is.null(covariates)) covs else covariates
+
+  cov.w <- matrix(NA_real_, nrow = n_ind, ncol = length(target_covs))
+  colnames(cov.w) <- target_covs
+
+  # Resolve point/row identifiers, preferring the cell-level names and falling
+  # back to the binned point ids (or the complete-case indices) in lean mode.
+  row_ids <- if (!is.null(d_list)) {
+    names(d_list)
+  } else if (!is.null(binned) && !is.null(binned$point_ids)) {
+    if (!is.null(eval_idx)) binned$point_ids[eval_idx] else binned$point_ids
+  } else {
+    NULL
+  }
+  if (is.null(row_ids) || length(row_ids) != n_ind ||
+      anyNA(row_ids) || any(!nzchar(row_ids)) || anyDuplicated(row_ids)) {
+    if (!is.null(eval_idx) && length(eval_idx) == n_ind) {
+      row_ids <- as.character(eval_idx)
+    } else {
+      row_ids <- as.character(seq_len(n_ind))
+    }
+  }
+  rownames(cov.w) <- row_ids
+
+  # Kernel covariates that have precomputed binned summaries use the O(nbins)
+  # fast path; everything else (landscape metrics, or legacy objects without
+  # binned data) uses the exact per-cell evaluation.
+  binned_covs <- if (!is.null(binned)) intersect(target_covs, binned$covariates) else character(0)
+  opt_vars <- .msr_optimized_scale_vars(scale_vars)
+  param_covariates <- if (is.null(opt_vars)) covs else covs[covs %in% opt_vars$covariate]
+
+  if (length(binned_covs) == length(target_covs) && length(target_covs) > 0) {
+    # Every requested covariate has a binned summary: pure fast path.
+    cov.w[, binned_covs] <- .msr_binned_kernel_means(
+      binned = binned,
+      covs = binned_covs,
+      param_covariates = param_covariates,
+      sigma = sigma,
+      shape = shape,
+      kernel = kernel,
+      eval_idx = eval_idx
+    )
+  } else {
+    if (is.null(d_list) || is.null(cov_df)) {
+      stop(
+        "Cell-level data are required to evaluate one or more covariates but were not stored. Re-run `kernel_prep()` with `store_cell_data = TRUE`.",
+        call. = FALSE
+      )
+    }
+
+    # Binned kernel columns are filled below. Evaluate only the remaining
+    # transforms here, retaining their requested order and parameter mapping.
+    # Legacy inputs without scale_vars keep their existing exact path.
+    exact_covs <- if (is.null(scale_vars)) target_covs else
+      setdiff(target_covs, binned_covs)
+    exact_params <- if (is.null(scale_vars)) exact_covs else
+      exact_covs[exact_covs %in% param_covariates]
+    sig_idx <- match(exact_params, covs)
+    prepared_adjacency <- opt_context$adjacency_neighbors
+    prepared_edges <- opt_context$edge_neighbors
+    if (!is.null(prepared_edges) && !is.null(eval_idx))
+      prepared_edges <- prepared_edges[eval_idx]
+    if (!is.null(prepared_adjacency) && !is.null(eval_idx))
+      prepared_adjacency <- prepared_adjacency[eval_idx]
+    prepared_neighbors <- opt_context$surface_neighbors
+    if (!is.null(prepared_neighbors) && !is.null(eval_idx))
+      prepared_neighbors <- prepared_neighbors[eval_idx]
+    for (i in seq_len(n_ind)) {
+      if (is.null(scale_vars)) {
+        cov.w[i, exact_covs] <-
+          scale_type(d_list[[i]],
+                     kernel = kernel,
+                     sigma = sigma[sig_idx],
+                     shape = if (is.null(shape)) NULL else shape[sig_idx],
+                     r_stack.df = cov_df[[i]][, exact_covs, drop = FALSE])
+      } else {
+        # Fixed-radius metrics have no parameter; pass only optimized scales
+        # and shapes in the order expected by the remaining transforms.
+        cov.w[i, exact_covs] <- .msr_eval_scale_vars(
+          d = d_list[[i]],
+          cov_df = cov_df[[i]],
+          scale_vars = scale_vars,
+          sigma = sigma[sig_idx],
+          shape = if (is.null(shape)) NULL else shape[sig_idx],
+          kernel = kernel,
+          unit_conv = opt_context$unit_conv,
+          resolution = opt_context$resolution,
+          n_cols = opt_context$n_cols,
+          covariates = exact_covs,
+          validate = FALSE,
+          prepared_neighbors = prepared_neighbors[[i]],
+          prepared_adjacency = prepared_adjacency[[i]],
+          prepared_edges = prepared_edges[[i]]
+        )
+      }
+    } ## End for loop
+
+    # Fill kernel columns once from the same binned summaries as before.
+    if (length(binned_covs) > 0 && !is.null(scale_vars)) {
+      cov.w[, binned_covs] <- .msr_binned_kernel_means(
+        binned = binned,
+        covs = binned_covs,
+        param_covariates = param_covariates,
+        sigma = sigma,
+        shape = shape,
+        kernel = kernel,
+        eval_idx = eval_idx
+      )
+    }
+  }
+
+  cov.w
+}
+
+
+#' @title Kernel scaling function
+#' @description Function for internal use with optim
+#' @param par list of parameters
+#' @param d_list List of distance vectors
+#' @param cov_df List of data frames with values extracted from rasters
+#' @param kernel Kernel used
+#' @param fitted_mod fitted model object
+#' @param join_by Optional data frame of site keys used to map prepared spatial
+#'   covariates to the unmarked frame without changing its row order.
+#' @param mod_return Default: NULL
+#' @param opt_context Cached optimization context created internally by `multiScale_optim()`
+#' @param cov_w Optional precomputed (unscaled) kernel-weighted covariate matrix.
+#'   When supplied, the per-covariate weighting step is skipped and this matrix is
+#'   scaled and refit directly. Used by `profile_sigma()` to reuse the columns of
+#'   covariates that are held at their optimum. Default: NULL (compute internally).
+#' @return Either estimated parameters or the fitted model using provided parameters
+#' @details For internal use. Native glmmTMB call replay resolves local
+#'   constructor arguments in the retained formula environment when ordinary
+#'   updating fails. The replacement data stay explicit. Constructor arguments
+#'   and defaults are not replaced; the initial update error is retained in the
+#'   returned model's \code{msr_refit_call} attribute.
+#' @rdname kernel_scale_fn
+#' @keywords internal
+#' @importFrom insight get_data get_loglikelihood find_predictors
+#' @importFrom stats formula logLik model.frame
+#' @useDynLib multiScaleR, .registration=TRUE
+#' @importFrom Rcpp evalCpp
+#' @importFrom methods is
+kernel_scale_fn <- function(par,
+                            d_list,
+                            cov_df,
+                            kernel,
+                            fitted_mod,
+                            join_by = NULL,
+                            mod_return = NULL,
+                            opt_context = NULL,
+                            cov_w = NULL){
+
+  if(is.null(opt_context)){
+    opt_context <- build_opt_context(fitted_mod = fitted_mod,
+                                     cov_df = cov_df,
+                                     join_by = join_by)
+  }
+
+  mod <- opt_context$fitted_mod
+  # Tell custom refitters when model metadata/uncertainty must be retained.
+  # This local list copy does not mutate the shared optimization context.
+  opt_context$return_model <- !is.null(mod_return)
+  mod_class <- opt_context$mod_class
+  n_covs <- opt_context$n_covs
+
+  sigma <- par[1:n_covs]
+  if (any(sigma < 0)) {
+    return(1e6^10)
+  }
+
+  if (is.null(cov_w)) {
+    cov.w <- .msr_kernel_cov_w(par = par,
+                               d_list = d_list,
+                               cov_df = cov_df,
+                               kernel = kernel,
+                               opt_context = opt_context)
+  } else {
+    cov.w <- cov_w
+  }
+
+  scale_validation_error <- tryCatch(
+    {
+      validate_covariates_before_scale(cov.w,
+                                       context = "optimized covariates",
+                                       scale_vars = opt_context$scale_vars)
+      NULL
+    },
+    error = function(e) conditionMessage(e)
+  )
+  if (!is.null(scale_validation_error)) {
+    if (is.null(mod_return)) {
+      return(1e6^10)
+    }
+    stop(scale_validation_error, call. = FALSE)
+  }
+
+  # A candidate scale must not change which observations contribute to the
+  # likelihood. In particular, an undefined landscape metric must not improve
+  # the objective merely by causing the model refit to drop its site.
+  if (anyNA(cov.w)) {
+    if (is.null(mod_return)) return(1e6^10)
+    stop("An optimized covariate is missing for an observation in the fitted sample. Choose a scale with defined covariates for every modeled observation.",
+         call. = FALSE)
+  }
+
+  if (identical(opt_context$covariate_transform, "raw")) {
+    # Keep the metric's units and a reusable identity transform. Upstream
+    # surface normalization and fixed-covariate transforms are unchanged.
+    scl_df <- as.matrix(cov.w)
+    attr(scl_df, "scaled:center") <- stats::setNames(rep(0, ncol(scl_df)), colnames(scl_df))
+    attr(scl_df, "scaled:scale") <- stats::setNames(rep(1, ncol(scl_df)), colnames(scl_df))
+  } else {
+    scl_df <- scale(cov.w)
+  }
+  refit_error <- NULL
+
+  if(mod_class == 'unmarked'){
+    umf <- opt_context$umf_template
+
+    mod_u <- tryCatch({
+      umf@siteCovs[opt_context$covs] <-
+        as.data.frame(scl_df[opt_context$unmarked_site_idx, , drop = FALSE])
+      .refit_model(mod, data = umf, opt_context = opt_context)
+    }, error = function(e) {
+      if (inherits(e, "msr_gdr_audit_error")) stop(e)
+      refit_error <<- conditionMessage(e)
+      NULL
+    })
+
+  } else {
+    dat <- opt_context$data_template
+    scl_df_dat <- align_scaled_covariates(scl_df = scl_df,
+                                          dat = dat,
+                                          opt_context = opt_context)
+    mod_u <- tryCatch({
+      dat[opt_context$covs] <- as.data.frame(scl_df_dat)
+      .refit_model(mod, data = dat, opt_context = opt_context)
+    }, error = function(e) {
+      if (inherits(e, "msr_gdr_audit_error")) stop(e)
+      refit_error <<- conditionMessage(e)
+      NULL
+    })
+
+    ## For DEBUGGING
+    # mod_u <- try(update(mod, data = dat))
+    # if(class(mod_u)[[1]] == 'try-error'){
+    #   browser()
+    # }
+    # browser()
+
+  }
+
+  if (is.null(mod_u)) {
+    if (is.null(mod_return)) {
+      return(1e6^10)
+    }
+
+    stop(
+      paste0(
+        "Failed to refit the model with the optimized covariates. ",
+        "Make sure the fitted model can be updated with a modified data argument. ",
+        "Original error: ", refit_error
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (identical(mod_class, "unmarked") &&
+      !identical(mod@sitesRemoved, mod_u@sitesRemoved)) {
+    if (is.null(mod_return)) return(1e6^10)
+    stop("The final unmarked refit changed which sites contribute to the likelihood.",
+         call. = FALSE)
+  }
+  starting_n <- tryCatch(.msr_model_nobs(.analysis_model(mod)),
+                         error = function(e) NA_integer_)
+  candidate_n <- tryCatch(.msr_model_nobs(.analysis_model(mod_u)),
+                          error = function(e) NA_integer_)
+  if (length(starting_n) == 1L && length(candidate_n) == 1L &&
+      is.finite(starting_n) && is.finite(candidate_n) &&
+      candidate_n != starting_n) {
+    if (is.null(mod_return)) return(1e6^10)
+    stop("The final refit changed the number of observations relative to the starting model.",
+         call. = FALSE)
+  }
+
+  if(is.null(mod_return)){
+    obj <- try(.neg_loglik_model(mod_u, mod_class), silent = TRUE)
+    if(inherits(obj, "try-error") || !is.finite(obj)){
+      return(1e6^10)
+    }
+  } else {
+    obj <- list(mod = mod_u,
+                scl_params = list(mean = attr(scl_df, "scaled:center"),
+                                  sd = attr(scl_df, "scaled:scale")))
+    # obj <- list(mod = mod,
+    #             scl_params = NULL)
+  }
+  return(obj)
+}
+
+
+align_scaled_covariates <- function(scl_df, dat, opt_context) {
+  dat_rows <- row.names(dat)
+  scl_rows <- row.names(scl_df)
+
+  if (length(dat_rows) == nrow(dat) && length(scl_rows) == nrow(scl_df) &&
+      all(dat_rows %in% scl_rows)) {
+    return(scl_df[dat_rows, , drop = FALSE])
+  }
+
+  idx <- opt_context$complete_idx
+  if (!is.null(idx) && length(idx) == nrow(dat) &&
+      all(!is.na(idx)) && all(idx >= 1) && all(idx <= nrow(scl_df))) {
+    return(scl_df[idx, , drop = FALSE])
+  }
+
+  if (nrow(scl_df) == nrow(dat)) {
+    return(scl_df)
+  }
+
+  stop(
+    paste0(
+      "Could not align kernel-weighted covariates with the fitted model data. ",
+      "Make sure the model data rows correspond to the rows of `kernel_inputs`."
+    ),
+    call. = FALSE
+  )
+}
+
+
+build_opt_context <- function(fitted_mod,
+                              cov_df,
+                              join_by = NULL,
+                              refit_fn = NULL,
+                              scale_vars = NULL,
+                              unit_conv = 1,
+                              resolution = NULL,
+                              n_cols = NULL,
+                              binned = NULL,
+                              d_list = NULL) {
+  mod <- fitted_mod
+  analysis_mod <- .analysis_model(mod)
+  .msr_gdr_native_guard(analysis_mod)
+  if (methods::is(analysis_mod, "unmarkedFitGDRField") && is.null(refit_fn))
+    stop("Supply make_gdr_refitter() for this audited GDR response field.", call. = FALSE)
+  cov_names <- .msr_optimized_covariates(scale_vars, cov_df = cov_df)
+
+  if(any(class(mod) == 'gls')){
+    mod_class <- 'gls'
+    mod_vars <- .model_predictors(analysis_mod)
+    dat <- .model_data(analysis_mod)
+  } else if(any(grepl("^unmarked", class(mod)))) {
+    mod_class <- 'unmarked'
+    mod_vars <- .unmarked_model_predictors(mod)
+    dat <- mod@data@siteCovs
+  } else if(any(class(mod) == 'glm')) {
+    mod_class <- 'glm'
+    mod_vars <- .model_predictors(analysis_mod)
+    dat <- .model_data(analysis_mod)
+  } else {
+    mod_class <- 'other'
+    mod_vars <- .model_predictors(analysis_mod)
+    dat <- .model_data(analysis_mod, effects = 'all')
+    if(is.null(dat)){
+      dat <- extract_model_data(mod)
+    }
+  }
+
+  if(is.null(dat)){
+    stop(
+      paste0(
+        "Could not recover the original model data needed to refit the model during optimization. ",
+        "Refit the model with an explicit `data = ...` argument and try again."
+      ),
+      call. = FALSE
+    )
+  }
+
+  covs <- unname(mod_vars[which(mod_vars %in% cov_names)])
+  n_covs <- length(covs)
+  if (n_covs == 0) {
+    stop(
+      "No raster covariates from `cov_df` were found in the fitted model. Check that raster layer names match the model terms.",
+      call. = FALSE
+    )
+  }
+
+  out <- list(fitted_mod = mod,
+              mod_class = mod_class,
+              covs = covs,
+              n_covs = n_covs,
+              refit_fn = refit_fn,
+              scale_vars = scale_vars,
+              unit_conv = unit_conv,
+              resolution = resolution,
+              n_cols = n_cols,
+              binned = .msr_subset_binned(binned, covs))
+  out$surface_neighbors <- .msr_prepare_surface_neighbors(
+    d_list, cov_df, if (is.null(scale_vars)) NULL else
+      scale_vars[scale_vars$covariate %in% covs, , drop = FALSE],
+    resolution, n_cols)
+
+  out$adjacency_neighbors <- .msr_prepare_adjacency(
+    d_list, cov_df, if (is.null(scale_vars)) NULL else
+      scale_vars[scale_vars$covariate %in% covs, , drop = FALSE], n_cols)
+
+  out$edge_neighbors <- .msr_prepare_edge_neighbors(
+    d_list, cov_df, if (is.null(scale_vars)) NULL else
+      scale_vars[scale_vars$covariate %in% covs, , drop = FALSE], resolution, n_cols)
+
+  n_sites <- if (!is.null(cov_df)) {
+    length(cov_df)
+  } else if (!is.null(binned)) {
+    binned$n_points
+  } else {
+    nrow(dat)
+  }
+  point_ids <- if (!is.null(cov_df)) names(cov_df) else binned$point_ids
+  complete_cases <- .model_complete_indices(dat = dat,
+                                            n_sites = n_sites, point_ids = point_ids)
+  data_idx <- complete_cases$data_idx
+  complete_idx <- complete_cases$complete_idx
+
+  if(mod_class == 'unmarked'){
+    .msr_gdr_spatial_guard(mod, covs)
+    umf_template <- mod@data
+    missing_site_covs <- setdiff(covs, names(umf_template@siteCovs))
+    if (length(missing_site_covs) > 0L) {
+      stop("Optimized unmarked covariates must be static `siteCovs`: ",
+           paste(missing_site_covs, collapse = ", "), call. = FALSE)
+    }
+    if (!is.null(join_by) && any(covs %in% names(join_by))) {
+      stop("`join_by` key columns cannot be optimized covariates.",
+           call. = FALSE)
+    }
+    prepared_ids <- if (!is.null(cov_df)) names(cov_df) else binned$point_ids
+    out$unmarked_site_idx <- .unmarked_site_map(umf_template@siteCovs,
+                                                join_by, n_sites,
+                                                prepared_ids)
+    if (!is.null(join_by)) out$join_cols <- names(join_by)
+    out$site_cov_idx <- match(covs, names(umf_template@siteCovs))
+    # Compute all prepared sites so the index map remains valid even when the
+    # model has repeated rows or missing values in unrelated site covariates.
+    out$complete_idx <- NULL
+    out$umf_template <- umf_template
+  } else {
+    out$data_template <- dat[data_idx, , drop = FALSE]
+    out$complete_idx <- complete_idx
+    out$data_idx <- data_idx
+    out$cov_idx <- match(covs, colnames(dat))
+  }
+
+  return(out)
+}
+
+
+.model_complete_indices <- function(dat, n_sites, point_ids = NULL) {
+  data_idx <- which(stats::complete.cases(dat))
+  complete_idx <- data_idx
+
+  row_ids <- row.names(dat)
+  has_numeric_row_ids <- length(row_ids) == nrow(dat) &&
+    all(grepl("^[0-9]+$", row_ids))
+
+  # Explicit named raw-cell IDs take precedence over numeric row-name
+  # guesses. This matters when CV subsets or permutes complete training rows.
+  if (.msr_valid_observation_ids(point_ids, n_sites) &&
+      .msr_valid_observation_ids(row_ids, nrow(dat)) && all(row_ids %in% point_ids)) {
+    complete_idx <- match(row_ids, point_ids)[data_idx]
+  } else if (isTRUE(has_numeric_row_ids)) {
+    row_idx <- suppressWarnings(as.integer(row_ids))
+    valid_row_idx <- !anyNA(row_idx) &&
+      !anyDuplicated(row_idx) &&
+      all(row_idx >= 1) &&
+      all(row_idx <= n_sites)
+
+    if (isTRUE(valid_row_idx)) {
+      complete_idx <- row_idx[data_idx]
+    }
+  }
+
+  list(data_idx = data_idx, complete_idx = complete_idx)
+}
+
+
+.recover_surv_data <- function(response, response_vars) {
+  if (!inherits(response, "Surv") || length(response_vars) == 0) {
+    return(list())
+  }
+
+  response <- as.matrix(response)
+  response_data <- list()
+
+  if (length(response_vars) == 1) {
+    response_data[[response_vars[[1]]]] <- response[, ncol(response)]
+  } else if (length(response_vars) == 2) {
+    response_data[[response_vars[[1]]]] <- response[, 1]
+    response_data[[response_vars[[2]]]] <- response[, ncol(response)]
+  } else if (length(response_vars) >= 3 && ncol(response) >= 3) {
+    response_data[[response_vars[[1]]]] <- response[, 1]
+    response_data[[response_vars[[2]]]] <- response[, 2]
+    response_data[[response_vars[[3]]]] <- response[, ncol(response)]
+  }
+
+  response_data
+}
+
+
+.model_frame_to_data <- function(model, mf) {
+  if (is.null(mf) || !is.data.frame(mf)) {
+    return(NULL)
+  }
+
+  formula <- try(stats::formula(model), silent = TRUE)
+  if (inherits(formula, "try-error") || length(formula) < 2) {
+    return(mf)
+  }
+
+  vars <- all.vars(formula)
+  if (length(vars) == 0) {
+    return(mf)
+  }
+
+  response_vars <- character()
+  response_data <- list()
+  terms <- try(stats::terms(model), silent = TRUE)
+  response_idx <- 0
+  if (!inherits(terms, "try-error")) {
+    response_idx <- attr(terms, "response")
+  }
+
+  if (length(formula) >= 3 && isTRUE(response_idx > 0)) {
+    response_vars <- all.vars(formula[[2]])
+    response <- mf[[response_idx]]
+    response_data <- .recover_surv_data(response, response_vars)
+  }
+
+  out <- data.frame(row.names = row.names(mf), check.names = FALSE)
+  for (var in vars) {
+    if (var %in% names(mf)) {
+      out[[var]] <- mf[[var]]
+    } else if (var %in% names(response_data)) {
+      out[[var]] <- response_data[[var]]
+    } else {
+      strata_col <- paste0("strata(", var, ")")
+      if (strata_col %in% names(mf)) {
+        out[[var]] <- mf[[strata_col]]
+      }
+    }
+  }
+
+  if (all(vars %in% names(out))) {
+    return(out)
+  }
+
+  mf
+}
+
+
+## Custom data extraction
+extract_model_data <- function(model) {
+  # Try common extraction methods
+  data <- tryCatch({
+    analysis_mod <- .analysis_model(model)
+
+    # Method 1: model.frame() (works for most stats models)
+    mf_error <- NULL
+    mf <- tryCatch(
+      model.frame(analysis_mod),
+      error = function(e) {
+        mf_error <<- conditionMessage(e)
+        NULL
+      }
+    )
+    if (!is.null(mf)) {
+      return(.model_frame_to_data(analysis_mod, mf))
+    }
+
+    # Some wrapped survival fits retain the original model frame here when
+    # model.frame() cannot be reconstructed cleanly outside the fitting call.
+    if (is.data.frame(analysis_mod$model)) {
+      return(.model_frame_to_data(analysis_mod, analysis_mod$model))
+    }
+
+    # Method 2: Check for @frame (lme4, glmmTMB)
+    if (is(analysis_mod, "merMod") && !is.null(analysis_mod@frame)) {
+      return(analysis_mod@frame)
+    }
+    if (inherits(analysis_mod, "glmmTMB") && !is.null(analysis_mod$frame)) {
+      return(analysis_mod$frame)
+    }
+
+    # Method 3: Check for $data (some packages store it here)
+    if (!is.null(analysis_mod$data)) {
+      return(analysis_mod$data)
+    }
+
+    # Method 4: Try eval(model$call$data) (if data was passed in the call)
+    if (!is.null(analysis_mod$call$data)) {
+      data_name <- as.character(analysis_mod$call$data)
+      if (exists(data_name, envir = parent.frame())) {
+        return(get(data_name, envir = parent.frame()))
+      }
+    }
+
+    # Method 5: For spaMM models (specific checks)
+    if (inherits(analysis_mod, "HLfit")) {
+      if (!is.null(analysis_mod$data)) return(analysis_mod$data)
+      # Alternative for spaMM: model$fr
+      if (!is.null(analysis_mod$fr)) return(analysis_mod$fr)
+    }
+
+    # Fallback: Return NULL if no method worked
+    if (!is.null(mf_error)) {
+      warning(
+        paste0(
+          "Failed to extract model data needed for refitting: ",
+          mf_error
+        )
+      )
+    } else {
+      warning(
+        "Could not extract data from the model object; optimization may fail unless the model was fit with an explicit `data = ...` argument."
+      )
+    }
+    NULL
+  }, error = function(e) {
+    warning(
+      paste0(
+        "Failed to extract model data needed for refitting: ",
+        e$message
+      )
+    )
+    NULL
+  })
+
+  return(data)
+}

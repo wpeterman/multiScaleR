@@ -1,9 +1,9 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# multiScaleR <img src="man/figures/logo.png" align="right" height="150"/>
+# multiScaleR <img src="man/figures/logo.png" alt="multiScaleR package logo" align="right" height="150"/>
 
-README last updated: 2026-11-12
+README last updated: 2026-11-13
 
 <!-- Status badges. Kept in a table (not a "badges: start/end" block) so that
      pkgdown shows them on the home page instead of moving them to the sidebar. -->
@@ -64,8 +64,32 @@ remotes::install_github("wpeterman/multiScaleR",
 library(multiScaleR) # Load the package
 ```
 
-The package vignettes provide worked analyses of simulated data and
-explain the main workflows.
+## Vignettes
+
+The vignettes work through simulated data and explain how to read each
+result. Start with the quick start and the user guide, then turn to the
+topics you need. Open one in R with
+`vignette("v01-quickstart", package = "multiScaleR")`, or read them all
+on the [package
+website](https://wpeterman.github.io/multiScaleR/articles/).
+
+| Vignette | Name in `vignette()` |
+|:---|:---|
+| [01. Quick start](https://wpeterman.github.io/multiScaleR/articles/v01-quickstart.html) | `v01-quickstart` |
+| [02. User guide](https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.html) | `v02-user-guide` |
+| [03. Mapping predictions and limiting extrapolation](https://wpeterman.github.io/multiScaleR/articles/v03-map-predictions.html) | `v03-map-predictions` |
+| [04. Landscape metrics as covariates](https://wpeterman.github.io/multiScaleR/articles/v04-landscape-metrics.html) | `v04-landscape-metrics` |
+| [05. Surface texture metrics as covariates](https://wpeterman.github.io/multiScaleR/articles/v05-surface-metrics.html) | `v05-surface-metrics` |
+| [06. Using year-specific rasters in one model](https://wpeterman.github.io/multiScaleR/articles/v06-year-specific-rasters.html) | `v06-year-specific-rasters` |
+| [07. Choose a fitting method for your model](https://wpeterman.github.io/multiScaleR/articles/v07-fitting-methods.html) | `v07-fitting-methods` |
+| [08. Cross-validate scale-of-effect models](https://wpeterman.github.io/multiScaleR/articles/v08-cross-validation.html) | `v08-cross-validation` |
+| [09. What your estimates and intervals mean](https://wpeterman.github.io/multiScaleR/articles/v09-estimates-and-intervals.html) | `v09-estimates-and-intervals` |
+| [10. Estimate scales of effect in step-selection models](https://wpeterman.github.io/multiScaleR/articles/v10-step-selection.html) | `v10-step-selection` |
+| [11. Account for spatial autocorrelation with a spatial field](https://wpeterman.github.io/multiScaleR/articles/v11-spatial-fields.html) | `v11-spatial-fields` |
+| [12. Fit distance-removal models with scales of effect](https://wpeterman.github.io/multiScaleR/articles/v12-distance-removal.html) | `v12-distance-removal` |
+| [13. Estimate scales of effect with a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.html) | `v13-bayesian-scales` |
+| [14. Predict new sites and years from a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.html) | `v14-bayesian-prediction` |
+| [15. Choose and check a Bayesian computation method](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.html) | `v15-bayesian-computation` |
 
 ## Bayesian scale estimation
 
@@ -76,7 +100,7 @@ assess chain mixing and simulation precision.
 
 ``` r
 check_bayes_setup(method = "slice")
-vignette("bayesian-scales", package = "multiScaleR")
+vignette("v13-bayesian-scales", package = "multiScaleR")
 # Before fitting, simulate_bayes_prior() checks a prepared model's implications.
 
 fit <- multiScale_bayes(
@@ -97,16 +121,15 @@ and posterior. Preparation can be checked without them using
 `method = "prepare"`. `predict_scales()` predicts scales for unobserved
 years. `predict()` and `simulate()` accept new observations and matching
 prepared landscapes, with explicit choices for new year and site
-effects. Read `vignette("bayesian-prediction", package = "multiScaleR")`
-for a worked forecast, shared group effects and joint totals. Future
-responses require a response formula that supports unseen years; a fixed
-year factor cannot supply a new coefficient. Both importance-corrected
-proposals have simulation evidence across Gaussian, Poisson, grouped
-binomial, and NB2 responses with one annually varying scale. The
-computation vignette describes the evaluated response random-effect
-designs and the limits of this evidence. For computation options,
-results and their numerical checks, read
-`vignette("bayesian-computation", package = "multiScaleR")`.
+effects. Read
+`vignette("v14-bayesian-prediction", package = "multiScaleR")` for a
+worked forecast, shared group effects and joint totals. Future responses
+require a response formula that supports unseen years; a fixed year
+factor cannot supply a new coefficient. Approximation methods remain
+experimental, and numerical convergence does not establish interval
+accuracy. For the alternative computations, actual matched outputs and
+interpretation of their numerical checks, read
+`vignette("v15-bayesian-computation", package = "multiScaleR")`.
 
 ## Kernel distance reporting
 
@@ -125,8 +148,8 @@ and `opt_distance` follow that selection; `opt_dist_1d` and
 reporting switch does not change the fitted sigma, coefficients, or
 likelihood. Simulation extents, projection windows, and stored
 optimization warnings retain their historical 1D cutoffs. See
-`vignette("multiScaleR_Guide", package = "multiScaleR")` for
-interpretation and migration examples.
+`vignette("v02-user-guide", package = "multiScaleR")` for interpretation
+and migration examples.
 
 ## Marginal effects for unmarked models
 
@@ -146,5 +169,5 @@ plotted without rerunning scale optimization.
 
 <p align="center">
 
-<img src="man/figures/logo.png" height="200"/>
+<img src="man/figures/logo.png" alt="multiScaleR package logo" height="200"/>
 </p>

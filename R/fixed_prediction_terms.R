@@ -8,6 +8,7 @@
   prediction <- as.list(prediction)
   if (length(variables) != length(prediction) || length(variables) - 1L > ncol(frame))
     stop("Cannot align fixed prediction terms with the retained training frame.", call. = FALSE)
+  fixed <- function(value) is.numeric(value) || identical(value, FALSE)
   for (j in seq_len(length(variables) - 1L)) {
     ex <- prediction[[j + 1L]]
     if (!is.call(ex) || !is.call(head <- ex[[1L]]) ||
@@ -15,6 +16,8 @@
     known <- (identical(head[[2L]], as.name("stats")) && identical(head[[3L]], as.name("poly"))) ||
       (identical(head[[2L]], as.name("base")) && identical(head[[3L]], as.name("scale")))
     if (!known) next
+    if ((identical(head[[3L]], as.name("poly")) && (isTRUE(ex$raw) || is.list(ex$coefs))) ||
+        (identical(head[[3L]], as.name("scale")) && fixed(ex$center) && fixed(ex$scale))) next
     bare <- ex; bare[[1L]] <- head[[3L]]
     learned <- stats::makepredictcall(frame[[j]], bare)
     learned[[1L]] <- head
@@ -46,7 +49,7 @@
   }, logical(1)))
 }
 
-.msr_native_fixed_metadata <- function(model, nested = FALSE) {
+.msr_native_fixed_metadata <- function(model, nested = FALSE, training = NULL) {
   validate_scalar_logical(nested, "nested")
   needs <- function(tt) if (nested) .msr_needs_nested_metadata(tt) else
     .msr_needs_fixed_metadata(tt)
@@ -67,6 +70,14 @@
         length(attr(tt, "specials")$tt))
       stop("Fixed prediction recovery requires a checked time-fixed, unpenalized native Cox structure.", call. = FALSE)
     frame <- model$model
+    if (!is.null(training) && is.data.frame(frame) && inherits(attr(frame, "terms"), "terms")) {
+      original <- attr(frame, "terms")
+      learned <- tryCatch(.msr_fixed_prediction_terms(tt,
+        .msr_response_frame_subset(original, frame, tt), nested = nested),
+        error = function(e) tt)
+      if (needs(learned))
+        frame <- .msr_cox_training_frame(model, frame, original, training)
+    }
   } else if (inherits(model, c("lm", "glm"))) {
     frame <- model$model
     tt <- model$terms
@@ -108,7 +119,8 @@
   } else {
     if (inherits(model, "gam")) model$pterms <- repair(parametric)
     model$terms <- fixed
-    attr(model$model, "terms") <- repair(original)
+    attr(frame, "terms") <- repair(original)
+    model$model <- frame
   }
   model
 }

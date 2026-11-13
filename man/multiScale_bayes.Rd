@@ -165,7 +165,7 @@ exact. The other families use a normalized Student t proposal with
 helps cover regions missed by local geometry. Both corrected proposals have
 simulation evidence for Gaussian, Poisson, grouped binomial and NB2
 responses with one annual scale-group SD. See
-\code{vignette("bayesian-computation", package = "multiScaleR")}
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")}
 for the tested models, diagnostic results and limits.
 These are proposal changes, not changes to model priors or diagnostics.
 Conditional optimization costs more per candidate and does not guarantee
@@ -343,7 +343,7 @@ covariates and groups. \code{predict()} and \code{simulate()} also accept new
 observations with matching prepared landscape inputs and explicit policies
 for unseen random-effect levels. A fixed year factor cannot supply an unseen
 year's coefficient; the response formula must support that prediction.
-See \code{vignette("bayesian-prediction", package = "multiScaleR")}.
+See \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 
 Kernel means retain the finite-cell numerator and denominator of the
 prepared inputs. Missing raster cells are excluded and remaining weights
@@ -515,7 +515,7 @@ prepared  # validates rows, maps, formulas and priors; no sampler is needed
 prepared$inference_metadata[c("target", "method", "uncertainty")]
 stored_fit <- example$fits$pooled  # actual fitted example, not the prepared object
 posterior_scales(stored_fit)[c("group", "median", "lower", "upper")]
-# See vignette("bayesian-scales", package = "multiScaleR") for fitting and interpretation.
+# See vignette("v13-bayesian-scales", package = "multiScaleR") for fitting and interpretation.
 
 }
 \seealso{
@@ -523,6 +523,6 @@ posterior_scales(stored_fit)[c("group", "median", "lower", "upper")]
   \code{\link{diagnose_bayes_scales}}, \code{\link{simulate_bayes_prior}},
   \code{\link{kernel_prep_by_group}}, \code{\link{posterior_scales}},
   \code{\link{multiScale_optim}};
-  \code{vignette("bayesian-scales", package = "multiScaleR")} and
-  \code{vignette("bayesian-computation", package = "multiScaleR")}.
+  \code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
+  \code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
 }

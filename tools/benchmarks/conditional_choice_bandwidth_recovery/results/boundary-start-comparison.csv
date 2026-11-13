@@ -1,0 +1,2 @@
+"id","kernel","n_analysis","signal","replicate","primary_status","primary_bandwidth","primary_objective_gap","diagnostic_status","diagnostic_bandwidth","diagnostic_objective_gap","diagnostic_eligible_starts","primary_test_nll_per_set","diagnostic_test_nll_per_set","reference_bandwidth"
+"choice_047","gaussian",450,"null",3,"scored",147.778301563362,0.0168863710939604,"scored",800,0,6,1.27284826553451,1.27226324360748,800

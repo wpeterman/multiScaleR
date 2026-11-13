@@ -84,5 +84,5 @@ plot(example$fits$pooled, type = "group_sd") # between-group variation
 \seealso{
 \code{\link{posterior_scales}}, \code{\link{multiScale_bayes}},
   \code{\link{diagnose_bayes_scales}}, \code{\link{simulate.multiScaleR_bayes}},
-  and \code{vignette("bayesian-scales", package = "multiScaleR")}.
+  and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }
