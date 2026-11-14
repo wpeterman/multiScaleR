@@ -29,23 +29,23 @@ ecological formulas or prepared kernel covariates before supplying this
 vector; density is on the response scale, not the log scale.}
 
 \item{distance_scale}{Positive numeric scalar or vector with one value per
-site. This is the half-normal detection standard deviation, in `units_in`.
+site. This is the half-normal detection standard deviation, in \code{units_in}.
 It is distinct from an ecological kernel's scale of effect.}
 
 \item{removal}{Numeric per-time-unit singing/detection probabilities in
-`[0, 1]`. Supply a scalar, a vector with one value per site, or a matrix
+\verb{[0, 1]}. Supply a scalar, a vector with one value per site, or a matrix
 with sites in rows and removal intervals in columns. Matrix entries allow
 interval-specific probabilities, matching native GDR removal designs.}
 
 \item{dist_breaks}{Increasing numeric distance boundaries starting at zero,
-in `units_in`. The last boundary is the point-survey radius.}
+in \code{units_in}. The last boundary is the point-survey radius.}
 
 \item{interval_lengths}{Positive integer durations of the removal intervals,
-measured in `interval_units`. Unequal durations are supported.}
+measured in \code{interval_units}. Unequal durations are supported.}
 
-\item{interval_units}{One nonempty time-unit label, for example `"minutes"`.}
+\item{interval_units}{One nonempty time-unit label, for example \code{"minutes"}.}
 
-\item{units_in}{Distance units, `"m"` or `"km"`.}
+\item{units_in}{Distance units, \code{"m"} or \code{"km"}.}
 
 \item{site_covs}{Optional data frame of actual or prepared site covariates,
 with one row per density. Factors, transformations supplied as columns,
@@ -55,36 +55,36 @@ Native character-to-factor conversion and its warning are preserved.}
 \item{event_keys}{Optional data frame with one row per site, retaining the
 original event identifiers separately from covariates. Supplying keys does
 not aggregate, reorder, or validate their scientific interpretation; use
-[validate_unmarked_data()] to audit them.}
+\code{\link[=validate_unmarked_data]{validate_unmarked_data()}} to audit them.}
 
 \item{seed}{Nonnegative integer simulation seed. The caller's random-number
 state is restored, including its absence when no state existed initially.}
 
 \item{return_joint}{Logical; return the site-by-distance-by-removal count
-array as `joint`. The default avoids retaining this intermediate array.}
+array as \code{joint}. The default avoids retaining this intermediate array.}
 
 \item{provenance}{Named list retaining caller-supplied generating formulas,
 coefficients, kernel definitions, fixed reference transformations, raster
 years, or other design information. Values are recorded without evaluation.}
 
-\item{x}{An object returned by `sim_dat_gdr()`.}
+\item{x}{An object returned by \code{sim_dat_gdr()}.}
 
 \item{...}{Reserved for compatibility with the generic print function.}
 }
 \value{
-A list with class `msr_gdr_simulation` containing `observed`, an
-  `unmarkedFrameGDR`; `truth`, a data frame
-  with site row, expected density, expected circle abundance, realized latent
-  abundance, distance and removal detection probabilities, total observation
-  probability, expected observed count, and realized observed count;
-  `probabilities`, distance-bin and first-removal-interval probability
-  matrices; `joint`, the optional joint count array (otherwise `NULL`);
-  `event_keys`; and `design`. The latter records units, survey area in square
-  kilometers, distance/removal parameters, breaks/durations, seed/RNG kind,
-  assumptions, native package version, and caller provenance. Truth and
-  provenance are not inserted into the observed frame's covariates.
-  Printing the result shows a compact survey and unit summary and returns
-  the object invisibly. It does not call the native frame printer.
+A list with class \code{msr_gdr_simulation} containing \code{observed}, an
+\code{unmarkedFrameGDR}; \code{truth}, a data frame
+with site row, expected density, expected circle abundance, realized latent
+abundance, distance and removal detection probabilities, total observation
+probability, expected observed count, and realized observed count;
+\code{probabilities}, distance-bin and first-removal-interval probability
+matrices; \code{joint}, the optional joint count array (otherwise \code{NULL});
+\code{event_keys}; and \code{design}. The latter records units, survey area in square
+kilometers, distance/removal parameters, breaks/durations, seed/RNG kind,
+assumptions, native package version, and caller provenance. Truth and
+provenance are not inserted into the observed frame's covariates.
+Printing the result shows a compact survey and unit summary and returns
+the object invisibly. It does not call the native frame printer.
 }
 \description{
 Generate single-primary point surveys with Poisson abundance, a half-normal
@@ -92,23 +92,23 @@ distance key, and first-detection removal intervals. Paired margins describe
 the same birds. Observed data and generating truth are returned separately.
 }
 \details{
-Survey area is `pi * radius_km^2`. Expected abundance is density times this
-  area. A bird's distance and removal categories are independent conditional
-  on the supplied site parameters. First-removal probabilities account for
-  survival through all preceding intervals; durations convert per-unit
-  probability `p` to `1 - (1 - p)^duration`.
+Survey area is \code{pi * radius_km^2}. Expected abundance is density times this
+area. A bird's distance and removal categories are independent conditional
+on the supplied site parameters. First-removal probabilities account for
+survival through all preceding intervals; durations convert per-unit
+probability \code{p} to \code{1 - (1 - p)^duration}.
 
 Independent Poisson counts are drawn for every observed joint category and
-  the unobserved category. Their sum is Poisson latent abundance, and their
-  conditional allocation given that sum is multinomial. This avoids a loop
-  over birds or repeated full multinomial draws. Both margins are derived
-  from these same joint counts.
+the unobserved category. Their sum is Poisson latent abundance, and their
+conditional allocation given that sum is multinomial. This avoids a loop
+over birds or repeated full multinomial draws. Both margins are derived
+from these same joint counts.
 
 This baseline assumes a closed population within the survey radius and one
-  primary occasion. It does not simulate movement across the radius,
-  negative-binomial or zero-inflated abundance, annual availability, or random
-  detection heterogeneity. Those require separate models and validation.
-  This helper does not change [sim_dat_unmarked()] or fit any model.
+primary occasion. It does not simulate movement across the radius,
+negative-binomial or zero-inflated abundance, annual availability, or random
+detection heterogeneity. Those require separate models and validation.
+This helper does not change \code{\link[=sim_dat_unmarked]{sim_dat_unmarked()}} or fit any model.
 }
 \examples{
 sim <- sim_dat_gdr(density = c(100, 200, 0), distance_scale = 40,

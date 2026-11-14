@@ -74,7 +74,7 @@
 #'   amplitude. Every requested point, lower ineligible candidate and competing
 #'   nuisance optimum remains explicit. A later boundary-aware bootstrap or
 #'   test-inversion design is required before reporting confidence intervals.
-#' @keywords internal
+#' @noRd
 .msr_factorized_scale_sd_profile <- function(spec, sd, control = list(), initial_parameters = list()) {
   if (!is.list(spec) || !is.null(spec$priors) || is.null(spec$zero_sd))
     stop("A prepared unpenalized marginal-likelihood specification is required.", call. = FALSE)

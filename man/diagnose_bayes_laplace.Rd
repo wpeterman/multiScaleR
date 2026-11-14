@@ -40,19 +40,19 @@ seed preserves the caller's random-number state.}
 }
 \value{
 A list with \code{available} indicating whether importance ratios
-  and reference summaries could be calculated. A reference that fails
-  overlap checks still has \code{available = TRUE}. Its \code{reason} explains
-  why the event statuses remain unresolved. The report includes the
-  original \code{raw_diagnostics}, importance
-  \code{overlap} checks, counts of posterior density rechecks
-  (\code{target_evaluation}), and a \code{probabilities} table. Each row
-  identifies the fitted scale combination and threshold, then reports
-  the approximation and reference CDF estimates, weighted reference MCSE,
-  signed difference and numerical bounds, indicator ESS, the absolute
-  difference between two halves of the reference, and a status. Settings
-  retain the \code{candidates}, \code{seed}, and \code{tolerance}, plus
-  coefficient-proposal and defensive-draw counts. An unavailable reference
-  records a \code{reason} and leaves assessment statuses unresolved.
+and reference summaries could be calculated. A reference that fails
+overlap checks still has \code{available = TRUE}. Its \code{reason} explains
+why the event statuses remain unresolved. The report includes the
+original \code{raw_diagnostics}, importance
+\code{overlap} checks, counts of posterior density rechecks
+(\code{target_evaluation}), and a \code{probabilities} table. Each row
+identifies the fitted scale combination and threshold, then reports
+the approximation and reference CDF estimates, weighted reference MCSE,
+signed difference and numerical bounds, indicator ESS, the absolute
+difference between two halves of the reference, and a status. Settings
+retain the \code{candidates}, \code{seed}, and \code{tolerance}, plus
+coefficient-proposal and defensive-draw counts. An unavailable reference
+records a \code{reason} and leaves assessment statuses unresolved.
 }
 \description{
 Compare selected scale probabilities with a fresh importance estimate of
@@ -64,29 +64,29 @@ This function is experimental. Its arguments and results may change in a
 later release without a deprecation period.
 
 The reference uses a mixture of heavy-tailed local proposals and
-  a defensive component based on the latent-effect and scale priors. It
-  draws response coefficients from their exact Gaussian conditional or a
-  normalized heavy-tailed conditional proposal for other families. The
-  full posterior density and actual mixture density determine all weights.
-  Neither the approximation nor its draws are replaced.
+a defensive component based on the latent-effect and scale priors. It
+draws response coefficients from their exact Gaussian conditional or a
+normalized heavy-tailed conditional proposal for other families. The
+full posterior density and actual mixture density determine all weights.
+Neither the approximation nor its draws are replaced.
 
-  The reference must pass the package's importance overlap checks and
-  the event must have indicator ESS at least 400. Its independent sample
-  halves must differ by no more than the smaller of 0.05 and
-  \code{tolerance}. The numerical bounds combine three-standard-error
-  uncertainty for the weighted reference with Wilson bounds for the
-  original approximate draws. A \code{"discrepancy"} lies wholly beyond
-  the tolerance on either side. \code{"within_tolerance"} places both
-  numerical bounds inside the tolerance. Other cases are
-  \code{"unresolved"}. A constant reference indicator or a failed original
-  fit diagnostic leaves the assessment unresolved.
+The reference must pass the package's importance overlap checks and
+the event must have indicator ESS at least 400. Its independent sample
+halves must differ by no more than the smaller of 0.05 and
+\code{tolerance}. The numerical bounds combine three-standard-error
+uncertainty for the weighted reference with Wilson bounds for the
+original approximate draws. A \code{"discrepancy"} lies wholly beyond
+the tolerance on either side. \code{"within_tolerance"} places both
+numerical bounds inside the tolerance. Other cases are
+\code{"unresolved"}. A constant reference indicator or a failed original
+fit diagnostic leaves the assessment unresolved.
 
-  This exploratory assessment targets only the requested fitted scale
-  probabilities. A heavy-tailed proposal can miss posterior regions.
-  The report does not certify approximation accuracy, general calibration,
-  held-out predictions, or the fit's original diagnostics. Compare with a
-  full posterior fit when the conclusions depend on these probabilities.
-  Requires RTMB and posterior.
+This exploratory assessment targets only the requested fitted scale
+probabilities. A heavy-tailed proposal can miss posterior regions.
+The report does not certify approximation accuracy, general calibration,
+held-out predictions, or the fit's original diagnostics. Compare with a
+full posterior fit when the conclusions depend on these probabilities.
+Requires RTMB and posterior.
 }
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{diagnose_bayes_probabilities}}

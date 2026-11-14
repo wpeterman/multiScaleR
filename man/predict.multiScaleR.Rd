@@ -79,20 +79,20 @@ Raster controls go in a named \code{raster_args} list; see Details.}
 }
 \value{
 Without standard errors or intervals, a named numeric vector.
-  Otherwise a list containing \code{fit}, \code{se.fit}, \code{type}, and
-  \code{uncertainty}; confidence intervals add \code{lower}, \code{upper},
-  and \code{level}. Binomial response predictions are probabilities.
-  For \code{joint_mixed}, returns the native glmmTMB prediction vector or,
-  with \code{se.fit = TRUE}, its list containing \code{fit} and \code{se.fit}.
-  Native-refit results follow the provider's output. Computed-raster inputs
-  return a \code{SpatRaster} of predictions, with SE layers when requested
-  and available. Unmarked SE output retains the native \code{Predicted},
-  \code{SE}, \code{lower}, and \code{upper} columns as layers, with native
-  confidence-level semantics. No observation noise is added.
+Otherwise a list containing \code{fit}, \code{se.fit}, \code{type}, and
+\code{uncertainty}; confidence intervals add \code{lower}, \code{upper},
+and \code{level}. Binomial response predictions are probabilities.
+For \code{joint_mixed}, returns the native glmmTMB prediction vector or,
+with \code{se.fit = TRUE}, its list containing \code{fit} and \code{se.fit}.
+Native-refit results follow the provider's output. Computed-raster inputs
+return a \code{SpatRaster} of predictions, with SE layers when requested
+and available. Unmarked SE output retains the native \code{Predicted},
+\code{SE}, \code{lower}, and \code{upper} columns as layers, with native
+confidence-level semantics. No observation noise is added.
 }
 \description{
 Predict the expected response, with optional uncertainty from
-  joint estimation of regression coefficients and spatial kernel parameters.
+joint estimation of regression coefficients and spatial kernel parameters.
 }
 \details{
 The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
@@ -135,18 +135,18 @@ The ordinary
 already standardized kernel predictors and do not include scale uncertainty.
 
 For \code{joint_mixed}, prediction delegates to the final native
-  glmmTMB model. Standard errors require \code{uncertainty = "conditional"}
-  and exclude scale estimation uncertainty; confidence intervals are not
-  provided by this wrapper. Supply both \code{newdata} and matching
-  \code{kernel_inputs} for new rows. Include all fixed-effect, offset, and
-  grouping variables. Kernel means need binned summaries; weighted surface
-  SQ needs matching source specifications, raw cell buffers, and row IDs.
-  Spatial columns are recomputed using the
-  training means and standard deviations. Additional arguments, including
-  \code{re.form} and \code{allow.new.levels}, follow native glmmTMB behavior.
-  The default includes fitted random effects; \code{re.form = NA} sets them
-  to zero and does not integrate over their distribution. Use native
-  \code{predict(object$opt_mod, ...)} for other glmmTMB prediction types.
+glmmTMB model. Standard errors require \code{uncertainty = "conditional"}
+and exclude scale estimation uncertainty; confidence intervals are not
+provided by this wrapper. Supply both \code{newdata} and matching
+\code{kernel_inputs} for new rows. Include all fixed-effect, offset, and
+grouping variables. Kernel means need binned summaries; weighted surface
+SQ needs matching source specifications, raw cell buffers, and row IDs.
+Spatial columns are recomputed using the
+training means and standard deviations. Additional arguments, including
+\code{re.form} and \code{allow.new.levels}, follow native glmmTMB behavior.
+The default includes fitted random effects; \code{re.form = NA} sets them
+to zero and does not integrate over their distribution. Use native
+\code{predict(object$opt_mod, ...)} for other glmmTMB prediction types.
 
 \strong{Fixed-radius point predictors.} For analytic GLM/NB2, conditional
 logistic, joint mixed, and native-refit models, \code{include_fixed = TRUE}
@@ -342,5 +342,5 @@ choices. A single selected-scale raster is not a Bayesian posterior map.
 }
 \seealso{
 \code{\link{multiScale_optim}}, \code{\link{vcov.multiScaleR}},
-  \code{\link{prepare_prediction}} for repeated summaries of fixed rows.
+\code{\link{prepare_prediction}} for repeated summaries of fixed rows.
 }

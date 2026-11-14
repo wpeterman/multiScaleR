@@ -183,6 +183,7 @@
 #' @rdname kernel_dist
 #' @export
 #' @importFrom insight get_df
+#' @noMd
 
 kernel_dist <- function(model,
                         prob = 0.9,
@@ -410,7 +411,7 @@ kernel_dist <- function(model,
 #'   original distance along a line through the point.
 #' @return Numeric distance in map units at which the cumulative kernel weight
 #'   reaches \code{prob} under the selected dimensional definition.
-#' @keywords internal
+#' @noRd
 #' @importFrom stats qnorm qgamma
 k_dist <- function(sigma, prob = 0.95, kernel = c("gaussian", "exp", "expow", "fixed"),
                    beta = NULL, dimension = c("2d", "1d")) {

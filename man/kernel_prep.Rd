@@ -33,22 +33,22 @@ which is reserved for internal coordinate data.}
 
 \item{max_D}{Positive numeric. The maximum radius (in the same units as the
 projection of \code{pts} and \code{raster_stack}) around each point to
-sample from the raster. Should be at least 2–3 times the largest expected
+sample from the raster. Should be at least 2 to 3 times the largest expected
 sigma value. Raster layers must extend far enough beyond the points to
 fully cover buffers of this radius.}
 
 \item{kernel}{Kernel function to be used for weighting raster values by
 distance. One of:
 \describe{
-  \item{\code{"gaussian"}}{(Default) Gaussian (normal) decay: weights fall
-    off as a normal distribution with standard deviation \code{sigma}.}
-  \item{\code{"exp"}}{Negative exponential decay: weights fall off as
-    \code{exp(-d / sigma)}.}
-  \item{\code{"fixed"}}{Fixed-radius (step) buffer: all cells within
-    \code{sigma} receive equal weight; cells beyond receive zero.}
-  \item{\code{"expow"}}{Exponential power kernel parameterized by both
-    \code{sigma} (scale) and \code{shape} (shape). Requires \code{shape}
-    to be specified.}
+\item{\code{"gaussian"}}{(Default) Gaussian (normal) decay: weights fall
+off as a normal distribution with standard deviation \code{sigma}.}
+\item{\code{"exp"}}{Negative exponential decay: weights fall off as
+\code{exp(-d / sigma)}.}
+\item{\code{"fixed"}}{Fixed-radius (step) buffer: all cells within
+\code{sigma} receive equal weight; cells beyond receive zero.}
+\item{\code{"expow"}}{Exponential power kernel parameterized by both
+\code{sigma} (scale) and \code{shape} (shape). Requires \code{shape}
+to be specified.}
 }}
 
 \item{scale_vars}{Optional variable specifications created with
@@ -97,7 +97,7 @@ figures. Ignored when \code{bin = FALSE}.}
 \code{d_list}/\code{raw_cov} data are retained. If \code{FALSE} and every
 covariate is kernel-type (no landscape metrics) and \code{bin = TRUE}, the
 cell-level data are dropped after binning, dramatically reducing the
-object's memory footprint (often by 1–2 orders of magnitude). The binned
+object's memory footprint (often by 1 to 2 orders of magnitude). The binned
 summaries are sufficient to drive optimization, \code{\link{profile_sigma}},
 and the final refit. Ignored (with a message) when landscape metrics are
 present or \code{bin = FALSE}.}
@@ -105,47 +105,47 @@ present or \code{bin = FALSE}.}
 \value{
 A list of class \code{"multiScaleR_data"} containing:
 \describe{
-  \item{\code{kernel_dat}}{Data frame of scaled (mean-centered, unit-variance)
-    initial kernel-weighted covariate values, one row per point and one column
-    per covariate. Row names match \code{pts} row names or sequential integers.
-    Use this directly to fit the initial model passed to
-    \code{\link{multiScale_optim}}.}
-  \item{\code{d_list}}{Named list (one element per point) of numeric distance
-    vectors from the point to every raster cell within the buffer.}
-  \item{\code{raw_cov}}{Named list (one element per point) of matrices
-    containing raw raster cell values within the buffer, aligned with
-    \code{d_list}. Each point is stored as a dense or sparse matrix,
-    whichever is smaller. \code{NULL} in lean mode.}
-  \item{\code{cell_size}}{Fixed x/y raster cell dimensions in map units.
-    CV uses these to retain intersecting cells whose centers extend beyond
-    \code{max_D}, without learning a bin domain from assessment rows.}
-  \item{\code{kernel}}{Character string identifying the kernel used.}
-  \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
-    (scaled) parameter space.}
-  \item{\code{shape}}{Numeric vector of initial shape values, or \code{NULL}.}
-  \item{\code{min_D}}{Numeric. Approximate minimum inter-cell distance,
-    used as the lower bound for sigma during optimization.}
-  \item{\code{max_D}}{Numeric. The \code{max_D} value supplied by the user.}
-  \item{\code{n_covs}}{Integer. Number of covariates with scale being
-    optimized.}
-  \item{\code{unit_conv}}{Numeric. Internal distance scaling factor (equals
-    \code{max_D}).}
-  \item{\code{scale_vars}}{Data frame of class \code{"multiScaleR_vars"}
-    describing all covariate specifications.}
-  \item{\code{resolution}}{Numeric. Raster cell resolution.}
-  \item{\code{n_cols}}{Integer. Number of raster columns (used for adjacency
-    landscape metrics).}
-  \item{\code{scl_params}}{Named list with elements \code{mean} and \code{sd}
-    the centering and scaling parameters applied to \code{kernel_dat}.
-    Stored for use by \code{\link{kernel_scale.raster}} when
-    \code{scale_center = TRUE}.}
-  \item{\code{binned}}{When \code{bin = TRUE}, a list of precomputed
-    distance-binned summaries (representative bin distances and per-covariate
-    value/count matrices) used to accelerate optimization. \code{NULL} when
-    \code{bin = FALSE}.}
-  \item{\code{cell_data_stored}}{Logical flag indicating whether the
-    per-cell \code{d_list}/\code{raw_cov} data were retained. \code{FALSE}
-    only in lean mode (\code{store_cell_data = FALSE}).}
+\item{\code{kernel_dat}}{Data frame of scaled (mean-centered, unit-variance)
+initial kernel-weighted covariate values, one row per point and one column
+per covariate. Row names match \code{pts} row names or sequential integers.
+Use this directly to fit the initial model passed to
+\code{\link{multiScale_optim}}.}
+\item{\code{d_list}}{Named list (one element per point) of numeric distance
+vectors from the point to every raster cell within the buffer.}
+\item{\code{raw_cov}}{Named list (one element per point) of matrices
+containing raw raster cell values within the buffer, aligned with
+\code{d_list}. Each point is stored as a dense or sparse matrix,
+whichever is smaller. \code{NULL} in lean mode.}
+\item{\code{cell_size}}{Fixed x/y raster cell dimensions in map units.
+CV uses these to retain intersecting cells whose centers extend beyond
+\code{max_D}, without learning a bin domain from assessment rows.}
+\item{\code{kernel}}{Character string identifying the kernel used.}
+\item{\code{sigma}}{Numeric vector of initial sigma values on the internal
+(scaled) parameter space.}
+\item{\code{shape}}{Numeric vector of initial shape values, or \code{NULL}.}
+\item{\code{min_D}}{Numeric. Approximate minimum inter-cell distance,
+used as the lower bound for sigma during optimization.}
+\item{\code{max_D}}{Numeric. The \code{max_D} value supplied by the user.}
+\item{\code{n_covs}}{Integer. Number of covariates with scale being
+optimized.}
+\item{\code{unit_conv}}{Numeric. Internal distance scaling factor (equals
+\code{max_D}).}
+\item{\code{scale_vars}}{Data frame of class \code{"multiScaleR_vars"}
+describing all covariate specifications.}
+\item{\code{resolution}}{Numeric. Raster cell resolution.}
+\item{\code{n_cols}}{Integer. Number of raster columns (used for adjacency
+landscape metrics).}
+\item{\code{scl_params}}{Named list with elements \code{mean} and \code{sd}
+the centering and scaling parameters applied to \code{kernel_dat}.
+Stored for use by \code{\link{kernel_scale.raster}} when
+\code{scale_center = TRUE}.}
+\item{\code{binned}}{When \code{bin = TRUE}, a list of precomputed
+distance-binned summaries (representative bin distances and per-covariate
+value/count matrices) used to accelerate optimization. \code{NULL} when
+\code{bin = FALSE}.}
+\item{\code{cell_data_stored}}{Logical flag indicating whether the
+per-cell \code{d_list}/\code{raw_cov} data were retained. \code{FALSE}
+only in lean mode (\code{store_cell_data = FALSE}).}
 }
 }
 \description{
@@ -162,7 +162,7 @@ meters or feet).
 
 The \code{max_D} buffer should be large enough to encompass the plausible
 range of the true scale of effect. A common rule of thumb is to set
-\code{max_D} to at least 2–3 times the largest expected sigma. After running
+\code{max_D} to at least 2 to 3 times the largest expected sigma. After running
 \code{\link{multiScale_optim}}, the \code{max_distance} diagnostic will warn
 if the estimated scale approaches \code{max_D}.
 

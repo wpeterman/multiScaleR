@@ -7,7 +7,7 @@
 gdr_start_values(model)
 }
 \arguments{
-\item{model}{An `unmarkedFitGDR` from the qualified unmarked 1.5.2 layout.
+\item{model}{An \code{unmarkedFitGDR} from the qualified unmarked 1.5.2 layout.
 Stored fixed coefficients, log-SDs, optimizer values and constructor block
 metadata must be complete and consistent. Existing offset and TMB ZIP
 restrictions remain in force. A finite coordinate snapshot does not
@@ -15,26 +15,26 @@ establish that the model converged or is eligible for inference.}
 }
 \value{
 A plain list with:
-  \itemize{
-    \item `starts`: unnamed numeric constructor starts on the native link
-      scales. Log-SDs remain log-SDs; latent random modes are not included.
-    \item `map`: `constructor_position`, native `block`, `within_block`,
-      `fitted_position`, `component`, `kind` (`"regression"` or `"log_sd"`),
-      and the original stored coefficient or variance `label`.
-    \item `fitted_values`: the original fixed optimizer vector, including
-      its names and order; `coordinate_count`: its length, not a new AIC
-      parameter-count estimate; `random_modes_omitted`: the stored number
-      of latent coordinates in each native component.
-    \item `optimizer`: stored scalar `value` and `convergence` when present.
-      Nonfinite diagnostic values are retained; they do not validate a fit.
-    \item `provider`: unmarked version, native engine and, for TMB, the
-      installed TMB version. `format_version` identifies the snapshot schema.
-    \item `fingerprint`: SHA256 of this coordinate snapshot. It does not
-      identify the complete data, likelihood, controls or prediction context.
-    \item `qualification`: coordinate-only scope.
-      `fit_eligibility_established`, `likelihood_evaluated` and
-      `uncertainty_evaluated` are all `FALSE`.
-  }
+\itemize{
+\item \code{starts}: unnamed numeric constructor starts on the native link
+scales. Log-SDs remain log-SDs; latent random modes are not included.
+\item \code{map}: \code{constructor_position}, native \code{block}, \code{within_block},
+\code{fitted_position}, \code{component}, \code{kind} (\code{"regression"} or \code{"log_sd"}),
+and the original stored coefficient or variance \code{label}.
+\item \code{fitted_values}: the original fixed optimizer vector, including
+its names and order; \code{coordinate_count}: its length, not a new AIC
+parameter-count estimate; \code{random_modes_omitted}: the stored number
+of latent coordinates in each native component.
+\item \code{optimizer}: stored scalar \code{value} and \code{convergence} when present.
+Nonfinite diagnostic values are retained; they do not validate a fit.
+\item \code{provider}: unmarked version, native engine and, for TMB, the
+installed TMB version. \code{format_version} identifies the snapshot schema.
+\item \code{fingerprint}: SHA256 of this coordinate snapshot. It does not
+identify the complete data, likelihood, controls or prediction context.
+\item \code{qualification}: coordinate-only scope.
+\code{fit_eligibility_established}, \code{likelihood_evaluated} and
+\code{uncertainty_evaluated} are all \code{FALSE}.
+}
 }
 \description{
 Extract stored numeric optimizer values in the original constructor order,
@@ -42,28 +42,28 @@ retaining a reversible component and within-component position map.
 }
 \details{
 Native TMB incoming starts and fitted optimizer coordinates can have different
-  orders. For example, the constructor may place NB dispersion after the
-  regression and variance blocks, while the fitted vector places it beside
-  abundance. Repeated coefficient labels do not resolve this difference.
-  The map uses the native block and its within-block position, checking every
-  coordinate against the stored component values before returning starts.
+orders. For example, the constructor may place NB dispersion after the
+regression and variance blocks, while the fitted vector places it beside
+abundance. Repeated coefficient labels do not resolve this difference.
+The map uses the native block and its within-block position, checking every
+coordinate against the stored component values before returning starts.
 
 This function reads stored metadata only. It does not call a saved likelihood,
-  update, score, Hessian, covariance or TMB tape, and it leaves the fitted model
-  unchanged. A failed or nonconverged fit can still have finite coordinates;
-  its stored diagnostics retain their original interpretation. Nonfinite or
-  inconsistent coordinates stop rather than being dropped or repaired.
+update, score, Hessian, covariance or TMB tape, and it leaves the fitted model
+unchanged. A failed or nonconverged fit can still have finite coordinates;
+its stored diagnostics retain their original interpretation. Nonfinite or
+inconsistent coordinates stop rather than being dropped or repaired.
 
-The list can be saved with `saveRDS()` without serializing a fitted model or
-  executable objective. Restoring an objective still requires the original
-  data, transformations, formulas and evaluated controls, plus all original
-  numerical and scientific checks. The snapshot is not a likelihood cache or
-  a portable fitted model. It does not restore latent modes or qualify native
-  TMB likelihood-only fitting; top-level `se = FALSE` and optimizer controls
-  do not establish that behavior in the inspected provider.
+The list can be saved with \code{saveRDS()} without serializing a fitted model or
+executable objective. Restoring an objective still requires the original
+data, transformations, formulas and evaluated controls, plus all original
+numerical and scientific checks. The snapshot is not a likelihood cache or
+a portable fitted model. It does not restore latent modes or qualify native
+TMB likelihood-only fitting; top-level \code{se = FALSE} and optimizer controls
+do not establish that behavior in the inspected provider.
 
 Priors, normalized targets, parameter penalties, diagnostics, native
-  coefficient covariance and uncertainty distinctions are unchanged.
+coefficient covariance and uncertainty distinctions are unchanged.
 }
 \examples{
 frame <- unmarked::unmarkedFrameGDR(matrix(c(0, 0, 1, 0), 2, byrow = TRUE),
@@ -78,5 +78,5 @@ snapshot$starts
 snapshot$map
 }
 \seealso{
-[make_gdr_refitter()], [expand_gdr_intervals()]
+\code{\link[=make_gdr_refitter]{make_gdr_refitter()}}, \code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}
 }

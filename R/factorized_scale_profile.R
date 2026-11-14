@@ -76,7 +76,7 @@
 #'   spatial-field amplitude. It provides no confidence level, Wilks cutoff,
 #'   p-value, predictive interval or calibration claim. A later boundary-aware
 #'   bootstrap or test-inversion design is required before reporting intervals.
-#' @keywords internal
+#' @noRd
 .msr_factorized_response_sd_profile <- function(spec, sd, control = list(), initial_parameters = list()) {
   if (!is.list(spec) || !is.null(spec$priors) || is.null(spec$zero_sd))
     stop("A prepared unpenalized marginal-likelihood specification is required.", call. = FALSE)

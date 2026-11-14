@@ -40,11 +40,11 @@ but does not improve effective sample size or correct a missed mode.}
 }
 \value{
 A ggplot object. Its \code{data} contains the plotted summaries,
-  including \code{median}, \code{lower}, and \code{upper}. Scale panels also
-  contain \code{covariate} and \code{group}; SD panels contain
-  \code{component} and \code{term}. Print the object inside a function or
-  loop to display it. A failed or unavailable stored diagnostic flag is
-  shown in the subtitle. This does not compute new chain diagnostics.
+including \code{median}, \code{lower}, and \code{upper}. Scale panels also
+contain \code{covariate} and \code{group}; SD panels contain
+\code{component} and \code{term}. Print the object inside a function or
+loop to display it. A failed or unavailable stored diagnostic flag is
+shown in the subtitle. This does not compute new chain diagnostics.
 }
 \description{
 Display posterior medians and central credible intervals for fitted scales
@@ -53,27 +53,27 @@ does not refit the model or change its posterior draws.
 }
 \details{
 Annual intervals describe uncertainty in each fitted year's scale.
-  The between-year SD describes population variation on the log-distance
-  axis; it is not an annual scale's standard error. Response SDs use the
-  response link scale. Shared-scale models without group effects have no
-  group SD to plot. No plot establishes calibration or model adequacy.
-  Continuous half-normal SD priors have no point mass at zero. A positive
-  lower SD interval limit does not establish between-group heterogeneity;
-  assess meaningful variation and compare a shared-scale model instead.
-  For NUTS and slice fits, the stored flag describes checks on the original
-  parameters. NUTS also checks sampler behavior. Use
-  \code{\link{diagnose_bayes_scales}} to check mixing and simulation
-  precision of derived log distances and group SDs.
+The between-year SD describes population variation on the log-distance
+axis; it is not an annual scale's standard error. Response SDs use the
+response link scale. Shared-scale models without group effects have no
+group SD to plot. No plot establishes calibration or model adequacy.
+Continuous half-normal SD priors have no point mass at zero. A positive
+lower SD interval limit does not establish between-group heterogeneity;
+assess meaningful variation and compare a shared-scale model instead.
+For NUTS and slice fits, the stored flag describes checks on the original
+parameters. NUTS also checks sampler behavior. Use
+\code{\link{diagnose_bayes_scales}} to check mixing and simulation
+precision of derived log distances and group SDs.
 
-  For chain plots, pass \code{fit$chains} for a slice fit or
-  \code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
-  for a NUTS fit to bayesplot. Use \code{mcmc_trace()} for trajectories,
-  \code{mcmc_rank_overlay()} for rank distributions by chain, and
-  \code{mcmc_dens_overlay()} for posterior densities by chain. Select
-  \code{regex_pars = "^scale_beta"} to view the scale formula coefficients
-  on the internal log scale. Approximate fits and compact examples support
-  interval plots and posterior predictive checks. Chain plots require
-  the original post-warmup draws in iteration and chain order.
+For chain plots, pass \code{fit$chains} for a slice fit or
+\code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
+for a NUTS fit to bayesplot. Use \code{mcmc_trace()} for trajectories,
+\code{mcmc_rank_overlay()} for rank distributions by chain, and
+\code{mcmc_dens_overlay()} for posterior densities by chain. Select
+\code{regex_pars = "^scale_beta"} to view the scale formula coefficients
+on the internal log scale. Approximate fits and compact examples support
+interval plots and posterior predictive checks. Chain plots require
+the original post-warmup draws in iteration and chain order.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -83,6 +83,6 @@ plot(example$fits$pooled, type = "group_sd") # between-group variation
 }
 \seealso{
 \code{\link{posterior_scales}}, \code{\link{multiScale_bayes}},
-  \code{\link{diagnose_bayes_scales}}, \code{\link{simulate.multiScaleR_bayes}},
-  and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
+\code{\link{diagnose_bayes_scales}}, \code{\link{simulate.multiScaleR_bayes}},
+and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }

@@ -16,41 +16,41 @@ output type. Their native numerical outputs retain native attributes.
 
 The fields describe the calculation:
 \describe{
-  \item{schema_version}{Version of the metadata structure.}
-  \item{inference_target, method}{The posterior, likelihood, conditional
-    likelihood, or native target, and its retained computation label.}
-  \item{quantity, output_scale}{Expected response, linear predictor, kernel
-    scale, a contrast between kernel scales, replicate response, choice probability, or named native component,
-    on the stated output scale. Native component meanings remain model specific.}
-  \item{target_population, effects}{The supplied prediction rows and policies
-    for known and unseen groups. Sampled new effects are shared by each group's
-    rows within a complete joint vector. Zero deviations are reference values,
-    not integration over the group's distribution.}
-  \item{conditioning, integration}{The quantities held fixed and the recorded
-    treatment of uncertainty. Missing historical solver metadata is marked
-    unrecorded rather than inferred.}
-  \item{uncertainty}{Population and kernel parameter treatment, inclusion of
-    observation noise, interval meaning, and omitted uncertainty. Analytic
-    snapshots also record whether joint covariance was available at preparation.
-    This does not bypass the prediction method's covariance checks.}
-  \item{original_coordinates, joint_parameter_map_complete}{The parameter
-    representation used by the adapter. For Bayesian predictions, completeness
-    checks stored block dimensions against the original prepared parameter map.
-    This structural check does not validate a coordinate transformation,
-    reconstruct integrated coefficients, or establish posterior accuracy.}
-  \item{diagnostics_status}{The existing fit status when available. It can be
-    \code{"passed"}, \code{"failed"}, or \code{"unavailable"}. Joint covariance
-    availability is separate from this status.}
-  \item{kernel_support}{Native predictions retain any recoverable refit
-    optimization-bound table and existing extraction-window diagnostic.
-    These flags qualify the selected kernel and do not add kernel uncertainty,
-    alter conditional coefficient SEs or establish prediction eligibility.}
-  \item{metadata_establishes_eligibility}{Always \code{FALSE}. Read the original
-    fit diagnostics before interpreting predictions.}
-  \item{target_population}{Specified prediction rows, or specified location
-    pairs for private spatial scale contrasts.}
-  \item{fixed_inputs, component}{Whether the rows and controls are bound to a
-    snapshot, and the named component when applicable.}
+\item{schema_version}{Version of the metadata structure.}
+\item{inference_target, method}{The posterior, likelihood, conditional
+likelihood, or native target, and its retained computation label.}
+\item{quantity, output_scale}{Expected response, linear predictor, kernel
+scale, a contrast between kernel scales, replicate response, choice probability, or named native component,
+on the stated output scale. Native component meanings remain model specific.}
+\item{target_population, effects}{The supplied prediction rows and policies
+for known and unseen groups. Sampled new effects are shared by each group's
+rows within a complete joint vector. Zero deviations are reference values,
+not integration over the group's distribution.}
+\item{conditioning, integration}{The quantities held fixed and the recorded
+treatment of uncertainty. Missing historical solver metadata is marked
+unrecorded rather than inferred.}
+\item{uncertainty}{Population and kernel parameter treatment, inclusion of
+observation noise, interval meaning, and omitted uncertainty. Analytic
+snapshots also record whether joint covariance was available at preparation.
+This does not bypass the prediction method's covariance checks.}
+\item{original_coordinates, joint_parameter_map_complete}{The parameter
+representation used by the adapter. For Bayesian predictions, completeness
+checks stored block dimensions against the original prepared parameter map.
+This structural check does not validate a coordinate transformation,
+reconstruct integrated coefficients, or establish posterior accuracy.}
+\item{diagnostics_status}{The existing fit status when available. It can be
+\code{"passed"}, \code{"failed"}, or \code{"unavailable"}. Joint covariance
+availability is separate from this status.}
+\item{kernel_support}{Native predictions retain any recoverable refit
+optimization-bound table and existing extraction-window diagnostic.
+These flags qualify the selected kernel and do not add kernel uncertainty,
+alter conditional coefficient SEs or establish prediction eligibility.}
+\item{metadata_establishes_eligibility}{Always \code{FALSE}. Read the original
+fit diagnostics before interpreting predictions.}
+\item{target_population}{Specified prediction rows, or specified location
+pairs for private spatial scale contrasts.}
+\item{fixed_inputs, component}{Whether the rows and controls are bound to a
+snapshot, and the named component when applicable.}
 }
 Identified native GDR response fields record a fixed correlation range,
 conditional physical abundance effects and distinct new-location residual
@@ -148,6 +148,6 @@ calibration or upgrades a rejected fit.
 }
 \seealso{
 \code{\link{predict.multiScaleR_bayes}},
-  \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}},
-  \code{\link{prepare_prediction}}
+\code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}},
+\code{\link{prepare_prediction}}
 }

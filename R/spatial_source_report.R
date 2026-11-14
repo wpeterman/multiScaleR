@@ -54,7 +54,7 @@
 #'   distinct distances. This report estimates neither and changes no priors,
 #'   likelihood/posterior target, fitting gates or prediction uncertainty.
 #' @seealso \code{\link{kernel_prep}}, \code{\link{kernel_prep_by_group}}
-#' @keywords internal
+#' @noRd
 .msr_spatial_source_report <- function(points, raster, inputs, data, coordinates,
     row_id = NULL, point_id = NULL, coordinate_tolerance = 0) {
   if (is.complex(coordinate_tolerance) || !is.null(dim(coordinate_tolerance)))

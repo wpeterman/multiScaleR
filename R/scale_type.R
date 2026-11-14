@@ -11,7 +11,7 @@
 #' @examples
 #' ### TO BE COMPLETED ###
 #' @rdname scale_type
-#' @keywords internal
+#' @noRd
 
 scale_type <- function(d,
                        kernel = c('gaussian', 'exp', 'expow', 'fixed'),

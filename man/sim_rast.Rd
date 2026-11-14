@@ -66,7 +66,7 @@ All layers span the same spatial extent:
 \description{
 Creates a \code{SpatRaster} stack of four simulated landscape surfaces for
 use with \code{\link{sim_dat}} and \code{\link{sim_dat_unmarked}}. The stack
-contains two binary (0/1) and two continuous (0–1) surfaces with differing
+contains two binary (0/1) and two continuous (0 to 1) surfaces with differing
 spatial autocorrelation ranges, allowing simulation of multiscale ecological
 processes.
 }

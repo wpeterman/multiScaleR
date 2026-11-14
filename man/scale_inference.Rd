@@ -51,35 +51,35 @@ bounds are also included. Failed starts cannot win.}
 \value{
 A list of class \code{msr_scale_inference} with:
 \describe{
-  \item{estimate}{Refined scale estimate in map units.}
-  \item{reference}{Refined log-parameter vector, negative log likelihood,
-    start audit, original negative log likelihood, and improvement. The
-    original fitted object remains unchanged.}
-  \item{grid}{Scale values, profile negative log likelihood, likelihood-ratio
-    statistic, chi-squared acceptance, bootstrap p-value and 95 percent
-    Monte Carlo limits, bootstrap acceptance, and whether the Monte Carlo
-    limits cross the rejection threshold. Uncalibrated entries are missing.}
-  \item{profile_set}{Separate accepted scale regions. Columns \code{lower}
-    and \code{upper} are root-refined endpoints in map units;
-    \code{lower_outside} and \code{upper_outside} retain adjacent rejected
-    grid points. The two \code{*_bound_limited} columns mark endpoints
-    limited by the optimization bounds.}
-  \item{bootstrap_set}{Accepted grid components with the same columns, or
-    \code{NULL} unless every grid point was successfully calibrated.
-    Endpoints are accepted grid values, not root-refined limits; outside
-    brackets show their resolution.}
-  \item{diagnostics}{Zero-effect likelihood deviance and compatibility with
-    the profile cutoff; profile status (\code{localized}, \code{disconnected},
-    \code{bound_limited}, or \code{unresolved}); original Wald availability;
-    and bootstrap status, failure count, and Monte Carlo ambiguity count.}
-  \item{bootstrap_records}{One row per attempted bootstrap refit pair:
-    generating scale, replicate, success, likelihood-ratio statistic,
-    fitted scale and theta, boundary indicator, both likelihoods,
-    attempted/eligible start counts, errors, and warnings. No failed
-    replicate is silently dropped.}
-  \item{profile_audit}{Start records at each observed profile grid point.}
-  \item{level, bootstrap, seed, bounds, call}{Requested confidence level,
-    bootstrap count and seed, map-unit search bounds, and matched call.}
+\item{estimate}{Refined scale estimate in map units.}
+\item{reference}{Refined log-parameter vector, negative log likelihood,
+start audit, original negative log likelihood, and improvement. The
+original fitted object remains unchanged.}
+\item{grid}{Scale values, profile negative log likelihood, likelihood-ratio
+statistic, chi-squared acceptance, bootstrap p-value and 95 percent
+Monte Carlo limits, bootstrap acceptance, and whether the Monte Carlo
+limits cross the rejection threshold. Uncalibrated entries are missing.}
+\item{profile_set}{Separate accepted scale regions. Columns \code{lower}
+and \code{upper} are root-refined endpoints in map units;
+\code{lower_outside} and \code{upper_outside} retain adjacent rejected
+grid points. The two \code{*_bound_limited} columns mark endpoints
+limited by the optimization bounds.}
+\item{bootstrap_set}{Accepted grid components with the same columns, or
+\code{NULL} unless every grid point was successfully calibrated.
+Endpoints are accepted grid values, not root-refined limits; outside
+brackets show their resolution.}
+\item{diagnostics}{Zero-effect likelihood deviance and compatibility with
+the profile cutoff; profile status (\code{localized}, \code{disconnected},
+\code{bound_limited}, or \code{unresolved}); original Wald availability;
+and bootstrap status, failure count, and Monte Carlo ambiguity count.}
+\item{bootstrap_records}{One row per attempted bootstrap refit pair:
+generating scale, replicate, success, likelihood-ratio statistic,
+fitted scale and theta, boundary indicator, both likelihoods,
+attempted/eligible start counts, errors, and warnings. No failed
+replicate is silently dropped.}
+\item{profile_audit}{Start records at each observed profile grid point.}
+\item{level, bootstrap, seed, bounds, call}{Requested confidence level,
+bootstrap count and seed, map-unit search bounds, and matched call.}
 }
 }
 \description{
@@ -179,5 +179,5 @@ if (requireNamespace("MASS", quietly = TRUE)) {
 }
 \seealso{
 \code{\link{multiScale_optim}}, \code{\link{profile_sigma}},
-  \code{\link{diagnostics}}
+\code{\link{diagnostics}}
 }

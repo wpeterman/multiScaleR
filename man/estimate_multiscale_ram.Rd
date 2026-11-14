@@ -55,26 +55,26 @@ Default: \code{2}.}
 \value{
 A list of class \code{"multiScaleR_ram"} with:
 \describe{
-  \item{\code{requested_n_cores}}{Worker count used for the
-    \code{peak_parallel_estimate}.}
-  \item{\code{recommended_n_cores}}{Conservative recommended maximum worker
-    count after applying both CPU and RAM limits.}
-  \item{\code{max_cores_by_cpu}}{Maximum worker count allowed by detected
-    physical CPU cores after leaving \code{leave_free} cores unused.}
-  \item{\code{max_cores_by_ram}}{Maximum worker count allowed by the RAM
-    budget, or \code{NA} if total system RAM could not be detected.}
-  \item{\code{backend}}{Character string identifying the assumed parallel
-    backend budget: \code{"PSOCK"} or \code{"fork"}.}
-  \item{\code{system}}{Named list describing detected physical cores,
-    logical cores, total RAM, usable RAM, and the reservation settings.}
-  \item{\code{point_summary}}{One-row data frame summarizing the number of
-    points, extracted cells per point, source raster layer count, whether
-    cell-level data were retained (\code{cell_data_stored}), and the number
-    of distance bins (\code{nbins}).}
-  \item{\code{component_bytes}}{Data frame reporting estimated byte sizes for
-    the major stored objects and worker bundles.}
-  \item{\code{notes}}{Character vector with interpretation notes and any
-    detection warnings.}
+\item{\code{requested_n_cores}}{Worker count used for the
+\code{peak_parallel_estimate}.}
+\item{\code{recommended_n_cores}}{Conservative recommended maximum worker
+count after applying both CPU and RAM limits.}
+\item{\code{max_cores_by_cpu}}{Maximum worker count allowed by detected
+physical CPU cores after leaving \code{leave_free} cores unused.}
+\item{\code{max_cores_by_ram}}{Maximum worker count allowed by the RAM
+budget, or \code{NA} if total system RAM could not be detected.}
+\item{\code{backend}}{Character string identifying the assumed parallel
+backend budget: \code{"PSOCK"} or \code{"fork"}.}
+\item{\code{system}}{Named list describing detected physical cores,
+logical cores, total RAM, usable RAM, and the reservation settings.}
+\item{\code{point_summary}}{One-row data frame summarizing the number of
+points, extracted cells per point, source raster layer count, whether
+cell-level data were retained (\code{cell_data_stored}), and the number
+of distance bins (\code{nbins}).}
+\item{\code{component_bytes}}{Data frame reporting estimated byte sizes for
+the major stored objects and worker bundles.}
+\item{\code{notes}}{Character vector with interpretation notes and any
+detection warnings.}
 }
 }
 \description{

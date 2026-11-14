@@ -6,7 +6,7 @@
 \format{
 A binary SpatRaster object
 \describe{
-  \item{hab}{ --> A binary raster}
+\item{hab}{ --> A binary raster}
 }
 }
 \description{

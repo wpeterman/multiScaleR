@@ -44,15 +44,15 @@ or inconsistent training information raises an error.}
 }
 \value{
 A data frame with the same rows, row names, and nonspatial columns as
-  \code{newdata}. Calculated spatial columns contain the fitted transforms in
-  standard-deviation units relative to the training sample. These are native
-  model inputs, not response predictions. Do not standardize them again.
+\code{newdata}. Calculated spatial columns contain the fitted transforms in
+standard-deviation units relative to the training sample. These are native
+model inputs, not response predictions. Do not standardize them again.
 }
 \description{
 Calculate optimized spatial predictors at new sites and insert
-  them into an explicitly keyed native prediction data frame. Training means
-  and standard deviations are reused, so prediction sites are on the fitted
-  model's covariate scale.
+them into an explicitly keyed native prediction data frame. Training means
+and standard deviations are reused, so prediction sites are on the fitted
+model's covariate scale.
 }
 \details{
 Only active GDR component formulas identify spatial predictors. Availability
@@ -125,5 +125,5 @@ nd_fixed <- prepare_unmarked_data(fit, scenarios, inputs, join_by = keys,
 }
 \seealso{
 \code{\link{kernel_prep}}, \code{\link{prepare_prediction}},
-  \code{\link{kernel_scale.raster}}
+\code{\link{kernel_scale.raster}}
 }

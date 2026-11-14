@@ -9,7 +9,7 @@
 #'   Prepared, approximate, and compact fits return an unavailable report.
 #' @param probs Numeric vector of distinct probabilities strictly between zero
 #'   and one. Defaults to \code{c(0.025, 0.5, 0.975)}, the endpoints and median
-#'   of a central 95\% interval. Changing this vector changes the quantiles
+#'   of a central 95% interval. Changing this vector changes the quantiles
 #'   whose simulation error is reported, not any diagnostic threshold.
 #' @return A list with the following components:
 #'   \describe{

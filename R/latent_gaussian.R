@@ -14,7 +14,7 @@
 #' @details Fixed covariance must be symmetric and positive definite. Singular
 #'   or ill-conditioned matrices are rejected without covariance repair. This
 #'   interface represents a proper finite Gaussian block, not an intrinsic field.
-#' @keywords internal
+#' @noRd
 .msr_gaussian_block <- function(design, covariance = diag(ncol(design)), label = "Gaussian block") {
   if (!is.matrix(design) || !is.numeric(design) || !nrow(design) || !ncol(design) ||
       any(!is.finite(design))) stop("Gaussian block design must be a finite nonempty numeric matrix.", call. = FALSE)

@@ -108,21 +108,21 @@ raise an error; create a new snapshot for changed data.}
 }
 \value{
 An object of class \code{multiScaleR_prediction}. Its \code{predict()}
-  method returns the same output as \code{predict()} on the original model
-  and fixed prediction inputs. \code{max_bytes} counts its R object size.
-  Unmarked snapshots return the native \code{predict(object$opt_mod, ...)}
-  table, including its \code{Predicted}, \code{SE}, \code{lower}, and
-  \code{upper} columns. Mixed snapshots return native glmmTMB vectors or
-  standard-error lists for the bound prediction type and controls.
-  The named \code{prediction_contract} list describes each prepared output
-  type: its target, conditioning, random-effect policy, and uncertainty
-  restrictions. This descriptive metadata does not establish fit eligibility
-  or interval calibration. Numerical prediction outputs retain their usual
-  structure, including native attributes.
+method returns the same output as \code{predict()} on the original model
+and fixed prediction inputs. \code{max_bytes} counts its R object size.
+Unmarked snapshots return the native \code{predict(object$opt_mod, ...)}
+table, including its \code{Predicted}, \code{SE}, \code{lower}, and
+\code{upper} columns. Mixed snapshots return native glmmTMB vectors or
+standard-error lists for the bound prediction type and controls.
+The named \code{prediction_contract} list describes each prepared output
+type: its target, conditioning, random-effect policy, and uncertainty
+restrictions. This descriptive metadata does not establish fit eligibility
+or interval calibration. Numerical prediction outputs retain their usual
+structure, including native attributes.
 }
 \description{
 Prepare a spatial prediction design or native prediction output
-  once and retain a compact snapshot for repeated summaries of fixed rows.
+once and retain a compact snapshot for repeated summaries of fixed rows.
 }
 \details{
 Native GDR models with active formula offsets or TMB zero inflation are
@@ -138,10 +138,10 @@ The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
 subclasses retain their existing provider path.
 
 Ordinary native LM, GLM and time-fixed unpenalized Cox snapshots
-  use the original fitted terms for dot shortcuts and active variables.
-  Removed variables do not add prediction inputs or parameters. Their
-  original coefficient covariance and kernel-conditional uncertainty remain
-  unchanged. New data columns never enter the fitted design.
+use the original fitted terms for dot shortcuts and active variables.
+Removed variables do not add prediction inputs or parameters. Their
+original coefficient covariance and kernel-conditional uncertainty remain
+unchanged. New data columns never enter the fitted design.
 
 The snapshot binds coefficients, covariance, spatial scales, training
 standardization, row order, and any choice sets to the supplied model and

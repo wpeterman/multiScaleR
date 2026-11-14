@@ -36,13 +36,13 @@ buffer).}
 \item{type}{Character. Distribution of the simulated response variable. One
 of:
 \describe{
-  \item{\code{"count"}}{(Default) Poisson-distributed counts.}
-  \item{\code{"count_nb"}}{Negative binomial counts with dispersion
-    \code{StDev}.}
-  \item{\code{"occ"}}{Bernoulli (0/1) occupancy data via a logistic
-    link.}
-  \item{\code{"gaussian"}}{Normally distributed continuous response with
-    standard deviation \code{StDev}.}
+\item{\code{"count"}}{(Default) Poisson-distributed counts.}
+\item{\code{"count_nb"}}{Negative binomial counts with dispersion
+\code{StDev}.}
+\item{\code{"occ"}}{Bernoulli (0/1) occupancy data via a logistic
+link.}
+\item{\code{"gaussian"}}{Normally distributed continuous response with
+standard deviation \code{StDev}.}
 }}
 
 \item{StDev}{Positive numeric. Dispersion parameter for \code{"count_nb"}
@@ -85,17 +85,17 @@ larger \code{max_D} if that planar cutoff is needed.}
 \value{
 A named list with three elements:
 \describe{
-  \item{\code{obs}}{Numeric vector of length \code{n_points} containing the
-    simulated response values.}
-  \item{\code{df}}{Data frame with \code{n_points} rows and one column per
-    raster layer plus a \code{y} column. The raster columns contain the
-    true kernel-weighted mean values, scaled to zero mean and unit variance.
-    This data frame can be used to fit a model for
-    \code{\link{multiScale_optim}}.}
-  \item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
-    An \code{obs} column is appended containing the simulated response
-    values. Pass this to \code{\link{kernel_prep}} as the \code{pts}
-    argument.}
+\item{\code{obs}}{Numeric vector of length \code{n_points} containing the
+simulated response values.}
+\item{\code{df}}{Data frame with \code{n_points} rows and one column per
+raster layer plus a \code{y} column. The raster columns contain the
+true kernel-weighted mean values, scaled to zero mean and unit variance.
+This data frame can be used to fit a model for
+\code{\link{multiScale_optim}}.}
+\item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
+An \code{obs} column is appended containing the simulated response
+values. Pass this to \code{\link{kernel_prep}} as the \code{pts}
+argument.}
 }
 }
 \description{

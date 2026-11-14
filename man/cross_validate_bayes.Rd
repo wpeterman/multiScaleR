@@ -98,19 +98,19 @@ Use \code{TRUE} to retain complete Bayesian fits for investigation.}
 }
 \value{
 A \code{multiScaleR_bayes_cv} object inheriting
-  \code{multiScaleR_cv}. \code{predictions} contains the posterior mean
-  response and marginal negative log score per observation. For binomial
-  models, \code{prediction} is a per-trial probability and log scores use
-  the observed count and trial total. \code{joint_scores} contains each
-  fold's block sizes and joint negative log scores. \code{summary} and
-  \code{metrics} report pooled and per-fold joint negative log score divided
-  by the number of assessment observations. \code{fold_results} records
-  which folds scored, failed fitting or scoring, or failed diagnostics.
-  \code{training} records analysis and point IDs, frozen normalization,
-  bin references, priors and random seeds. \code{diagnostics},
-  \code{prediction_contracts}, \code{warnings}, \code{errors},
-  \code{targets}, \code{folds}, \code{settings}, \code{assessment_counts},
-  \code{complete}, and optional \code{fits} support audit and comparison.
+\code{multiScaleR_cv}. \code{predictions} contains the posterior mean
+response and marginal negative log score per observation. For binomial
+models, \code{prediction} is a per-trial probability and log scores use
+the observed count and trial total. \code{joint_scores} contains each
+fold's block sizes and joint negative log scores. \code{summary} and
+\code{metrics} report pooled and per-fold joint negative log score divided
+by the number of assessment observations. \code{fold_results} records
+which folds scored, failed fitting or scoring, or failed diagnostics.
+\code{training} records analysis and point IDs, frozen normalization,
+bin references, priors and random seeds. \code{diagnostics},
+\code{prediction_contracts}, \code{warnings}, \code{errors},
+\code{targets}, \code{folds}, \code{settings}, \code{assessment_counts},
+\code{complete}, and optional \code{fits} support audit and comparison.
 }
 \description{
 Refit a Bayesian scale model in each explicit analysis split. Score the
@@ -122,36 +122,36 @@ This function is experimental. Its arguments and results may change in a
 later release without a deprecation period.
 
 The joint score is the negative log of the posterior average of
-  the conditional product of observation densities in each assessment
-  block. For grouped binomial data, the block product uses one normalized
-  count probability per observation. New effects are drawn once per
-  group in each joint parameter vector and shared by all corresponding
-  assessment observations. The sum of marginal row scores is a different
-  target. Pooled scores weight each joint block by its observation count
-  after expressing its score per observation.
+the conditional product of observation densities in each assessment
+block. For grouped binomial data, the block product uses one normalized
+count probability per observation. New effects are drawn once per
+group in each joint parameter vector and shared by all corresponding
+assessment observations. The sum of marginal row scores is a different
+target. Pooled scores weight each joint block by its observation count
+after expressing its score per observation.
 
-  Each fit learns normalization, formula bases, coefficients and ecological
-  scales only from analysis rows. Repeated visits can share one point
-  buffer. Use whole-site or whole-year folds if prediction concerns an
-  unseen site or year. Where several groups cross, the assessment block
-  should cover the observations whose joint response you want to predict.
+Each fit learns normalization, formula bases, coefficients and ecological
+scales only from analysis rows. Repeated visits can share one point
+buffer. Use whole-site or whole-year folds if prediction concerns an
+unseen site or year. Where several groups cross, the assessment block
+should cover the observations whose joint response you want to predict.
 
-  Failed native or derived diagnostics keep the fold incomplete, with any
-  computed scores available for investigation. Slice sampling without the
-  optional posterior package can score folds with diagnostics recorded as
-  unavailable. Install posterior to check mixing and simulation precision.
-  Laplace and marginal scores inherit their fitted approximation and
-  diagnostic limits. Importance correction uses normalized candidate
-  weights directly. Numerical diagnostic checks do not establish
-  predictive calibration.
+Failed native or derived diagnostics keep the fold incomplete, with any
+computed scores available for investigation. Slice sampling without the
+optional posterior package can score folds with diagnostics recorded as
+unavailable. Install posterior to check mixing and simulation precision.
+Laplace and marginal scores inherit their fitted approximation and
+diagnostic limits. Importance correction uses normalized candidate
+weights directly. Numerical diagnostic checks do not establish
+predictive calibration.
 
-  Use \code{\link{cv_tab}} with \code{metric = "neg_log_score"} for complete
-  Bayesian results on the same targets, folds, blocks and new-level policies.
-  Poisson and NB2 can compare predictive mass on the same count observations.
-  Training AIC, AICc and BIC selection does not apply to this posterior
-  workflow. Use an outer split to evaluate a model-selection rule.
+Use \code{\link{cv_tab}} with \code{metric = "neg_log_score"} for complete
+Bayesian results on the same targets, folds, blocks and new-level policies.
+Poisson and NB2 can compare predictive mass on the same count observations.
+Training AIC, AICc and BIC selection does not apply to this posterior
+workflow. Use an outer split to evaluate a model-selection rule.
 }
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{grouped_cv_folds}},
-  \code{\link{diagnose_bayes_scales}}, \code{\link{cv_tab}}
+\code{\link{diagnose_bayes_scales}}, \code{\link{cv_tab}}
 }

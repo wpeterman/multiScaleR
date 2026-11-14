@@ -75,21 +75,21 @@ fit and add no model fitting or diagnostic eligibility.}
 }
 \value{
 A \code{multiScaleR_choice_cv} object inheriting \code{multiScaleR_cv}.
-  Standard CV fields retain their meanings with the following target-specific
-  definitions. \code{predictions} retains every alternative, its \code{choice}
-  ID, zero/one \code{observed} case, uncentered \code{linear_predictor},
-  within-set \code{prediction} probability and natural-log \code{log_probability}.
-  Only used alternatives are \code{eligible}; their \code{neg_log_score} is
-  the negative log choice probability. \code{summary}/\code{metrics} average
-  over choice sets, with \code{unit = "choice_set"}, set counts and a separate
-  \code{n_alternatives} count. \code{fold_results} counts alternative rows.
-  \code{targets} binds all used row IDs, cases and set membership.
-  \code{training}, \code{diagnostics}, \code{warnings}, \code{errors},
-  \code{raster_groups}, \code{fits} and opt-in \code{selection_records} retain
-  their contracts described in \code{\link{cross_validate}}. Choice records
-  use version 2, native partial-method/stratum signatures and event-based
-  \code{nobs}. Failed folds retain every planned alternative and pooled
-  estimates remain \code{NA}. Inspect original diagnostics before comparison.
+Standard CV fields retain their meanings with the following target-specific
+definitions. \code{predictions} retains every alternative, its \code{choice}
+ID, zero/one \code{observed} case, uncentered \code{linear_predictor},
+within-set \code{prediction} probability and natural-log \code{log_probability}.
+Only used alternatives are \code{eligible}; their \code{neg_log_score} is
+the negative log choice probability. \code{summary}/\code{metrics} average
+over choice sets, with \code{unit = "choice_set"}, set counts and a separate
+\code{n_alternatives} count. \code{fold_results} counts alternative rows.
+\code{targets} binds all used row IDs, cases and set membership.
+\code{training}, \code{diagnostics}, \code{warnings}, \code{errors},
+\code{raster_groups}, \code{fits} and opt-in \code{selection_records} retain
+their contracts described in \code{\link{cross_validate}}. Choice records
+use version 2, native partial-method/stratum signatures and event-based
+\code{nobs}. Failed folds retain every planned alternative and pooled
+estimates remain \code{NA}. Inspect original diagnostics before comparison.
 }
 \description{
 Refit native conditional-logistic coefficients and, optionally, ecological
@@ -98,35 +98,35 @@ alternative among every alternative in each held-out choice set.
 }
 \details{
 Each set needs one used alternative and at least two alternatives.
-  Weights, missing-row omission, robust clustering, penalized/special Cox terms
-  and generic censored survival responses are outside this adapter. No rows
-  are silently dropped. Predictions use saved training terms without assigning
-  an effect to new set labels. Log scores are calculated directly in log space,
-  including when a displayed probability underflows to zero.
+Weights, missing-row omission, robust clustering, penalized/special Cox terms
+and generic censored survival responses are outside this adapter. No rows
+are silently dropped. Predictions use saved training terms without assigning
+an effect to new set labels. Log scores are calculated directly in log space,
+including when a displayed probability underflows to zero.
 
-  A zero-coefficient native fit receives a CV-only likelihood adapter when
-  survival retains a scalar null likelihood. Its value must agree with the
-  exact complete-set offset likelihood before native K = 0 and event counts
-  can be used. Other native Cox fits are not altered. Inconsistent or missing
-  native metadata remains a failure.
-  Every scored fold checks its unweighted, unpenalized native fit, analysis
-  rows, complete strata and partial method before prediction. These checks
-  apply even when fits and selection records are not retained.
+A zero-coefficient native fit receives a CV-only likelihood adapter when
+survival retains a scalar null likelihood. Its value must agree with the
+exact complete-set offset likelihood before native K = 0 and event counts
+can be used. Other native Cox fits are not altered. Inconsistent or missing
+native metadata remains a failure.
+Every scored fold checks its unweighted, unpenalized native fit, analysis
+rows, complete strata and partial method before prediction. These checks
+apply even when fits and selection records are not retained.
 
-  Use \code{\link{cv_tab}} to compare this choice target and
-  \code{\link{select_cv}} for training-only AIC/AICc/BIC selection. Penalties
-  retain native event counts and full coefficient/scale/shape K. Ordinary
-  Bernoulli probabilities and relative selection risks are different targets.
-  Dot formulas expand declared column names before fitting and learn no
-  assessment transformations. Exclude the set ID as an ordinary predictor,
-  for example \code{case_ ~ . - choice_id + strata(choice_id)}. Predictors
-  constant within every set have no identified conditional coefficient.
-  The supported training-only transformations described in
-  \code{\link{cross_validate}} also apply inside choice expressions and offsets.
-  Their saved constants do not introduce stratum effects or change event K.
-  Point scores do not integrate parameter/selection uncertainty, provide
-  observation intervals or establish calibration. This adapter does not
-  promote guarded spatial-scale or Bayesian methods.
+Use \code{\link{cv_tab}} to compare this choice target and
+\code{\link{select_cv}} for training-only AIC/AICc/BIC selection. Penalties
+retain native event counts and full coefficient/scale/shape K. Ordinary
+Bernoulli probabilities and relative selection risks are different targets.
+Dot formulas expand declared column names before fitting and learn no
+assessment transformations. Exclude the set ID as an ordinary predictor,
+for example \code{case_ ~ . - choice_id + strata(choice_id)}. Predictors
+constant within every set have no identified conditional coefficient.
+The supported training-only transformations described in
+\code{\link{cross_validate}} also apply inside choice expressions and offsets.
+Their saved constants do not introduce stratum effects or change event K.
+Point scores do not integrate parameter/selection uncertainty, provide
+observation intervals or establish calibration. This adapter does not
+promote guarded spatial-scale or Bayesian methods.
 }
 \examples{
 if (requireNamespace("survival", quietly = TRUE)) {
@@ -140,5 +140,5 @@ if (requireNamespace("survival", quietly = TRUE)) {
 }
 \seealso{
 \code{\link{cross_validate}}, \code{\link{grouped_cv_folds}},
-  \code{\link{spatial_cv_folds}}, \code{\link{cv_tab}}, \code{\link{select_cv}}
+\code{\link{spatial_cv_folds}}, \code{\link{cv_tab}}, \code{\link{select_cv}}
 }

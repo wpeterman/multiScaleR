@@ -20,83 +20,83 @@ prepare_gdr_intervals(
 \method{print}{msr_gdr_intervals}(x, ...)
 }
 \arguments{
-\item{object}{An `unmarkedFrameGDR` with paired histories and its original
+\item{object}{An \code{unmarkedFrameGDR} with paired histories and its original
 site, primary-period and observation covariates.}
 
 \item{event_keys}{A data frame with one row per native site row and primary
 period, in native site-major order. Supply original survey identifiers.}
 
-\item{event_id}{Character vector naming the columns of `event_keys` that
+\item{event_id}{Character vector naming the columns of \code{event_keys} that
 uniquely identify each survey. Compound keys are supported.}
 
-\item{interval_data}{A data frame containing the `event_id` columns, the
+\item{interval_data}{A data frame containing the \code{event_id} columns, the
 interval index, and new observation predictors. It must contain exactly
 one row for every survey and removal interval. Rows may be shuffled;
-`alignment` records their explicit mapping to native order.}
+\code{alignment} records their explicit mapping to native order.}
 
 \item{interval_units}{Nonempty time-unit label for the original removal
-durations, such as `"minutes"`. No time conversion is performed.}
+durations, such as \code{"minutes"}. No time conversion is performed.}
 
 \item{interval}{One character string naming the numeric interval-index
-column in `interval_data`. Its values must be integers from one through
-the number of removal intervals per primary period. Default: `"interval"`.
+column in \code{interval_data}. Its values must be integers from one through
+the number of removal intervals per primary period. Default: \code{"interval"}.
 This column is retained as an observation predictor.}
 
-\item{site_id}{Optional physical-site columns in `event_keys`, passed to
-[validate_unmarked_data()]. Native frame rows need not be physical sites.}
+\item{site_id}{Optional physical-site columns in \code{event_keys}, passed to
+\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}. Native frame rows need not be physical sites.}
 
 \item{effort}{Optional event-order effort vector, passed to
-[validate_unmarked_data()]. Unknown, unsurveyed and surveyed-zero events
+\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}. Unknown, unsurveyed and surveyed-zero events
 retain their separate meanings.}
 
 \item{expected_event_keys}{Optional independently supplied event mapping in
-native frame order, passed to [validate_unmarked_data()].}
+native frame order, passed to \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}.}
 
-\item{x}{A prepared `msr_gdr_intervals` object to print.}
+\item{x}{A prepared \code{msr_gdr_intervals} object to print.}
 
 \item{...}{Unused.}
 }
 \value{
-A list of class `msr_gdr_intervals` containing `data`, the updated
-  native frame; `survey_audit`, the original survey audit; `alignment`, the
-  native event/row/primary/interval positions and matching input row; and
-  `protocol`, the units, durations, added columns and provider metadata.
-  `fit_eligibility_established` is always `FALSE`. Structural errors stop
-  without changing the input; interval errors carry the survey audit.
-  Printing reports dimensions and whether the input order changed, returning
-  the object invisibly. Full alignment and warning records remain available.
+A list of class \code{msr_gdr_intervals} containing \code{data}, the updated
+native frame; \code{survey_audit}, the original survey audit; \code{alignment}, the
+native event/row/primary/interval positions and matching input row; and
+\code{protocol}, the units, durations, added columns and provider metadata.
+\code{fit_eligibility_established} is always \code{FALSE}. Structural errors stop
+without changing the input; interval errors carry the survey audit.
+Printing reports dimensions and whether the input order changed, returning
+the object invisibly. Full alignment and warning records remain available.
 }
 \description{
 Add observation-interval predictors to a copy of an
-`unmarkedFrameGDR`, retaining an explicit record of their alignment.
+\code{unmarkedFrameGDR}, retaining an explicit record of their alignment.
 }
 \details{
 Native GDR observation rows are ordered by frame row, primary period, then
-  removal interval. The native observation-covariate setter does not verify
-  this layout. This helper checks keys before using that setter. It rejects
-  unknown, duplicate, missing or extra survey/interval combinations and any
-  attempt to overwrite an existing observation column. Event identifier
-  columns are used for alignment; all other supplied columns, including the
-  interval index, are added to native observation covariates.
+removal interval. The native observation-covariate setter does not verify
+this layout. This helper checks keys before using that setter. It rejects
+unknown, duplicate, missing or extra survey/interval combinations and any
+attempt to overwrite an existing observation column. Event identifier
+columns are used for alignment; all other supplied columns, including the
+interval index, are added to native observation covariates.
 
 The response matrices, existing covariates, distance geometry, durations,
-  units, column classes, factor levels and contrasts remain unchanged.
-  Missing predictor values are retained, and native model fitting still
-  applies its own missingness rules. No records are aggregated or imputed.
-  `.input_row`, `.input_row_name` and `.interval` are reserved alignment names
-  in `event_keys`. Shared site/annual predictor names are recorded for
-  review; scale-fitting guards against shadowed optimized site predictors
-  remain in force. Use distinct names for fields with different meanings.
+units, column classes, factor levels and contrasts remain unchanged.
+Missing predictor values are retained, and native model fitting still
+applies its own missingness rules. No records are aggregated or imputed.
+\code{.input_row}, \code{.input_row_name} and \code{.interval} are reserved alignment names
+in \code{event_keys}. Shared site/annual predictor names are recorded for
+review; scale-fitting guards against shadowed optimized site predictors
+remain in force. Use distinct names for fields with different meanings.
 
-Use native formulas such as `~ I(interval == 1)` or `~ factor(interval)`
-  when the observation process justifies them. With equal unit intervals,
-  hazards pi in the first interval and b thereafter reproduce the first-time
-  law of a simple encounter Markov process regardless of persistence after
-  an encounter. First times alone do not estimate that persistence or
-  establish a finite corrected density. Unequal native durations retain
-  their per-unit probability interpretation. Keep linked complete histories
-  when assessing re-detections. This helper adds no likelihood, parameter,
-  prior, uncertainty method or conditional-random prediction admission.
+Use native formulas such as \code{~ I(interval == 1)} or \code{~ factor(interval)}
+when the observation process justifies them. With equal unit intervals,
+hazards pi in the first interval and b thereafter reproduce the first-time
+law of a simple encounter Markov process regardless of persistence after
+an encounter. First times alone do not estimate that persistence or
+establish a finite corrected density. Unequal native durations retain
+their per-unit probability interpretation. Keep linked complete histories
+when assessing re-detections. This helper adds no likelihood, parameter,
+prior, uncertainty method or conditional-random prediction admission.
 }
 \examples{
 frame <- unmarked::unmarkedFrameGDR(

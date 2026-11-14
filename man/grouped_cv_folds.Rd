@@ -26,9 +26,9 @@ must align exactly with supplied IDs.}
 }
 \value{
 A named list of class \code{multiScaleR_folds}. Each element contains
-  disjoint character vectors \code{analysis} and \code{assessment}, accepted
-  by \code{\link{cross_validate}}. Every row is assessed once. Attribute
-  \code{fold_info} records the method, row/unit assignments and exclusions.
+disjoint character vectors \code{analysis} and \code{assessment}, accepted
+by \code{\link{cross_validate}}. Every row is assessed once. Attribute
+\code{fold_info} records the method, row/unit assignments and exclusions.
 }
 \description{
 Keep all rows from a sampling group in the same assessment fold. Whole
@@ -36,11 +36,11 @@ groups are assigned to balance row counts, largest groups first.
 }
 \details{
 Assignment is deterministic and does not use the random-number
-  generator. Equal-size groups are ordered by their labels. Balancing counts
-  does not stratify responses. Choose sampling groups and the validation
-  target before examining assessment outcomes. Fold construction does not
-  qualify a model class for scoring; matched-set survival/amt scoring still
-  requires a separate adapter.
+generator. Equal-size groups are ordered by their labels. Balancing counts
+does not stratify responses. Choose sampling groups and the validation
+target before examining assessment outcomes. Fold construction does not
+qualify a model class for scoring; matched-set survival/amt scoring still
+requires a separate adapter.
 }
 \examples{
 ids <- paste0("row", 1:12)
@@ -49,5 +49,5 @@ folds
 }
 \seealso{
 \code{\link{spatial_cv_folds}}, \code{\link{cross_validate}},
-  \code{\link{cv_tab}}
+\code{\link{cv_tab}}
 }

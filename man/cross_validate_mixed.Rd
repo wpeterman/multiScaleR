@@ -69,19 +69,19 @@ scored fold. Defaults to \code{FALSE}.}
 }
 \value{
 An object of class \code{multiScaleR_mixed_cv} and
-  \code{multiScaleR_cv}. \code{predictions} contains the fold and row ID,
-  group ID, observed response, trials, integrated response mean, and an
-  eligibility flag. \code{joint_scores} has one table per scored fold with
-  the number of held-out rows and the negative log predictive density
-  for each group. \code{summary} and \code{metrics} give pooled and
-  fold-specific scores. \code{training} retains analysis IDs, native
-  coefficients, covariance, dispersion, and any fitted ecological scales.
-  \code{selection_records} stores the native analysis log likelihood,
-  its row count and parameter counts. \code{settings}, \code{folds},
-  \code{targets}, and \code{prediction_contracts} identify the comparison.
-  \code{fold_results}, \code{errors}, \code{diagnostics}, and \code{warnings}
-  retain failed folds and native convergence information.
-  \code{fits} is optional. A failed fold makes pooled scores unavailable.
+\code{multiScaleR_cv}. \code{predictions} contains the fold and row ID,
+group ID, observed response, trials, integrated response mean, and an
+eligibility flag. \code{joint_scores} has one table per scored fold with
+the number of held-out rows and the negative log predictive density
+for each group. \code{summary} and \code{metrics} give pooled and
+fold-specific scores. \code{training} retains analysis IDs, native
+coefficients, covariance, dispersion, and any fitted ecological scales.
+\code{selection_records} stores the native analysis log likelihood,
+its row count and parameter counts. \code{settings}, \code{folds},
+\code{targets}, and \code{prediction_contracts} identify the comparison.
+\code{fold_results}, \code{errors}, \code{diagnostics}, and \code{warnings}
+retain failed folds and native convergence information.
+\code{fits} is optional. A failed fold makes pooled scores unavailable.
 }
 \description{
 Refit a mixed model in every analysis split and score the observations
@@ -94,22 +94,22 @@ This function is experimental. Its arguments and results may change in a
 later release without a deprecation period.
 
 Mixed CV uses maximum-likelihood fits with constant dispersion
-  and a Gaussian distribution for the group effects. Given the fitted
-  parameters, new groups use the estimated population distribution of
-  effects. Existing groups condition that distribution on their analysis
-  responses. Gaussian response models use exact multivariate Normal
-  conditioning. For other families the function integrates over one group
-  intercept with adaptive quadrature. Each assessment group contributes one
-  joint predictive density. Parameter, ecological-scale and model-selection
-  uncertainty are outside these plug-in predictions.
+and a Gaussian distribution for the group effects. Given the fitted
+parameters, new groups use the estimated population distribution of
+effects. Existing groups condition that distribution on their analysis
+responses. Gaussian response models use exact multivariate Normal
+conditioning. For other families the function integrates over one group
+intercept with adaptive quadrature. Each assessment group contributes one
+joint predictive density. Parameter, ecological-scale and model-selection
+uncertainty are outside these plug-in predictions.
 
-  Use \code{\link{cv_tab}} to compare complete results with the same
-  observation support, group assignments, prediction target and splits.
-  Use \code{\link{select_cv}} to evaluate a training information-criterion
-  selection rule. Its sample size for the criterion is the native number
-  of analysis observations. Estimated covariance parameters count toward
-  the penalty. Integrated group effects do not count individually.
-  Native fitting, preprocessing and selection use analysis observations.
+Use \code{\link{cv_tab}} to compare complete results with the same
+observation support, group assignments, prediction target and splits.
+Use \code{\link{select_cv}} to evaluate a training information-criterion
+selection rule. Its sample size for the criterion is the native number
+of analysis observations. Estimated covariance parameters count toward
+the penalty. Integrated group effects do not count individually.
+Native fitting, preprocessing and selection use analysis observations.
 }
 \examples{
 if (requireNamespace("glmmTMB", quietly = TRUE)) {
@@ -122,5 +122,5 @@ if (requireNamespace("glmmTMB", quietly = TRUE)) {
 }
 \seealso{
 \code{\link{cross_validate}}, \code{\link{cross_validate_field}},
-  \code{\link{cv_tab}}, \code{\link{select_cv}}
+\code{\link{cv_tab}}, \code{\link{select_cv}}
 }

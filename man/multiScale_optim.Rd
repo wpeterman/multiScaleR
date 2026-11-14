@@ -210,74 +210,74 @@ uses the selected backend's usual optimizer.}
 \value{
 A list of class \code{"multiScaleR"} containing:
 \describe{
-  \item{\code{scale_est}}{Data frame with one row per optimized covariate and
-    two columns: \code{Mean} (optimized sigma on the original projection
-    scale) and \code{SE} (Hessian-based standard error). \code{SE} is
-    \code{NA} for hard-radius landscape and unweighted surface metrics
-    and for every estimated radius under \code{kernel = "fixed"},
-    whose likelihood changes in steps. Row names are covariate names.}
-  \item{\code{shape_est}}{Data frame of the same structure as
-    \code{scale_est} for the shape parameter, or \code{NULL} when
-    \code{kernel != "expow"}. Hard-radius variables have NA shape and shape
-    SE because shape is inapplicable; their ignored shape positions are
-    excluded from likelihood parameter counts.}
-  \item{\code{optim_results}}{The raw list returned by \code{stats::optim}
-    or \code{optimParallel::optimParallel}, including \code{par},
-    \code{value} (negative log-likelihood), \code{hessian}, and convergence
-    codes. Also contains \code{par_unscale} (sigma values back on the
-    projection scale) and \code{hessian_unscale}. For a declared radius
-    grid, this list describes the selected combination. The Hessian covers
-    only the smooth parameters at those fixed radii, with \code{NA} for
-    hard-radius rows and columns and any inactive shape.
-    See \code{diagnostics(fit)$radius_profile} for all candidates.}
-  \item{\code{opt_mod}}{The refitted model at the optimized sigma values.
-    This is the model object to use for inference, prediction, and
-    \code{\link{plot_marginal_effects}}.}
-  \item{\code{fitted_mod_original}}{The original \code{fitted_mod} passed
-    by the user, stored for reference.}
-  \item{\code{min_D}}{Numeric. Lower bound for sigma during optimization.}
-  \item{\code{max_D}}{Numeric. Upper bound for sigma during optimization.}
-  \item{\code{kernel_inputs}}{The \code{kernel_inputs} list (minus
-    \code{min_D} and \code{max_D}, which are stored separately).}
-  \item{\code{scl_params}}{Named list with \code{mean} and \code{sd} vectors
-    for each covariate: the centering and scaling parameters from the
-    optimized kernel data. Used by \code{\link{kernel_scale.raster}} when
-    \code{scale_center = TRUE}. Raw optimized predictors retain centers of
-    zero and scales of one; prediction batches never relearn these values.}
-  \item{\code{join_by}}{The \code{join_by} data frame, or \code{NULL}.}
-  \item{\code{opt_context}}{Internal optimization context object storing the
-    model-class-specific refit logic. Retained for use by
-    \code{\link{profile_sigma}}. Raw mode also retains
-    \code{covariate_transform = "raw"} here.}
-  \item{\code{profile_scale_est}}{Profile-likelihood CI data frame, or
-    \code{NULL} until \code{\link{profile_sigma}} has been run.}
-  \item{\code{diagnostics}}{List of diagnostic objects; see
-    \code{\link{diagnostics}}.}
-  \item{\code{next_run}}{List of recommended values for a follow-up fit.
-    Includes \code{max_D} for the next \code{\link{kernel_prep}} call,
-    optimized \code{start_sigma} values in map units, optional
-    \code{start_shape} values for \code{kernel = "expow"}, and
-    \code{start_par} on the internal scaled parameter space expected by
-    \code{multiScale_optim}. \code{n_cores} is \code{NULL}; a conservative
-    parallel worker-count suggestion is available on demand from
-    \code{\link{estimate_multiscale_ram}} (it is no longer computed
-    automatically, as that query can be slow and shells out to an external
-    process).}
-  \item{\code{warn_message}}{Integer vector of triggered warning codes:
-    1 = max-distance, 2 = sigma precision, 3 = shape precision.}
-  \item{\code{call}}{The matched call.}
-  \item{\code{profile_fit}, \code{uncertainty}, \code{dispersion_est}}{Present
-    for both analytic GLM backends. These retain transformed parameter estimates,
-    starts and convergence scores, the profile and joint information
-    matrices, identifiability diagnostics, and NB2 theta. The ordinary
-    \code{opt_mod} and its coefficient summary condition on optimized kernel
-    parameters. Use \code{\link{vcov.multiScaleR}} and
-    \code{\link{predict.multiScaleR}} for joint uncertainty.}
-  \item{\code{mixed_fit}}{For \code{joint_mixed}, retained kernel engine,
-    log-scale estimates and bounds in internal distance units, independent
-    starts, every start outcome and warning, selected-start index, and
-    required prediction variables. \code{uncertainty$available} is
-    \code{FALSE}; \code{next_run} and \code{opt_context} are \code{NULL}.}
+\item{\code{scale_est}}{Data frame with one row per optimized covariate and
+two columns: \code{Mean} (optimized sigma on the original projection
+scale) and \code{SE} (Hessian-based standard error). \code{SE} is
+\code{NA} for hard-radius landscape and unweighted surface metrics
+and for every estimated radius under \code{kernel = "fixed"},
+whose likelihood changes in steps. Row names are covariate names.}
+\item{\code{shape_est}}{Data frame of the same structure as
+\code{scale_est} for the shape parameter, or \code{NULL} when
+\code{kernel != "expow"}. Hard-radius variables have NA shape and shape
+SE because shape is inapplicable; their ignored shape positions are
+excluded from likelihood parameter counts.}
+\item{\code{optim_results}}{The raw list returned by \code{stats::optim}
+or \code{optimParallel::optimParallel}, including \code{par},
+\code{value} (negative log-likelihood), \code{hessian}, and convergence
+codes. Also contains \code{par_unscale} (sigma values back on the
+projection scale) and \code{hessian_unscale}. For a declared radius
+grid, this list describes the selected combination. The Hessian covers
+only the smooth parameters at those fixed radii, with \code{NA} for
+hard-radius rows and columns and any inactive shape.
+See \code{diagnostics(fit)$radius_profile} for all candidates.}
+\item{\code{opt_mod}}{The refitted model at the optimized sigma values.
+This is the model object to use for inference, prediction, and
+\code{\link{plot_marginal_effects}}.}
+\item{\code{fitted_mod_original}}{The original \code{fitted_mod} passed
+by the user, stored for reference.}
+\item{\code{min_D}}{Numeric. Lower bound for sigma during optimization.}
+\item{\code{max_D}}{Numeric. Upper bound for sigma during optimization.}
+\item{\code{kernel_inputs}}{The \code{kernel_inputs} list (minus
+\code{min_D} and \code{max_D}, which are stored separately).}
+\item{\code{scl_params}}{Named list with \code{mean} and \code{sd} vectors
+for each covariate: the centering and scaling parameters from the
+optimized kernel data. Used by \code{\link{kernel_scale.raster}} when
+\code{scale_center = TRUE}. Raw optimized predictors retain centers of
+zero and scales of one; prediction batches never relearn these values.}
+\item{\code{join_by}}{The \code{join_by} data frame, or \code{NULL}.}
+\item{\code{opt_context}}{Internal optimization context object storing the
+model-class-specific refit logic. Retained for use by
+\code{\link{profile_sigma}}. Raw mode also retains
+\code{covariate_transform = "raw"} here.}
+\item{\code{profile_scale_est}}{Profile-likelihood CI data frame, or
+\code{NULL} until \code{\link{profile_sigma}} has been run.}
+\item{\code{diagnostics}}{List of diagnostic objects; see
+\code{\link{diagnostics}}.}
+\item{\code{next_run}}{List of recommended values for a follow-up fit.
+Includes \code{max_D} for the next \code{\link{kernel_prep}} call,
+optimized \code{start_sigma} values in map units, optional
+\code{start_shape} values for \code{kernel = "expow"}, and
+\code{start_par} on the internal scaled parameter space expected by
+\code{multiScale_optim}. \code{n_cores} is \code{NULL}; a conservative
+parallel worker-count suggestion is available on demand from
+\code{\link{estimate_multiscale_ram}} (it is no longer computed
+automatically, as that query can be slow and shells out to an external
+process).}
+\item{\code{warn_message}}{Integer vector of triggered warning codes:
+1 = max-distance, 2 = sigma precision, 3 = shape precision.}
+\item{\code{call}}{The matched call.}
+\item{\code{profile_fit}, \code{uncertainty}, \code{dispersion_est}}{Present
+for both analytic GLM backends. These retain transformed parameter estimates,
+starts and convergence scores, the profile and joint information
+matrices, identifiability diagnostics, and NB2 theta. The ordinary
+\code{opt_mod} and its coefficient summary condition on optimized kernel
+parameters. Use \code{\link{vcov.multiScaleR}} and
+\code{\link{predict.multiScaleR}} for joint uncertainty.}
+\item{\code{mixed_fit}}{For \code{joint_mixed}, retained kernel engine,
+log-scale estimates and bounds in internal distance units, independent
+starts, every start outcome and warning, selected-start index, and
+required prediction variables. \code{uncertainty$available} is
+\code{FALSE}; \code{next_run} and \code{opt_context} are \code{NULL}.}
 }
 }
 \description{
@@ -687,16 +687,16 @@ For complete choice sets with learned predictors such as
 fitted transformation attributes. Some survival versions drop those
 attributes when applying omission, even with complete data.
 
-When `start_strategy = "screen"` and `par` is left as `NULL`,
-`multiScale_optim()` first scouts the sigma space with one-dimensional
+When \code{start_strategy = "screen"} and \code{par} is left as \code{NULL},
+\code{multiScale_optim()} first scouts the sigma space with one-dimensional
 log-spaced scans, then optionally tests a few jittered starts using short,
 Hessian-free optimizations. The marginal sigma scans are serial, but the
-short screening attempts use `n_cores` when parallel optimization is
+short screening attempts use \code{n_cores} when parallel optimization is
 requested. These screening steps are used only to choose one starting vector
 for the single full optimization. On Windows, those parallel screening
 attempts use PSOCK workers, so the same PSOCK serialization guidance applies
 as in the full optimization. For reproducible screened starts, call
-`set.seed()` before `multiScale_optim()`.
+\code{set.seed()} before \code{multiScale_optim()}.
 }
 \examples{
 \donttest{

@@ -13,7 +13,7 @@
 }
 \value{
 A list of \code{ggplot} objects (one per covariate), returned
-  invisibly. Plots are printed as a side effect.
+invisibly. Plots are printed as a side effect.
 }
 \description{
 Plots the profiled log-likelihood or AICc across sigma values for each

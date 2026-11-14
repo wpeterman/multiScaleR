@@ -42,7 +42,7 @@
 #'   eligibility, including when stored vectors use a Gaussian approximation.
 #' @seealso \code{\link{.msr_spatial_scale_prepare}},
 #'   \code{\link{.msr_spatial_scale_plot}}, \code{\link{prediction_contract}}
-#' @keywords internal
+#' @noRd
 .msr_spatial_scale_summary <- function(object, newdata = NULL, level = .95,
     draws = NULL, scale = c("distance", "log"), summary = TRUE, seed = NULL) {
   if (!inherits(object, "msr_spatial_scale_prototype"))
@@ -110,7 +110,7 @@
 #'   All input rows are retained, including repeated coordinates. No new field
 #'   innovation, spatial interpolation, covariance repair or fit qualification
 #'   is introduced. Nonfinite colors cause an error rather than clipping.
-#' @keywords internal
+#' @noRd
 .msr_spatial_scale_plot <- function(object, newdata = NULL,
     statistic = c("median", "sd", "lower", "upper"), scale = c("distance", "log"),
     level = .95, draws = NULL, seed = NULL) {

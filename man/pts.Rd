@@ -6,7 +6,7 @@
 \format{
 An sf class point object:
 \describe{
-  \item{pts}{ --> spatial location of points}
+\item{pts}{ --> spatial location of points}
 }
 }
 \usage{

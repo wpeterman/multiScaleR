@@ -55,7 +55,7 @@
 #'   fixed; no annual effect or independent new-location innovation is added.
 #' @seealso \code{\link{diagnose_bayes_probabilities}},
 #'   \code{\link{.msr_spatial_scale_summary}}
-#' @keywords internal
+#' @noRd
 .msr_spatial_scale_probabilities <- function(object, thresholds, newdata = NULL,
     scale = c("distance", "log"), mcse_target = NULL) {
   if (!inherits(object, "msr_spatial_scale_prototype"))

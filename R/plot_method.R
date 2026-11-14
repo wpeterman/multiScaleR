@@ -80,6 +80,7 @@
 #'
 #' @importFrom cowplot theme_cowplot
 #' @importFrom ggplot2 aes annotate geom_line geom_vline ggplot xlab ylab theme_light geom_rect ggtitle
+#' @noMd
 plot.multiScaleR <- function(x,
                              dimension = c("2d", "1d"),
                              ...) {

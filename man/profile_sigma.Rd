@@ -57,14 +57,14 @@ supplied.}
 \value{
 A list of class \code{sigma_profile} containing:
 \describe{
-  \item{profiles}{A data frame with columns \code{variable}, \code{sigma},
-    \code{LL}, and \code{AICc}.}
-  \item{opt_sigma}{A named numeric vector of the optimized sigma for each
-    covariate.}
-  \item{metric}{The metric used for profiling.}
-  \item{spacing}{The profile grid type: \code{"log"}, \code{"linear"}, or
-    \code{"custom"}.}
-  \item{sigma_grid}{The sigma values evaluated for each covariate.}
+\item{profiles}{A data frame with columns \code{variable}, \code{sigma},
+\code{LL}, and \code{AICc}.}
+\item{opt_sigma}{A named numeric vector of the optimized sigma for each
+covariate.}
+\item{metric}{The metric used for profiling.}
+\item{spacing}{The profile grid type: \code{"log"}, \code{"linear"}, or
+\code{"custom"}.}
+\item{sigma_grid}{The sigma values evaluated for each covariate.}
 }
 }
 \description{

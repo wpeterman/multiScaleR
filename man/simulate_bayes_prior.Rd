@@ -19,27 +19,27 @@ caller's random-number state is restored, including when simulation fails.}
 }
 \value{
 A list with:
-  \describe{
-    \item{responses}{A data frame with the original observation rows and
-      one column per simulated dataset, named \code{sim_1}, \code{sim_2},
-      and so on. Gaussian responses use response units. Poisson and NB2
-      responses are counts. Binomial responses are success counts out of
-      the prepared trial totals.}
-    \item{means}{A data frame of matching expected responses. Binomial
-      values are success probabilities, not expected success counts;
-      multiply by the prepared trial totals for expected counts. Other
-      families use the response scale. Each mean conditions on its replicate's
-      prior parameter vector and excludes observation variation; it is not
-      an expectation integrated over the entire prior.}
-    \item{log_scales}{A named list, one matrix per landscape predictor.
-      Rows follow its distinct scale-formula combinations, labeled as in
-      \code{\link{posterior_scales}}; columns match the simulated datasets.
-      Entries are natural log distances in projected map units. Exponentiate
-      medians and interval limits for distance summaries.}
-    \item{observation_ids}{The prepared observation identities, in the same
-      order as the rows of \code{responses} and \code{means}.}
-    \item{priors}{The complete prior settings used.}
-  }
+\describe{
+\item{responses}{A data frame with the original observation rows and
+one column per simulated dataset, named \code{sim_1}, \code{sim_2},
+and so on. Gaussian responses use response units. Poisson and NB2
+responses are counts. Binomial responses are success counts out of
+the prepared trial totals.}
+\item{means}{A data frame of matching expected responses. Binomial
+values are success probabilities, not expected success counts;
+multiply by the prepared trial totals for expected counts. Other
+families use the response scale. Each mean conditions on its replicate's
+prior parameter vector and excludes observation variation; it is not
+an expectation integrated over the entire prior.}
+\item{log_scales}{A named list, one matrix per landscape predictor.
+Rows follow its distinct scale-formula combinations, labeled as in
+\code{\link{posterior_scales}}; columns match the simulated datasets.
+Entries are natural log distances in projected map units. Exponentiate
+medians and interval limits for distance summaries.}
+\item{observation_ids}{The prepared observation identities, in the same
+order as the rows of \code{responses} and \code{means}.}
+\item{priors}{The complete prior settings used.}
+}
 }
 \description{
 Check the implications of the complete model priors before fitting. Draw
@@ -48,26 +48,26 @@ prepared observations, including observation sampling variation.
 }
 \details{
 Each dataset uses one complete, independent prior parameter vector.
-  All observations in a group share that vector's group effect, retaining
-  the dependence specified by the scale and response formulas. Scale effects
-  and response effects are drawn separately, as specified by the model.
+All observations in a group share that vector's group effect, retaining
+the dependence specified by the scale and response formulas. Scale effects
+and response effects are drawn separately, as specified by the model.
 
-  Simulation conditions on the prepared maps, fixed covariates, offsets,
-  group identities, binomial trial totals and frozen predictor
-  standardization. It does not use observed response values, posterior
-  draws or likelihood weights. It does not generate new sites or years.
-  No optional Bayesian packages are required.
+Simulation conditions on the prepared maps, fixed covariates, offsets,
+group identities, binomial trial totals and frozen predictor
+standardization. It does not use observed response values, posterior
+draws or likelihood weights. It does not generate new sites or years.
+No optional Bayesian packages are required.
 
-  Compare replicated magnitudes, zero fractions and scale quantiles with
-  scientifically plausible ranges before fitting. Extreme predictions can
-  reveal a prior that is implausible for your design. They do not demonstrate
-  poor posterior fit or prescribe a prior automatically. Broad distance
-  priors can have infinite arithmetic moments; prefer log-scale summaries
-  and distance quantiles. Broad log-link response group-SD priors can also
-  permit infinite prior predictive count moments. A finite simulation does
-  not establish that an arithmetic mean over prior replicates exists.
-  Nonfinite calculations cause an informative error
-  identifying the replicate instead of clipping values or replacing a draw.
+Compare replicated magnitudes, zero fractions and scale quantiles with
+scientifically plausible ranges before fitting. Extreme predictions can
+reveal a prior that is implausible for your design. They do not demonstrate
+poor posterior fit or prescribe a prior automatically. Broad distance
+priors can have infinite arithmetic moments; prefer log-scale summaries
+and distance quantiles. Broad log-link response group-SD priors can also
+permit infinite prior predictive count moments. A finite simulation does
+not establish that an arithmetic mean over prior replicates exists.
+Nonfinite calculations cause an informative error
+identifying the replicate instead of clipping values or replacing a draw.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -83,6 +83,6 @@ exp(apply(prior$log_scales$habitat, 1, stats::quantile, c(.025, .5, .975)))
 }
 \seealso{
 \code{\link{multiScale_bayes}},
-  \code{\link{simulate.multiScaleR_bayes}},
-  \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
+\code{\link{simulate.multiScaleR_bayes}},
+\code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }

@@ -47,8 +47,8 @@ their existing CRS. Coordinates are never transformed or relabeled here.}
 }
 \value{
 A \code{multiScaleR_folds} list with analysis/assessment IDs and
-  \code{fold_info} metadata: CRS, units, grid/buffer controls, compact row,
-  block, group and fold assignments, and excluded training IDs per fold.
+\code{fold_info} metadata: CRS, units, grid/buffer controls, compact row,
+block, group and fold assignments, and excluded training IDs per fold.
 }
 \description{
 Assign whole projected grid blocks to assessment folds. Optional sampling
@@ -57,17 +57,17 @@ can exclude nearby training units without dropping assessment rows.
 }
 \details{
 Units are assigned largest first to balance row counts, with stable
-  ties and no random draws. Several disjoint blocks can share a fold; this
-  does not produce contiguous geographic regions. Buffers measure separation
-  between sampled points, not distances to entire cell boundaries. Whole-unit
-  exclusions can create a larger gap than requested. Distance calculations
-  use nearest-point indices and elementwise distances rather than a dense
-  training-by-assessment distance matrix.
+ties and no random draws. Several disjoint blocks can share a fold; this
+does not produce contiguous geographic regions. Buffers measure separation
+between sampled points, not distances to entire cell boundaries. Whole-unit
+exclusions can create a larger gap than requested. Distance calculations
+use nearest-point indices and elementwise distances rather than a dense
+training-by-assessment distance matrix.
 
 Choose block size, groups, buffer and the prediction target from the sampling
-  design and ecological question. A projected CRS and a distance buffer alone
-  do not establish independence or validate calibration. All rows are assessed
-  once; some can be absent from a training set because of the buffer.
+design and ecological question. A projected CRS and a distance buffer alone
+do not establish independence or validate calibration. All rows are assessed
+once; some can be absent from a training set because of the buffer.
 }
 \examples{
 xy <- cbind(x = rep(c(0, 100, 200), each = 2), y = rep(c(0, 10), 3))
@@ -75,5 +75,5 @@ spatial_cv_folds(xy, block_size = 50, k = 3, crs = 32617)
 }
 \seealso{
 \code{\link{grouped_cv_folds}}, \code{\link{cross_validate}},
-  \code{\link{cv_tab}}
+\code{\link{cv_tab}}
 }

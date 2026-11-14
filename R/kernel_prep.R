@@ -15,7 +15,7 @@
 #'   which is reserved for internal coordinate data.
 #' @param max_D Positive numeric. The maximum radius (in the same units as the
 #'   projection of \code{pts} and \code{raster_stack}) around each point to
-#'   sample from the raster. Should be at least 2–3 times the largest expected
+#'   sample from the raster. Should be at least 2 to 3 times the largest expected
 #'   sigma value. Raster layers must extend far enough beyond the points to
 #'   fully cover buffers of this radius.
 #' @param kernel Kernel function to be used for weighting raster values by
@@ -69,7 +69,7 @@
 #'   \code{d_list}/\code{raw_cov} data are retained. If \code{FALSE} and every
 #'   covariate is kernel-type (no landscape metrics) and \code{bin = TRUE}, the
 #'   cell-level data are dropped after binning, dramatically reducing the
-#'   object's memory footprint (often by 1–2 orders of magnitude). The binned
+#'   object's memory footprint (often by 1 to 2 orders of magnitude). The binned
 #'   summaries are sufficient to drive optimization, \code{\link{profile_sigma}},
 #'   and the final refit. Ignored (with a message) when landscape metrics are
 #'   present or \code{bin = FALSE}.
@@ -127,7 +127,7 @@
 #'
 #' The \code{max_D} buffer should be large enough to encompass the plausible
 #' range of the true scale of effect. A common rule of thumb is to set
-#' \code{max_D} to at least 2–3 times the largest expected sigma. After running
+#' \code{max_D} to at least 2 to 3 times the largest expected sigma. After running
 #' \code{\link{multiScale_optim}}, the \code{max_distance} diagnostic will warn
 #' if the estimated scale approaches \code{max_D}.
 #'

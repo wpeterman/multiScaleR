@@ -44,13 +44,13 @@ cannot account exactly for opaque native automatic-differentiation tapes.}
 }
 \value{
 A \code{multiScaleR_field_geometry} descriptor with schema version,
-  projected \code{crs} WKT, \code{units}, native \code{position} and
-  \code{group} column names, the fitted \code{group_value}/\code{group_levels},
-  \code{training_locations}/\code{training_rows} counts, \code{provider_version},
-  prediction controls \code{batch_size}/\code{max_memory_mb}, and SHA256
-  \code{reference_sha256}, \code{binding_sha256} and \code{definition_sha256}.
-  The hashes bind coordinate verification, fitted context and descriptor
-  contents respectively. Recreate the descriptor after changing its inputs.
+projected \code{crs} WKT, \code{units}, native \code{position} and
+\code{group} column names, the fitted \code{group_value}/\code{group_levels},
+\code{training_locations}/\code{training_rows} counts, \code{provider_version},
+prediction controls \code{batch_size}/\code{max_memory_mb}, and SHA256
+\code{reference_sha256}, \code{binding_sha256} and \code{definition_sha256}.
+The hashes bind coordinate verification, fitted context and descriptor
+contents respectively. Recreate the descriptor after changing its inputs.
 }
 \description{
 Verify the physical coordinates used by a fitted response field before making
@@ -59,44 +59,44 @@ hashes, without a model, coordinate array or prediction array.
 }
 \details{
 Supply this object as
-  \code{raster_args = list(field_geometry = geometry)} in
-  \code{predict.multiScaleR()}. Cells supply their own projected coordinates.
-  Their native position factor replaces any constant position scenario.
-  Every cell uses the verified shared field group. An inconsistent group
-  scenario fails rather than selecting another field. Prediction uses one
-  worker, with serial native sub-batches. No full-grid covariance is retained.
-  For previously unobserved positions, explicitly set
-  \code{native_args = list(allow.new.levels = TRUE)}. A missing or false
-  setting fails before that batch enters native prediction. Native warnings
-  from otherwise supported calls pass through unchanged.
+\code{raster_args = list(field_geometry = geometry)} in
+\code{predict.multiScaleR()}. Cells supply their own projected coordinates.
+Their native position factor replaces any constant position scenario.
+Every cell uses the verified shared field group. An inconsistent group
+scenario fails rather than selecting another field. Prediction uses one
+worker, with serial native sub-batches. No full-grid covariance is retained.
+For previously unobserved positions, explicitly set
+\code{native_args = list(allow.new.levels = TRUE)}. A missing or false
+setting fails before that batch enters native prediction. Native warnings
+from otherwise supported calls pass through unchanged.
 
-  Native GDR field maps use type = "lambda" and fixed-range numeric
-  projection at cell centers. They do not use glmmTMB's allow.new.levels
-  control. Their descriptor identifies provider, fixed range and target binding;
-  no native position factor or shared-group scenario is stored. Conditional
-  predictor SEs include full fitted covariance and separately identified
-  new-location field residual variance, with no observation or kernel noise.
+Native GDR field maps use type = "lambda" and fixed-range numeric
+projection at cell centers. They do not use glmmTMB's allow.new.levels
+control. Their descriptor identifies provider, fixed range and target binding;
+no native position factor or shared-group scenario is stored. Conditional
+predictor SEs include full fitted covariance and separately identified
+new-location field residual variance, with no observation or kernel noise.
 
-  Prepare ecological layers with \code{kernel_scale.raster()},
-  \code{scale_center = TRUE} and \code{match_buffer = TRUE}. Supply ordinary
-  site and offset scenarios as usual. Position/group scenarios can select
-  fitted levels during raster preparation. During prediction, the geometry
-  descriptor supplies cell-specific positions. Do not supply a constant
-  physical coordinate in place of this binding.
+Prepare ecological layers with \code{kernel_scale.raster()},
+\code{scale_center = TRUE} and \code{match_buffer = TRUE}. Supply ordinary
+site and offset scenarios as usual. Position/group scenarios can select
+fitted levels during raster preparation. During prediction, the geometry
+descriptor supplies cell-specific positions. Do not supply a constant
+physical coordinate in place of this binding.
 
-  Native mean-prediction SEs remain conditional on selected ecological kernel
-  scales. They do not add observation noise or kernel-scale uncertainty.
-  Binomial output keeps the native per-trial probability scale, including
-  when fitting grouped success/failure counts. Poisson/NB2 output is the
-  native expected count; Gaussian/Gamma output is the native response mean.
-  \code{re.form = NA} gives a zero-field reference, not integration over the
-  random field. Output retains fit and requested SE bands even if all cells
-  are NA. Multiple rows in \code{raster_args$const} produce one fit/SE band
-  pair per scenario row, in that order, with names made unique. Scenarios
-  are evaluated serially without a full-grid coordinate or scenario array.
-  Explicit \code{wopt$names} are retained. Cross-row covariance requires point predictions. Coordinate
-  verification does not establish recovery, calibrated intervals, spatial CV
-  scoring or eligibility for the guarded \code{joint_mixed} backend.
+Native mean-prediction SEs remain conditional on selected ecological kernel
+scales. They do not add observation noise or kernel-scale uncertainty.
+Binomial output keeps the native per-trial probability scale, including
+when fitting grouped success/failure counts. Poisson/NB2 output is the
+native expected count; Gaussian/Gamma output is the native response mean.
+\code{re.form = NA} gives a zero-field reference, not integration over the
+random field. Output retains fit and requested SE bands even if all cells
+are NA. Multiple rows in \code{raster_args$const} produce one fit/SE band
+pair per scenario row, in that order, with names made unique. Scenarios
+are evaluated serially without a full-grid coordinate or scenario array.
+Explicit \code{wopt$names} are retained. Cross-row covariance requires point predictions. Coordinate
+verification does not establish recovery, calibrated intervals, spatial CV
+scoring or eligibility for the guarded \code{joint_mixed} backend.
 }
 \examples{
 # After fitting a native response field, use its retained fitting rows:
@@ -107,5 +107,5 @@ Supply this object as
 }
 \seealso{
 \code{\link{predict.multiScaleR}}, \code{\link{kernel_scale.raster}},
-  \code{\link{prediction_contract}}
+\code{\link{prediction_contract}}
 }

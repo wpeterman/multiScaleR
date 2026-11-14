@@ -88,7 +88,7 @@
 #'   It provides no claim of interval calibration or detection of nonstationarity.
 #'   Use the dedicated private prediction adapter; public summaries/prediction
 #'   and scalar/one-SD integrators do not support Gaussian-block specifications.
-#' @keywords internal
+#' @noRd
 .msr_spatial_scale_prepare <- function(formula, inputs, data, scales = NULL,
     family = c("nbinom2", "poisson", "binomial", "gaussian"), row_id = NULL,
     priors = list(), covariate, coordinates, knots, range, field_sd_prior = NULL,

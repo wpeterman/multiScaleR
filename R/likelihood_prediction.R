@@ -91,7 +91,7 @@
 #'   Input checks verify numeric/source declarations, not scientific raster
 #'   provenance. A legacy input without source definitions is labeled explicitly.
 #' @rdname dot-msr_likelihood_point_snapshot
-#' @keywords internal
+#' @noRd
 .msr_likelihood_point_snapshot <- function(spec, parameters, newdata = NULL,
     kernel_inputs = NULL, training_inputs = NULL, row_id = NULL,
     method = c("laplace", "factorized"), scale_re.form = NULL, re.form = NULL,
@@ -149,6 +149,7 @@
 }
 
 #' @rdname dot-msr_likelihood_point_snapshot
+#' @noRd
 #' @param object For preparation, a numerically admitted private marginal or
 #'   factorized fit with its original selected start and zero-SD reduction.
 #'   For prediction, a snapshot returned by either preparer.
@@ -207,6 +208,7 @@
 }
 
 #' @rdname dot-msr_likelihood_point_snapshot
+#' @noRd
 #' @param quantity Output: "expected_response", "linear_predictor" or
 #'   "kernel_scale". Scales are in the retained model's map units.
 #' @param se.fit Must be FALSE. This snapshot has no qualified SE estimator.

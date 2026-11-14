@@ -120,64 +120,64 @@ SE convention. Other families reject it.}
 }
 \value{
 An object of class \code{multiScaleR_cv}, additionally inheriting
-  \code{multiScaleR_distribution_cv} for NB2/Gamma, a list containing:
-  \describe{
-    \item{\code{summary}}{Pooled scores with columns \code{metric},
-      \code{estimate}, scoring \code{unit}, planned \code{n_assessment},
-      \code{n_scored}, \code{weight_sum} and \code{complete}. Estimates are
-      \code{NA} if any planned fold fails.}
-    \item{\code{metrics}}{The same score columns per \code{fold}. RMSE is the
-      square root of pooled squared errors, not the average of fold RMSEs.}
-    \item{\code{predictions}}{Every planned assessment occurrence, including
-      failed folds: \code{fold}, \code{row_id}, \code{observed} response/count,
-      \code{trials}, response-scale \code{prediction}, frequency \code{weight},
-      \code{eligible} scoring flag and requested score columns. The \code{rmse}
-      column stores squared errors. Failed predictions/scores are \code{NA}.
-      NB2/Gamma add \code{distribution_family}, frozen training \code{theta}
-      or \code{dispersion}, and the existing joint-NB2 \code{poisson_limit}
-      flag. Inapplicable nuisance columns are \code{NA}.}
-    \item{\code{distribution}}{NB2/Gamma training distribution metadata per
-      fold: family, theta/dispersion, estimated/fixed convention, Poisson-limit
-      flag, native rank/K, log likelihood, effective nobs, deviance and weight
-      total. A failed training distribution may leave an element \code{NULL}.}
-    \item{\code{fold_results}}{Per-fold \code{fold}, \code{n_analysis},
-      \code{n_assessment} and \code{status} (\code{"scored"} or \code{"failed"}).}
-    \item{\code{folds}, \code{assessment_counts}}{The explicit split plan and
-      named counts of assessment occurrences for every input row, including
-      unassessed rows. Repeated assessment occurrences each enter pooled scores.}
-    \item{\code{training}}{Per-fold initial/fitted normalization,
-      coefficients on the link scale, scales in map units, unitless shapes,
-      frozen bin reference and optimizer/start
-      records when available. Failed preparation can leave an element empty.}
-    \item{\code{diagnostics}, \code{warnings}, \code{errors}}{Original scale-fit
-      diagnostics, initial/final GLM convergence metadata and captured messages
-      per fold. Failures are retained and never retried automatically.}
-    \item{\code{prediction_contracts}}{Existing prediction contracts per fold,
-      retaining the native conditioning and uncertainty distinctions.}
-    \item{\code{raster_groups}}{For grouped raster inputs, named fixed-map
-      labels for analysis/assessment IDs per fold, retained even on failure.
-      Otherwise \code{NULL}. These are input maps, not fitted random effects.}
-    \item{\code{targets}}{Compact used-row responses, trials and weights for
-      guarded comparison with \code{\link{cv_tab}}. Never used in fitting.}
-    \item{\code{selection_records}}{Native training likelihood, complete
-      parameter counts, effective row IDs, outcomes/trials/frequencies, formula
-      text, controls, diagnostics and metadata failures when
-      \code{keep_selection = TRUE}; otherwise \code{NULL}. These compact records
-      support \code{\link{select_cv}} without full fold models. Each record has
-      \code{version}, \code{controls}, \code{diagnostics}, metadata \code{warnings},
-      \code{data} and, on extraction failure, an \code{error} message.
-      Successful \code{data} contains \code{logLik} on the natural-log scale;
-      \code{native_K}, \code{ecological_K} and their total \code{K}; effective
-      \code{nobs} and \code{observation_ids}; analysis-row \code{targets};
-      \code{response_layout}, native likelihood \code{signature}, \code{formula}
-      text, \code{family} and \code{link}. These are provenance from the fit;
-      preserve them unchanged. Records cannot reconstruct native models.}
-    \item{\code{fits}}{Full fold fits when \code{keep_fits = TRUE}; otherwise
-      \code{NULL}. These fits use only their own training data.}
-    \item{\code{complete}, \code{settings}, \code{call}}{Whether all planned
-      folds were scored, family/backend/metric settings and the original call.
-      Completion does not certify diagnostic eligibility or calibration.}
-  }
+\code{multiScaleR_distribution_cv} for NB2/Gamma, a list containing:
+\describe{
+\item{\code{summary}}{Pooled scores with columns \code{metric},
+\code{estimate}, scoring \code{unit}, planned \code{n_assessment},
+\code{n_scored}, \code{weight_sum} and \code{complete}. Estimates are
+\code{NA} if any planned fold fails.}
+\item{\code{metrics}}{The same score columns per \code{fold}. RMSE is the
+square root of pooled squared errors, not the average of fold RMSEs.}
+\item{\code{predictions}}{Every planned assessment occurrence, including
+failed folds: \code{fold}, \code{row_id}, \code{observed} response/count,
+\code{trials}, response-scale \code{prediction}, frequency \code{weight},
+\code{eligible} scoring flag and requested score columns. The \code{rmse}
+column stores squared errors. Failed predictions/scores are \code{NA}.
+NB2/Gamma add \code{distribution_family}, frozen training \code{theta}
+or \code{dispersion}, and the existing joint-NB2 \code{poisson_limit}
+flag. Inapplicable nuisance columns are \code{NA}.}
+\item{\code{distribution}}{NB2/Gamma training distribution metadata per
+fold: family, theta/dispersion, estimated/fixed convention, Poisson-limit
+flag, native rank/K, log likelihood, effective nobs, deviance and weight
+total. A failed training distribution may leave an element \code{NULL}.}
+\item{\code{fold_results}}{Per-fold \code{fold}, \code{n_analysis},
+\code{n_assessment} and \code{status} (\code{"scored"} or \code{"failed"}).}
+\item{\code{folds}, \code{assessment_counts}}{The explicit split plan and
+named counts of assessment occurrences for every input row, including
+unassessed rows. Repeated assessment occurrences each enter pooled scores.}
+\item{\code{training}}{Per-fold initial/fitted normalization,
+coefficients on the link scale, scales in map units, unitless shapes,
+frozen bin reference and optimizer/start
+records when available. Failed preparation can leave an element empty.}
+\item{\code{diagnostics}, \code{warnings}, \code{errors}}{Original scale-fit
+diagnostics, initial/final GLM convergence metadata and captured messages
+per fold. Failures are retained and never retried automatically.}
+\item{\code{prediction_contracts}}{Existing prediction contracts per fold,
+retaining the native conditioning and uncertainty distinctions.}
+\item{\code{raster_groups}}{For grouped raster inputs, named fixed-map
+labels for analysis/assessment IDs per fold, retained even on failure.
+Otherwise \code{NULL}. These are input maps, not fitted random effects.}
+\item{\code{targets}}{Compact used-row responses, trials and weights for
+guarded comparison with \code{\link{cv_tab}}. Never used in fitting.}
+\item{\code{selection_records}}{Native training likelihood, complete
+parameter counts, effective row IDs, outcomes/trials/frequencies, formula
+text, controls, diagnostics and metadata failures when
+\code{keep_selection = TRUE}; otherwise \code{NULL}. These compact records
+support \code{\link{select_cv}} without full fold models. Each record has
+\code{version}, \code{controls}, \code{diagnostics}, metadata \code{warnings},
+\code{data} and, on extraction failure, an \code{error} message.
+Successful \code{data} contains \code{logLik} on the natural-log scale;
+\code{native_K}, \code{ecological_K} and their total \code{K}; effective
+\code{nobs} and \code{observation_ids}; analysis-row \code{targets};
+\code{response_layout}, native likelihood \code{signature}, \code{formula}
+text, \code{family} and \code{link}. These are provenance from the fit;
+preserve them unchanged. Records cannot reconstruct native models.}
+\item{\code{fits}}{Full fold fits when \code{keep_fits = TRUE}; otherwise
+\code{NULL}. These fits use only their own training data.}
+\item{\code{complete}, \code{settings}, \code{call}}{Whether all planned
+folds were scored, family/backend/metric settings and the original call.
+Completion does not certify diagnostic eligibility or calibration.}
+}
 }
 \description{
 Refit ecological scales and GLM coefficients using only each training set,
@@ -267,5 +267,5 @@ intersect(folds$first$analysis, folds$first$assessment) # no overlap
 }
 \seealso{
 \code{\link{kernel_prep}}, \code{\link{multiScale_optim}},
-  \code{\link{prepare_prediction}}, \code{\link{aic_tab}}
+\code{\link{prepare_prediction}}, \code{\link{aic_tab}}
 }

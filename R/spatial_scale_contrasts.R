@@ -47,7 +47,7 @@
 #'   model eligibility is introduced.
 #' @seealso \code{\link{.msr_spatial_scale_summary}},
 #'   \code{\link{prediction_contract}}
-#' @keywords internal
+#' @noRd
 .msr_spatial_scale_contrasts <- function(object, pairs, newdata = NULL,
     scale = c("log_ratio", "ratio"), level = .95, draws = NULL,
     summary = TRUE, seed = NULL) {

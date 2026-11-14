@@ -87,24 +87,24 @@ This adds no scale parameters or uncertainty.}
 }
 \value{
 With \code{summary = TRUE}, a data frame in the supplied observation
-  order containing \code{row}, \code{point_id}, \code{mean}, \code{median},
-  \code{sd}, \code{lower}, and \code{upper}. Otherwise a numeric matrix.
-  New-data summaries also include \code{new_scale_level} and
-  \code{new_response_level}, indicating unseen groups in included components.
-  New-data outputs have a \code{new_groups} attribute with \code{component},
-  \code{covariate}, \code{group}, \code{level} and \code{action}, recording
-  which new levels were sampled or fixed at zero.
-  Intervals describe uncertainty in expected responses or linear predictors;
-  they do not include a new observation's sampling variation. These are
-  marginal intervals for individual observations, not a simultaneous band.
-  When new effects are sampled, they also include variation among new groups.
-  The mean and SD are empirical draw summaries. A finite Monte Carlo result
-  does not establish that the corresponding posterior or new-group moment
-  exists; medians and quantiles are preferable for heavy-tailed predictions.
-  Summaries have a \code{prediction_contract} attribute describing the target,
-  included effects, uncertainty, and stored original-parameter map. Its
-  diagnostic status reports the fit's existing status; prediction does not
-  make a failed fit eligible. Raw draw matrices keep their existing attributes.
+order containing \code{row}, \code{point_id}, \code{mean}, \code{median},
+\code{sd}, \code{lower}, and \code{upper}. Otherwise a numeric matrix.
+New-data summaries also include \code{new_scale_level} and
+\code{new_response_level}, indicating unseen groups in included components.
+New-data outputs have a \code{new_groups} attribute with \code{component},
+\code{covariate}, \code{group}, \code{level} and \code{action}, recording
+which new levels were sampled or fixed at zero.
+Intervals describe uncertainty in expected responses or linear predictors;
+they do not include a new observation's sampling variation. These are
+marginal intervals for individual observations, not a simultaneous band.
+When new effects are sampled, they also include variation among new groups.
+The mean and SD are empirical draw summaries. A finite Monte Carlo result
+does not establish that the corresponding posterior or new-group moment
+exists; medians and quantiles are preferable for heavy-tailed predictions.
+Summaries have a \code{prediction_contract} attribute describing the target,
+included effects, uncertainty, and stored original-parameter map. Its
+diagnostic status reports the fit's existing status; prediction does not
+make a failed fit eligible. Raw draw matrices keep their existing attributes.
 }
 \description{
 Predict fitted or new-observation means using joint scale, coefficient,
@@ -113,48 +113,48 @@ about sampling their effects or fixing their deviations at zero.
 }
 \details{
 Fitting standardization, fixed-effect bases and contrasts are reused.
-  Fixed covariate learners \code{scale()}, \code{poly()}, \code{splines::ns()}
-  and \code{splines::bs()} retain their training definitions inside ordinary
-  expressions such as \code{I(scale(temp))} and transformed offsets. The same
-  constants apply to single rows, batches and coefficient effect curves.
-  For older fits, reconstructed calls must reproduce the retained training
-  formula values using original stored data; otherwise prediction stops.
-  Namespace-qualify custom functions with these learner names, or precompute
-  their predictors. Existing dynamic-kernel expression restrictions apply.
+Fixed covariate learners \code{scale()}, \code{poly()}, \code{splines::ns()}
+and \code{splines::bs()} retain their training definitions inside ordinary
+expressions such as \code{I(scale(temp))} and transformed offsets. The same
+constants apply to single rows, batches and coefficient effect curves.
+For older fits, reconstructed calls must reproduce the retained training
+formula values using original stored data; otherwise prediction stops.
+Namespace-qualify custom functions with these learner names, or precompute
+their predictors. Existing dynamic-kernel expression restrictions apply.
 
-  Prediction does not refit the model, learn a new scale reference or condition
-  on response values in \code{newdata}. An unseen fixed year factor remains an
-  error, even when random-effect sampling is enabled. A hierarchical response
-  year term or a scientifically justified numeric trend is needed for future
-  response years. Exchangeable annual effects alone impose no temporal trend
-  or autocorrelation. \code{\link{predict_scales}} can predict annual scales
-  separately when the response formula still contains fixed year effects.
+Prediction does not refit the model, learn a new scale reference or condition
+on response values in \code{newdata}. An unseen fixed year factor remains an
+error, even when random-effect sampling is enabled. A hierarchical response
+year term or a scientifically justified numeric trend is needed for future
+response years. Exchangeable annual effects alone impose no temporal trend
+or autocorrelation. \code{\link{predict_scales}} can predict annual scales
+separately when the response formula still contains fixed year effects.
 
-  Use one batch for joint predictions across rows. Within that batch, all
-  new observations in one grouping term and level share their new effect
-  for each posterior vector. Distinct terms and groups follow the model's
-  conditional independence, while joint posterior parameter dependence is
-  retained. Separate calls generate separate new effects; do not combine
-  independently generated batches to infer joint spatial or annual uncertainty.
+Use one batch for joint predictions across rows. Within that batch, all
+new observations in one grouping term and level share their new effect
+for each posterior vector. Distinct terms and groups follow the model's
+conditional independence, while joint posterior parameter dependence is
+retained. Separate calls generate separate new effects; do not combine
+independently generated batches to infer joint spatial or annual uncertainty.
 
-  Setting effects to zero is not integration over group variation. With a
-  nonlinear link or kernel, the two predictions generally differ. Grouping
-  columns used only by omitted components may be absent. New fixed-factor
-  levels are always rejected. Formula transforms must remain available in
-  base/stats or through explicit package namespaces; precompute caller-defined
-  transforms as covariate columns. Older fits without design metadata must
-  reproduce their stored training matrix before new predictions are allowed.
-  Prediction-aware bases such as \code{scale()} and \code{poly()} retain
-  their training definitions. Arbitrary expressions such as
-  \code{I(x - mean(x))} evaluate their mean on the new batch by R formula
-  rules; precompute with training constants when that is not intended.
+Setting effects to zero is not integration over group variation. With a
+nonlinear link or kernel, the two predictions generally differ. Grouping
+columns used only by omitted components may be absent. New fixed-factor
+levels are always rejected. Formula transforms must remain available in
+base/stats or through explicit package namespaces; precompute caller-defined
+transforms as covariate columns. Older fits without design metadata must
+reproduce their stored training matrix before new predictions are allowed.
+Prediction-aware bases such as \code{scale()} and \code{poly()} retain
+their training definitions. Arbitrary expressions such as
+\code{I(x - mean(x))} evaluate their mean on the new batch by R formula
+rules; precompute with training constants when that is not intended.
 
-  New kernels use the neighborhoods actually prepared. Larger predicted
-  scales cannot recover missing distant landscape cells. The method uses
-  stored joint draws, including resamples from corrected fits, and does not
-  validate failed fit diagnostics. Nonfinite new predictions cause an error
-  without clipping or replacing draws. Large draws-by-observations matrices
-  require memory; \code{draws} reduces size at a cost in simulation precision.
+New kernels use the neighborhoods actually prepared. Larger predicted
+scales cannot recover missing distant landscape cells. The method uses
+stored joint draws, including resamples from corrected fits, and does not
+validate failed fit diagnostics. Nonfinite new predictions cause an error
+without clipping or replacing draws. Large draws-by-observations matrices
+require memory; \code{draws} reduces size at a cost in simulation precision.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -173,7 +173,7 @@ predict(fit, new_surveys, kernel_inputs = example$inputs,
 }
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
-  \code{\link{prediction_contract}},
-  \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
-  \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
+\code{\link{prediction_contract}},
+\code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
+\code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 }

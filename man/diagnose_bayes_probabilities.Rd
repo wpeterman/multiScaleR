@@ -35,32 +35,32 @@ The default \code{NULL} reports precision without judging a target.}
 }
 \value{
 A list containing:
-  \describe{
-    \item{available, reason}{Whether original chains could be read, and an
-      explanation when unavailable. Individual events can have unavailable
-      precision even when the chain report is available.}
-    \item{raw_diagnostics}{The fit's original diagnostics, unchanged.}
-    \item{probabilities}{A data frame with \code{covariate}, \code{group}, and
-      representative fitted \code{row}; the supplied \code{threshold} and
-      \code{threshold_scale}; estimated event probability \code{estimate};
-      indicator \code{mcse}, \code{ess_mean}, and \code{rhat}; \code{constant},
-      \code{precision_available}, \code{precision_target_met}, and \code{reason}.
-      Mean precision requires finite positive MCSE and mean ESS. Separate
-      \code{rhat_available} and \code{rhat_reason} fields describe indicator
-      Rhat availability without changing the fit's original diagnostic gates.
-      The event includes equality: kernel scale is less than or equal to the
-      threshold. Probability estimates and MCSE use the probability axis.
-      Undefined diagnostics and unrequested target decisions remain \code{NA}.}
-    \item{chain_probabilities}{The same event identifiers plus \code{chain},
-      its empirical probability \code{estimate}, and whether its indicator
-      is \code{constant}. This retains chain differences without storing draws.}
-    \item{chains, iterations}{Numbers of original chains and post-warmup
-      iterations per chain, or \code{NA} when unavailable.}
-    \item{mcse_target, event, notes}{The requested precision target, event
-      definition, and interpretation limits.}
-    \item{metadata_establishes_eligibility}{Always \code{FALSE}. This report
-      does not change the fit's sampling or derived-scale diagnostic gates.}
-  }
+\describe{
+\item{available, reason}{Whether original chains could be read, and an
+explanation when unavailable. Individual events can have unavailable
+precision even when the chain report is available.}
+\item{raw_diagnostics}{The fit's original diagnostics, unchanged.}
+\item{probabilities}{A data frame with \code{covariate}, \code{group}, and
+representative fitted \code{row}; the supplied \code{threshold} and
+\code{threshold_scale}; estimated event probability \code{estimate};
+indicator \code{mcse}, \code{ess_mean}, and \code{rhat}; \code{constant},
+\code{precision_available}, \code{precision_target_met}, and \code{reason}.
+Mean precision requires finite positive MCSE and mean ESS. Separate
+\code{rhat_available} and \code{rhat_reason} fields describe indicator
+Rhat availability without changing the fit's original diagnostic gates.
+The event includes equality: kernel scale is less than or equal to the
+threshold. Probability estimates and MCSE use the probability axis.
+Undefined diagnostics and unrequested target decisions remain \code{NA}.}
+\item{chain_probabilities}{The same event identifiers plus \code{chain},
+its empirical probability \code{estimate}, and whether its indicator
+is \code{constant}. This retains chain differences without storing draws.}
+\item{chains, iterations}{Numbers of original chains and post-warmup
+iterations per chain, or \code{NA} when unavailable.}
+\item{mcse_target, event, notes}{The requested precision target, event
+definition, and interpretation limits.}
+\item{metadata_establishes_eligibility}{Always \code{FALSE}. This report
+does not change the fit's sampling or derived-scale diagnostic gates.}
+}
 }
 \description{
 Estimate probabilities that fitted kernel scales fall below specified
@@ -68,32 +68,32 @@ thresholds, and diagnose their simulation precision using the original chains.
 }
 \details{
 Each event is evaluated on fitted log scales in map units, avoiding
-  overflow from exponentiating distances. The \code{posterior} package
-  computes mean ESS, MCSE and rank-normalized Rhat of the binary indicators.
-  At least two chains with four retained iterations each are required for
-  precision diagnostics. Constant indicators have nonestimable precision,
-  even when their empirical probability is zero or one. Nonfinite derived
-  log scales remain explicit failures; iterations are never dropped.
+overflow from exponentiating distances. The \code{posterior} package
+computes mean ESS, MCSE and rank-normalized Rhat of the binary indicators.
+At least two chains with four retained iterations each are required for
+precision diagnostics. Constant indicators have nonestimable precision,
+even when their empirical probability is zero or one. Nonfinite derived
+log scales remain explicit failures; iterations are never dropped.
 
-  Indicator Rhat can be undefined for balanced binary events even when mean
-  ESS and MCSE are finite. Its reported value remains \code{NA}, with an
-  explicit availability flag and reason. This alone does not make mean
-  precision unavailable. Inspect the original and derived-scale mixing
-  diagnostics before interpreting a probability's MCSE.
+Indicator Rhat can be undefined for balanced binary events even when mean
+ESS and MCSE are finite. Its reported value remains \code{NA}, with an
+explicit availability flag and reason. This alone does not make mean
+precision unavailable. Inspect the original and derived-scale mixing
+diagnostics before interpreting a probability's MCSE.
 
-  MCSE describes computational uncertainty in a probability estimate, not
-  posterior uncertainty about the scale or observation sampling variation.
-  \code{precision_target_met} only compares that MCSE with the requested
-  target. It does not override Rhat, ESS, raw sampler diagnostics, or model
-  checks. A small estimated MCSE cannot rule out an unvisited tail or mode.
-  Read \code{\link{diagnose_bayes_scales}} alongside this report and compare
-  independent runs when consequential probabilities remain uncertain.
+MCSE describes computational uncertainty in a probability estimate, not
+posterior uncertainty about the scale or observation sampling variation.
+\code{precision_target_met} only compares that MCSE with the requested
+target. It does not override Rhat, ESS, raw sampler diagnostics, or model
+checks. A small estimated MCSE cannot rule out an unvisited tail or mode.
+Read \code{\link{diagnose_bayes_scales}} alongside this report and compare
+independent runs when consequential probabilities remain uncertain.
 
-  The function does not fit a model, change priors, simulate future groups,
-  or use stored importance candidates as MCMC chains. Private Gaussian
-  projection blocks require a dedicated diagnostic adapter. Reading a full
-  retained sampler can require substantial memory; the returned report keeps
-  only summaries and retains neither a sampler nor chain arrays.
+The function does not fit a model, change priors, simulate future groups,
+or use stored importance candidates as MCMC chains. Private Gaussian
+projection blocks require a dedicated diagnostic adapter. Reading a full
+retained sampler can require substantial memory; the returned report keeps
+only summaries and retains neither a sampler nor chain arrays.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -105,5 +105,5 @@ report$reason
 }
 \seealso{
 \code{\link{diagnose_bayes_scales}},
-  \code{\link{posterior_scales}}, \code{\link{predict_scales}}
+\code{\link{posterior_scales}}, \code{\link{predict_scales}}
 }

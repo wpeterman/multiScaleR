@@ -32,12 +32,12 @@ processx for fitting methods. Preparation uses one process.}
 }
 \value{
 A \code{multiScaleR_bayes_setup} list with \code{method},
-  \code{correction}, \code{ready} (whether package checks passed),
-  \code{packages} (a data frame with \code{package}, \code{minimum},
-  installed \code{version}, \code{loadable}, \code{meets_version},
-  \code{passed}, and a diagnostic \code{message}), and \code{notes}.
-  A passed check does not certify a working compiler, successful sampling,
-  convergence, or adequate memory. Fit a small model next.
+\code{correction}, \code{ready} (whether package checks passed),
+\code{packages} (a data frame with \code{package}, \code{minimum},
+installed \code{version}, \code{loadable}, \code{meets_version},
+\code{passed}, and a diagnostic \code{message}), and \code{notes}.
+A passed check does not certify a working compiler, successful sampling,
+convergence, or adequate memory. Fit a small model next.
 }
 \description{
 Check whether the R packages needed by a Bayesian inference method can be
@@ -46,9 +46,9 @@ model is fitted, and compiler or sampling performance is not tested.
 }
 \details{
 Preparation can validate your data and formulas before installing
-  sampling software. For installation instructions, including Windows
-  toolchain guidance, see
-  \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
+sampling software. For installation instructions, including Windows
+toolchain guidance, see
+\code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }
 \examples{
 check_bayes_setup(method = "prepare")

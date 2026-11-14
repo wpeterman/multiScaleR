@@ -97,7 +97,7 @@
 #'   a confidence cutoff, p-value, calibrated interval or global-optimum proof.
 #'   Rejected fits and limiting witnesses cannot be promoted by this comparison.
 #' @seealso \code{\link{.msr_factorized_response_sd_profile}}
-#' @keywords internal
+#' @noRd
 .msr_factorized_response_sd_statistic <- function(spec, sd, control = list(),
     initial_parameters = list()) {
   profile <- .msr_factorized_response_sd_profile(spec, sd, control, initial_parameters)

@@ -34,17 +34,17 @@ console. Default: \code{FALSE}.}
 A data frame of class \code{"aictab"} (from the \code{AICcmodavg}
 package) sorted by ascending AIC(c), containing:
 \describe{
-  \item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
-  \item{\code{K}}{Number of fitted likelihood parameters, including
-    ancillary parameters such as negative-binomial dispersion (or native
-    effective degrees of freedom for GAMs), plus optimized
-    scale and shape parameters for \code{multiScaleR} models.}
-  \item{\code{AICc} or \code{AIC}}{Information criterion value.}
-  \item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}
-  \item{\code{ModelLik}}{Relative likelihood (\code{exp(-0.5 * Delta)}).}
-  \item{\code{AICcWt} or \code{AICWt}}{Akaike weight.}
-  \item{\code{LL}}{Log-likelihood.}
-  \item{\code{Cum.Wt}}{Cumulative Akaike weight.}
+\item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
+\item{\code{K}}{Number of fitted likelihood parameters, including
+ancillary parameters such as negative-binomial dispersion (or native
+effective degrees of freedom for GAMs), plus optimized
+scale and shape parameters for \code{multiScaleR} models.}
+\item{\code{AICc} or \code{AIC}}{Information criterion value.}
+\item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}
+\item{\code{ModelLik}}{Relative likelihood (\code{exp(-0.5 * Delta)}).}
+\item{\code{AICcWt} or \code{AICWt}}{Akaike weight.}
+\item{\code{LL}}{Log-likelihood.}
+\item{\code{Cum.Wt}}{Cumulative Akaike weight.}
 }
 }
 \description{

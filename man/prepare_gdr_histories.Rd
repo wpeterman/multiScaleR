@@ -40,82 +40,82 @@ surveyed events with no recorded individuals. Keys must be unique.}
 both key tables. Compound identifiers are supported.}
 
 \item{individual_id}{Character vector naming individual identifier columns
-in `history_keys`. The event/individual combination must be unique.}
+in \code{history_keys}. The event/individual combination must be unique.}
 
-\item{cell_map}{Data frame with `column`, `interval` and `distance_bin`.
+\item{cell_map}{Data frame with \code{column}, \code{interval} and \code{distance_bin}.
 It must map every named history column to exactly one source distance/time
 cell. Interval and distance indices are positive integers. Input columns
 may have any order; the complete rectangular source layout is required.}
 
 \item{dist_breaks}{Increasing numeric source distance boundaries, beginning
-at zero, in `units_in`. Only the final boundary may be infinite. Retain
+at zero, in \code{units_in}. Only the final boundary may be infinite. Retain
 outside-radius bins here when they occur in the original records.}
 
-\item{radius}{Positive finite survey radius in `units_in`, equal to a source
+\item{radius}{Positive finite survey radius in \code{units_in}, equal to a source
 distance boundary. Bins cannot be split without finer source measurements.}
 
 \item{interval_lengths}{Positive integer native removal durations, one per
-interval, measured in `interval_units`. Unequal durations are supported.}
+interval, measured in \code{interval_units}. Unequal durations are supported.}
 
-\item{interval_units}{Nonempty time-unit label, such as `"seconds"`.
+\item{interval_units}{Nonempty time-unit label, such as \code{"seconds"}.
 Values are recorded without conversion.}
 
-\item{units_in}{Source distance units, `"m"` or `"km"`.}
+\item{units_in}{Source distance units, \code{"m"} or \code{"km"}.}
 
-\item{surveyed}{Complete logical vector in event order. Supply `TRUE` for
-completed surveys and `FALSE` for unsurveyed events. There is no default
+\item{surveyed}{Complete logical vector in event order. Supply \code{TRUE} for
+completed surveys and \code{FALSE} for unsurveyed events. There is no default
 assumption about survey effort. A positive mark at an unsurveyed event
 raises an error.}
 
 \item{expected_event_keys}{Optional independent event mapping in intended
-order. It must contain the `event_id` columns. This detects mapping drift;
+order. It must contain the \code{event_id} columns. This detects mapping drift;
 a supplied key table cannot prove its own alignment.}
 
-\item{native_frame}{Optional existing single-primary `unmarkedFrameGDR`.
+\item{native_frame}{Optional existing single-primary \code{unmarkedFrameGDR}.
 Its two margins, inherited response, finite distance geometry, units and
 durations must match the prepared response. The original survey audit is
 returned. This argument validates data and never evaluates saved callbacks.}
 
-\item{x}{Prepared `msr_gdr_histories` data to print.}
+\item{x}{Prepared \code{msr_gdr_histories} data to print.}
 
 \item{...}{Unused.}
 }
 \value{
-A list of class `msr_gdr_histories` with:
-  \itemize{
-    \item `histories`, `history_keys`, `event_keys` and `cell_map`: unchanged
-      source values, order, identifiers and attributes.
-    \item `native_cells`: the in-radius cell map in distance-major then
-      interval order. Rows correspond to columns of `first_cells`.
-    \item `first`: original `.history_row`, matched `.event`, earliest known
-      positive `candidate_interval`, unambiguous `first_interval` and
-      `first_distance_bin`, `primary_eligible`, `history_complete`,
-      `complete_history_eligible`, and the explicit preparation `status`.
-      `history_complete` requires complete binary cells and a unique distance
-      state per interval; it is not a judgment that other source marks are
-      biological errors.
-      Eligibility here concerns data layout, not a fitted model.
-    \item `events`: `.event`, `surveyed`, `response_complete`,
-      `known_first_records` and `unresolved_first_histories` in event order.
-      Counts of known records remain available even in quarantined events.
-    \item `findings`: `.history_row`, `.cell`, `.column`, `interval`,
-      `distance_bin`, `code` and original numeric `value`. History-level
-      findings have missing cell/value fields. No source row is deleted.
-    \item `first_cells`, `yDistance`, `yRemoval`: paired first-cell counts
-      and their exact two margins. Unsurveyed events and events with an
-      unresolved first encounter have fully missing response rows; completed
-      surveys with no eligible records have observed zero rows.
-    \item `protocol`: original and finite-circle geometry, distance/time
-      units, durations, one-primary layout, response conventions and
-      preparation scope. No biological target population is inferred.
-    \item `surveyed`: the original effort-status vector; `survey_audit`:
-      optional native audit; `fingerprint`: SHA256 of source inputs and
-      protocol; `summary`: history/event, retained and unresolved counts.
-    \item `fit_eligibility_established` and
-      `density_identification_established`: always `FALSE`.
-  }
-  Printing reports these preparation counts and returns the object invisibly.
-  Structural errors carry the implicated `history_rows` when recoverable.
+A list of class \code{msr_gdr_histories} with:
+\itemize{
+\item \code{histories}, \code{history_keys}, \code{event_keys} and \code{cell_map}: unchanged
+source values, order, identifiers and attributes.
+\item \code{native_cells}: the in-radius cell map in distance-major then
+interval order. Rows correspond to columns of \code{first_cells}.
+\item \code{first}: original \code{.history_row}, matched \code{.event}, earliest known
+positive \code{candidate_interval}, unambiguous \code{first_interval} and
+\code{first_distance_bin}, \code{primary_eligible}, \code{history_complete},
+\code{complete_history_eligible}, and the explicit preparation \code{status}.
+\code{history_complete} requires complete binary cells and a unique distance
+state per interval; it is not a judgment that other source marks are
+biological errors.
+Eligibility here concerns data layout, not a fitted model.
+\item \code{events}: \code{.event}, \code{surveyed}, \code{response_complete},
+\code{known_first_records} and \code{unresolved_first_histories} in event order.
+Counts of known records remain available even in quarantined events.
+\item \code{findings}: \code{.history_row}, \code{.cell}, \code{.column}, \code{interval},
+\code{distance_bin}, \code{code} and original numeric \code{value}. History-level
+findings have missing cell/value fields. No source row is deleted.
+\item \code{first_cells}, \code{yDistance}, \code{yRemoval}: paired first-cell counts
+and their exact two margins. Unsurveyed events and events with an
+unresolved first encounter have fully missing response rows; completed
+surveys with no eligible records have observed zero rows.
+\item \code{protocol}: original and finite-circle geometry, distance/time
+units, durations, one-primary layout, response conventions and
+preparation scope. No biological target population is inferred.
+\item \code{surveyed}: the original effort-status vector; \code{survey_audit}:
+optional native audit; \code{fingerprint}: SHA256 of source inputs and
+protocol; \code{summary}: history/event, retained and unresolved counts.
+\item \code{fit_eligibility_established} and
+\code{density_identification_established}: always \code{FALSE}.
+}
+Printing reports these preparation counts and returns the object invisibly.
+Structural errors carry the implicated \code{history_rows} when recoverable.
 }
 \description{
 Retain original bird histories while deriving paired first-distance/time
@@ -123,26 +123,26 @@ cells and native GDR margins from the first encounter across all distances.
 }
 \details{
 Determine first encounters before truncating distance. A bird first recorded
-  outside the radius remains outside the primary response even if a later
-  mark is near the point. Multiple positive distance cells in one interval
-  do not determine a unique state for this binned layout. They are retained
-  for adjudication and never collapsed into a single distance. Such marks
-  may require a different movement or recording model. If earlier or
-  first-band marks make the first encounter ambiguous, the event's aggregate
-  response is missing pending adjudication, rather than a partial zero count.
+outside the radius remains outside the primary response even if a later
+mark is near the point. Multiple positive distance cells in one interval
+do not determine a unique state for this binned layout. They are retained
+for adjudication and never collapsed into a single distance. Such marks
+may require a different movement or recording model. If earlier or
+first-band marks make the first encounter ambiguous, the event's aggregate
+response is missing pending adjudication, rather than a partial zero count.
 
 A uniquely known in-radius first encounter is retained when only later marks
-  are malformed. That history is excluded from the complete-history subset.
-  Complete histories of the primary cohort and native first-time margins are
-  different responses. Their likelihood constants and conditioning differ.
-  Keep re-detections and original outside-radius cells for separate analyses;
-  within-count bands are not independent primary visits.
+are malformed. That history is excluded from the complete-history subset.
+Complete histories of the primary cohort and native first-time margins are
+different responses. Their likelihood constants and conditioning differ.
+Keep re-detections and original outside-radius cells for separate analyses;
+within-count bands are not independent primary visits.
 
 No source correction, probability model, density correction, parameter,
-  prior, model-selection admission or uncertainty procedure is added. Empty
-  linked histories do not establish the size of an unobserved population.
-  Native geometry comparisons convert meters/kilometers to meters only in
-  the comparison copy; inputs and native objects remain unchanged.
+prior, model-selection admission or uncertainty procedure is added. Empty
+linked histories do not establish the size of an unobserved population.
+Native geometry comparisons convert meters/kilometers to meters only in
+the comparison copy; inputs and native objects remain unchanged.
 }
 \examples{
 map <- expand.grid(interval = 1:2, distance_bin = 1:3)
@@ -161,5 +161,5 @@ prepared$first
 prepared$yRemoval
 }
 \seealso{
-[validate_unmarked_data()], [prepare_gdr_intervals()]
+\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}, \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}
 }

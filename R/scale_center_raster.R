@@ -8,7 +8,7 @@
 #' @param pct_mx Numeric greater than -0.5 and no larger than 0.99. If `clamp` is `TRUE`, each clamping limit moves outward by `pct_mx` times the observed range of that covariate at the survey points: `lower = min - pct_mx * (max - min)` and `upper = max + pct_mx * (max - min)`. For example, a covariate observed from -1 to 3 is clamped to -1.4 and 3.4 with `pct_mx = 0.1`, and to -0.6 and 2.6 with `pct_mx = -0.1`. Default = 0 (the observed range).
 #'
 #' @return A `terra::SpatRaster` with each layer scaled and optionally clamped.
-#' @keywords internal
+#' @noRd
 scale_center_raster <- function(r,
                                 multiScaleR,
                                 clamp = FALSE,

@@ -256,7 +256,7 @@
 #'   SD, and is \code{NULL} for Poisson and binomial models. Scale-group SDs
 #'   measure population variation in log distance; response-group SDs use the
 #'   response link scale. They are not annual-scale standard errors.
-#'   Summary intervals are marginal central 95\% intervals for individual
+#'   Summary intervals are marginal central 95% intervals for individual
 #'   quantities. The stored sampler flag checks raw parameters and sampler
 #'   behavior. It does not replace \code{\link{diagnose_bayes_scales}} or a
 #'   posterior predictive assessment. For importance fits, the scale table in

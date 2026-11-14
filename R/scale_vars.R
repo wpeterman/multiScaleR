@@ -361,6 +361,7 @@
 #'
 #' @rdname msr_vars
 #' @export
+#' @noMd
 msr_vars <- function(...) {
   specs <- list(...)
   if (length(specs) == 0) {

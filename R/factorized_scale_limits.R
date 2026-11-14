@@ -350,7 +350,7 @@
 #'   a witness do not establish global identification. This operation supplies
 #'   no intervals, posterior inference, new parameter count, or finite scale.
 #'   Priors remain excluded. Original fitting and constructor guards remain.
-#' @keywords internal
+#' @noRd
 .msr_factorized_limit_component_audit <- function(spec, parameters, candidate_nll) {
   .msr_factorized_limit_component_validate(spec)
   if (!is.numeric(candidate_nll) || is.complex(candidate_nll) ||

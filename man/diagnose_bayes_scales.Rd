@@ -18,32 +18,32 @@ whose simulation error is reported, not any diagnostic threshold.}
 }
 \value{
 A list with the following components:
-  \describe{
-    \item{available, reason}{Whether full chain diagnostics could be computed
-      and an explanation when they are unavailable.}
-    \item{raw_diagnostics}{The original, unchanged sampler or approximation
-      diagnostics stored in the fit.}
-    \item{parameters}{A data frame identifying each derived \code{variable},
-      \code{quantity}, landscape \code{covariate}, \code{group}, representative
-      observation \code{row}, and \code{units}, followed by \code{rhat},
-      \code{ess_bulk}, and \code{ess_tail}. Quantities are \code{log_distance},
-      \code{scale_group_sd}, and \code{response_group_sd}.}
-    \item{quantiles}{A data frame with the same identifying columns plus
-      \code{probability}, \code{estimate}, and \code{mcse}, the estimated Monte
-      Carlo standard error of that quantile. Both estimate and MCSE use the
-      stated units. Undefined diagnostics remain \code{NA}.}
-    \item{chains, iterations}{Actual numbers of retained chains and
-      post-warmup iterations per chain, or \code{NA} when unavailable.}
-    \item{derived_passed}{Whether at least two chains, Rhat no greater than
-      1.01, and bulk and tail effective sample sizes of at least 100 per
-      chain hold for every derived quantity. \code{NA} when unavailable.}
-    \item{passed}{Whether both the original sampler checks and the derived
-      checks passed. \code{NA} when derived diagnostics are unavailable.
-      For slice fits sampled without posterior installed, the original
-      parameter checks are computed from the stored chains. The fit's
-      stored diagnostics stay as recorded at fitting.}
-    \item{criteria, notes}{The fixed derived checks and their limitations.}
-  }
+\describe{
+\item{available, reason}{Whether full chain diagnostics could be computed
+and an explanation when they are unavailable.}
+\item{raw_diagnostics}{The original, unchanged sampler or approximation
+diagnostics stored in the fit.}
+\item{parameters}{A data frame identifying each derived \code{variable},
+\code{quantity}, landscape \code{covariate}, \code{group}, representative
+observation \code{row}, and \code{units}, followed by \code{rhat},
+\code{ess_bulk}, and \code{ess_tail}. Quantities are \code{log_distance},
+\code{scale_group_sd}, and \code{response_group_sd}.}
+\item{quantiles}{A data frame with the same identifying columns plus
+\code{probability}, \code{estimate}, and \code{mcse}, the estimated Monte
+Carlo standard error of that quantile. Both estimate and MCSE use the
+stated units. Undefined diagnostics remain \code{NA}.}
+\item{chains, iterations}{Actual numbers of retained chains and
+post-warmup iterations per chain, or \code{NA} when unavailable.}
+\item{derived_passed}{Whether at least two chains, Rhat no greater than
+1.01, and bulk and tail effective sample sizes of at least 100 per
+chain hold for every derived quantity. \code{NA} when unavailable.}
+\item{passed}{Whether both the original sampler checks and the derived
+checks passed. \code{NA} when derived diagnostics are unavailable.
+For slice fits sampled without posterior installed, the original
+parameter checks are computed from the stored chains. The fit's
+stored diagnostics stay as recorded at fitting.}
+\item{criteria, notes}{The fixed derived checks and their limitations.}
+}
 }
 \description{
 Check chain mixing and simulation precision for fitted log distances and
@@ -52,27 +52,27 @@ individual coefficients checked by the original sampler diagnostics.
 }
 \details{
 Landscape distances are diagnosed on the natural log axis in map
-  units, avoiding overflow and the potentially infinite arithmetic distance
-  moments permitted by the hierarchical priors. Exponentiate an estimated
-  log-distance quantile to express it in map units. Its MCSE is on the log
-  axis; it is computational uncertainty, not a posterior interval or a
-  biological SD. Scale-group SDs measure population variation in log
-  distance. Response-group SDs use the response linear-predictor axis.
+units, avoiding overflow and the potentially infinite arithmetic distance
+moments permitted by the hierarchical priors. Exponentiate an estimated
+log-distance quantile to express it in map units. Its MCSE is on the log
+axis; it is computational uncertainty, not a posterior interval or a
+biological SD. Scale-group SDs measure population variation in log
+distance. Response-group SDs use the response linear-predictor axis.
 
-  The function uses \code{posterior} for rank-normalized Rhat, effective
-  sample sizes, and quantile MCSE. A passed screen does not guarantee a
-  precise tail endpoint or discovery of every mode. Compare MCSE with the
-  precision your scientific decision needs, inspect independent runs when
-  tails matter, and assess the likelihood and priors separately.
+The function uses \code{posterior} for rank-normalized Rhat, effective
+sample sizes, and quantile MCSE. A passed screen does not guarantee a
+precise tail endpoint or discovery of every mode. Compare MCSE with the
+precision your scientific decision needs, inspect independent runs when
+tails matter, and assess the likelihood and priors separately.
 
-  Permuted or thinned stored draws do not reconstruct the original chain
-  order or full-chain precision. Compact examples therefore retain their
-  original diagnostic evidence but cannot provide new chain diagnostics.
-  For chain plots in bayesplot, use \code{fit$chains} for a slice fit or
-  \code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
-  for a NUTS fit. The scale vignette shows trace, rank, and density plots
-  alongside the derived diagnostics. Use the stored numerical checks for
-  Laplace draws and weighted importance candidates.
+Permuted or thinned stored draws do not reconstruct the original chain
+order or full-chain precision. Compact examples therefore retain their
+original diagnostic evidence but cannot provide new chain diagnostics.
+For chain plots in bayesplot, use \code{fit$chains} for a slice fit or
+\code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
+for a NUTS fit. The scale vignette shows trace, rank, and density plots
+alongside the derived diagnostics. Use the stored numerical checks for
+Laplace draws and weighted importance candidates.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -83,6 +83,6 @@ report$reason
 }
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
-  \code{\link{plot.multiScaleR_bayes}}, \code{\link{diagnose_bayes_probabilities}},
-  and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
+\code{\link{plot.multiScaleR_bayes}}, \code{\link{diagnose_bayes_probabilities}},
+and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }

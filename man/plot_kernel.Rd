@@ -34,14 +34,14 @@ range is 1 to 50. Ignored for all other kernel types. Default: \code{NULL}.}
 
 \item{kernel}{Character. The kernel function to visualize. One of:
 \describe{
-  \item{\code{"gaussian"}}{Gaussian (normal) decay; weights follow a
-    half-normal density with standard deviation \code{sigma}.}
-  \item{\code{"exp"}}{Negative exponential decay; weights follow
-    \code{exp(-d / sigma)}.}
-  \item{\code{"fixed"}}{Fixed-radius step function; all distances up to
-    \code{sigma} receive equal weight.}
-  \item{\code{"expow"}}{Exponential power kernel parameterized by
-    \code{sigma} and \code{shape}.}
+\item{\code{"gaussian"}}{Gaussian (normal) decay; weights follow a
+half-normal density with standard deviation \code{sigma}.}
+\item{\code{"exp"}}{Negative exponential decay; weights follow
+\code{exp(-d / sigma)}.}
+\item{\code{"fixed"}}{Fixed-radius step function; all distances up to
+\code{sigma} receive equal weight.}
+\item{\code{"expow"}}{Exponential power kernel parameterized by
+\code{sigma} and \code{shape}.}
 }}
 
 \item{scale_dist}{Logical. If \code{TRUE} (default), a vertical dashed line
@@ -64,7 +64,7 @@ different values is an error.}
 }
 \value{
 A \code{ggplot2} object showing kernel weight (y-axis) as a function
-  of distance in map units (x-axis), returned for display or customization.
+of distance in map units (x-axis), returned for display or customization.
 }
 \description{
 Visualizes the weight (density) of a kernel function as a

@@ -77,7 +77,7 @@
 #'   nor its metadata qualifies failed diagnostics or extreme-tail precision.
 #' @seealso \code{\link{.msr_spatial_scale_prepare}},
 #'   \code{\link{prediction_contract}}
-#' @keywords internal
+#' @noRd
 .msr_spatial_response_predict <- function(object, newdata = NULL,
     kernel_inputs = NULL, row_id = NULL, parameters = NULL,
     type = c("response", "link"), scale_re.form = NULL, re.form = NULL,

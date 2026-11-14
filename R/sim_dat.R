@@ -31,7 +31,7 @@
 #'   \code{"gaussian"} responses. Default: \code{0.5}.
 #' @param n_points Positive integer or a \code{SpatVector}/\code{sf} point
 #'   object. When an integer, that many points are placed on a hexagonal grid
-#'   covering the raster extent (trimmed to 85\% of the x/y range) and then
+#'   covering the raster extent (trimmed to 85% of the x/y range) and then
 #'   randomly subsampled. When a spatial object is supplied, those points are
 #'   used directly. Default: \code{50}.
 #' @param min_D Positive numeric. Minimum inter-point spacing on the hexagonal
@@ -47,9 +47,9 @@
 #'   between 1 and 50 are typical. Required when \code{kernel = "expow"}.
 #' @param max_D Positive numeric. Maximum buffer radius for
 #'   \code{\link{kernel_prep}} during simulation. If \code{NULL} (default), set
-#'   automatically to 110\% of the one-dimensional distance enclosing 99\%
+#'   automatically to 110% of the one-dimensional distance enclosing 99%
 #'   of kernel weight along a line at \code{max(sigma)}. This historical default
-#'   is smaller than the radius enclosing 99\% of weight on a plane; supply a
+#'   is smaller than the radius enclosing 99% of weight on a plane; supply a
 #'   larger \code{max_D} if that planar cutoff is needed.
 #' @param user_seed Optional integer seed for reproducibility. Default:
 #'   \code{NULL}.
@@ -72,10 +72,10 @@
 #'
 #' @details
 #' Points are distributed on a hexagonal grid across the interior of the raster
-#' extent (85\% of the range in each direction to avoid edge effects), then
+#' extent (85% of the range in each direction to avoid edge effects), then
 #' randomly subsampled to \code{n_points}. The \code{min_D} spacing controls
 #' the grid resolution; if the grid produces fewer points than \code{n_points},
-#' \code{min_D} is reduced iteratively by 3\% until enough points are generated.
+#' \code{min_D} is reduced iteratively by 3% until enough points are generated.
 #'
 #' Kernel-weighted covariate values are computed using
 #' \code{\link{kernel_prep}} at the specified \code{sigma} (and \code{shape})

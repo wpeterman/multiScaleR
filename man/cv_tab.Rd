@@ -21,11 +21,11 @@ same conditional-choice target, complete sets and native partial method.}
 }
 \value{
 A data frame with \code{Modnames}, \code{Rank}, \code{Score},
-  \code{Delta}, \code{Metric}, \code{Unit}, \code{N_assessment},
-  \code{N_scored}, \code{Weight_sum}, \code{Warnings} and, for per-fold
-  comparisons, \code{Fold}. Ties share their minimum rank. If every score
-  is infinite, deltas are \code{NA}. Original candidate fits and diagnostics
-  are not modified.
+\code{Delta}, \code{Metric}, \code{Unit}, \code{N_assessment},
+\code{N_scored}, \code{Weight_sum}, \code{Warnings} and, for per-fold
+comparisons, \code{Fold}. Ties share their minimum rank. If every score
+is infinite, deltas are \code{NA}. Original candidate fits and diagnostics
+are not modified.
 }
 \description{
 Rank candidate predictions using identical recorded targets and splits.
@@ -34,34 +34,34 @@ preserving frequency weights and binomial trial definitions.
 }
 \details{
 Incomplete candidates are rejected as a group; no failed model or
-  fold is silently removed. Comparisons match analysis/assessment IDs and all
-  used responses, trials and frequency weights. RMSE/MAE can compare qualified
-  conditional-mean predictions across qualified Gaussian, Poisson, NB2 and
-  Gamma targets on the same observations. NB2 and Poisson log scores can
-  compare their count distributions. Continuous/discrete density scores
-  cannot be mixed, and Gaussian density scores remain unqualified. Gamma
-  density comparisons preserve positive-response and training-dispersion
-  guards. Other canonical scores retain their family/link requirements. Conditional-choice comparisons use
-  \code{neg_log_score} only, per held-out set, preserving every alternative
-  and its membership. They cannot be mixed with Bernoulli/GLM targets.
-  Binomial negative log scores refer to
-  count probabilities; Brier scores average over individual trials.
+fold is silently removed. Comparisons match analysis/assessment IDs and all
+used responses, trials and frequency weights. RMSE/MAE can compare qualified
+conditional-mean predictions across qualified Gaussian, Poisson, NB2 and
+Gamma targets on the same observations. NB2 and Poisson log scores can
+compare their count distributions. Continuous/discrete density scores
+cannot be mixed, and Gaussian density scores remain unqualified. Gamma
+density comparisons preserve positive-response and training-dispersion
+guards. Other canonical scores retain their family/link requirements. Conditional-choice comparisons use
+\code{neg_log_score} only, per held-out set, preserving every alternative
+and its membership. They cannot be mixed with Bernoulli/GLM targets.
+Binomial negative log scores refer to
+count probabilities; Brier scores average over individual trials.
 
 There is no added complexity penalty, Akaike weight or model probability.
-  Fold variation is not an independence-based standard error or calibration
-  certificate. Per-fold assessment ranks must not select that fold's model.
-  Use \code{\link{select_cv}} for training-only information-criterion selection.
-  Choosing a model or tuning rule from pooled CV results requires independent
-  assessment or an outer validation layer to evaluate that choice.
+Fold variation is not an independence-based standard error or calibration
+certificate. Per-fold assessment ranks must not select that fold's model.
+Use \code{\link{select_cv}} for training-only information-criterion selection.
+Choosing a model or tuning rule from pooled CV results requires independent
+assessment or an outer validation layer to evaluate that choice.
 
 Complete \code{\link{cross_validate_field}} results compare joint
-  assessment densities or masses for matching response and split targets.
-  Poisson and NB2 share a count target. These scores integrate field
-  dependence and observation noise at training estimates. Compare these
-  results with other joint field scores using the same observations and
-  coordinates.
-  Complete \code{\link{cross_validate_mixed}} results compare matching
-  group targets. Their log scores use one joint density per held-out group.
+assessment densities or masses for matching response and split targets.
+Poisson and NB2 share a count target. These scores integrate field
+dependence and observation noise at training estimates. Compare these
+results with other joint field scores using the same observations and
+coordinates.
+Complete \code{\link{cross_validate_mixed}} results compare matching
+group targets. Their log scores use one joint density per held-out group.
 }
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
@@ -72,5 +72,5 @@ cv_tab(candidates, metric = "neg_log_score")
 }
 \seealso{
 \code{\link{cross_validate}}, \code{\link{cross_validate_glm}},
-  \code{\link{select_cv}}, \code{\link{aic_tab}}
+\code{\link{select_cv}}, \code{\link{aic_tab}}
 }

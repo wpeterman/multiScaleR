@@ -79,11 +79,11 @@ SE convention. Other families reject it.}
 }
 \value{
 A \code{multiScaleR_cv} object as described in
-  \code{\link{cross_validate}}, with backend \code{"glm"}, no estimated
-  spatial scales, and ordinary GLM fits when \code{keep_fits = TRUE}.
-  Compact \code{targets} metadata records used row IDs, observed outcomes,
-  trials and frequency weights for guarded model comparison. Optional
-  \code{selection_records} have the same contract as \code{cross_validate()}.
+\code{\link{cross_validate}}, with backend \code{"glm"}, no estimated
+spatial scales, and ordinary GLM fits when \code{keep_fits = TRUE}.
+Compact \code{targets} metadata records used row IDs, observed outcomes,
+trials and frequency weights for guarded model comparison. Optional
+\code{selection_records} have the same contract as \code{cross_validate()}.
 }
 \description{
 Fit a GLM using only each fold's analysis rows, then score its held-out
@@ -92,29 +92,29 @@ the same folds used to validate estimated ecological scales.
 }
 \details{
 This adapter supports the same qualified GLM families, outcome and
-  frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
-  interactions and offsets use native GLM machinery. Supported saved
-  \code{scale()}, \code{poly()}, natural-spline and B-spline transformations
-  use training constants even inside expressions and offsets. See
-  \code{cross_validate()} for supported inputs and custom-recipe limitations.
-  All learned preprocessing must occur within the training fit; do not supply
-  predictors standardized with assessment data.
+frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
+interactions and offsets use native GLM machinery. Supported saved
+\code{scale()}, \code{poly()}, natural-spline and B-spline transformations
+use training constants even inside expressions and offsets. See
+\code{cross_validate()} for supported inputs and custom-recipe limitations.
+All learned preprocessing must occur within the training fit; do not supply
+predictors standardized with assessment data.
 
 NB2 uses \code{MASS::glm.nb()} when theta is estimated and
-  \code{glm(family = MASS::negative.binomial(theta))} when it is fixed.
-  Gamma retains its native deviance-based AIC scale when dispersion is
-  estimated. Known Gamma dispersion uses the normalized fixed-scale family
-  constructed before fitting. Coefficients and native coefficient SEs are
-  retained; density dispersion is not a replacement for the SE convention.
-  Nuisance parameters and supported training transformations are frozen
-  before assessment prediction. See \code{cross_validate()} for their counts,
-  support, compact metadata and uncertainty distinctions.
+\code{glm(family = MASS::negative.binomial(theta))} when it is fixed.
+Gamma retains its native deviance-based AIC scale when dispersion is
+estimated. Known Gamma dispersion uses the normalized fixed-scale family
+constructed before fitting. Coefficients and native coefficient SEs are
+retained; density dispersion is not a replacement for the SE convention.
+Nuisance parameters and supported training transformations are frozen
+before assessment prediction. See \code{cross_validate()} for their counts,
+support, compact metadata and uncertainty distinctions.
 
 No ecological scale is estimated here. Use \code{cross_validate()} for
-  training-only spatial scale refitting. Predictions use fitted parameters;
-  parameter uncertainty is not integrated, observation intervals are not
-  provided and calibration is not established. Fold failures and native
-  warnings are retained. No missing rows are silently dropped.
+training-only spatial scale refitting. Predictions use fitted parameters;
+parameter uncertainty is not integrated, observation intervals are not
+provided and calibration is not established. Fold failures and native
+warnings are retained. No missing rows are silently dropped.
 }
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
@@ -124,5 +124,5 @@ cv
 }
 \seealso{
 \code{\link{cross_validate}}, \code{\link{cv_tab}},
-  \code{\link{select_cv}}
+\code{\link{select_cv}}
 }

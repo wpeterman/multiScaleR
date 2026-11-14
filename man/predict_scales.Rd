@@ -54,23 +54,23 @@ restores the caller's random-number state, including on failure.}
 }
 \value{
 With \code{summary = TRUE}, a data frame with one row per predictor
-  and distinct active scale-formula combination. \code{covariate} names the
-  predictor, \code{group} labels the covariates and groups, and \code{row}
-  indexes a representative row of \code{newdata}. \code{new_level} identifies
-  rows containing an unseen included scale group. \code{distribution} is
-  \code{"conditional_posterior"}, \code{"new_group_predictive"}, or
-  \code{"zero_deviation_reference"}. \code{mean}, \code{median}, \code{sd},
-  \code{lower}, and \code{upper} summarize the finite draw distribution on
-  the requested scale. Prefer distance medians and quantiles when arithmetic
-  moments are poorly defined; see \code{\link{posterior_scales}}.
-  \code{p_below_min_D} and \code{p_above_max_D} use the fitted input reference
-  range, not an unsupplied future map's coverage.
+and distinct active scale-formula combination. \code{covariate} names the
+predictor, \code{group} labels the covariates and groups, and \code{row}
+indexes a representative row of \code{newdata}. \code{new_level} identifies
+rows containing an unseen included scale group. \code{distribution} is
+\code{"conditional_posterior"}, \code{"new_group_predictive"}, or
+\code{"zero_deviation_reference"}. \code{mean}, \code{median}, \code{sd},
+\code{lower}, and \code{upper} summarize the finite draw distribution on
+the requested scale. Prefer distance medians and quantiles when arithmetic
+moments are poorly defined; see \code{\link{posterior_scales}}.
+\code{p_below_min_D} and \code{p_above_max_D} use the fitted input reference
+range, not an unsupplied future map's coverage.
 
-  With \code{summary = FALSE}, a named list of numeric matrices retains every
-  new observation column in its supplied order. Repeated rows within a group
-  share its effect. Both forms have a small \code{new_groups} attribute with
-  \code{component}, \code{covariate}, \code{group}, \code{level} and
-  \code{action}; it identifies the explicitly sampled or zeroed new levels.
+With \code{summary = FALSE}, a named list of numeric matrices retains every
+new observation column in its supplied order. Repeated rows within a group
+share its effect. Both forms have a small \code{new_groups} attribute with
+\code{component}, \code{covariate}, \code{group}, \code{level} and
+\code{action}; it identifies the explicitly sampled or zeroed new levels.
 }
 \description{
 Propagate joint posterior uncertainty into scales at new scale-formula
@@ -78,41 +78,41 @@ covariates, including new years when the model contains annual random effects.
 }
 \details{
 Supported fixed scale-formula learners retain their training
-  constants inside nested expressions, including \code{I(scale(temp))} and
-  polynomial or spline bases. Older retained fits require verified recovery
-  from original training data. Single rows and batches use the same basis.
+constants inside nested expressions, including \code{I(scale(temp))} and
+polynomial or spline bases. Older retained fits require verified recovery
+from original training data. Single rows and batches use the same basis.
 
-  Summary tables have a \code{prediction_contract} attribute describing
-  their posterior target, included scale effects, and uncertainty. Setting
-  effects to zero remains a reference calculation rather than integration
-  over group variation. Metadata does not establish diagnostic eligibility
-  or calibration; raw draw lists retain their existing attributes.
+Summary tables have a \code{prediction_contract} attribute describing
+their posterior target, included scale effects, and uncertainty. Setting
+effects to zero remains a reference calculation rather than integration
+over group variation. Metadata does not establish diagnostic eligibility
+or calibration; raw draw lists retain their existing attributes.
 
 A new year's sampled effect is shared by that year's rows within
-  one posterior vector. Different new years are independent conditional on
-  the population parameters, whose posterior dependence is retained.
-  Effects for separate model components follow their specified independence.
-  Separate calls sample independently unless their complete random-number
-  streams coincide; use a single batch to retain within-group dependence.
+one posterior vector. Different new years are independent conditional on
+the population parameters, whose posterior dependence is retained.
+Effects for separate model components follow their specified independence.
+Separate calls sample independently unless their complete random-number
+streams coincide; use a single batch to retain within-group dependence.
 
-  New-group intervals include variation among future groups as well as
-  uncertainty about population parameters. They are marginal prediction
-  intervals, not simultaneous bands or estimates of a realized future year's
-  scale after observing its responses. Exchangeable annual effects do not
-  impose temporal autocorrelation. A fitted numeric trend extrapolates under
-  that trend assumption; an unseen fixed year factor is an error.
-  Zeroing effects does not compute a population-averaged distance.
+New-group intervals include variation among future groups as well as
+uncertainty about population parameters. They are marginal prediction
+intervals, not simultaneous bands or estimates of a realized future year's
+scale after observing its responses. Exchangeable annual effects do not
+impose temporal autocorrelation. A fitted numeric trend extrapolates under
+that trend assumption; an unseen fixed year factor is an error.
+Zeroing effects does not compute a population-averaged distance.
 
-  The method uses stored joint draws, including stored resamples for an
-  importance-corrected fit. It does not add effective posterior information
-  or validate a failed fit. Nonfinite distance calculations cause an error;
-  use log summaries for extreme scales. Formula transforms must remain
-  available in base/stats or through an explicit package namespace. Fitted
-  contrasts and prediction-aware bases such as \code{scale()} and
-  \code{poly()} are reused. An expression such as
-  \code{I(x - mean(x))} evaluates its mean on the supplied new batch by
-  ordinary R formula rules. Use a prediction-aware basis or precomputed
-  training constants when the original centering must be retained.
+The method uses stored joint draws, including stored resamples for an
+importance-corrected fit. It does not add effective posterior information
+or validate a failed fit. Nonfinite distance calculations cause an error;
+use log summaries for extreme scales. Formula transforms must remain
+available in base/stats or through an explicit package namespace. Fitted
+contrasts and prediction-aware bases such as \code{scale()} and
+\code{poly()} are reused. An expression such as
+\code{I(x - mean(x))} evaluates its mean on the supplied new batch by
+ordinary R formula rules. Use a prediction-aware basis or precomputed
+training constants when the original centering must be retained.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -126,8 +126,8 @@ predict_scales(example$fits$pooled, future,
 }
 \seealso{
 \code{\link{posterior_scales}},
-  \code{\link{prediction_contract}},
-  \code{\link{predict.multiScaleR_bayes}},
-  \code{\link{simulate.multiScaleR_bayes}},
-  \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
+\code{\link{prediction_contract}},
+\code{\link{predict.multiScaleR_bayes}},
+\code{\link{simulate.multiScaleR_bayes}},
+\code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 }

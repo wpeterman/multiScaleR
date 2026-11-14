@@ -53,10 +53,10 @@
 #' the marker accounts for ring area (proportional to distance), so the area
 #' under the displayed curve to its left is not \code{prob}.
 #'
-#' The x-axis covers at least 99.9\% of weight under the selected definition,
+#' The x-axis covers at least 99.9% of weight under the selected definition,
 #' or \code{prob} when larger. Marker positions use the unrounded distance;
 #' labels round to two decimal places. Sigma remains a kernel parameter, not
-#' the marked radius. For a Gaussian kernel with sigma = 300 m, the 90\% marker
+#' the marked radius. For a Gaussian kernel with sigma = 300 m, the 90% marker
 #' is about 644 m in 2D and 493 m in 1D.
 #'
 #' Development versions after 0.7.3 default to 2D; use

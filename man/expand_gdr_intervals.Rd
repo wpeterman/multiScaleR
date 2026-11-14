@@ -18,21 +18,21 @@ expand_gdr_intervals(
 )
 }
 \arguments{
-\item{object}{An `unmarkedFrameGDR` with its original paired response,
+\item{object}{An \code{unmarkedFrameGDR} with its original paired response,
 site, primary-survey and observation covariates.}
 
 \item{event_keys}{Data frame in native site-major, primary-survey order,
 including completed zero surveys. Supply original survey identifiers.}
 
 \item{event_id}{Character vector of columns identifying a survey in
-`event_keys`. Compound keys are supported.}
+\code{event_keys}. Compound keys are supported.}
 
 \item{interval_units}{Nonempty label for original removal-duration units,
-such as `"minutes"`. Durations are retained without conversion.}
+such as \code{"minutes"}. Durations are retained without conversion.}
 
 \item{site_covariates}{Character vector naming static site covariates to
 repeat. Default: none. Optional names specify new observation-column
-aliases, for example `c(rem_forest = "forest", rem_observer = "Observer")`.
+aliases, for example \code{c(rem_forest = "forest", rem_observer = "Observer")}.
 Unnamed entries retain their source names. Selection is explicit; no
 formula variables or observer roles are inferred.}
 
@@ -41,26 +41,26 @@ covariates to repeat, with the same optional alias convention. Default:
 none. These rows refer to native primary periods, not necessarily years.}
 
 \item{interval}{One string naming the retained numeric removal-interval
-index. Default: `"interval"`. It must not collide with an event key or
+index. Default: \code{"interval"}. It must not collide with an event key or
 another requested observation column.}
 
-\item{site_id}{Optional physical-site identifier columns in `event_keys`,
-passed to [prepare_gdr_intervals()].}
+\item{site_id}{Optional physical-site identifier columns in \code{event_keys},
+passed to \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}.}
 
 \item{effort}{Optional event-order effort vector, passed to
-[prepare_gdr_intervals()]. Surveyed zeros and unsurveyed missing responses
+\code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}. Surveyed zeros and unsurveyed missing responses
 keep their original meanings.}
 
 \item{expected_event_keys}{Optional independently supplied event mapping
-in native order, passed to [prepare_gdr_intervals()].}
+in native order, passed to \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}.}
 }
 \value{
-An `msr_gdr_intervals` list as returned by [prepare_gdr_intervals()],
-  with the copied frame in `data`, survey audit, complete alignment and
-  protocol. `protocol$expanded_covariates` is a data frame with `source_table`
-  (`"site"` or `"yearly"`), original `source` name and observation-column
-  `target` alias. Its rows identify every repeated field. An empty selection
-  adds only the interval index. `fit_eligibility_established` stays `FALSE`.
+An \code{msr_gdr_intervals} list as returned by \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}},
+with the copied frame in \code{data}, survey audit, complete alignment and
+protocol. \code{protocol$expanded_covariates} is a data frame with \code{source_table}
+(\code{"site"} or \code{"yearly"}), original \code{source} name and observation-column
+\code{target} alias. Its rows identify every repeated field. An empty selection
+adds only the interval index. \code{fit_eligibility_established} stays \code{FALSE}.
 }
 \description{
 Repeat explicitly selected covariates into native removal-interval rows and
@@ -68,29 +68,29 @@ prepare a copy of the GDR frame with its keyed alignment and source aliases.
 }
 \details{
 The native removal random-term model frame can evaluate fixed covariates
-  from the observation table as well as its grouping factor. Repeating only
-  an observer label can therefore leave a formula such as
-  `~ rem_forest + I(interval == 1) + (1 | rem_observer)` incomplete. Select
-  all survey-constant fields needed by that observation formula.
+from the observation table as well as its grouping factor. Repeating only
+an observer label can therefore leave a formula such as
+\code{~ rem_forest + I(interval == 1) + (1 | rem_observer)} incomplete. Select
+all survey-constant fields needed by that observation formula.
 
 Static site fields repeat across every primary survey and interval for the
-  site. Primary-survey fields repeat only within their own survey. Original
-  column classes, matrix columns, factor levels, contrasts and missing values
-  are preserved. No model is fitted, no predictor is standardized and no
-  missingness decision is made here. Original covariate tables, responses,
-  geometry and durations remain unchanged.
+site. Primary-survey fields repeat only within their own survey. Original
+column classes, matrix columns, factor levels, contrasts and missing values
+are preserved. No model is fitted, no predictor is standardized and no
+missingness decision is made here. Original covariate tables, responses,
+geometry and durations remain unchanged.
 
-Use aliases for different component roles. For example, `forest` in abundance
-  and `rem_forest` in removal are distinct inputs. An alias copies the values
-  present at preparation; it does not keep later changes synchronized. The
-  existing guard against optimizing a static site name shadowed by an
-  observation or primary-survey column remains in force. Existing observation
-  columns cannot be overwritten. Interval-varying measurements can instead
-  be supplied directly through [prepare_gdr_intervals()].
+Use aliases for different component roles. For example, \code{forest} in abundance
+and \code{rem_forest} in removal are distinct inputs. An alias copies the values
+present at preparation; it does not keep later changes synchronized. The
+existing guard against optimizing a static site name shadowed by an
+observation or primary-survey column remains in force. Existing observation
+columns cannot be overwritten. Interval-varying measurements can instead
+be supplied directly through \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}.
 
 Data alignment does not qualify native TMB controls, likelihood-only fitting,
-  latent integration, start agreement, score, covariance or identification.
-  Priors, parameter counts, diagnostics and uncertainty methods are unchanged.
+latent integration, start agreement, score, covariance or identification.
+Priors, parameter counts, diagnostics and uncertainty methods are unchanged.
 }
 \examples{
 frame <- unmarked::unmarkedFrameGDR(matrix(0, 2, 2), matrix(0, 2, 3),
@@ -103,6 +103,6 @@ unmarked::obsCovs(prepared$data)
 prepared$protocol$expanded_covariates
 }
 \seealso{
-[prepare_gdr_intervals()], [prepare_gdr_histories()],
-  [validate_unmarked_data()]
+\code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}, \code{\link[=prepare_gdr_histories]{prepare_gdr_histories()}},
+\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}
 }

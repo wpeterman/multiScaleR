@@ -31,18 +31,18 @@ records. \code{TRUE} retains the selected training fit per fold in memory.}
 }
 \value{
 A \code{multiScaleR_cv} result for the selection procedure, with
-  \code{selection} metadata containing the criterion, tie policy, candidate
-  names, the scoring metrics kept (\code{metrics}) and left out
-  (\code{metrics_dropped}), chosen model and native training table per fold, including original
-  parameter penalties, and \code{candidate_settings} with each candidate's
-  controls. Shared output settings inherit the first candidate, identified
-  by \code{settings$controls_from}; use \code{candidate_settings} for the
-  complete procedure. NB2/Gamma procedures also retain the actual selected
-  \code{settings$fold_settings} and \code{distribution} metadata per fold,
-  including when a Poisson or Gaussian reference wins. Selected
-  \code{raster_groups} are retained when present.
-  Candidate warnings/diagnostics and selection failures
-  are retained. Failed selection makes pooled scores \code{NA}.
+\code{selection} metadata containing the criterion, tie policy, candidate
+names, the scoring metrics kept (\code{metrics}) and left out
+(\code{metrics_dropped}), chosen model and native training table per fold, including original
+parameter penalties, and \code{candidate_settings} with each candidate's
+controls. Shared output settings inherit the first candidate, identified
+by \code{settings$controls_from}; use \code{candidate_settings} for the
+complete procedure. NB2/Gamma procedures also retain the actual selected
+\code{settings$fold_settings} and \code{distribution} metadata per fold,
+including when a Poisson or Gaussian reference wins. Selected
+\code{raster_groups} are retained when present.
+Candidate warnings/diagnostics and selection failures
+are retained. Failed selection makes pooled scores \code{NA}.
 }
 \description{
 Select a candidate using each fold's training likelihood, then evaluate its
@@ -50,49 +50,49 @@ already recorded held-out predictions. No additional model fits are run.
 }
 \details{
 Inputs must retain native training-selection records via
-  \code{keep_selection = TRUE} or full fold fits via \code{keep_fits = TRUE},
-  share compatible likelihood targets and splits, and record at least one
-  scoring metric in common. The selection result is scored on the metrics
-  that every candidate recorded. For example, a default Poisson candidate
-  records \code{"deviance"} but a default NB2 candidate does not, so their
-  selection result keeps \code{"rmse"}, \code{"mae"} and
-  \code{"neg_log_score"}. \code{selection$metrics} lists the metrics kept
-  and \code{selection$metrics_dropped} those left out. NB2/Poisson
-  candidates may share a count target. Gamma/Gaussian
-  candidates may share a continuous target using RMSE/MAE. Density scores
-  cannot compare different observation measures. Other canonical family/link
-  and conditional-choice guards are unchanged.
-  Analysis-row identities and response/weight definitions are checked against
-  each retained GLM or record. Compact records store native log likelihood,
-  native and ecological parameter counts, effective row IDs, outcomes, trials,
-  frequencies, formula text, controls and diagnostics. NB2/Gamma records also
-  preserve estimated/fixed nuisance metadata and native nuisance counts.
-  They retain no model
-  environment, design matrix or raw raster. If both representations are
-  retained, they must agree exactly. Record-only selection uses the same
-  likelihood-signature guards and information-criterion table constructors.
-  Selection records cannot reconstruct fits requested by \code{keep_fits}.
-  Metadata failures remain selection failures without discarding scored folds.
-  Conditional-choice records retain event-based nobs and native
-  partial-method/stratum signatures. Alternative counts do not substitute
-  for native events in AICc/BIC. Native likelihood comparability, parameter
-  counts and numerical guards remain unchanged. Invalid inputs are rejected; criterion
-  failures, nonfinite criteria and unresolved ties are retained per fold.
+\code{keep_selection = TRUE} or full fold fits via \code{keep_fits = TRUE},
+share compatible likelihood targets and splits, and record at least one
+scoring metric in common. The selection result is scored on the metrics
+that every candidate recorded. For example, a default Poisson candidate
+records \code{"deviance"} but a default NB2 candidate does not, so their
+selection result keeps \code{"rmse"}, \code{"mae"} and
+\code{"neg_log_score"}. \code{selection$metrics} lists the metrics kept
+and \code{selection$metrics_dropped} those left out. NB2/Poisson
+candidates may share a count target. Gamma/Gaussian
+candidates may share a continuous target using RMSE/MAE. Density scores
+cannot compare different observation measures. Other canonical family/link
+and conditional-choice guards are unchanged.
+Analysis-row identities and response/weight definitions are checked against
+each retained GLM or record. Compact records store native log likelihood,
+native and ecological parameter counts, effective row IDs, outcomes, trials,
+frequencies, formula text, controls and diagnostics. NB2/Gamma records also
+preserve estimated/fixed nuisance metadata and native nuisance counts.
+They retain no model
+environment, design matrix or raw raster. If both representations are
+retained, they must agree exactly. Record-only selection uses the same
+likelihood-signature guards and information-criterion table constructors.
+Selection records cannot reconstruct fits requested by \code{keep_fits}.
+Metadata failures remain selection failures without discarding scored folds.
+Conditional-choice records retain event-based nobs and native
+partial-method/stratum signatures. Alternative counts do not substitute
+for native events in AICc/BIC. Native likelihood comparability, parameter
+counts and numerical guards remain unchanged. Invalid inputs are rejected; criterion
+failures, nonfinite criteria and unresolved ties are retained per fold.
 
 Assessment outcomes and CV scores never choose the winner inside a fold.
-  The resulting held-out score evaluates the predeclared candidate set and
-  selection rule. If those are tuned using these results, use an independent
-  test set or outer validation layer. Selection does not integrate parameter
-  or selection uncertainty, add intervals or establish calibration.
+The resulting held-out score evaluates the predeclared candidate set and
+selection rule. If those are tuned using these results, use an independent
+test set or outer validation layer. Selection does not integrate parameter
+or selection uncertainty, add intervals or establish calibration.
 
 Complete spatial-field CV candidates also support training-only
-  selection using compact native ML likelihood and parameter counts.
-  Native coefficients, field SD, estimated range and any observation
-  dispersion parameter keep their penalties. Integrated states add zero.
-  The held-out joint block score uses the model selected by the training
-  criterion in that fold.
-  Mixed-model CV candidates use compact native ML likelihoods and include
-  their covariance and ecological-scale parameters in training penalties.
+selection using compact native ML likelihood and parameter counts.
+Native coefficients, field SD, estimated range and any observation
+dispersion parameter keep their penalties. Integrated states add zero.
+The held-out joint block score uses the model selected by the training
+criterion in that fold.
+Mixed-model CV candidates use compact native ML likelihoods and include
+their covariance and ecological-scale parameters in training penalties.
 }
 \examples{
 dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
@@ -104,5 +104,5 @@ selected$selection$chosen
 }
 \seealso{
 \code{\link{cv_tab}}, \code{\link{cross_validate}},
-  \code{\link{cross_validate_glm}}, \code{\link{aic_tab}}, \code{\link{bic_tab}}
+\code{\link{cross_validate_glm}}, \code{\link{aic_tab}}, \code{\link{bic_tab}}
 }

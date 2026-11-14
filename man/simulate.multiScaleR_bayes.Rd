@@ -81,14 +81,14 @@ This adds no scale parameters or uncertainty.}
 }
 \value{
 A data frame with fitted or new observation rows and one column per
-  replicate dataset. Binomial values are success counts out of the fitted
-  or supplied trial totals, not proportions. Each column uses one sampled
-  complete posterior vector and the requested included random effects.
-  For new data, \code{point_ids} and \code{new_groups} attributes identify
-  original row order and sampled/zeroed levels, as in \code{predict()}.
-  The \code{prediction_contract} attribute identifies posterior predictive
-  replicates, which include observation noise, and records the included
-  effect policies. It does not establish diagnostic eligibility or calibration.
+replicate dataset. Binomial values are success counts out of the fitted
+or supplied trial totals, not proportions. Each column uses one sampled
+complete posterior vector and the requested included random effects.
+For new data, \code{point_ids} and \code{new_groups} attributes identify
+original row order and sampled/zeroed levels, as in \code{predict()}.
+The \code{prediction_contract} attribute identifies posterior predictive
+replicates, which include observation noise, and records the included
+effect policies. It does not establish diagnostic eligibility or calibration.
 }
 \description{
 Generate replicate responses for fitted or new observations, including
@@ -97,18 +97,18 @@ sampling variation.
 }
 \details{
 Compare summaries of these replicate datasets with the observed
-  response to assess model adequacy. Good sampling diagnostics do not
-  establish that the observation model fits the data.
-  To use bayesplot, convert the replicates to a matrix and transpose it
-  with \code{t(as.matrix(replicated))}. This gives one simulated dataset
-  per row. For a count model, use \code{ppc_stat()} with
-  \code{stat = function(y) mean(y == 0)} to check the fraction of zeros.
-  For new groups, effects are sampled afresh for each replicate dataset,
-  shared by its rows in that group and independent across replicate datasets
-  conditional on the sampled posterior vector. Observation noise is then
-  generated separately for each row. Use a single batch to retain dependence.
-  Summaries of individual predictive intervals cannot be summed to obtain
-  an interval for a total; sum each complete replicate instead.
+response to assess model adequacy. Good sampling diagnostics do not
+establish that the observation model fits the data.
+To use bayesplot, convert the replicates to a matrix and transpose it
+with \code{t(as.matrix(replicated))}. This gives one simulated dataset
+per row. For a count model, use \code{ppc_stat()} with
+\code{stat = function(y) mean(y == 0)} to check the fraction of zeros.
+For new groups, effects are sampled afresh for each replicate dataset,
+shared by its rows in that group and independent across replicate datasets
+conditional on the sampled posterior vector. Observation noise is then
+generated separately for each row. Use a single batch to retain dependence.
+Summaries of individual predictive intervals cannot be summed to obtain
+an interval for a total; sum each complete replicate instead.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -122,7 +122,7 @@ mean(example$data$count == 0)  # observed fraction of zero counts
 }
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{simulate_bayes_prior}},
-  \code{\link{prediction_contract}},
-  \code{\link{predict.multiScaleR_bayes}};
-  \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
+\code{\link{prediction_contract}},
+\code{\link{predict.multiScaleR_bayes}};
+\code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 }

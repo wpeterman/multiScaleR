@@ -1,3 +1,12 @@
+multiScaleR 0.7.46
+
+* Help pages are now written in roxygen markdown, so code in backticks
+  renders as code. The help for `multiScale_bayes()` also shows two
+  sentences about posterior quantiles that an unescaped percent sign used to
+  cut off.
+* The 25 help pages for internal functions are no longer built. The
+  functions themselves are unchanged and remain unexported.
+
 multiScaleR 0.7.45
 
 * The website build also removes the two developer notes from the site

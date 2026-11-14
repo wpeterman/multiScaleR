@@ -125,6 +125,7 @@
 #' }
 #'
 #' @export
+#' @noMd
 diagnostics <- function(object, ...) {
   UseMethod("diagnostics")
 }

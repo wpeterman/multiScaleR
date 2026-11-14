@@ -9,7 +9,7 @@
 #' @return data frame with calculated confidence intervals
 
 #' @rdname ci_func
-#' @keywords internal
+#' @noRd
 #'
 ci_func <- function(x,
                     df,

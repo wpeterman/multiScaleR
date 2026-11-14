@@ -138,7 +138,7 @@ For \code{"marginal"}, supports \code{starts} (default 3 per conditional
 node), \code{iter.max} (1000), \code{max_grid} (129; one of 33, 65, 129,
 or 257), \code{cdf_tol} (0.005), \code{quantile_tol} (0.02 prior SDs),
 and \code{logz_tol} (0.01). These bound changes in the marginal SD CDF,
-its 2.5%, 50%, and 97.5% quantiles, and the log normalizing constant
+its 2.5\%, 50\%, and 97.5\% quantiles, and the log normalizing constant
 between successive integration grids. More grid points cost more time.
 \code{correction = "none"} retains this original approximation.
 \code{correction = "importance"} additionally corrects a heavy-tailed
@@ -210,105 +210,105 @@ can make small fits slower.}
 }
 \value{
 A \code{multiScaleR_bayes} list with \code{specification} (frozen
-  model rows, bin summaries, formulas, priors, reference standardization,
-  and parameter layout), \code{parameters} (initial parameters),
-  \code{call}, \code{inference}, and \code{inference_metadata}.
-  The metadata records \code{schema_version}, \code{target}, \code{method},
-  \code{objective}, \code{population_priors}, \code{response_normalizers},
-  \code{integration}, \code{solver}, and \code{uncertainty}. Integration
-  labels \code{scale_effects}, \code{response_effects} and
-  \code{population_parameters} describe how each present block is treated.
-  Uncertainty records \code{intervals}, \code{population_parameters},
-  \code{annual_scales} and \code{calibration}. Prepared objects report no computed integration
-  or intervals. Posterior methods propagate population uncertainty and label
-  their intervals as marginal credible intervals. The private hierarchical
-  likelihood prototypes instead optimize population parameters and do not
-  provide calibrated confidence intervals. Their conditional annual summaries
-  omit population-parameter uncertainty. These methods therefore have
-  different inferential targets even when both use Laplace integration.
-  \code{diagnostics_field} identifies the unchanged \code{diagnostics}
-  component. \code{metadata_establishes_eligibility = FALSE} and
-  \code{uncertainty$calibration = "not_established"} distinguish the method
-  description from numerical acceptance or demonstrated interval coverage.
-  Older saved fits can lack this additive metadata and remain usable.
-  Newly prepared fits retain compact training levels/contrasts and the
-  original row-ID column name, when supplied, for new-observation prediction.
-  Sampled fits additionally contain \code{draws} (posterior matrices by
-  parameter block), \code{diagnostics}, and \code{sampling} settings.
-  NUTS fits retain \code{sampler} (a \code{stanfit}). Slice fits retain
-  \code{chains}, a numeric array ordered by post-warmup iteration, chain, and
-  parameter. Without posterior installed, a slice fit records
-  \code{diagnostics$passed = NA} and the reason in \code{diagnostics$reason}.
-  Install posterior to compute derived diagnostics from the saved chains.
-  Laplace fits contain \code{draws}, numerical \code{diagnostics}, and
-  \code{laplace}: the unconstrained \code{mode}, joint \code{covariance},
-  \code{hessian}, optimizer \code{starts}, \code{draws}, \code{seed}, and
-  \code{coordinates}. These matrices follow the concatenated parameter layout.
-  They retain correlations with coefficients and group SDs. No sampler is stored.
-  Marginal fits instead store \code{marginal}: prior-CDF coordinates
-  \code{x}, normalized node \code{weights}, interpolated \code{density}
-  and \code{cumulative} probability, \code{log_normalizer}, conditional
-  \code{nodes} (modes, Hessians, covariances, and optimizer attempts),
-  \code{prior_sd}, \code{refinement}, \code{converged}, parameter
-  \code{hyper_index}, \code{draws}, \code{seed}, \code{control}, and
-  \code{coordinates}. \code{parameter_indices} maps node parameters to the
-  full concatenated layout; with one integrated response grouping term,
-  corrected node geometry excludes its latent site effects. Its log normalizer describes the approximate
-  posterior integration, not a model-selection criterion.
-  Importance-corrected fits also contain \code{importance}: unconstrained
-  \code{candidates}, normalized \code{weights}, full-posterior/proposal
-  \code{log_weights}, \code{resample_ids} into candidates, stage
-  \code{history}, \code{seed}, a \code{proposal} description,
-  \code{adapted_proposal} (\code{components} containing nodes/densities
-  and their mixture \code{weights}), \code{pilot_candidates},
-  retained-parameter \code{proposal_indices}, a \code{conditional_response}
-  flag, total \code{production_candidates} including discarded stages,
-  \code{response_proposal} fallback counts and maximum remaining Newton step,
-  and the original \code{proposal_diagnostics}. The \code{target_evaluation}
-  counts cover all target evaluations, invalid automatic-differentiation (AD)
-  values, ordinary full-posterior rechecks recovering finite or zero density,
-  and unresolved values. Only invalid AD targets are re-evaluated, at the
-  same parameters. Counts include pilots and discarded production stages.
-  Every candidate is retained, and unresolved target or proposal densities
-  still fail the original importance checks. Adapted components record
-  \code{skipped_nodes} whose original proposal geometry was retained.
-  With conditional coefficients, \code{conditional_beta = TRUE} and
-  \code{beta_proposal} additionally record the starting coefficients,
-  fallback count, maximum remaining Newton step and latent-prior mixture
-  fraction. The defensive component stores its normalized prior/proposal
-  specification rather than conditional nodes. Coefficient fallbacks use
-  their original normal prior as a proposal and retain every candidate.
-  Corrected diagnostic
-  \code{ess} measures weight concentration. \code{min_tail_ess} measures
-  precision of tail indicators, \code{pareto_k} diagnoses extreme ratios,
-  \code{max_weight} identifies dominance by one candidate, and
-  \code{split_cdf_error} compares two independent production halves.
-  \code{min_candidates} records the requested production minimum;
-  history also records whether each stage met that budget.
-  Prepared objects have no posterior draws. Use \code{summary()} for
-  response coefficients and group scales, \code{\link{posterior_scales}}
-  for scale summaries in map units, and \code{predict()} for fitted means
-  with joint posterior uncertainty.
-  The sampled summary contains \code{coefficients} for response effects,
-  \code{scale_coefficients} by landscape predictor, \code{scales},
-  \code{group_sd}, \code{dispersion}, and \code{diagnostics}. Scale-formula
-  intercepts and \code{~0 + year} coefficients in that summary use log map
-  units; other scale coefficients
-  are log-distance contrasts. Exponentiation converts them to distances
-  or multiplicative distance ratios, respectively.
-  Response \code{coefficients} use the family link scale: count models use
-  log expected counts, binomial models use log odds, and Gaussian models use
-  response units. \code{dispersion} is NB2 size theta or Gaussian residual
-  SD, and is \code{NULL} for Poisson and binomial models. Scale-group SDs
-  measure population variation in log distance; response-group SDs use the
-  response link scale. They are not annual-scale standard errors.
-  Summary intervals are marginal central 95\% intervals for individual
-  quantities. The stored sampler flag checks raw parameters and sampler
-  behavior. It does not replace \code{\link{diagnose_bayes_scales}} or a
-  posterior predictive assessment. For importance fits, the scale table in
-  \code{summary()} uses resampled draws; request
-  \code{posterior_scales(fit, estimator = "weighted")} for direct candidate
-  summaries, as used by the plot's automatic estimator.
+model rows, bin summaries, formulas, priors, reference standardization,
+and parameter layout), \code{parameters} (initial parameters),
+\code{call}, \code{inference}, and \code{inference_metadata}.
+The metadata records \code{schema_version}, \code{target}, \code{method},
+\code{objective}, \code{population_priors}, \code{response_normalizers},
+\code{integration}, \code{solver}, and \code{uncertainty}. Integration
+labels \code{scale_effects}, \code{response_effects} and
+\code{population_parameters} describe how each present block is treated.
+Uncertainty records \code{intervals}, \code{population_parameters},
+\code{annual_scales} and \code{calibration}. Prepared objects report no computed integration
+or intervals. Posterior methods propagate population uncertainty and label
+their intervals as marginal credible intervals. The private hierarchical
+likelihood prototypes instead optimize population parameters and do not
+provide calibrated confidence intervals. Their conditional annual summaries
+omit population-parameter uncertainty. These methods therefore have
+different inferential targets even when both use Laplace integration.
+\code{diagnostics_field} identifies the unchanged \code{diagnostics}
+component. \code{metadata_establishes_eligibility = FALSE} and
+\code{uncertainty$calibration = "not_established"} distinguish the method
+description from numerical acceptance or demonstrated interval coverage.
+Older saved fits can lack this additive metadata and remain usable.
+Newly prepared fits retain compact training levels/contrasts and the
+original row-ID column name, when supplied, for new-observation prediction.
+Sampled fits additionally contain \code{draws} (posterior matrices by
+parameter block), \code{diagnostics}, and \code{sampling} settings.
+NUTS fits retain \code{sampler} (a \code{stanfit}). Slice fits retain
+\code{chains}, a numeric array ordered by post-warmup iteration, chain, and
+parameter. Without posterior installed, a slice fit records
+\code{diagnostics$passed = NA} and the reason in \code{diagnostics$reason}.
+Install posterior to compute derived diagnostics from the saved chains.
+Laplace fits contain \code{draws}, numerical \code{diagnostics}, and
+\code{laplace}: the unconstrained \code{mode}, joint \code{covariance},
+\code{hessian}, optimizer \code{starts}, \code{draws}, \code{seed}, and
+\code{coordinates}. These matrices follow the concatenated parameter layout.
+They retain correlations with coefficients and group SDs. No sampler is stored.
+Marginal fits instead store \code{marginal}: prior-CDF coordinates
+\code{x}, normalized node \code{weights}, interpolated \code{density}
+and \code{cumulative} probability, \code{log_normalizer}, conditional
+\code{nodes} (modes, Hessians, covariances, and optimizer attempts),
+\code{prior_sd}, \code{refinement}, \code{converged}, parameter
+\code{hyper_index}, \code{draws}, \code{seed}, \code{control}, and
+\code{coordinates}. \code{parameter_indices} maps node parameters to the
+full concatenated layout; with one integrated response grouping term,
+corrected node geometry excludes its latent site effects. Its log normalizer describes the approximate
+posterior integration, not a model-selection criterion.
+Importance-corrected fits also contain \code{importance}: unconstrained
+\code{candidates}, normalized \code{weights}, full-posterior/proposal
+\code{log_weights}, \code{resample_ids} into candidates, stage
+\code{history}, \code{seed}, a \code{proposal} description,
+\code{adapted_proposal} (\code{components} containing nodes/densities
+and their mixture \code{weights}), \code{pilot_candidates},
+retained-parameter \code{proposal_indices}, a \code{conditional_response}
+flag, total \code{production_candidates} including discarded stages,
+\code{response_proposal} fallback counts and maximum remaining Newton step,
+and the original \code{proposal_diagnostics}. The \code{target_evaluation}
+counts cover all target evaluations, invalid automatic-differentiation (AD)
+values, ordinary full-posterior rechecks recovering finite or zero density,
+and unresolved values. Only invalid AD targets are re-evaluated, at the
+same parameters. Counts include pilots and discarded production stages.
+Every candidate is retained, and unresolved target or proposal densities
+still fail the original importance checks. Adapted components record
+\code{skipped_nodes} whose original proposal geometry was retained.
+With conditional coefficients, \code{conditional_beta = TRUE} and
+\code{beta_proposal} additionally record the starting coefficients,
+fallback count, maximum remaining Newton step and latent-prior mixture
+fraction. The defensive component stores its normalized prior/proposal
+specification rather than conditional nodes. Coefficient fallbacks use
+their original normal prior as a proposal and retain every candidate.
+Corrected diagnostic
+\code{ess} measures weight concentration. \code{min_tail_ess} measures
+precision of tail indicators, \code{pareto_k} diagnoses extreme ratios,
+\code{max_weight} identifies dominance by one candidate, and
+\code{split_cdf_error} compares two independent production halves.
+\code{min_candidates} records the requested production minimum;
+history also records whether each stage met that budget.
+Prepared objects have no posterior draws. Use \code{summary()} for
+response coefficients and group scales, \code{\link{posterior_scales}}
+for scale summaries in map units, and \code{predict()} for fitted means
+with joint posterior uncertainty.
+The sampled summary contains \code{coefficients} for response effects,
+\code{scale_coefficients} by landscape predictor, \code{scales},
+\code{group_sd}, \code{dispersion}, and \code{diagnostics}. Scale-formula
+intercepts and \code{~0 + year} coefficients in that summary use log map
+units; other scale coefficients
+are log-distance contrasts. Exponentiation converts them to distances
+or multiplicative distance ratios, respectively.
+Response \code{coefficients} use the family link scale: count models use
+log expected counts, binomial models use log odds, and Gaussian models use
+response units. \code{dispersion} is NB2 size theta or Gaussian residual
+SD, and is \code{NULL} for Poisson and binomial models. Scale-group SDs
+measure population variation in log distance; response-group SDs use the
+response link scale. They are not annual-scale standard errors.
+Summary intervals are marginal central 95\% intervals for individual
+quantities. The stored sampler flag checks raw parameters and sampler
+behavior. It does not replace \code{\link{diagnose_bayes_scales}} or a
+posterior predictive assessment. For importance fits, the scale table in
+\code{summary()} uses resampled draws; request
+\code{posterior_scales(fit, estimator = "weighted")} for direct candidate
+summaries, as used by the plot's automatic estimator.
 }
 \description{
 Estimate landscape scales and response effects jointly. Give each landscape
@@ -466,7 +466,7 @@ ratios still correct these proposals, and the same eligibility checks apply.
 Corrected numerical checks require Pareto k at most 0.7, raw weight ESS at
 least 1000, tail-indicator ESS at least 400, maximum weight at most 0.01,
 and split-half CDF differences at most 0.05. Indicators are checked at the
-2.5%, 50%, and 97.5% quantiles of unconstrained parameters, annual log
+2.5\%, 50\%, and 97.5\% quantiles of unconstrained parameters, annual log
 scales, and group SDs. These are importance diagnostics, not MCMC Rhat or
 ESS. Original proposal flags remain available separately: an imperfect,
 normalized proposal can be corrected, but only the corrected diagnostics
@@ -520,9 +520,9 @@ posterior_scales(stored_fit)[c("group", "median", "lower", "upper")]
 }
 \seealso{
 \code{\link{check_bayes_setup}}, \code{\link{plot.multiScaleR_bayes}},
-  \code{\link{diagnose_bayes_scales}}, \code{\link{simulate_bayes_prior}},
-  \code{\link{kernel_prep_by_group}}, \code{\link{posterior_scales}},
-  \code{\link{multiScale_optim}};
-  \code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
-  \code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
+\code{\link{diagnose_bayes_scales}}, \code{\link{simulate_bayes_prior}},
+\code{\link{kernel_prep_by_group}}, \code{\link{posterior_scales}},
+\code{\link{multiScale_optim}};
+\code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
 }

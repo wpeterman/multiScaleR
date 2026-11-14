@@ -62,34 +62,34 @@ requiring cell detail retain it regardless.}
 \value{
 A \code{multiScaleR_data} list containing:
 \describe{
-  \item{\code{kernel_dat}}{Initial covariate data frame, with one row per
-    point. Columns are centered and divided by their pooled standard
-    deviations. Use this in the starting model.}
-  \item{\code{d_list}, \code{raw_cov}}{Named per-point distance vectors
-    (divided by \code{unit_conv}) and raster-value matrices. Both are
-    \code{NULL} in lean mode.}
-  \item{\code{binned}}{Pooled distance-bin summaries for kernel covariates,
-    or \code{NULL} when \code{bin = FALSE}. Each covariate has finite-value
-    sums and counts by point and distance bin.}
-  \item{\code{cell_size}}{Fixed x/y cell dimensions in map units, shared
-    by every map. CV derives its intersecting-cell center envelope from this
-    declared geometry, independently of assessment data.}
-  \item{\code{raster_group}}{Named character vector recording the map
-    assigned to each point, in input order.}
-  \item{\code{scl_params}}{Pooled means and standard deviations used to
-    create \code{kernel_dat}; the fitted model replaces these with scaling
-    parameters at the optimized scales.}
-  \item{\code{kernel}, \code{sigma}, \code{shape}}{Kernel name, initial
-    scales divided by \code{unit_conv}, and optional initial shape values.}
-  \item{\code{min_D}, \code{max_D}, \code{unit_conv}}{Lower scale bound,
-    maximum extraction radius, and internal distance scaling factor. These
-    are in map units except the internally scaled \code{sigma}.}
-  \item{\code{n_covs}, \code{scale_vars}}{Number of optimized covariates and
-    the validated covariate definitions.}
-  \item{\code{resolution}, \code{n_cols}}{Raster cell size and column count,
-    used to calculate landscape configuration metrics.}
-  \item{\code{cell_data_stored}}{Whether per-cell values and distances are
-    retained.}
+\item{\code{kernel_dat}}{Initial covariate data frame, with one row per
+point. Columns are centered and divided by their pooled standard
+deviations. Use this in the starting model.}
+\item{\code{d_list}, \code{raw_cov}}{Named per-point distance vectors
+(divided by \code{unit_conv}) and raster-value matrices. Both are
+\code{NULL} in lean mode.}
+\item{\code{binned}}{Pooled distance-bin summaries for kernel covariates,
+or \code{NULL} when \code{bin = FALSE}. Each covariate has finite-value
+sums and counts by point and distance bin.}
+\item{\code{cell_size}}{Fixed x/y cell dimensions in map units, shared
+by every map. CV derives its intersecting-cell center envelope from this
+declared geometry, independently of assessment data.}
+\item{\code{raster_group}}{Named character vector recording the map
+assigned to each point, in input order.}
+\item{\code{scl_params}}{Pooled means and standard deviations used to
+create \code{kernel_dat}; the fitted model replaces these with scaling
+parameters at the optimized scales.}
+\item{\code{kernel}, \code{sigma}, \code{shape}}{Kernel name, initial
+scales divided by \code{unit_conv}, and optional initial shape values.}
+\item{\code{min_D}, \code{max_D}, \code{unit_conv}}{Lower scale bound,
+maximum extraction radius, and internal distance scaling factor. These
+are in map units except the internally scaled \code{sigma}.}
+\item{\code{n_covs}, \code{scale_vars}}{Number of optimized covariates and
+the validated covariate definitions.}
+\item{\code{resolution}, \code{n_cols}}{Raster cell size and column count,
+used to calculate landscape configuration metrics.}
+\item{\code{cell_data_stored}}{Whether per-cell values and distances are
+retained.}
 }
 Pass the full object to \code{\link{multiScale_optim}}.
 }
@@ -100,13 +100,13 @@ across years but the model estimates shared landscape effects and scales.
 }
 \details{
 Raster maps must be aligned because landscape configuration metrics
-  use cell adjacency and the resulting model assumes common map units.
-  Group-specific maps may contain different missing cells. For kernel
-  covariates, pooled bins track both finite-cell value sums and counts.
-  The fitted model has common slopes and scales unless its formula explicitly
-  includes group interactions. Choose the response likelihood and any group
-  effect according to the sampling design. A pooled model does not establish
-  that effects are stable across years.
+use cell adjacency and the resulting model assumes common map units.
+Group-specific maps may contain different missing cells. For kernel
+covariates, pooled bins track both finite-cell value sums and counts.
+The fitted model has common slopes and scales unless its formula explicitly
+includes group interactions. Choose the response likelihood and any group
+effect according to the sampling design. A pooled model does not establish
+that effects are stable across years.
 }
 \examples{
 library(terra)

@@ -38,7 +38,7 @@
 #'   Original sampler/approximation labels and failed diagnostics are retained.
 #'   These outputs do not establish calibration or diagnostic eligibility.
 #' @seealso \code{\link{.msr_spatial_response_predict}}
-#' @keywords internal
+#' @noRd
 .msr_spatial_response_simulate <- function(object, nsim = 1L, seed = NULL,
     newdata = NULL, kernel_inputs = NULL, row_id = NULL, re.form = NULL,
     scale_re.form = NULL, new_scale_levels = c("error", "sample", "zero"),

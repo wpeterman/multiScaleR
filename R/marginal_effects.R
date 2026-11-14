@@ -282,6 +282,7 @@
 #' @importFrom ggplot2 ggplot aes geom_ribbon geom_line xlab ylab labs
 #' @importFrom cowplot theme_cowplot
 #' @importFrom utils globalVariables
+#' @noMd
 
 plot_marginal_effects <- function(x,
                                   ylab = "Estimated response",

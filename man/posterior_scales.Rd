@@ -35,22 +35,22 @@ weights. This avoids additional resampling error. It requires
 }
 \value{
 A data frame with one row per predictor and distinct scale-formula
-  covariate combination. \code{covariate} identifies the landscape predictor;
-  \code{group} labels the scale predictors; \code{row} is a representative
-  observation row. \code{mean}, \code{median}, \code{sd}, \code{lower}, and
-  \code{upper} summarize the stored draws in map units, or log map units
-  when \code{scale = "log"}. The \code{mean} and \code{sd} are empirical
-  draw summaries; a finite sample does not establish that the corresponding
-  posterior moment exists. Exponentiate log-scale medians and interval
-  limits to express them as distances. Exponentiating a log mean gives a
-  geometric summary, not an arithmetic posterior mean.
-  Weighted summaries use empirical inverse-CDF quantiles and the population
-  SD of the finite weighted candidate distribution. They do not increase
-  importance effective sample size, correct an unseen mode, or establish
-  that an arithmetic posterior moment exists.
-  \code{p_below_min_D} and \code{p_above_max_D} give posterior mass outside
-  the input reference range. These are truncation and resolution diagnostics,
-  not automatic evidence of a biological boundary.
+covariate combination. \code{covariate} identifies the landscape predictor;
+\code{group} labels the scale predictors; \code{row} is a representative
+observation row. \code{mean}, \code{median}, \code{sd}, \code{lower}, and
+\code{upper} summarize the stored draws in map units, or log map units
+when \code{scale = "log"}. The \code{mean} and \code{sd} are empirical
+draw summaries; a finite sample does not establish that the corresponding
+posterior moment exists. Exponentiate log-scale medians and interval
+limits to express them as distances. Exponentiating a log mean gives a
+geometric summary, not an arithmetic posterior mean.
+Weighted summaries use empirical inverse-CDF quantiles and the population
+SD of the finite weighted candidate distribution. They do not increase
+importance effective sample size, correct an unseen mode, or establish
+that an arithmetic posterior moment exists.
+\code{p_below_min_D} and \code{p_above_max_D} give posterior mass outside
+the input reference range. These are truncation and resolution diagnostics,
+not automatic evidence of a biological boundary.
 }
 \description{
 Report shared or group-specific landscape scales in projected map units,
@@ -58,22 +58,22 @@ including their posterior uncertainty and mass outside the reference range.
 }
 \details{
 For \code{~1 + (1 | year)}, each row describes one fitted year's
-  scale after partial pooling. A median is not a separately optimized annual
-  estimate. The shared log-scale intercept describes a population median;
-  it differs from the arithmetic mean of annual scales. Intervals describe
-  uncertainty conditional on the likelihood, priors, maps, and binning.
+scale after partial pooling. A median is not a separately optimized annual
+estimate. The shared log-scale intercept describes a population median;
+it differs from the arithmetic mean of annual scales. Intervals describe
+uncertainty conditional on the likelihood, priors, maps, and binning.
 
-  A random scale effect is \eqn{\tau z}, with standard-normal \eqn{z}
-  and half-normal \eqn{\tau} whose prior scale is \eqn{s}. Its prior
-  exponential moment of order \eqn{r} exists only when \eqn{rs < 1}.
-  Consequently, \code{scale_group_sd = 0.5} places annual distance variance
-  at the infinite-moment boundary; \code{scale_group_sd >= 1} also permits
-  an infinite arithmetic distance mean. A binned likelihood can retain
-  these tails because very large distances approach uniform weighting
-  within the extracted neighborhood. Prefer medians and interval quantiles
-  for distance inference, and \code{scale = "log"} for means and SDs.
-  Log-scale SD here measures uncertainty in a fitted year's log distance;
-  it differs from the between-year population SD in \code{summary(object)}.
+A random scale effect is \eqn{\tau z}, with standard-normal \eqn{z}
+and half-normal \eqn{\tau} whose prior scale is \eqn{s}. Its prior
+exponential moment of order \eqn{r} exists only when \eqn{rs < 1}.
+Consequently, \code{scale_group_sd = 0.5} places annual distance variance
+at the infinite-moment boundary; \code{scale_group_sd >= 1} also permits
+an infinite arithmetic distance mean. A binned likelihood can retain
+these tails because very large distances approach uniform weighting
+within the extracted neighborhood. Prefer medians and interval quantiles
+for distance inference, and \code{scale = "log"} for means and SDs.
+Log-scale SD here measures uncertainty in a fitted year's log distance;
+it differs from the between-year population SD in \code{summary(object)}.
 }
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
@@ -87,7 +87,7 @@ posterior_scales(fit, scale = "log")[c("group", "mean", "sd")]
 }
 \seealso{
 \code{\link{multiScale_bayes}}, \code{\link{plot.multiScaleR_bayes}},
-  \code{\link{diagnose_bayes_scales}};
-  \code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
-  \code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
+\code{\link{diagnose_bayes_scales}};
+\code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
 }

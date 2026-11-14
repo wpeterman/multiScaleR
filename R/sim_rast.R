@@ -4,7 +4,7 @@
 #' @description
 #' Creates a \code{SpatRaster} stack of four simulated landscape surfaces for
 #' use with \code{\link{sim_dat}} and \code{\link{sim_dat_unmarked}}. The stack
-#' contains two binary (0/1) and two continuous (0–1) surfaces with differing
+#' contains two binary (0/1) and two continuous (0 to 1) surfaces with differing
 #' spatial autocorrelation ranges, allowing simulation of multiscale ecological
 #' processes.
 #'
@@ -65,6 +65,7 @@
 #' @rdname sim_rast
 #' @importFrom terra as.int rast plot minmax ext<- values<- crs<-
 #' @importFrom stats rpois rnbinom plogis rbinom dist predict
+#' @noMd
 
 sim_rast <- function(dim = 100,
                      resolution = 10,

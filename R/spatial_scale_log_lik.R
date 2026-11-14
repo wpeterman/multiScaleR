@@ -64,7 +64,7 @@
 #'   accounting alone does not supply a maximized likelihood or an IC penalty.
 #' @seealso \code{\link{.msr_spatial_response_predict}},
 #'   \code{\link{.msr_spatial_scale_probabilities}}
-#' @keywords internal
+#' @noRd
 .msr_spatial_response_log_lik <- function(object, parameters = NULL, draws = NULL) {
   if (!inherits(object, "msr_spatial_scale_prototype"))
     stop("Use a prepared private spatial scale prototype.", call. = FALSE)

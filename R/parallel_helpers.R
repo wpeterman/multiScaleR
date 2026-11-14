@@ -7,7 +7,7 @@
 #' @return Invisibly returns the package name loaded
 #' @details For internal use
 #' @rdname cluster_prep
-#' @keywords internal
+#' @noRd
 #' @importFrom utils getS3method
 #' @importFrom methods getClassDef
 cluster_prep <- function(model, cl) {
@@ -171,7 +171,7 @@ cluster_prep <- function(model, cl) {
 #'
 #' @details For internal use
 #' @rdname extract_namespace
-#' @keywords internal
+#' @noRd
 #' @importFrom insight get_call
 extract_namespace <- function(x) {
   fc <- tryCatch(

@@ -275,6 +275,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #' \code{\link{kernel_dist}} for formulas and examples.
 #' @export
 #' @method summary multiScaleR
+#' @noMd
 summary.multiScaleR <- function(object, profile = FALSE,
                                 dimension = c("2d", "1d"), ...){
 

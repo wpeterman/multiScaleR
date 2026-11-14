@@ -452,7 +452,7 @@
 #'   and defaults are not replaced; the initial update error is retained in the
 #'   returned model's \code{msr_refit_call} attribute.
 #' @rdname kernel_scale_fn
-#' @keywords internal
+#' @noRd
 #' @importFrom insight get_data get_loglikelihood find_predictors
 #' @importFrom stats formula logLik model.frame
 #' @useDynLib multiScaleR, .registration=TRUE

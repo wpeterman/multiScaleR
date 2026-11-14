@@ -22,10 +22,10 @@ remains unavailable.}
 }
 \value{
 A named covariance matrix. Joint covariance is unavailable at
-  parameter bounds or when identifiability diagnostics fail; in that case
-  this method raises an error rather than reporting a misleading Wald result.
-  For \code{joint_mixed} with \code{type = "conditional"}, returns the native
-  glmmTMB covariance list by model component, conditional on selected scales.
+parameter bounds or when identifiability diagnostics fail; in that case
+this method raises an error rather than reporting a misleading Wald result.
+For \code{joint_mixed} with \code{type = "conditional"}, returns the native
+glmmTMB covariance list by model component, conditional on selected scales.
 }
 \description{
 Covariance for an analytic multiscale GLM

@@ -9,7 +9,7 @@
 #' @return data frame with calculated confidence intervals
 
 #' @rdname ci_func_r
-#' @keywords internal
+#' @noRd
 #' @importFrom stats quantile rnorm qt
 
 ci_func_r <- function(x,

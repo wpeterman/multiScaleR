@@ -2,7 +2,7 @@
 % Please edit documentation in R/sim_dat_unmarked.R
 \name{sim_dat_unmarked}
 \alias{sim_dat_unmarked}
-\title{Simulate data for optimizing scales of effect with `unmarked`}
+\title{Simulate data for optimizing scales of effect with \code{unmarked}}
 \usage{
 sim_dat_unmarked(
   alpha = 1,
@@ -36,13 +36,13 @@ exponential), \code{"expow"} (exponential power), or \code{"fixed"}
 
 \item{type}{Character. Response type to simulate. One of:
 \describe{
-  \item{\code{"count"}}{(Default) Poisson-distributed abundance with
-    binomial thinning to simulate detection probability \code{det}.}
-  \item{\code{"count_nb"}}{Negative binomial abundance with dispersion
-    \code{StDev}, then binomial thinning.}
-  \item{\code{"occ"}}{Bernoulli occupancy data; occupancy is generated
-    from a logistic model and detections follow
-    \code{Bernoulli(occ * det)}.}
+\item{\code{"count"}}{(Default) Poisson-distributed abundance with
+binomial thinning to simulate detection probability \code{det}.}
+\item{\code{"count_nb"}}{Negative binomial abundance with dispersion
+\code{StDev}, then binomial thinning.}
+\item{\code{"occ"}}{Bernoulli occupancy data; occupancy is generated
+from a logistic model and detections follow
+\code{Bernoulli(occ * det)}.}
 }}
 
 \item{StDev}{Positive numeric. Dispersion (size) parameter for
@@ -85,17 +85,17 @@ set automatically to 110\% of the one-dimensional distance enclosing
 \value{
 A named list with three elements:
 \describe{
-  \item{\code{y}}{Integer matrix of dimensions \code{n_points x n_surv}
-    containing the simulated replicated observations. Pass as the \code{y}
-    argument when constructing an \code{unmarkedFrame}.}
-  \item{\code{df}}{Data frame with \code{n_points} rows. The \code{y} column
-    contains the simulated true abundance/occupancy (before detection
-    thinning). Remaining columns are the true kernel-weighted covariate
-    values, scaled to zero mean and unit variance.}
-  \item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
-    An \code{obs} column is appended containing the true
-    abundance/occupancy values. Pass to \code{\link{kernel_prep}} as
-    \code{pts}.}
+\item{\code{y}}{Integer matrix of dimensions \code{n_points x n_surv}
+containing the simulated replicated observations. Pass as the \code{y}
+argument when constructing an \code{unmarkedFrame}.}
+\item{\code{df}}{Data frame with \code{n_points} rows. The \code{y} column
+contains the simulated true abundance/occupancy (before detection
+thinning). Remaining columns are the true kernel-weighted covariate
+values, scaled to zero mean and unit variance.}
+\item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
+An \code{obs} column is appended containing the true
+abundance/occupancy values. Pass to \code{\link{kernel_prep}} as
+\code{pts}.}
 }
 }
 \description{
