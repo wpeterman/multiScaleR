@@ -45,10 +45,27 @@ jobs:
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
-      # pkgdown renders every top-level .md file as a page and has no option
-      # to skip one. Remove the developer notes so they are not published.
+      # pkgdown renders every top-level .md file as a page and indexes its
+      # text for the site search, with no option to skip a file. Remove the
+      # developer notes, their search entries, and their sitemap entries so
+      # that none of their text is published. jsonlite comes with pkgdown.
       - name: Remove developer-only pages
-        run: rm -f docs/AGENTS.html docs/AGENTS.md docs/PROJECT_NOTES.html docs/PROJECT_NOTES.md
+        shell: Rscript {0}
+        run: |
+          notes <- c("AGENTS", "PROJECT_NOTES")
+          unlink(file.path("docs", paste0(notes, rep(c(".html", ".md"), each = 2))))
+          pattern <- paste0("/(", paste(notes, collapse = "|"), ")[.]html")
+          if (file.exists("docs/search.json")) {
+            index <- jsonlite::read_json("docs/search.json")
+            keep <- !vapply(index, function(e) any(grepl(pattern, unlist(e$path))), logical(1))
+            jsonlite::write_json(index[keep], "docs/search.json", auto_unbox = TRUE, null = "null")
+          }
+          if (file.exists("docs/sitemap.xml")) {
+            map <- paste(readLines("docs/sitemap.xml", warn = FALSE), collapse = "\n")
+            map <- gsub(paste0("<url>[[:space:]]*<loc>[^<]*", pattern,
+                               "</loc>[[:space:]]*</url>[[:space:]]*"), "", map)
+            writeLines(map, "docs/sitemap.xml")
+          }
 
       - name: Deploy to GitHub pages
         if: github.event_name != 'pull_request'
