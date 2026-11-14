@@ -1,4 +1,5 @@
 test_that("zero random effects use syntax and retain fixed-variable checks", {
+  skip_on_cran()
   skip_if_not_installed("lme4")
   f <- refit_spatial_fixture()
   dat <- f$data
@@ -74,6 +75,7 @@ test_that("nlme population controls accept integer and double zero levels", {
 })
 
 test_that("GAM snapshots retain native components and covariance choices", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- refit_spatial_fixture()
   dat <- f$data

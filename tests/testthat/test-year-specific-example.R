@@ -1,4 +1,5 @@
 test_that("group-specific bins and final model use the assigned annual map", {
+  skip_on_cran()
   example_file <- system.file("examples", "year_specific_rasters.R",
                               package = "multiScaleR")
   if (!nzchar(example_file)) {

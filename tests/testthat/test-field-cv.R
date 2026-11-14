@@ -48,6 +48,7 @@ test_that("native Gaussian field CV estimates ranges and retains exact joint sco
 })
 
 test_that("field points survive covariance work without losing final native SEs or calls", {
+  skip_on_cran()
   f <- field_cv_fixture(); model <- f$result$fits[[1L]]
   points <- list.files(f$audit, pattern = "-point[12][.]rds$", recursive = TRUE, full.names = TRUE)
   expect_length(points, 4L)
@@ -63,6 +64,7 @@ test_that("field points survive covariance work without losing final native SEs 
 })
 
 test_that("held-out and buffer responses cannot train field parameters or predictions", {
+  skip_on_cran()
   f <- field_cv_fixture(); name <- names(f$folds)[1L]; split <- f$folds[[name]]
   changed <- f$data
   outside <- setdiff(rownames(changed), split$analysis)
@@ -80,6 +82,7 @@ test_that("held-out and buffer responses cannot train field parameters or predic
 })
 
 test_that("field CV compares joint targets and selects only from training criteria", {
+  skip_on_cran()
   exp <- field_cv_fixture()$result; gau <- field_cv_fixture("gaussian")$result
   candidates <- list(exp = exp, gau = gau)
   expect_equal(nrow(cv_tab(candidates, "neg_log_score", by_fold = TRUE)), 4L)

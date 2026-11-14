@@ -1,5 +1,6 @@
 # Existing bounded software fixtures only. No recovery/sampler/seed search.
 test_that("fixed spline matrices follow native crossings, columns and row layouts", {
+  skip_on_cran()
   dat <- data.frame(y = 1:12, h = c(-1, 0, .2, .5, .8, 1, 2, .2-1e-8,
     .2+1e-8, .5-1e-8, .5+1e-8, .3), k = seq(.05, .95, length.out = 12),
     z = seq(.3, .9, length.out = 12), group = factor(rep(c("a", "b", "c"), 4)))
@@ -227,6 +228,7 @@ test_that("dynamic spline policy rejects adaptive and ambiguous recipes", {
 
 
 test_that("public fixed spline fits preserve coefficient SEs, K and frozen curves", {
+  skip_on_cran()
   f <- formula_integration_fixture()
   model <- glm(y ~ splines::ns(hab,knots=c(-.4,.6),Boundary.knots=c(-5,5)) +
     group + z + offset(log(exposure)),f$data,family=poisson())

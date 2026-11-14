@@ -47,6 +47,7 @@ test_that("compact selection matches native tables, choices and held-out scores"
 })
 
 test_that("native response representations, zero rows and rank counts survive compact capture", {
+  skip_on_cran()
   z <- cv_record_data(); d <- z$data; d$alias <- d$x
   d$yes[c(1, 5)] <- d$no[c(1, 5)] <- 0
   d$factor_y <- factor(ifelse(d$binary, "yes", "no"), levels = c("no", "yes"))

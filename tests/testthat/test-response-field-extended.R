@@ -49,6 +49,7 @@ test_that("more native response families and spatial covariances retain predicti
 })
 
 test_that("native field effects retain zero-field contracts and guarded joint fitting", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   f <- extended_response_field_fixture("nbinom2", "mat")
   path <- tempfile(fileext = ".pdf"); on.exit(unlink(path), add = TRUE)
@@ -71,6 +72,7 @@ test_that("native field effects retain zero-field contracts and guarded joint fi
 })
 
 test_that("extended spatial families retain native fixed-reference refits and raster bands", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   for (pair in list(c("binomial", "mat"), c("nbinom2", "exp"), c("Gamma", "gau"))) {
     f <- extended_response_field_fixture(pair[1L], pair[2L])

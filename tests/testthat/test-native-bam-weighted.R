@@ -205,6 +205,7 @@ test_that("weighted and legacy NB BAM curves keep conditional means and raw refe
 })
 
 test_that("weighted NB BAM selection counts actual nuisance and spatial parameters", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   for (entry in weighted_bam_fixture()) {
     before <- entry$model; model <- entry$model

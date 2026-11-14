@@ -24,6 +24,7 @@ test_that("native mixed expression likelihoods retain complete AD scores", {
 })
 
 test_that("public expression fits retain native prediction, covariance, curves and K", {
+  skip_on_cran()
   f <- formula_integration_fixture()
   model <- glm(y ~ hab * group + I(hab^2) + z + offset(log(exposure)),
     f$data, family = poisson())
@@ -51,6 +52,7 @@ test_that("public expression fits retain native prediction, covariance, curves a
 
 
 test_that("conditional GLM metadata retains every native formula offset", {
+  skip_on_cran()
   for (family in c("poisson", "gaussian", "binomial", "nbinom2")) {
     for (expression in c(FALSE, TRUE)) {
       f <- formula_integration_fixture(family)

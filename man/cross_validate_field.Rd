@@ -158,6 +158,12 @@ data and records the package versions, convergence, marginal score, and
 curvature checks of each. For Gaussian responses both starts must pass and
 agree, or the fold fails. For the other families the passing start with
 the highest likelihood is used, and the outcome of each start is kept.
+With few locations in a training fold, the field's standard deviation and
+range are often weakly identified, and the two Gaussian starts can stop at
+different points of a nearly flat likelihood. Those folds fail by design
+("starts disagree") rather than report one arbitrary solution. Use more
+locations per fold, or fewer folds, and inspect \code{audit_dir} to see how far
+apart the starts ended.
 }
 
 \section{Build folds for a field model}{

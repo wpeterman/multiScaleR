@@ -128,6 +128,7 @@ gdr_start_TMB_witnesses <- local({
 })
 
 test_that("actual C points retain all active constructor coordinates without callbacks", {
+  skip_on_cran()
   for (model in c(gdr_guard_fixture(), gdr_start_C_points())) {
     before <- gdr_guard_state(model)
     snapshot <- gdr_start_values(model)

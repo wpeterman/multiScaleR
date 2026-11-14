@@ -63,6 +63,7 @@ test_that("keyed GDR intervals preserve all original slots and column attributes
 })
 
 test_that("native GDR designs retain interval formulas and primary/site placement", {
+  skip_on_cran()
   design <- get("getDesign", asNamespace("unmarked"))
   for (primary in 1:2) {
     f <- gdr_interval_fixture(primary)

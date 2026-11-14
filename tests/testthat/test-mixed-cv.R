@@ -22,6 +22,7 @@ mixed_cv_fixture <- function() {
 }
 
 test_that("Gaussian mixed CV agrees with independent dense conditioning", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   f <- mixed_cv_fixture()
   d <- f$data
@@ -111,6 +112,7 @@ test_that("non-Gaussian CV matches direct integration over the group effect", {
 })
 
 test_that("mixed CV comparison, selection and scoring use training outcomes only", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   f <- mixed_cv_fixture()
   d <- f$data

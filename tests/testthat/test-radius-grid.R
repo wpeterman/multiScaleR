@@ -172,6 +172,7 @@ mixed_radius_grid_fixture <- function(kernel = "gaussian") {
 }
 
 test_that("joint radii profile the Gaussian bandwidth against independent native fits", {
+  skip_on_cran()
   f <- mixed_radius_grid_fixture()
   d <- f$data
   fit <- multiScale_optim(lm(y ~ hab + diversity + rough, data = d), f$inputs,

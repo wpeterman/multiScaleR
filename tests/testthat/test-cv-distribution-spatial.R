@@ -134,6 +134,7 @@ test_that("spatial NB/Gamma folds preserve frozen mean/SQ predictions, native de
 })
 
 test_that("spatial NB/Gamma training nuisance, scales, transforms and starts resist assessment perturbation", {
+  skip_on_cran()
   z <- cv_distribution_spatial_fixture()
   for (pair in list(c("nb_profile", "nb_leak"), c("gamma", "gamma_leak"))) {
     a <- z$cases[[pair[1]]]$cv; b <- z$cases[[pair[2]]]$cv

@@ -1,3 +1,7 @@
+# Every test in this file shares a fitted fixture that takes several seconds to
+# build, so CRAN skips the whole file. CI sets NOT_CRAN and runs it.
+skip_on_cran()
+
 # These tests check observed-data/criterion bookkeeping, not general MLE quality.
 # A single failure-retaining fixture supplies six native fits per test lifecycle.
 pcount_comparison_cache <- new.env(parent = emptyenv())
@@ -103,6 +107,7 @@ test_that("mixed pcount penalties retain variance and mixture parameters", {
 })
 
 test_that("pcount comparisons check actual visits rather than raw frames or site totals", {
+  skip_on_cran()
   fits <- pcount_comparison_fixture()$fits
   a <- fits$missing_a; b <- fits$missing_b
   expect_identical(a@data, b@data)

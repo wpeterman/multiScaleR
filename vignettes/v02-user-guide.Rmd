@@ -682,9 +682,13 @@ round(summary(zinb_opt)$opt_scale)      # sigma (m): truth is 400 and 200
 round(coef(zinb_opt$opt_mod), 2)        # truth: 0.5, 0.75, -0.25, -1
 ```
 
-**How to read the output:** Both sigma intervals contain the value used to
-simulate the data. The interval for `cont1`, the zero-inflation covariate, is
-the wider of the two relative to its estimate. Coefficients named `count_` are
+**How to read the output:** The interval for `cont1`, the zero-inflation
+covariate, contains the 200 m used to simulate the data and is the wider of
+the two relative to its estimate. The interval for `bin1`,
+`r round(summary(zinb_opt)$opt_scale["bin1", "2.5%"])` to
+`r round(summary(zinb_opt)$opt_scale["bin1", "97.5%"])` m, stops short of the
+true 400 m. A 95% interval misses its true value in about one simulated data
+set in twenty, and this is one of them. Coefficients named `count_` are
 on the log scale, so `exp()` gives a multiplicative change in expected
 abundance. Coefficients named `zero_` are on the logit scale and describe the
 probability of an excess zero. The negative `zero_cont1` means that excess
@@ -807,10 +811,11 @@ for the final model. Abundance coefficients are on the log scale and detection
 is on the logit scale. The intercept and both effects are close to the
 simulated values of 1, 0.75, and -0.75, and the detection probability of
 `r round(plogis(coef(opt_nmix$opt_mod, type = "det")), 2)` is close to 0.5.
-Scale recovery is weaker. The interval for `cont2` contains the true
-150 m, but the interval for `bin1` falls short of the true 75 m. The summary
-also warns that an effective distance approaches `max_D`. Prepare the inputs
-again with the larger `max_D` it suggests before you interpret these scales.
+Both sigma intervals contain their true values of 75 m for `bin1` and 150 m
+for `cont2`. The interval for `cont2` is about three times as wide as the one
+for `bin1`, so its scale is the less certain of the two. If the summary warns
+that an effective distance approaches `max_D`, prepare the inputs again with
+the larger `max_D` it suggests before you interpret the scales.
 
 `plot()` and `plot_marginal_effects()` work as they do for a GLM. The effect
 panels show expected abundance by default. `type = "det"` plots detection

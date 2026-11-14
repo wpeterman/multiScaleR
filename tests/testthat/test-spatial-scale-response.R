@@ -126,6 +126,7 @@ test_that("new ordinary group coefficients append after the spatial field and re
 })
 
 test_that("spatial responses reevaluate fixed metrics at their frozen reference scales", {
+  skip_on_cran()
   skip_if_not_installed("terra")
   for (kernel in c("gaussian", "exp")) for (field in c("mean", "rough")) {
     f <- refit_spatial_fixture(kernel = kernel, bin = TRUE)

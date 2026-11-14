@@ -96,6 +96,7 @@ test_that("native C refit checkpoints bind each attempt to its data and settings
 })
 
 test_that("interrupted requests survive before native entry", {
+  skip_on_cran()
   fixture <- gdr_refit_fixture("P")
   path <- gdr_test_audit_path("gdr-checkpoint-interrupted-")
   writer <- .msr_gdr_atomic_audit

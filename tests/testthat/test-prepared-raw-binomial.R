@@ -35,6 +35,7 @@ test_that("finite-MLE geometry distinguishes overlap, separation and unresolved 
 
 
 test_that("prepared raw ns2 values preserve native designs, likelihoods and nominal counts", {
+  skip_on_cran()
   skip_if_not_installed("lpSolve")
   skip_if_not_installed("gmp")
   for (kind in c("binary", "grouped", "factor")) {

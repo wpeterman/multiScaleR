@@ -1,4 +1,5 @@
 test_that("stream kernel arithmetic preserves values, derivatives and defaults", {
+  skip_on_cran()
   # A fixed arithmetic fixture, without responses or model fitting.
   counts <- matrix(rep(1:4, 18), 8, 9)
   values <- matrix(sin(seq_len(72)), 8, 9) * counts

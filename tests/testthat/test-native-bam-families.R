@@ -135,6 +135,7 @@ test_that("binomial and Poisson BAM maps and curves retain response semantics", 
 })
 
 test_that("binomial and Poisson BAM tables preserve family and native penalty counts", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   for (entry in native_bam_family_fixture()) {
     model <- entry$model; models <- list(entry$object, model); labels <- c("wrapped", "native")

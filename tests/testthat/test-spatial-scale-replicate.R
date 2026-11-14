@@ -18,6 +18,7 @@ spatial_replicate_oracle <- function(object, data, inputs, nsim, seed, trials = 
 }
 
 test_that("private spatial replicates match independent family RNG and preserve joint metadata", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
     for (metric in c("mean", "sq")) {
       x <- spatial_response_fixture(kernel, family, metric); b <- x$object

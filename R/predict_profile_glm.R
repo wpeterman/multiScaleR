@@ -616,6 +616,14 @@ predict.multiScaleR <- function(object, newdata = NULL, kernel_inputs = NULL,
       match.arg(interval), ...))
   type <- match.arg(type)
   dots <- list(...)
+  # The analytic backends accept only include_fixed through `...`. Stop on
+  # anything else (for example re.form or a misspelled name) rather than
+  # silently ignoring it, as the other backends do.
+  extra <- setdiff(names(dots), "include_fixed")
+  if (length(dots) && (is.null(names(dots)) || any(!nzchar(names(dots))) || length(extra)))
+    stop("Unsupported prediction arguments for the analytic backends: ",
+         if (length(extra)) paste(extra, collapse = ", ") else "unnamed arguments",
+         ". Only include_fixed is accepted through `...`.", call. = FALSE)
   include_fixed <- if (is.null(dots$include_fixed)) FALSE else dots$include_fixed
   newdata <- .msr_fixed_point_data(object, newdata, kernel_inputs, include_fixed)
   uncertainty <- match.arg(uncertainty)

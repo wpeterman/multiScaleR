@@ -116,6 +116,7 @@ test_that("ziplss response uncertainty uses both predictors and signed covarianc
 })
 
 test_that("scalar count means survive snapshots, checked rasters and raw-reference curves", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- zip_response_fixture(); dat <- f$data; model <- f$models$plain$model
   object <- f$f$object; object$opt_mod <- model

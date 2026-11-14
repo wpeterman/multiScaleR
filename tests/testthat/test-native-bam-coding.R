@@ -102,6 +102,7 @@ test_that("serial native BAM routes retain fitted coding and numerical outputs",
 })
 
 test_that("native BAM checked maps and raw curves retain conditional means", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- native_bam_coding_fixture()
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)

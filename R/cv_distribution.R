@@ -204,8 +204,12 @@
       status = if (complete) "scored" else "failed", stringsAsFactors = FALSE)
     output$warnings[name] <- list(messages); output$errors[name] <- list(error); output$distribution[name] <- list(nuisance)
     native <- if (inherits(fit, "multiScaleR")) fit$opt_mod else fit
-    output$diagnostics[name] <- list(list(initial_glm = if (is.null(initial)) NULL else initial[c("converged", "boundary", "iter", "th.warn", "SE.theta")],
-      fitted_glm = if (is.null(native)) NULL else native[c("converged", "boundary", "iter", "th.warn", "SE.theta")],
+    # Keep only the fields a fit actually has; Gamma and Poisson fits carry no
+    # theta fields, which would otherwise appear as NA-named NULL entries.
+    glm_fields <- function(x) if (is.null(x)) NULL else
+      x[intersect(c("converged", "boundary", "iter", "th.warn", "SE.theta"), names(x))]
+    output$diagnostics[name] <- list(list(initial_glm = glm_fields(initial),
+      fitted_glm = glm_fields(native),
       scale = if (inherits(fit, "multiScaleR")) fit$diagnostics else NULL))
     if (is.null(inputs)) output$prediction_contracts[[name]] <- .msr_prediction_contract("likelihood", "glm",
       "expected_response", "response", population = "fixed_at_estimate", kernel = "not_applicable",

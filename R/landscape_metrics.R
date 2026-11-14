@@ -1180,7 +1180,9 @@
     high <- (g_i >= p_i) | (p_i >= 0.5)
     high[is.na(high)] <- FALSE
     result[high]  <- (g_i[high]  - p_i[high])  / (1 - p_i[high])
-    result[!high] <- (g_i[!high] - p_i[!high]) / (-p_i[!high])
+    # FRAGSTATS: -1 when maximally disaggregated (g_i = 0). landscapemetrics
+    # 2.2.1 divides by -p_i here, which flips the sign of this branch.
+    result[!high] <- (g_i[!high] - p_i[!high]) / p_i[!high]
     result[n_i <= 0 | p_i >= 1 | !is.finite(min_e) |
              total_cells <= 0 | counts$area_cells <= 0] <- NA_real_
   } else {

@@ -729,7 +729,18 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
       if (backend == "refit") controls$include_fixed <- TRUE
       mu <- do.call(stats::predict, controls)
       if (!is.numeric(mu) || length(mu) != nrow(pred)) stop("Prediction rows do not match the assessment set.", call. = FALSE)
-      output$prediction_contracts[[name]] <- attr(mu, "prediction_contract", exact = TRUE)
+      contract <- attr(mu, "prediction_contract", exact = TRUE)
+      # Point predictions from the analytic backends carry no contract, so
+      # record what this fold's prediction is: the expected response at the
+      # training estimates, with no parameter or kernel uncertainty.
+      if (is.null(contract) && .msr_analytic_backend(fit))
+        contract <- .msr_prediction_contract("likelihood", fit$backend,
+          "expected_response", "response", population = "fixed_at_estimate",
+          kernel = "fixed_at_estimate",
+          conditioning = c("training_fit", "selected_kernel_parameters"),
+          omitted = c("parameter_uncertainty", "kernel_parameter_uncertainty",
+                      "observation_noise"), fixed_inputs = TRUE)
+      output$prediction_contracts[[name]] <- contract
       pred$prediction <- as.numeric(mu)
       stage <- "scoring"
       pred <- .msr_cv_score(pred, family, metrics)

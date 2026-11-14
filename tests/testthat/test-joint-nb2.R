@@ -29,6 +29,7 @@ test_that("stable NB2 likelihood includes the exact boundary and large counts", 
 })
 
 test_that("joint NB2 matches profile fitting and observed uncertainty", {
+  skip_on_cran()
   f <- profile_glm_fixture()
   j <- joint_nb2_fit(f)
   p <- suppressWarnings(profile_glm_fit(f))
@@ -119,6 +120,7 @@ test_that("exact Poisson fits preserve prediction and uncertainty contracts", {
 })
 
 test_that("joint NB2 supports weighted two-kernel fits and rejects invalid starts", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 180)
   f$inputs$binned$vsum$cover <- f$inputs$binned$vsum$hab[, 30:1]
   f$inputs$binned$csum$cover <- f$inputs$binned$csum$hab[, 30:1]
@@ -143,6 +145,7 @@ test_that("joint NB2 supports weighted two-kernel fits and rejects invalid start
 })
 
 test_that("joint NB2 retains weak-scale safeguards and fits exponential-power kernels", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 300, seed = 734007, effect = .05)
   j <- joint_nb2_fit(f)
   p <- suppressWarnings(profile_glm_fit(f))

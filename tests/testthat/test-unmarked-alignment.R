@@ -87,6 +87,12 @@ test_that("unmarked open-population models use component formulas and static sit
   mod <- unmarked::pcountOpen(~x, ~1, ~1, ~1, data = umf, K = 20,
                               se = FALSE)
   expect_equal(multiScaleR:::.unmarked_model_predictors(mod), "x")
+  # The default prediction type is the model's own state process: "lambda"
+  # here, where unmarked rejects "state"; "state" for pcount().
+  expect_identical(multiScaleR:::.msr_unmarked_default_type(mod), "lambda")
+  pc <- unmarked::pcount(~1 ~ x, data = unmarked::unmarkedFramePCount(y = y,
+    siteCovs = site_covs), K = 20, se = FALSE)
+  expect_identical(multiScaleR:::.msr_unmarked_default_type(pc), "state")
   nested <- mod
   nested@formlist <- list(state = list(lambda = ~x), detection = list(~1))
   expect_equal(multiScaleR:::.unmarked_model_predictors(nested), "x")

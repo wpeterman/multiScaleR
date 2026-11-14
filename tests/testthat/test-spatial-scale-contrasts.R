@@ -18,6 +18,7 @@ spatial_contrast_design <- function(b, data) {
 }
 
 test_that("paired scales propagate the same joint field at both locations", {
+  skip_on_cran()
   nd <- data.frame(east = c(.2, -.1, .2, 99), north = c(.3, .4, .3, 88))
   pairs <- rbind(c(1, 2), c(1, 3), c(1, 1), c(2, 1), c(1, 2))
   rownames(pairs) <- c("forward", "equal coordinates", "same row", "reverse", "forward")

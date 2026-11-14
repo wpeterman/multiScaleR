@@ -1,4 +1,5 @@
 test_that("fixed-range GDR spatial fields retain native finite-K likelihood derivatives", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   for (K in c(2L, 40L)) for (range in c(10, 50, 150)) {
     f <- gdr_response_field_fixture(K)
@@ -78,6 +79,7 @@ test_that("GDR field independence and zero-SD limits retain normalized targets",
 })
 
 test_that("GDR spatial Laplace targets retain cold modes and current latent curvature", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   key <- function(x) paste(x, ave(seq_along(x), x, FUN = seq_along), sep = "#")
   for (K in c(2L, 40L)) for (range in c(10, 50, 150)) {
@@ -124,6 +126,7 @@ test_that("GDR spatial Laplace targets retain cold modes and current latent curv
 })
 
 test_that("new-coordinate GDR field variance stays separate and row aligned", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   f <- gdr_response_field_fixture(); range <- 50
   context <- .msr_gdr_response_field_context(f$data, f$pars, f$coords, f$crs, range)

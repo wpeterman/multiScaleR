@@ -71,7 +71,8 @@
         stop("Explicit new field coordinates require their declared crs.", call. = FALSE)
       projection <- field$project(coords, as.character(seq_len(rows)), crs)
       gradient[, latent] <- projection$loading
-      sd <- exp(point[names(point) == "lsigma_lambda"])
+      # unname() keeps the parameter name off one-row results.
+      sd <- unname(exp(point[names(point) == "lsigma_lambda"]))
       new_variance <- sd^2 * projection$conditional_unit_variance
     } else {
       Z <- .msr_unmarked_random_design(forms[[type]], field$raw[[type]], data)

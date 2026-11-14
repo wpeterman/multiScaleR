@@ -31,6 +31,7 @@ test_that("transport compacts only recognized native GAM warning call data", {
 })
 
 test_that("actual BAM worker warnings retain diagnostics without transporting fitted data", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   # This cache is normally shared with the facet test. Isolated-file execution
   # loads its definition only, not the tests, with the same bounded fixtures.

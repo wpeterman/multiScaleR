@@ -11,6 +11,7 @@ test_that("direct metric convolution preserves orientation, masks, and zero supp
 })
 
 test_that("weighted surface raster metrics support focal smoothing under all kernels", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp", "expow")) {
     f <- refit_spatial_fixture(kernel)
     raster <- f$rasters[["elev"]]
@@ -59,6 +60,7 @@ test_that("hard-radius texture and categorical metrics support focal smoothing",
 })
 
 test_that("focal projection can retain the exact prepared buffer and aliases", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp", "expow")) {
     f <- refit_spatial_fixture(kernel)
     x <- f$inputs
@@ -74,6 +76,7 @@ test_that("focal projection can retain the exact prepared buffer and aliases", {
 })
 
 test_that("roughness is stable under large offsets and zero on constant support", {
+  skip_on_cran()
   v <- c(1, 2, 4, 8, 16)
   w <- exp(-seq_along(v) / 2)
   for (metric in c("sa", "sq", "ssk", "sku"))
@@ -105,6 +108,7 @@ test_that("roughness is stable under large offsets and zero on constant support"
 })
 
 test_that("deterministic kernel smoothing preserves the caller RNG state", {
+  skip_on_cran()
   f <- refit_spatial_fixture()
   set.seed(773)
   before <- .Random.seed

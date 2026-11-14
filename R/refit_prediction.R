@@ -268,6 +268,15 @@
 }
 
 # Shared native target for prepared point rows and checked raster chunks.
+# Default prediction type for an unmarked fit: its first estimate type, which
+# is the state process. That is "state" for occu() and pcount(), "lambda" for
+# pcountOpen() and distance-removal models, and "psi" for colext(). A fixed
+# "state" default is not a valid type for every class.
+.msr_unmarked_default_type <- function(model) {
+  types <- tryCatch(names(model@estimates@estimates), error = function(e) NULL)
+  if (length(types) && nzchar(types[[1L]])) types[[1L]] else "state"
+}
+
 .msr_native_prediction_rows <- function(object, newdata, type, se.fit, dots = list(),
     unmarked_predictor = NULL) {
   model <- .msr_native_active_metadata(
@@ -276,7 +285,8 @@
   dots <- .msr_native_control_names(model, dots, newdata = !is.null(newdata))
   # A survival linear predictor or risk is not a within-choice-set probability.
   # Keep its native names, including lp/risk/survival where the model permits.
-  if (is.null(type)) type <- if (methods::is(model, "unmarkedFitGDRField")) "lambda" else if (unmarked) "state" else
+  if (is.null(type)) type <- if (methods::is(model, "unmarkedFitGDRField")) "lambda" else
+    if (unmarked) .msr_unmarked_default_type(model) else
     if (inherits(model, "coxph")) "lp" else "response"
   validate_character_scalar(type, "type")
   if (inherits(model, "coxph")) {

@@ -8,7 +8,14 @@
     if (is.matrix(hessian) && is.numeric(hessian) &&
         identical(dim(hessian), rep(length(active), 2L))) {
       h <- hessian[active, active, drop = FALSE]
-      if (all(is.finite(h)) && isTRUE(all.equal(h, t(h), tolerance = 1e-10))) {
+      # A refit that fails returns the penalty 1e60 (kernel_scale_fn()). If one
+      # of the finite-difference evaluations behind the Hessian hit it, the
+      # curvature is of order 1e60 or more and inverts to a meaningless,
+      # near-zero standard error. Real log-likelihood curvature on the scaled
+      # parameter (sigma / max_D) is many orders of magnitude smaller.
+      if (all(is.finite(h)) && any(abs(h) >= 1e30)) {
+        reason <- "hessian_includes_failed_refit"
+      } else if (all(is.finite(h)) && isTRUE(all.equal(h, t(h), tolerance = 1e-10))) {
         ch <- tryCatch(chol(h), error = function(e) NULL)
         if (!is.null(ch)) {
           covariance <- chol2inv(ch)

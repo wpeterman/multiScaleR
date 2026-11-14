@@ -1,4 +1,5 @@
 test_that("native refit prediction supports weighted surfaces and all kernels", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp", "expow")) {
     for (metric in c("sa", "sq", "ssk", "sku")) {
       f <- refit_spatial_fixture(kernel, metric)
@@ -17,6 +18,7 @@ test_that("native refit prediction supports weighted surfaces and all kernels", 
 })
 
 test_that("hard-radius surface features retain native refit predictions", {
+  skip_on_cran()
   for (metric in c("sa", "sq", "ssk", "sku", "sdq", "sdr")) {
     f <- refit_spatial_fixture(metric = metric, weighted = FALSE)
     rows <- c(2, 25, 14)

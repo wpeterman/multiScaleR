@@ -1244,6 +1244,12 @@ multiScale_optim <- function(fitted_mod,
         if (kernel_inputs$kernel == "expow") rep(1, n_covs)))
     if (!is.null(radius_grid) && any(active))
       uncertainty$diagnostic$uncertainty <- "outer_refit_wald_conditional_on_selected_hard_radii"
+    if (identical(uncertainty$diagnostic$status, "hessian_includes_failed_refit"))
+      warning("A model refit near the estimated scales failed while the Hessian was ",
+              "computed, so Wald standard errors for the scales are withheld. The ",
+              "estimates stand, but the likelihood near them is fragile. See ",
+              "diagnostics(fit)$refit_hessian and use summary(fit, profile = TRUE) ",
+              "for profile-likelihood limits.", call. = FALSE)
     bounds <- .msr_refit_bounds(opt_results$par, lwr, uppr, active,
       c(rep(kernel_inputs$unit_conv, n_covs),
         if (kernel_inputs$kernel == "expow") rep(1, n_covs)),

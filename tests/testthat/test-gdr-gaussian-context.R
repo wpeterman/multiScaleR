@@ -1,4 +1,5 @@
 test_that("one observation context refreshes independent abundance designs", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   f <- gdr_gaussian_fixture(TRUE, TRUE, 2L)
   counts <- c(cdf = 0L, annulus = 0L)

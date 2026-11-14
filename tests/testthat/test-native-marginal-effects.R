@@ -1,4 +1,5 @@
 test_that("native GLM marginal effects preserve factors, contrasts, and spatial units", {
+  skip_on_cran()
   f <- refit_spatial_fixture()
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
@@ -28,6 +29,7 @@ test_that("native GLM marginal effects preserve factors, contrasts, and spatial 
 })
 
 test_that("glmmTMB curves use its full response target and zero random effects", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   f <- refit_spatial_fixture()
   model <- glmmTMB::glmmTMB(

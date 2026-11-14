@@ -12,6 +12,7 @@ test_that("full profiles retain distinct regions and outside brackets", {
 })
 
 test_that("NB2 profile inference refines likelihood crossings without mutating fits", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 180)
   x <- suppressWarnings(profile_glm_fit(f))
   before <- suppressWarnings(serialize(x, NULL))
@@ -39,6 +40,7 @@ test_that("NB2 profile inference refines likelihood crossings without mutating f
 })
 
 test_that("weak-effect inference finds the boundary and reports an unresolved scale", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 300, seed = 43008, effect = .05)
   x <- suppressWarnings(profile_glm_fit(f))
   a <- scale_inference(x, grid_points = 17, n_starts = 4)
@@ -88,6 +90,7 @@ test_that("bootstrap refits are reproducible, audit failures, and preserve RNG",
 })
 
 test_that("bootstrap p-values at the cutoff reject on the confidence-level axis", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 80)
   x <- suppressWarnings(profile_glm_fit(f))
   local_mocked_bindings(.msr_scale_bootstrap = function(...) {
@@ -159,6 +162,7 @@ test_that("zero-effect diagnostics recover oscillating reduced NB2 fits", {
 })
 
 test_that("no-intercept NB2 profiles recover oscillating conditional GLM fits", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 100, seed = 9822)
   f$model <- glm(y ~ hab - 1 + offset(log(exposure)), data = f$data,
     family = MASS::negative.binomial(2))

@@ -66,6 +66,10 @@ A named list with the following elements:
     If any active parameter is within \code{1e-5} log units of a positive
     bound, joint outer Wald SEs are withheld. A zero lower bound is flagged
     only when reached. The original curvature status is retained separately.
+    A status of \code{"hessian_includes_failed_refit"} means a refit failed
+    at one of the finite-difference points used for the Hessian, so its
+    curvature reflects the failure penalty; Wald SEs are withheld and a
+    warning is given.
     This is a numerical support flag, not a test of identification or a
     calibrated confidence limit. Native coefficient covariance and parameter
     counts are unchanged.}

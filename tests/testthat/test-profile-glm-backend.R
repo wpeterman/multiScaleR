@@ -53,6 +53,9 @@ test_that("prediction uses training normalization, offsets, and joint derivative
   converted$binned$bin_rep <- converted$binned$bin_rep * 1000
   expect_equal(predict(x, nd, converted), response$fit, tolerance = 1e-9)
   expect_error(predict(x, nd), "matching smooth kernel_inputs")
+  # Arguments the analytic route cannot use are refused, not silently dropped.
+  expect_error(predict(x, nd, f$inputs, re.form = NA), "Unsupported prediction arguments.*re.form")
+  expect_error(predict(x, nd, f$inputs, include_fxed = TRUE), "include_fxed")
   missing_fixed <- f$data
   missing_fixed$z <- NULL
   assign("z", f$data$z, envir = environment(formula(x$opt_mod)))
@@ -172,6 +175,7 @@ test_that("Poisson-limit scores and predictions are stable and uncertainty is wi
 })
 
 test_that("likelihood intervals reestimate nuisance parameters and expose search bounds", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 120)
   x <- profile_glm_fit(f)
   pr <- profile_sigma_intervals(x)

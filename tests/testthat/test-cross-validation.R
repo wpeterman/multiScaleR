@@ -142,6 +142,10 @@ test_that("explicit-fold GLM CV refits scales and preserves every planned row", 
       expect_identical(x$training[[fold]]$start_results, x$fits[[fold]]$profile_fit$start_results)
       expect_gte(nrow(x$training[[fold]]$start_results), 6L)
       expect_equal(length(x$training[[fold]]$bin_reference$bin_rep), 32L)
+      # Every scored fold records what its prediction represents.
+      contract <- x$prediction_contracts[[fold]]
+      expect_identical(contract$quantity, "expected_response")
+      expect_identical(contract$method, x$fits[[fold]]$backend)
     }
   }
   expect_identical(unname(z$fits$gaussian$assessment_counts), rep(1L, nrow(f$data)))
@@ -152,6 +156,7 @@ test_that("explicit-fold GLM CV refits scales and preserves every planned row", 
 })
 
 test_that("CV predictions and count scores agree with fixed-scale native GLM oracles", {
+  skip_on_cran()
   z <- cv_stage1_fixture(); f <- z$fixture
   for (name in c("gaussian", "poisson", "binomial")) for (fold in names(f$folds)) {
     x <- z$fits[[name]]; fit <- x$fits[[fold]]
@@ -310,6 +315,7 @@ test_that("fold generators produce explicit splits accepted by scale CV", {
 })
 
 test_that("ordinary GLM references, CV tables and training selection match native oracles", {
+  skip_on_cran()
   z <- cv_stage1_fixture(); f <- z$fixture
   null <- cross_validate_glm(count ~ 1, f$data, f$folds, "poisson", weights = z$weights, keep_fits = TRUE)
   trend <- cross_validate_glm(count ~ poly(z, 2) + group + offset(log(exposure)), f$data,

@@ -84,6 +84,7 @@ test_that("summary and printing select 2D or legacy 1D without modifying the fit
 })
 
 test_that("fitted plot markers and intervals use the chosen dimension", {
+  skip_on_cran()
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
   fit <- make_core_fixture()$opt

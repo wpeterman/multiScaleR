@@ -84,6 +84,7 @@ logical_selection_pairs <- function() {
 }
 
 test_that("logical selection fixtures preserve verified native binomial targets", {
+  skip_on_cran()
   f <- logical_selection_fixture()
   expect_identical(f$calls, 21L)
   for (name in names(f$fits)) {

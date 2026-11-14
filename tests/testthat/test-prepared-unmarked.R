@@ -33,6 +33,7 @@ test_that("N-mixture snapshots retain native tables and component controls", {
 })
 
 test_that("occupancy and dynamic occupancy snapshots retain observation and year contracts", {
+  skip_on_cran()
   skip_if_not_installed("unmarked")
   e <- new.env()
   utils::data("crossbill", package = "unmarked", envir = e)

@@ -78,6 +78,7 @@ test_that("TMB conditional curvature uses the current mode rather than its initi
 })
 
 test_that("explicit TMB settings, target bindings and existing native guards fail closed", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")
   expect_error(make_gdr_refitter(f$model, f$starts, tempfile()), "explicitly contain")
   for (setting in list(list(), within(f$settings, threads <- 2L),
@@ -103,6 +104,7 @@ test_that("explicit TMB settings, target bindings and existing native guards fai
 })
 
 test_that("native TMB uses explicit positive iteration budgets and retains failures", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")
   settings <- f$settings; settings$control$maxit <- 1L
   refit <- make_gdr_refitter(f$model, f$starts, gdr_test_audit_path("tmb-iterations-"), tmb_settings = settings)

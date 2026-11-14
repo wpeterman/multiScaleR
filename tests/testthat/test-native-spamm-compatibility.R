@@ -14,6 +14,7 @@ spamm_native_fixture <- local({
 })
 
 test_that("real HLfit fixed features, zero effects and snapshots retain native values", {
+  skip_on_cran()
   skip_if_not_installed("spaMM")
   for (family in c("gaussian", "poisson")) {
     f <- spamm_native_fixture(family)
@@ -50,6 +51,7 @@ test_that("real HLfit fixed features, zero effects and snapshots retain native v
 })
 
 test_that("HLfit plots transform native link-scale uncertainty and preserve variance attributes", {
+  skip_on_cran()
   skip_if_not_installed("spaMM")
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   for (family in c("gaussian", "poisson")) {
@@ -97,6 +99,7 @@ test_that("HLfit plots transform native link-scale uncertainty and preserve vari
 })
 
 test_that("HLfit penalties include every native DoF component and retain restricted comparisons", {
+  skip_on_cran()
   skip_if_not_installed("spaMM")
   for (family in c("gaussian", "poisson")) {
     f <- spamm_native_fixture(family)

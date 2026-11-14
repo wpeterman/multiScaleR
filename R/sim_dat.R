@@ -188,12 +188,19 @@ sim_dat <- function(alpha = 1,
 
   if(is.numeric(n_points)){
     validate_scalar_numeric(n_points, "n_points", integerish = TRUE, positive = TRUE)
+    # Keep points 15% of the raster width and height inside each edge. Using
+    # each axis's own extent lets rasters that do not start at the origin, or
+    # are not square, work; for a square raster at the origin the window is
+    # the same as before.
     s_ext <- as.vector(ext(raster_stack[[1]]))
-    min_x <- min_y <- floor(s_ext[1] + (s_ext[2] * 0.15))
-    max_x <- max_y <- floor(s_ext[2] - (s_ext[2] * 0.15))
+    x_pad <- (s_ext[2] - s_ext[1]) * 0.15
+    y_pad <- (s_ext[4] - s_ext[3]) * 0.15
+    min_x <- floor(s_ext[1] + x_pad); max_x <- floor(s_ext[2] - x_pad)
+    min_y <- floor(s_ext[3] + y_pad); max_y <- floor(s_ext[4] - y_pad)
     r <- rast()
     ext(r) <- c(min_x, max_x, min_y, max_y)
-    poly <- as.polygons(ext(c(min_x, max_x, min_y, max_y)))
+    # Generated points share the raster's coordinate reference system.
+    poly <- as.polygons(ext(c(min_x, max_x, min_y, max_y)), crs = terra::crs(raster_stack))
     poly_sf <- st_as_sf(poly)
 
     pts <- 0
@@ -213,16 +220,23 @@ sim_dat <- function(alpha = 1,
       stop("A spatVector or sf point object is required if `n_points` is not numeric")
     }
 
-    n_points <- length(pts)
+    # length() of an sf data frame counts its columns, not its points.
+    n_points <- if (inherits(pts, c("sf", "SpatVector"))) nrow(pts) else length(pts)
 
 
   }
 
   if(is.null(max_D)){
-    max_D <- kernel_dist(kernel = kernel,
-                         dimension = "1d",
-                         prob = 0.99,
-                         sigma = max(sigma)) * 1.1
+    # The largest 99% distance over the layers. Each layer is evaluated with
+    # its own shape under "expow"; for the other kernels this equals the
+    # distance at the largest sigma.
+    max_D <- max(vapply(seq_along(sigma), function(i)
+      kernel_dist(kernel = kernel,
+                  dimension = "1d",
+                  prob = 0.99,
+                  sigma = sigma[i],
+                  shape = if (kernel == "expow") shape[i] else NULL),
+      numeric(1))) * 1.1
   } else {
     validate_scalar_numeric(max_D, "max_D", positive = TRUE)
   }

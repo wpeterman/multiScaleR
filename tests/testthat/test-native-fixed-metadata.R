@@ -73,6 +73,7 @@ test_that("native qualified fixed transforms preserve fitted targets and all row
 })
 
 test_that("native effect curves retain fixed normalization when raw inputs are retained", {
+  skip_on_cran()
   f <- refit_spatial_fixture(); dat <- f$data
   bare <- glm(y ~ mean + rough * group + fixed + scale(z) + z:fixed,
     data = dat, family = poisson())

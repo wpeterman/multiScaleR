@@ -1,3 +1,7 @@
+# Every test in this file shares a fitted fixture that takes about a minute to
+# build, so CRAN skips the whole file. CI sets NOT_CRAN and runs it.
+skip_on_cran()
+
 test_that("GDR component points retain original learned bases and native uncertainty", {
   skip_on_cran()
   f <- gdr_trained_fixture()
@@ -26,6 +30,7 @@ test_that("GDR component points retain original learned bases and native uncerta
 })
 
 test_that("GDR native frames preserve site, primary and removal row layouts", {
+  skip_on_cran()
   f <- gdr_trained_fixture()
   for (name in names(f$models)) {
     model <- f$models[[name]]
@@ -43,6 +48,7 @@ test_that("GDR native frames preserve site, primary and removal row layouts", {
 })
 
 test_that("GDR points, snapshots and raster chunks share component recipes", {
+  skip_on_cran()
   f <- gdr_trained_fixture()
   for (name in names(f$models)) {
     model <- f$models[[name]]
@@ -127,6 +133,7 @@ test_that("GDR effect curves use active component rows and raw modeled values", 
 })
 
 test_that("GDR scopes and guards preserve unrelated and unavailable metadata", {
+  skip_on_cran()
   f <- gdr_trained_fixture()
   model <- f$models$TMB
   rows <- unmarked:::get_covariates(model, "lambda")[c(2, 9), c("hab", "land cover")]

@@ -59,6 +59,7 @@ native_dot_original_rows <- function(rows, name) {
 # All references call the ORIGINAL provider on the ORIGINAL fitted model.
 # The six models have no data-learning terms, so single/batched rows agree.
 test_that("native dot formulas validate the fitted variable expansion", {
+  skip_on_cran()
   f <- native_dot_fixture()
   expect_identical(f$calls, 6L)
   for (name in names(f$fits)) {

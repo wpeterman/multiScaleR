@@ -1,4 +1,5 @@
 test_that("exact audit components preserve every supported family and zero-face model universe", {
+  skip_on_cran()
   # Mock optimization/tapes only: retain actual normalized point/path values.
   # The deliberate nonconvergence/singular curvature is not a fitted result.
   constructed <- list()

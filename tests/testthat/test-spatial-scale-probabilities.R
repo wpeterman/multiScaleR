@@ -34,6 +34,7 @@ spatial_probability_log_oracle <- function(b, a, data) {
 }
 
 test_that("location events retain original chain order and independent radial algebra", {
+  skip_on_cran()
   skip_if_not_installed("posterior")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
     for (metric in c("mean", "sq")) {

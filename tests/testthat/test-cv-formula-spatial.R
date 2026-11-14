@@ -23,6 +23,7 @@ cv_formula_spatial_data <- function(fixture, cv) {
 }
 
 test_that("spatial CV repairs final training metadata without changing native fits or gates", {
+  skip_on_cran()
   skip_if_not_installed("MASS")
   planned <- 0L
   cases <- list(gaussian = list(family = "gaussian", backend = "profile_glm"),

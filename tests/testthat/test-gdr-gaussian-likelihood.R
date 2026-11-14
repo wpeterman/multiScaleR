@@ -20,6 +20,7 @@ test_that("annulus callbacks retain moment orders and update across the numeric 
 })
 
 test_that("native finite-K joint targets and derivatives survive exact field reductions", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   key <- function(x) paste(x, ave(seq_along(x), x, FUN = seq_along), sep = "#")
   for (block in c(FALSE, TRUE)) for (observer in c(FALSE, TRUE)) for (K in c(2L, 40L)) {

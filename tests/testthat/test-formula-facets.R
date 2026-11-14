@@ -1,4 +1,5 @@
 test_that("weighted SQ products preserve streaming, family targets and scale scores", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp")) for (only in c(FALSE, TRUE)) {
     f <- formula_weighted_fixture(kernel, only)
     for (family in list(gaussian(), poisson(), binomial(), MASS::negative.binomial(2))) {

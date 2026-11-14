@@ -68,6 +68,9 @@ test_that("NB/Gamma CV matches native means, coefficient uncertainty, proper den
       m <- cv$fits[[name]]; ref <- case$native[[name]]; d <- cv$distribution[[name]]
       p <- cv$predictions[cv$predictions$fold == name, ]; r <- cv$selection_records[[name]]
       expect_identical(cv$warnings[[name]], case$native_warnings[[name]])
+      # Diagnostics list only the fields a fit has, never NA-named entries.
+      for (part in c("initial_glm", "fitted_glm"))
+        expect_false(anyNA(names(cv$diagnostics[[name]][[part]])))
       if (!isTRUE(ref$converged) || !is.null(ref$th.warn)) {
         expect_identical(cv$fold_results$status[cv$fold_results$fold == name], "failed")
         expect_match(cv$errors[[name]]$message, "theta warnings|converged")

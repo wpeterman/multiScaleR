@@ -15,6 +15,7 @@ cv_formula_data <- function() {
 }
 
 test_that("ordinary CV freezes nested learned expressions and offsets for five families", {
+  skip_on_cran()
   skip_if_not_installed("MASS")
   d <- cv_formula_data(); ids <- rownames(d)
   folds <- list(audit = list(analysis = ids[1:64], assessment = ids[65:96]))

@@ -40,6 +40,7 @@ test_that("native TMB S4 results work with all four kernel refit paths", {
 })
 
 test_that("unusable highest TMB attempts retain optimizer evidence and cannot lose to a lower fit", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")
   counter <- 0L
   # A declared constructor stub tests the audit selection contract only.

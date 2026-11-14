@@ -279,6 +279,7 @@ test_that("new annual scales share effects and retain pooling-SD uncertainty", {
 })
 
 test_that("new response effects are shared within a replicate and observation noise is separate", {
+  skip_on_cran()
   f <- bayesian_scale_fixture();fit <- fake_bayesian_draws(prepare_bayesian_fixture(f,"gaussian"),1)
   fit$draws$beta[,] <- 0;fit$draws$log_response_sd[,] <- log(.6)
   fit$draws$log_dispersion[,] <- log(.2)
@@ -293,6 +294,7 @@ test_that("new response effects are shared within a replicate and observation no
 })
 
 test_that("response families and new binomial trial totals have explicit units", {
+  skip_on_cran()
   for (family in c("gaussian","poisson","nbinom2","binomial")) {
     f <- bayesian_scale_fixture()
     if(family=="binomial") f$data$count <- rep(0:1,length.out=nrow(f$data))

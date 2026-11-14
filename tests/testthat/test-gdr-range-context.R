@@ -12,6 +12,7 @@ gdr_range_point <- function(f, cold = FALSE) {
 gdr_range_key <- function(x) paste(x, ave(seq_along(x), x, FUN = seq_along), sep = "#")
 
 test_that("physical range joint density and derivatives retain independent references", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   f <- gdr_response_field_fit_fixture()
   distance <- as.matrix(dist(f$locations)); step <- distance[1L, 2L]
@@ -67,6 +68,7 @@ test_that("physical range joint density and derivatives retain independent refer
 })
 
 test_that("physical range Laplace sections agree with the native whitened measure", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   f <- gdr_response_field_fit_fixture()
   for (range in c(25000, 50000, 100000)) {
@@ -99,6 +101,7 @@ test_that("physical range Laplace sections agree with the native whitened measur
 })
 
 test_that("range contexts retain geometry, counts and exact observation guards", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   f <- gdr_response_field_fit_fixture()
   context <- .msr_gdr_range_context(f$data, f$pars, f$coords, f$crs, 50000)

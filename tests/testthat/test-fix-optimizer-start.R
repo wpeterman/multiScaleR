@@ -86,6 +86,7 @@ test_that("smooth kernels keep the single default start", {
 })
 
 test_that("a start where every refit fails warns with the refit remedy", {
+  skip_on_cran()
   ex <- running_example("gaussian")
   # Stand-in for a glmmTMB model with a non-positive-definite Hessian, whose
   # log-likelihood is NA: logLik.glm() returns NA when the AIC is missing.

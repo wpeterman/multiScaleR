@@ -1,4 +1,5 @@
 test_that("independent log weights retain finite references and exact SQ endpoints", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
       for (response in if (family == "gaussian") c(FALSE, TRUE) else FALSE) {
@@ -76,6 +77,7 @@ test_that("large annual SD preserves independent normalized coordinate values", 
 })
 
 test_that("large-SD paths give the correct normalized group-mixture endpoints", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
       for (response in if (family == "gaussian") c(FALSE, TRUE) else FALSE) {

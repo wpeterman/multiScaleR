@@ -36,6 +36,7 @@ test_that("legacy binned inputs without scale_vars retain their original contrac
 })
 
 test_that("fixed features leave analytic objectives and scores unchanged", {
+  skip_on_cran()
   skip_if_not_installed("MASS")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- fixed_inference_fixture(kernel, bin = TRUE)

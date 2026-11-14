@@ -27,6 +27,7 @@ test_that("binned kernel-weighted mean matches the exact per-cell result", {
 })
 
 test_that("binned optimization recovers the same sigma as the exact path", {
+  skip_on_cran()
   rs <- terra::subset(sim_rast(dim = 60, resolution = 10, user_seed = 7), "cont1")
   names(rs) <- "cov"
   terra::crs(rs) <- "EPSG:32617"
@@ -61,6 +62,7 @@ test_that("binned optimization recovers the same sigma as the exact path", {
 })
 
 test_that("lean mode drops cell data, still optimizes, and matches binned", {
+  skip_on_cran()
   rs <- terra::subset(sim_rast(dim = 60, resolution = 10, user_seed = 7), "cont1")
   names(rs) <- "cov"
   terra::crs(rs) <- "EPSG:32617"

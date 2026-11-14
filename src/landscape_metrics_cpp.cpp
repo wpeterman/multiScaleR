@@ -489,10 +489,14 @@ static double adjacency_from_counts(const std::vector<double>& adjacency,
           double like_i = adjacency[fi * n_classes + fi];
           double g_i = like_i / (4.0 * n_i - min_e);
           double clumpy;
+          // FRAGSTATS definition: -1 when the class is maximally disaggregated
+          // (g_i = 0), 0 for a random arrangement, and 1 when maximally clumped.
+          // landscapemetrics 2.2.1 divides by -p_i here, which flips the sign
+          // of the disaggregated branch.
           if (g_i >= p_i || p_i >= 0.5) {
             clumpy = (g_i - p_i) / (1 - p_i);
           } else {
-            clumpy = (g_i - p_i) / (-p_i);
+            clumpy = (g_i - p_i) / p_i;
           }
           result = clumpy;
         }

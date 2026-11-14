@@ -27,6 +27,7 @@ unmarked_fixed_prediction_fixture <- local({
 })
 
 test_that("fixed-radius preparation is opt-in and matches native inputs", {
+  skip_on_cran()
   f <- unmarked_fixed_prediction_fixture()
   object <- f$object
   n <- nrow(f$inputs$kernel_dat)

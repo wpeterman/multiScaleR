@@ -242,7 +242,7 @@ configuration can be compared across buffers with different composition.
    Code \tab Name \tab Definition \tab Units or range \cr
    \code{pland} \tab Percentage of landscape \tab \code{n_k / n * 100}. 0 when the class is absent \tab Percent \cr
    \code{ca} \tab Class area \tab \code{n_k * res^2 / 10000}. 0 when the class is absent \tab Hectares \cr
-   \code{clumpy} \tab Clumpiness index \tab With \code{G = g_kk / (4 * n_k - Pmin(n_k))} and \code{P = n_k / n}: \code{(G - P) / (1 - P)} when \code{G >= P} or \code{P >= 0.5}, otherwise \code{(G - P) / (-P)}, as in \code{landscapemetrics}. \code{NA} when the class is absent or fills the buffer \tab Unitless. 0 when like adjacencies match the share \code{P} \cr
+   \code{clumpy} \tab Clumpiness index \tab With \code{G = g_kk / (4 * n_k - Pmin(n_k))} and \code{P = n_k / n}: \code{(G - P) / (1 - P)} when \code{G >= P} or \code{P >= 0.5}, otherwise \code{(G - P) / P}, the FRAGSTATS definition. \code{NA} when the class is absent or fills the buffer \tab Unitless, from -1 (maximally dispersed) through 0 (random) to 1 (maximally clumped). \code{landscapemetrics} 2.2.1 divides by \code{-P} in the second case, which reverses the sign of dispersed classes \cr
 }
 }
 

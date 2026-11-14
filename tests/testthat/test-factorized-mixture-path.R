@@ -1,4 +1,5 @@
 test_that("prepared group paths retain native endpoint and group-mixture likelihoods", {
+  skip_on_cran()
   ratios <- c(-.75, 0, .75)
   mass <- vapply(ratios, function(b) integrate(dnorm, -b, Inf, rel.tol = 1e-12)$value, 0)
   expect_equal(mass, pnorm(ratios), tolerance = 1e-12)

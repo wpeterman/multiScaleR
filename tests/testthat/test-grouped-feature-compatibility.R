@@ -1,4 +1,5 @@
 test_that("grouped mean, weighted SQ, and fixed metrics share pooled prediction normalization", {
+  skip_on_cran()
   f <- refit_spatial_fixture()
   early <- f$rasters
   late <- early

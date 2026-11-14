@@ -9,6 +9,7 @@ native_nested_fixture <- local({
 })
 
 test_that("native frames and unmarked curve bases freeze nested standard learners", {
+  skip_on_cran()
   train <- data.frame(y = seq_len(24), z = sin(seq_len(24)/3) + seq_len(24)/20)
   next_rows <- train[c(18, 3, 18, 9), , drop = FALSE]
   next_rows$z <- next_rows$z + .15

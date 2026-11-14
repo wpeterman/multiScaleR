@@ -32,6 +32,7 @@ native_cox_metadata_fixture <- local({
 })
 
 test_that("ordinary native Cox rows retain trained transformations and targets", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   f <- native_cox_metadata_fixture(); model <- f$models$qualified; original <- model
   fixed <- .msr_native_fixed_metadata(model)
@@ -72,6 +73,7 @@ test_that("ordinary native Cox rows retain trained transformations and targets",
 })
 
 test_that("native Cox checked maps and raw-reference curves keep native scales", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   f <- native_cox_metadata_fixture(); dat <- f$data; model <- f$models$qualified
   object <- f$f$object; object$opt_mod <- model

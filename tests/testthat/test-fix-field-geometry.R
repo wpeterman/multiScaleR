@@ -68,6 +68,7 @@ test_that("response_field_geometry() accepts a real default-backend field fit", 
 })
 
 test_that("response_field_geometry() still rejects analytic-backend results", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   f <- small_field_fit()
   other <- f$fit

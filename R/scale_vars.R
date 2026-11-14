@@ -209,7 +209,7 @@
 #' |:-----|:-----|:-----------|:---------------|
 #' | `pland` | Percentage of landscape | `n_k / n * 100`. 0 when the class is absent | Percent |
 #' | `ca` | Class area | `n_k * res^2 / 10000`. 0 when the class is absent | Hectares |
-#' | `clumpy` | Clumpiness index | With `G = g_kk / (4 * n_k - Pmin(n_k))` and `P = n_k / n`: `(G - P) / (1 - P)` when `G >= P` or `P >= 0.5`, otherwise `(G - P) / (-P)`, as in `landscapemetrics`. `NA` when the class is absent or fills the buffer | Unitless. 0 when like adjacencies match the share `P` |
+#' | `clumpy` | Clumpiness index | With `G = g_kk / (4 * n_k - Pmin(n_k))` and `P = n_k / n`: `(G - P) / (1 - P)` when `G >= P` or `P >= 0.5`, otherwise `(G - P) / P`, the FRAGSTATS definition. `NA` when the class is absent or fills the buffer | Unitless, from -1 (maximally dispersed) through 0 (random) to 1 (maximally clumped). `landscapemetrics` 2.2.1 divides by `-P` in the second case, which reverses the sign of dispersed classes |
 #'
 #' # Surface metric definitions
 #'

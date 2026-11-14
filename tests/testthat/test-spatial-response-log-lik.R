@@ -9,6 +9,7 @@ spatial_density_oracle <- function(x, p = x$parameters) {
 }
 
 test_that("conditional spatial response densities retain constants, priors and original rows", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
     for (metric in c("mean", "sq")) {
       x <- spatial_response_fixture(kernel, family, metric)

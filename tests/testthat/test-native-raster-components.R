@@ -1,4 +1,5 @@
 test_that("GAM raster components and native covariance match prepared points", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- refit_spatial_fixture()
   dat <- f$data

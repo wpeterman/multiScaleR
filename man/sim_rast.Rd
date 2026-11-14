@@ -17,10 +17,7 @@ sim_rast(
 }
 \arguments{
 \item{dim}{Positive integer. Number of cells along each side of the square
-raster, so the output is a \code{dim} x \code{dim} grid. With the default ranges,
-use at least 40, because smaller values round the fine-scale range down
-to zero cells and \code{cont1} (and below 20, \code{bin1}) returns \code{NaN}. See
-Details. Default: \code{100}.}
+raster, so the output is a \code{dim} x \code{dim} grid. Default: \code{100}.}
 
 \item{resolution}{Positive numeric. Cell size (edge length) in map units.
 The raster spans 0 to \code{dim * resolution} in each direction. Default:
@@ -29,11 +26,11 @@ The raster spans 0 to \code{dim * resolution} in each direction. Default:
 \item{autocorr_range1}{Optional positive numeric. Autocorrelation range, in
 cells, of the fields behind \code{bin1} and \code{cont1}. Larger values give
 smoother, more broadly correlated patterns. Default \code{NULL} uses
-\code{floor(0.05 * dim)} (fine-scale autocorrelation).}
+\code{floor(0.05 * dim)}, and at least 1 (fine-scale autocorrelation).}
 
 \item{autocorr_range2}{Optional positive numeric. Autocorrelation range, in
 cells, of the fields behind \code{bin2} and \code{cont2}. Default \code{NULL} uses
-\code{floor(0.25 * dim)} (broad-scale autocorrelation).}
+\code{floor(0.25 * dim)}, and at least 1 (broad-scale autocorrelation).}
 
 \item{sill}{Positive numeric. Variance (partial sill) of the exponential
 covariance used for all four fields. Each field is rescaled to 0 to 1
@@ -60,9 +57,9 @@ rescaled to 0 to 1, is at least 0.55, and 0 elsewhere.
 \item \code{bin2}: binary, broad-scale (\code{autocorr_range2}). 1 where the rescaled
 field is below 0.4, and 0 elsewhere.
 \item \code{cont1}: continuous, rescaled to 0 to 1, with a range of
-\code{floor(0.75 * autocorr_range1)} cells.
+\code{floor(0.75 * autocorr_range1)} cells, and at least 1.
 \item \code{cont2}: continuous, rescaled to 0 to 1, with a range of
-\code{floor(1.25 * autocorr_range2)} cells.
+\code{floor(1.25 * autocorr_range2)} cells, and at least 1.
 }
 
 The thresholds are on the rescaled values, not percentiles, so the share
@@ -77,15 +74,15 @@ has one layer with a fine and one with a broad autocorrelation range. Use the la
 of effect, then check that \code{\link[=multiScale_optim]{multiScale_optim()}} recovers them.
 }
 \details{
-Each layer comes from a Gaussian random field generated with a fast
-Fourier transform (FFT) method from the exponential covariance function
-\code{sill * exp(-d / range)}, with \code{d} in cells. Each field is rescaled to run
-from 0 to 1 before it is thresholded (binary layers) or returned
-(continuous layers). A range rounded down to zero cells leaves the
-covariance undefined and fills the layer with \code{NaN}. This happens for
-\code{cont1} whenever \code{autocorr_range1} is below 2, and for \code{bin1} whenever
-\code{autocorr_range1} is 0. With the default ranges, that means \code{dim} below 40
-and below 20, respectively.
+Each layer comes from a Gaussian random field with the exponential
+covariance function \code{sill * exp(-d / range)}, with \code{d} in cells. The field
+is simulated with a fast Fourier transform (FFT) on a periodic grid twice
+the size of the output (circulant embedding), and one \code{dim} x \code{dim} corner
+is kept, so opposite edges of the output are not artificially correlated.
+Each field is rescaled to run from 0 to 1 before it is thresholded (binary
+layers) or returned (continuous layers). Version 0.7.48 corrected this
+construction, so a given \code{user_seed} gives different layers than in
+earlier versions.
 
 Two ranges let you simulate covariates that act at different spatial
 scales, as when one resource is patchy at fine scales and another varies

@@ -69,6 +69,7 @@ landscape_reference_values <- function(reference, metric) {
 
 
 test_that("fixed-buffer composition metrics match landscapemetrics point sampling", {
+  skip_on_cran()
   skip_if_not_installed("landscapemetrics")
 
   landcover <- landscape_test_raster(101, 1:5)
@@ -129,6 +130,7 @@ test_that("fixed-buffer composition metrics match landscapemetrics point samplin
 
 
 test_that("FFT composition projections agree with cached point metrics", {
+  skip_on_cran()
   landcover <- landscape_test_raster(202, 1:5)
   pts <- landscape_test_points(landcover)
   radius <- 80
@@ -953,6 +955,19 @@ test_that("IJI and information-theory metrics match landscapemetrics", {
 })
 
 
+test_that("CLUMPY follows the FRAGSTATS sign: -1 for a maximally dispersed class", {
+  # Class 1 occupies isolated cells of a checkerboard, so it has no like
+  # adjacencies (G = 0) and covers less than half the landscape (P < 0.5).
+  m <- outer(1:20, 1:20, function(i, j) ifelse((i + j) %% 2 == 0, 1, 2))
+  m[m == 1 & (outer(1:20, 1:20, "+") %% 4 != 0)] <- 2
+  r <- terra::rast(m)
+  expect_lt(mean(m == 1), 0.5)
+  expect_equal(landscape_whole_adjacency(r, "clumpy", focal = 1), -1, tolerance = 1e-12)
+  # A single compact block of the same class is clumped, so CLUMPY is positive.
+  b <- matrix(2, 20, 20); b[1:8, 1:8] <- 1
+  expect_gt(landscape_whole_adjacency(terra::rast(b), "clumpy", focal = 1), 0.5)
+})
+
 test_that("class-level CLUMPY, PLAND, and CA match landscapemetrics", {
   skip_if_not_installed("landscapemetrics")
 
@@ -962,8 +977,11 @@ test_that("class-level CLUMPY, PLAND, and CA match landscapemetrics", {
   lm_ca <- landscapemetrics::lsm_c_ca(landcover)
 
   for (k in 1:4) {
-    expect_equal(landscape_whole_adjacency(landcover, "clumpy", focal = k),
-                 lm_clumpy$value[lm_clumpy$class == k], tolerance = 1e-6,
+    # landscapemetrics 2.2.1 divides the dispersed branch (G < P < 0.5) by -P,
+    # the opposite sign of FRAGSTATS, which multiScaleR follows. Compare
+    # magnitudes here; the sign is tested separately below.
+    expect_equal(abs(landscape_whole_adjacency(landcover, "clumpy", focal = k)),
+                 abs(lm_clumpy$value[lm_clumpy$class == k]), tolerance = 1e-6,
                  info = paste("clumpy class", k))
     expect_equal(landscape_whole_composition(landcover, "pland", focal = k),
                  lm_pland$value[lm_pland$class == k], tolerance = 1e-6,
@@ -976,6 +994,7 @@ test_that("class-level CLUMPY, PLAND, and CA match landscapemetrics", {
 
 
 test_that("FFT projections of the new metrics agree with windowed landscapemetrics", {
+  skip_on_cran()
   skip_if_not_installed("landscapemetrics")
 
   landcover <- landscape_test_raster(606, 1:4)
@@ -1023,7 +1042,8 @@ test_that("FFT projections of the new metrics agree with windowed landscapemetri
     out <- res$value[res$class == 2]
     if (length(out) == 0) NA_real_ else out
   })
-  expect_equal(projected_clumpy, reference_clumpy, tolerance = 0.05,
+  # Magnitudes only: see the sign note in the CLUMPY comparison above.
+  expect_equal(abs(projected_clumpy), abs(reference_clumpy), tolerance = 0.05,
                info = "FFT clumpy")
 
   projected_pland <- terra::extract(
@@ -1205,6 +1225,7 @@ test_that("prepared adjacency matches all reference metrics at exact cutoffs", {
 })
 
 test_that("prepared adjacency respects context subset and memory contracts", {
+  skip_on_cran()
   skip_if_not_installed("terra")
   # Reuse the package's existing categorical fixture.
   r <- landscape_test_raster(808,1:3)

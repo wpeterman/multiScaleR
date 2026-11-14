@@ -107,6 +107,7 @@ test_that("logical profile responses preserve fixed-scale native likelihood and 
 })
 
 test_that("shared logical preparation preserves priors, normalized targets and fixed references", {
+  skip_on_cran()
   cases <- logical_binomial_cases()
   fields <- c("y", "trials", "rows", "observation_ids", "V", "C", "delta",
     "center", "spread", "X_fixed", "beta_names", "parameters")

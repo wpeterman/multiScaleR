@@ -9,20 +9,17 @@
 #' of effect, then check that [multiScale_optim()] recovers them.
 #'
 #' @param dim Positive integer. Number of cells along each side of the square
-#'   raster, so the output is a `dim` x `dim` grid. With the default ranges,
-#'   use at least 40, because smaller values round the fine-scale range down
-#'   to zero cells and `cont1` (and below 20, `bin1`) returns `NaN`. See
-#'   Details. Default: `100`.
+#'   raster, so the output is a `dim` x `dim` grid. Default: `100`.
 #' @param resolution Positive numeric. Cell size (edge length) in map units.
 #'   The raster spans 0 to `dim * resolution` in each direction. Default:
 #'   `10`.
 #' @param autocorr_range1 Optional positive numeric. Autocorrelation range, in
 #'   cells, of the fields behind `bin1` and `cont1`. Larger values give
 #'   smoother, more broadly correlated patterns. Default `NULL` uses
-#'   `floor(0.05 * dim)` (fine-scale autocorrelation).
+#'   `floor(0.05 * dim)`, and at least 1 (fine-scale autocorrelation).
 #' @param autocorr_range2 Optional positive numeric. Autocorrelation range, in
 #'   cells, of the fields behind `bin2` and `cont2`. Default `NULL` uses
-#'   `floor(0.25 * dim)` (broad-scale autocorrelation).
+#'   `floor(0.25 * dim)`, and at least 1 (broad-scale autocorrelation).
 #' @param sill Positive numeric. Variance (partial sill) of the exponential
 #'   covariance used for all four fields. Each field is rescaled to 0 to 1
 #'   afterward, so the sill does not change the returned values. Default:
@@ -43,24 +40,24 @@
 #' * `bin2`: binary, broad-scale (`autocorr_range2`). 1 where the rescaled
 #'   field is below 0.4, and 0 elsewhere.
 #' * `cont1`: continuous, rescaled to 0 to 1, with a range of
-#'   `floor(0.75 * autocorr_range1)` cells.
+#'   `floor(0.75 * autocorr_range1)` cells, and at least 1.
 #' * `cont2`: continuous, rescaled to 0 to 1, with a range of
-#'   `floor(1.25 * autocorr_range2)` cells.
+#'   `floor(1.25 * autocorr_range2)` cells, and at least 1.
 #'
 #' The thresholds are on the rescaled values, not percentiles, so the share
 #' of cells equal to 1 in `bin1` and `bin2` varies from one simulation to the
 #' next.
 #'
 #' @details
-#' Each layer comes from a Gaussian random field generated with a fast
-#' Fourier transform (FFT) method from the exponential covariance function
-#' `sill * exp(-d / range)`, with `d` in cells. Each field is rescaled to run
-#' from 0 to 1 before it is thresholded (binary layers) or returned
-#' (continuous layers). A range rounded down to zero cells leaves the
-#' covariance undefined and fills the layer with `NaN`. This happens for
-#' `cont1` whenever `autocorr_range1` is below 2, and for `bin1` whenever
-#' `autocorr_range1` is 0. With the default ranges, that means `dim` below 40
-#' and below 20, respectively.
+#' Each layer comes from a Gaussian random field with the exponential
+#' covariance function `sill * exp(-d / range)`, with `d` in cells. The field
+#' is simulated with a fast Fourier transform (FFT) on a periodic grid twice
+#' the size of the output (circulant embedding), and one `dim` x `dim` corner
+#' is kept, so opposite edges of the output are not artificially correlated.
+#' Each field is rescaled to run from 0 to 1 before it is thresholded (binary
+#' layers) or returned (continuous layers). Version 0.7.48 corrected this
+#' construction, so a given `user_seed` gives different layers than in
+#' earlier versions.
 #'
 #' Two ranges let you simulate covariates that act at different spatial
 #' scales, as when one resource is patchy at fine scales and another varies
@@ -100,11 +97,11 @@ sim_rast <- function(dim = 100,
                      ...){
 
   if(is.null(autocorr_range1)){
-    autocorr_range1 <- floor(0.05 * dim)
+    autocorr_range1 <- max(1, floor(0.05 * dim))
   }
 
   if(is.null(autocorr_range2)){
-    autocorr_range2 <- floor(0.25 * dim)
+    autocorr_range2 <- max(1, floor(0.25 * dim))
   }
 
   ## Make binary surface
@@ -137,7 +134,8 @@ sim_rast <- function(dim = 100,
   ## Make continuous surface
   r <- simulate_fft_grf(dim = dim,
                         resolution = resolution,
-                        range = floor(autocorr_range1*0.75),
+                        # Keep at least one cell, so small grids do not give a zero range.
+                        range = max(1, floor(autocorr_range1*0.75)),
                         sill = sill,
                         user_seed = user_seed3)
   r <- (r - minmax(r)[1]) / (minmax(r)[2] - minmax(r)[1])
@@ -146,7 +144,7 @@ sim_rast <- function(dim = 100,
 
   r <- simulate_fft_grf(dim = dim,
                         resolution = resolution,
-                        range = floor(autocorr_range2*1.25),
+                        range = max(1, floor(autocorr_range2*1.25)),
                         sill = sill,
                         user_seed = user_seed4)
   r <- (r - minmax(r)[1]) / (minmax(r)[2] - minmax(r)[1])
@@ -167,29 +165,30 @@ sim_rast <- function(dim = 100,
 
 simulate_fft_grf <- function(dim = 100, resolution = 10, range = 15, sill = 10, user_seed = NULL) {
   if (!is.null(user_seed)) set.seed(user_seed)
+  if (!is.numeric(range) || length(range) != 1L || !is.finite(range) || range <= 0)
+    stop("The autocorrelation range must be a positive number of cells.", call. = FALSE)
 
   n <- dim
-  # Create grid of distances from center
-  x <- seq(-n / 2, n / 2 - 1)
-  y <- seq(-n / 2, n / 2 - 1)
-  d2 <- outer(x^2, y^2, "+") # squared Euclidean distances
+  # Circulant embedding. Build the exponential covariance on a torus twice the
+  # size of the output, with lags measured around the torus so that lag zero
+  # sits at [1, 1]. Its FFT then gives the eigenvalues of the covariance
+  # matrix. Simulating on the larger torus and keeping one n x n corner avoids
+  # wrap-around correlation between opposite edges of the output.
+  m <- 2L * n
+  lag <- pmin(0:(m - 1L), m - 0:(m - 1L))
+  d <- sqrt(outer(lag^2, lag^2, "+"))
+  cov_base <- sill * exp(-d / range)
 
-  # Exponential covariance function
-  cov_mat <- sill * exp(-sqrt(d2) / range)
-
-  # FFT of covariance (circulant embedding assumption)
-  eigvals <- Re(fft(cov_mat))
-
-  # Clamp eigenvalues to non-negative to avoid NaNs in sqrt
+  eigvals <- Re(fft(cov_base))
+  # Embedding and rounding can leave a few tiny negative eigenvalues; set them
+  # to zero so the square root is defined.
   eigvals <- pmax(eigvals, 0)
 
-  # White noise in Fourier space
-  Z <- matrix(rnorm(n * n), nrow = n)
-  Z_fft <- fft(Z)
-
-  # Element-wise multiply and invert FFT
-  sim_complex <- Z_fft * sqrt(eigvals)
-  sim <- Re(fft(sim_complex, inverse = TRUE)) / (n * n)
+  # Filter real white noise by the square root of the covariance:
+  # X = F^-1 diag(sqrt(lambda)) F Z has covariance cov_base.
+  Z <- matrix(rnorm(m * m), nrow = m)
+  sim <- Re(fft(fft(Z) * sqrt(eigvals), inverse = TRUE)) / (m * m)
+  sim <- sim[seq_len(n), seq_len(n)]
 
   # Rescale to [0, 1] and convert to SpatRaster
   sim <- (sim - min(sim)) / (max(sim) - min(sim))

@@ -77,6 +77,7 @@ test_that("expanded coefficient proposals use the complete native Gaussian geome
 })
 
 test_that("prepared interaction predictions retain basis, row identity and uncertainty contracts", {
+  skip_on_cran()
   old <- options("contrasts")
   on.exit(options(old), add = TRUE)
   for (surface in c(FALSE, TRUE)) {

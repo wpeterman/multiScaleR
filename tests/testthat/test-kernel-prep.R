@@ -25,6 +25,7 @@ test_that("kernel_prep returns a complete multiScaleR_data object", {
 })
 
 test_that("kernel_prep creates default shape values for expow kernels", {
+  skip_on_cran()
   pts <- terra::vect(cbind(c(5, 7, 9), c(9, 7, 5)))
   r <- terra::rast(list(a = terra::rast(matrix(runif(20 * 20), 20, 20)),
                         b = terra::rast(matrix(runif(20 * 20), 20, 20))))

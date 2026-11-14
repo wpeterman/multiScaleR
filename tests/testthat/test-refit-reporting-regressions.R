@@ -34,6 +34,25 @@ test_that("outer Hessian uncertainty requires finite positive curvature", {
   expect_false(result$diagnostic$triggered)
   result <- .msr_refit_hessian_se(diag(c(4, 0)), c(TRUE, FALSE), c(10, 1))
   expect_equal(result$SE, c(5, NA_real_))
+  # A finite-difference point that hit the 1e60 failed-refit penalty gave this
+  # Hessian in a distance-removal field fit, and an SE of 3.4e-30 m.
+  result <- .msr_refit_hessian_se(matrix(2.5e65), TRUE, 1700)
+  expect_true(is.na(result$SE))
+  expect_identical(result$diagnostic$status, "hessian_includes_failed_refit")
+  expect_true(result$diagnostic$triggered)
+})
+
+test_that("a Hessian that touched a failed refit warns and withholds the SE", {
+  f <- make_core_fixture()
+  local_mocked_bindings(.msr_refit_hessian_se = function(hessian, active, multiplier)
+    list(SE = rep(NA_real_, length(active)), diagnostic = list(code = "refit_hessian",
+      triggered = TRUE, status = "hessian_includes_failed_refit", active = active,
+      uncertainty = "outer_refit_wald")))
+  expect_warning(fit <- multiScale_optim(f$fitted_mod, f$kernel_inputs, n_cores = 1,
+                                         verbose = FALSE),
+                 "refit near the estimated scales failed")
+  expect_true(all(is.na(fit$scale_est$SE)))
+  expect_identical(fit$diagnostics$refit_hessian$status, "hessian_includes_failed_refit")
 })
 
 test_that("quiet refits retain triggered diagnostics without printing blocks", {

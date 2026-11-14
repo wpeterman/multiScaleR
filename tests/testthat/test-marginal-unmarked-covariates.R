@@ -60,6 +60,7 @@ test_that("unmarked factor and unscaled effects use named site-year columns", {
 })
 
 test_that("unmarked transformed terms, offsets and absent intercepts recover base variables", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   mod <- unmarked::pcount(~1 ~ 0 + Year + habitat + I(habitat^2) +
     Year:habitat + offset(log(effort)), data = f$umf, K = 40)
@@ -77,6 +78,7 @@ test_that("unmarked transformed terms, offsets and absent intercepts recover bas
 })
 
 test_that("unmarked random-effect groups are excluded from panels and prediction", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   mod <- unmarked::pcount(~Year ~ Year + habitat + (1 | site),
                           data = f$umf, K = 40, engine = "TMB")
@@ -104,6 +106,7 @@ test_that("component variable recovery excludes only offset-only and grouping va
 })
 
 test_that("intercept-only unmarked states return no covariate panels", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   obj <- f$obj
   obj$opt_mod <- unmarked::pcount(~Year ~ 1, data = f$umf, K = 40)
@@ -111,6 +114,7 @@ test_that("intercept-only unmarked states return no covariate panels", {
 })
 
 test_that("occupancy models use the state formula even without a detection intercept", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   set.seed(907)
   present <- stats::rbinom(nrow(f$sc), 1, 0.65)
@@ -169,6 +173,7 @@ test_that("constant nuisance factors retain explicit fitted contrasts", {
 })
 
 test_that("custom contrasts retain the occupancy link and zero random effects", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   sc <- f$sc
   contrasts(sc$Year) <- stats::contr.sum(3L)

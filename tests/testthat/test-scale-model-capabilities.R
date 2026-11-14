@@ -24,6 +24,7 @@ test_that("capabilities distinguish structural support from inference targets", 
 })
 
 test_that("supported families, kernels and zero-SD faces pass without changing models", {
+  skip_on_cran()
   check <- multiScaleR:::.msr_scale_check_capability
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- bayesian_scale_fixture(n_site = 4, n_year = 3, kernel = kernel)

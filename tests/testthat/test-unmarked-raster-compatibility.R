@@ -1,4 +1,5 @@
 test_that("unmarked S4 raster preparation discovers formulas without generic dollar access", {
+  skip_on_cran()
   skip_if_not_installed("unmarked")
   f <- refit_unmarked_spatial_fixture()
   formulas <- .unmarked_model_formulas(f$object$opt_mod)

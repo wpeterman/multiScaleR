@@ -1,4 +1,5 @@
 test_that("expression predictions and coefficient curves freeze the original reference", {
+  skip_on_cran()
   for (surface in c(FALSE, TRUE)) {
     f <- prepared_formula_fixture(surface = surface)
     form <- count ~ I(habitat^2) * year + I(habitat * other) + poly(temp, 2) + offset(log(effort))

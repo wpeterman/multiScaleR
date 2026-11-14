@@ -7,6 +7,7 @@ factorized_refinement_fixture <- function() {
 }
 
 test_that("bounded integration refinement retries the identical point", {
+  skip_on_cran()
   spec <- factorized_refinement_fixture()
   constructions <- list()
   factory <- function(spec, parameters = spec$parameters, rel.tol = 1e-8, step = 1) {
@@ -68,6 +69,7 @@ test_that("value and curvature failures refine without inventing derivatives", {
 })
 
 test_that("terminal failures remain failures and default integration is direct", {
+  skip_on_cran()
   spec <- factorized_refinement_fixture()
   local_mocked_bindings(.msr_factorized_adfun = function(...) stop("injected terminal failure"),
     .package = "multiScaleR")

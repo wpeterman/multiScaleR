@@ -1,5 +1,6 @@
 # Bounded native/AD software checks on existing inputs. No sampling study.
 test_that("kernel expression leaves retain native algebra and zero derivatives", {
+  skip_on_cran()
   dat <- data.frame(y = c(1, 2, 1, 3, 2, 4), h = c(0, -.4, .2, .8, -.7, .5),
     k = c(.3, -.2, .5, .9, .7, -.6), z = seq_len(6) / 6,
     group = factor(rep(c("a", "b"), 3)))

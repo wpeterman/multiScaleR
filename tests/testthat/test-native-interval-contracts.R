@@ -95,6 +95,7 @@ test_that("native lm interval maps preserve columns and mean versus observation 
 })
 
 test_that("HLfit snapshots preserve compact native variance and interval attributes", {
+  skip_on_cran()
   skip_if_not_installed("spaMM")
   f <- refit_spatial_fixture()
   f$data$y <- f$data$y + as.integer(f$data$site)^2

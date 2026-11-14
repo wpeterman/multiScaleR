@@ -47,6 +47,10 @@
 #' Standard errors are Hessian-based approximations from this outer search.
 #' A nonfinite, singular, or non-positive-definite Hessian gives missing
 #' standard errors and a retained diagnostic, and the raw Hessian is kept.
+#' So does a Hessian built partly from a failed refit: a refit that fails
+#' returns a large penalty, and a finite-difference point that lands on one
+#' gives an absurdly large curvature. This case also gives a warning, because
+#' it means the model is hard to refit near the estimate.
 #'
 #' A smooth kernel or shape parameter within `1e-5` of a search bound, on the
 #' log scale, invalidates the Wald approximation. Its standard errors and Wald

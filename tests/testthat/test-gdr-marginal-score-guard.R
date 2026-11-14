@@ -34,6 +34,7 @@ test_that("generic native GDR eligibility rejects excessive finite marginal scor
 })
 
 test_that("qualified zero-score TMB stubs preserve counts and final uncertainty", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")
   original <- attr(f$model, "msr_gdr_tmb_diagnostics")
   constructor <- function(args, settings, checkpoint = NULL) {

@@ -27,6 +27,7 @@ weighted_glm_fixture <- function(kernel = "gaussian", surface_only = FALSE) {
 }
 
 test_that("analytic GLMs use weighted SQ values and profile derivatives", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp")) for (only in c(FALSE, TRUE)) {
     f <- weighted_glm_fixture(kernel, only)
     for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {

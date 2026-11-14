@@ -1,3 +1,63 @@
+multiScaleR 0.7.48
+
+Changes that can affect existing scripts
+
+* `landscape_var(metric = "clumpy")` follows the FRAGSTATS definition for a
+  class that is more dispersed than random and covers less than half the
+  landscape (G < P < 0.5): CLUMPY is `(G - P) / P`, so it runs down to -1
+  for a maximally dispersed class. It was `(G - P) / -P`, as in
+  landscapemetrics 2.2.1, which gave such classes positive values. Other
+  cases are unchanged.
+* `sim_rast()` simulates its fields by proper circulant embedding. The old
+  construction kept only half of the frequencies, so each field repeated
+  itself across half the grid and its covariance was not the stated
+  exponential. A given `user_seed` now gives different layers. Small grids
+  no longer return `NaN` layers, because each range is kept at one cell or
+  more.
+* Under `backend = "profile_glm"` or `"joint_nb2"`, `predict()` stops on
+  arguments it cannot use, such as `re.form`, instead of ignoring them.
+  `include_fixed` is still accepted.
+
+Bug fixes
+
+* `multiScale_optim()` withholds Wald standard errors, and warns, when a
+  refit failed at one of the points used to compute the Hessian. The failure
+  penalty had produced standard errors near zero (3.4e-30 m in a
+  distance-removal field fit) with no warning. `diagnostics(fit)$refit_hessian`
+  records the status `"hessian_includes_failed_refit"`.
+* `predict()` on an `unmarked` fit without `type` uses the model's own state
+  process: `"lambda"` for `pcountOpen()` and distance-removal models and
+  `"psi"` for `colext()`, where `"state"` is not a valid type. `occu()` and
+  `pcount()` still use `"state"`.
+* `cross_validate()` with an analytic backend records a prediction contract
+  for every fold. Its `prediction_contracts` list was empty.
+* `sim_dat()` counts the points of an `sf` object correctly, sets `max_D` for
+  the `"expow"` kernel from each layer's sigma and shape, places points
+  inside rasters whose extent does not start at the origin, and gives
+  generated points the raster's coordinate reference system.
+* A one-row prediction from a distance-removal response field no longer
+  carries the parameter name `lsigma_lambda` as its row name.
+* Negative binomial and Gamma cross-validation diagnostics no longer contain
+  `NA`-named empty entries.
+
+Documentation and data
+
+* The user guide's zero-inflated, occupancy, and N-mixture examples use
+  layers from the corrected `sim_rast()`, and their stored fits were
+  regenerated.
+* The stored Quick Start fit keeps only what the vignette and examples read
+  (329 KB to 74 KB). Every summary, plot, and map it produces is unchanged.
+* `?cross_validate_field` explains why Gaussian folds with few locations can
+  fail when the two starts disagree.
+
+Tests
+
+* With every suggested package installed, including RTMB, the suite passes
+  in full (1,187 tests). More slow tests now skip on CRAN: those over 1
+  second, and four files whose tests share a slow fitted fixture. The
+  CRAN-mode run takes about 3 minutes. No test was removed, and CI still
+  runs every test.
+
 multiScaleR 0.7.47
 
 * New reference topics: `?"multiScaleR-kernels"` (kernel families, hard
@@ -191,6 +251,11 @@ Changes that can affect existing scripts
 * `multiScale_optim()` screens starting values by default for
   `kernel = "fixed"`, so fixed-kernel estimates can change. Set
   `start_strategy = "single"` to restore the old single start.
+* CLUMPY follows the FRAGSTATS sign for dispersed classes, so it can be
+  negative where it was positive.
+* `sim_rast()` gives different layers for the same `user_seed`, because
+  its fields are now simulated correctly.
+* `predict()` under the analytic backends stops on arguments it cannot use.
 * The vignettes have new names.
 
 Documentation

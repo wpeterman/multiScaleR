@@ -1,5 +1,6 @@
 # Small native conformance fixtures, not a scale-recovery or timing panel.
 test_that("raw native refits preserve metric units, factors, SEs and spatial prediction", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp", "expow", "fixed")) {
     f <- refit_spatial_fixture(kernel)
     dat <- f$data
@@ -71,6 +72,7 @@ test_that("raw native refits preserve metric units, factors, SEs and spatial pre
 })
 
 test_that("fixed raw spline knots and hard radii keep native contracts", {
+  skip_on_cran()
   f <- refit_spatial_fixture()
   dat <- f$data; dat[c("mean", "rough")] <- as.data.frame(f$raw)
   model <- stats::glm(y ~ splines::ns(mean, knots = c(0, 1), Boundary.knots = c(-3, 5))*group +
@@ -128,6 +130,7 @@ test_that("raw native C GDR callbacks preserve observations, controls and final 
 })
 
 test_that("raw spatial CV fits and scores all supported GLM families in training units", {
+  skip_on_cran()
   # Seven bounded fold fits: six raw routes and one existing candidate route.
   candidates <- list()
   cases <- list(gaussian = list(family = "gaussian"), poisson = list(family = "poisson"),

@@ -98,6 +98,7 @@ test_that("Gaussian BAM maps and raw-reference curves agree across four kernels"
 })
 
 test_that("Gaussian BAM tables retain native EDF and selected scale/shape penalties", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   for (kernel in c("gaussian", "exp", "expow", "fixed")) {
     f <- native_bam_facets_fixture(kernel)

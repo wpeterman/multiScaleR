@@ -1,3 +1,7 @@
+# Every test in this file shares a fitted fixture that takes about 20 seconds to
+# build, so CRAN skips the whole file. CI sets NOT_CRAN and runs it.
+skip_on_cran()
+
 # Six fixed software fixture fits, with failures cached rather than retried.
 # No recovery, sampler, profile, timing or scientific interval admission panel.
 unmarked_trained_cache <- new.env(parent = emptyenv())
@@ -101,6 +105,7 @@ test_that("unmarked trained point tables retain native component targets and SEs
 })
 
 test_that("unmarked frames preserve training bases and native observation layout", {
+  skip_on_cran()
   f <- unmarked_trained_fixture()
   for (model in f$fits) {
     predictor <- .msr_unmarked_prediction_function(model)
@@ -122,6 +127,7 @@ test_that("unmarked frames preserve training bases and native observation layout
 })
 
 test_that("unmarked snapshots and raster chunks reuse the frozen training basis", {
+  skip_on_cran()
   f <- unmarked_trained_fixture()
   for (name in names(f$fits)) {
     model <- f$fits[[name]]; object <- structure(list(opt_mod = model), class = "multiScaleR")
@@ -213,6 +219,7 @@ test_that("all four unmarked fixed learners retain trained interactions without 
 })
 
 test_that("unmarked appendData and missing-site controls retain native semantics", {
+  skip_on_cran()
   f <- unmarked_trained_fixture()
   for (model in f$fits) {
     predictor <- .msr_unmarked_prediction_function(model)
@@ -655,6 +662,7 @@ test_that("unmarked requested components keep their own guards and native ZIP ta
 })
 
 test_that("unrelated learned random slopes do not block conditional detection", {
+  skip_on_cran()
   f <- unmarked_zero_slope_fixture()
   rows <- unmarked_trained_fixture()$rows
   for (model in f$fits) {

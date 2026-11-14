@@ -1,3 +1,7 @@
+# Every test in this file shares a fitted fixture that takes about a minute to
+# build, so CRAN skips the whole file. CI sets NOT_CRAN and runs it.
+skip_on_cran()
+
 test_that("native GDR field fits retain normalized targets, counts and every start", {
   skip_on_cran()
   f <- gdr_native_field_fixture(); model <- f$model; field <- model@response_field
@@ -43,6 +47,7 @@ test_that("native GDR field fits retain normalized targets, counts and every sta
 })
 
 test_that("field predictions retain native known-state and zero-effect uncertainty", {
+  skip_on_cran()
   f <- gdr_native_field_fixture(); rows <- c(3, 45, 3, 159)
   nd <- f$model@data@siteCovs[rows, , drop = FALSE]
   native <- methods::as(f$model, "unmarkedFitGDR")
@@ -68,6 +73,7 @@ test_that("field predictions retain native known-state and zero-effect uncertain
 })
 
 test_that("new-location density uncertainty includes distinct field residual variance", {
+  skip_on_cran()
   f <- gdr_native_field_fixture(); field <- f$model@response_field
   xy <- rbind(f$nodes[2, ], c(490000, 4405000), f$nodes[2, ], c(620000, 4395000))
   nd <- data.frame(hab = c(-.5, 0, .5, 1))
@@ -97,6 +103,12 @@ test_that("new-location density uncertainty includes distinct field residual var
   expect_equal(permuted$SE, rev(actual$SE), tolerance = 0)
   expect_error(unmarked::predict(f$model, type = "lambda", newdata = nd, coords = xy), "declared crs")
   expect_error(unmarked::predict(f$model, type = "lambda", newdata = nd, coords = xy, crs = 4326), "projected CRS")
+  # A one-row prediction must not inherit the field SD parameter's name.
+  one <- unmarked::predict(f$model, type = "lambda", newdata = nd[2, , drop = FALSE],
+    coords = xy[2, , drop = FALSE], crs = 32617, backTransform = FALSE)
+  expect_equal(one$Predicted, actual$Predicted[2], tolerance = 1e-10)
+  expect_false(identical(rownames(one), "lsigma_lambda"))
+  expect_null(names(attr(one, "response_field_uncertainty")$new_field_residual_predictor_variance))
 })
 
 test_that("native GDR fields integrate actual scale refits, snapshots, curves and maps", {
@@ -152,6 +164,7 @@ test_that("native GDR fields integrate actual scale refits, snapshots, curves an
 })
 
 test_that("field target mutations and unqualified inherited routes remain guarded", {
+  skip_on_cran()
   f <- gdr_native_field_fixture(); model <- f$model
   expect_error(unmarked::update(model), "make_gdr_refitter")
   expect_error(unmarked::simulate(model), "separate field qualification")
@@ -284,6 +297,7 @@ test_that("field callbacks isolate numeric recipes and guard fit-worker transpor
 })
 
 test_that("coordinate field batches preserve logical raster column contracts", {
+  skip_on_cran()
   f <- gdr_native_field_projection_fixture(); object <- f$object
   geometry <- response_field_geometry(object, f$field$coords, 32617, batch_size = 2L)
   xy <- rbind(f$field$nodes[2, ], c(490000, 4405000))

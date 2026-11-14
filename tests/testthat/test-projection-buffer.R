@@ -18,6 +18,7 @@ projection_buffer_fixture <- local({
 })
 
 test_that("prepared circular buffers match exact point means and weighted SQ", {
+  skip_on_cran()
   f <- projection_buffer_fixture()
   specs <- msr_vars(mean = kernel_var("cont1"),
                     rough = surface_var("cont1", "sq", weighted = TRUE))

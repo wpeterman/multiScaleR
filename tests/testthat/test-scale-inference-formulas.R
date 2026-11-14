@@ -26,6 +26,7 @@ inference_product_object <- function(boundary = FALSE, warm = FALSE, weighted = 
 }
 
 test_that("NB2 scale refits retain products in cold and warm coordinates", {
+  skip_on_cran()
   for (weighted in c(FALSE, TRUE)) for (boundary in c(FALSE, TRUE)) for (warm in c(FALSE, TRUE)) {
     f <- inference_product_object(boundary, warm, weighted)
     original <- f$object$profile_fit$contract$objective
@@ -89,6 +90,7 @@ test_that("bootstrap target reconstruction keeps the full native coefficient bas
 })
 
 test_that("the public product assessment retains all starts and its scale null", {
+  skip_on_cran()
   f <- formula_integration_fixture("nbinom2")
   fit <- multiScale_optim(f$model, f$inputs, backend = "profile_glm",
     n_cores = 1, verbose = FALSE,

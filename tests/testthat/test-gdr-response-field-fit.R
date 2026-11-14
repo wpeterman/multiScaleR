@@ -1,4 +1,5 @@
 test_that("canonical three-bin GDR targets retain native joint derivatives", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   f <- gdr_response_field_fit_fixture()
   for (K in c(400L, max(rowSums(f$data$yd)))) {
@@ -28,6 +29,7 @@ test_that("canonical three-bin GDR targets retain native joint derivatives", {
 })
 
 test_that("optimized spatial GDR reference preserves starts and full covariance", {
+  skip_on_cran()
   gdr_gaussian_require_RTMB()
   f <- gdr_response_field_fit_fixture()
   context <- .msr_gdr_response_field_context(f$data, f$pars, f$coords, f$crs, 50000)

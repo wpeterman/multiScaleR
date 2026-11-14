@@ -192,7 +192,7 @@ failures and speed-comparison lines (already archived in
 `validation-status.md`). The guide's claim that `match_buffer` needs
 `fft = TRUE` was false (both engines agree to 1.8e-14) and is corrected.
 
-## Code issues found in the help-page phase (not fixed; for Bill)
+## Code issues found in the help-page phase (resolved in 0.7.48; see the status note below the table)
 
 | Issue | Evidence |
 |:------|:---------|
@@ -207,3 +207,30 @@ failures and speed-comparison lines (already archived in
 | `.msr_native_prediction_rows` | Defaults `type = "state"` for non-field `unmarkedFitGDR`, probably not a valid native type (untested; no stored GDR fit) |
 | `bayesian-annual-example.rds` | `fits$pooled` predates the current format (no `inference_metadata` or `specification$row_id`), so `predict()` needs `row_id` |
 | Cosmetic | NB2 and Gamma CV `diagnostics$initial_glm` carry `NA`-named NULL entries; field CV column `observation_predictive_SE` holds an SD |
+
+Status 2026-11-14 (0.7.48, Bill: "Correct/resolve code issues"):
+
+- GDR sigma SE 3.4e-30: cause confirmed. The stored Hessian was 2.5e65,
+  produced when a finite-difference point hit the 1e60 failed-refit penalty.
+  `.msr_refit_hessian_se()` now treats any entry of 1e30 or more as
+  `hessian_includes_failed_refit`, withholds the SE, and `multiScale_optim()`
+  warns. Tests in `test-refit-reporting-regressions.R`.
+- CLUMPY: switched to the FRAGSTATS sign in both the C++ and FFT paths.
+  landscapemetrics comparisons now check magnitudes; a new test pins -1 for a
+  maximally dispersed class. The v04 `clumpy2` map is unchanged (no cell in
+  the changed branch).
+- `sim_rast()`: circulant embedding on a 2n torus, keep one corner; ranges
+  kept at one cell or more. Tests in `test-fix-sim-rast.R` fail on the old
+  code (quadrant correlation 1) and pass on the new. v02 caches regenerated.
+- `sim_dat()`: sf point count, expow `max_D`, non-origin extents, CRS
+  carried. Tests in `test-fix-sim-dat.R`.
+- `cross_validate()` analytic contracts, one-row GDR row name, NA-named CV
+  diagnostics, analytic `predict()` arguments, unmarked default type: fixed
+  with tests.
+- Gaussian field CV start disagreement: intended gate; documented in
+  `?cross_validate_field`.
+- `bayesian-annual-example.rds` format: its generator is a benchmark study,
+  not `data-raw`; older fits need `row_id` in `predict()`, as documented.
+  Not regenerated.
+- `observation_predictive_SE` column name: kept (renaming would break
+  scripts); documented as a predictive SD.

@@ -28,6 +28,7 @@ likelihood_prediction_reference <- function(s, p, d, inputs, training) {
 }
 
 test_that("private snapshots match independent kernel means and frozen formula designs", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- likelihood_prediction_fixture(kernel = kernel)
     f$data$region <- factor(rep(c("a", "b"), 6))

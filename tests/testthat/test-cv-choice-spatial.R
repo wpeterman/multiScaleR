@@ -59,6 +59,7 @@ choice_spatial_fixture <- function() {
 }
 
 test_that("spatial choice CV preserves native fits, starts, map labels and compact penalties", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   z <- choice_spatial_fixture()
   expect_identical(z$planned, 6L)
@@ -118,6 +119,7 @@ test_that("spatial choice CV preserves native fits, starts, map labels and compa
 })
 
 test_that("assessment changes do not alter native spatial choice training", {
+  skip_on_cran()
   z <- choice_spatial_fixture(); a <- z$gaussian; b <- z$leakage
   expect_true(a$complete); expect_true(b$complete)
   expect_identical(coef(a$fits[[1]]$opt_mod), coef(b$fits[[1]]$opt_mod))

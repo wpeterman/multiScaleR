@@ -60,10 +60,12 @@ check_native_gamma_compatibility <- function(kind) {
 }
 
 test_that("Gamma inverse glm features, maps, snapshots, penalties and plots match native targets", {
+  skip_on_cran()
   check_native_gamma_compatibility("glm")
 })
 
 test_that("Gamma inverse HLfit features and ordered mean limits match native targets", {
+  skip_on_cran()
   skip_if_not_installed("spaMM")
   check_native_gamma_compatibility("HLfit")
 })

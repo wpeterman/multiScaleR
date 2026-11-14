@@ -21,6 +21,7 @@ curve_reference_observe_basis_lifetime <- function(object, model, reference) {
 # Supplied raw inputs establish fitted feature equivalence, not an inverse of
 # evaluated transformations. All targets below use existing software fixtures.
 test_that("expired GLM curves verify raw references with quotes, bases and offsets", {
+  skip_on_cran()
   f <- refit_spatial_fixture(); dat <- f$data
   names(dat)[names(dat) == "z"] <- "z value|raw"
   dat$a <- seq_len(nrow(dat)) %% 2L == 0L
@@ -189,6 +190,7 @@ test_that("analytic raw curves rebuild selected kernels without changing the fit
 })
 
 test_that("retained conditional Cox curves verify raw bases, strata and compound offsets", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   coxph <- survival::coxph
   f <- profile_glm_fixture(); dat <- f$data

@@ -10,7 +10,7 @@
 #   Rscript data-raw/generate_vignette_cache.R quickstart nmix  # named sections
 #
 # Section               Vignette                   Output in inst/extdata/          Time
-# quickstart            v01-quickstart             cache-quickstart.rds             ~10 s
+# quickstart            v01-quickstart             cache-quickstart.rds             ~10 s (fit stripped)
 # user-guide            v02-user-guide             cache-user-guide.rds             ~20 s
 # nmix                  v02-user-guide             cache-user-guide-nmix.rds        ~5 min
 # spatial-fields        v11-spatial-fields         cache-spatial-fields.rds         ~2 min
@@ -84,7 +84,10 @@ sections$quickstart <- quote({
                                   scale_center = TRUE, clamp = TRUE,
                                   verbose = FALSE)
   pred <- terra::predict(r_scaled, opt$opt_mod, type = "response")
-  save_cache(list(opt = opt, prof = prof,
+  # The vignette and the kernel_scale.raster() example only summarize, plot,
+  # and project the stored fit, so the refit context and binned data can go
+  # (329 KB to 74 KB). profile_sigma() ran above and is stored as prof.
+  save_cache(list(opt = strip_fit(opt), prof = prof,
                   r_scaled = pack_plot_raster(r_scaled),
                   pred = pack_plot_raster(pred),
                   built_with = as.character(packageVersion("multiScaleR"))),

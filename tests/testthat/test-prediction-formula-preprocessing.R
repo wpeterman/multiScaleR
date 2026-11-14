@@ -31,6 +31,7 @@ prediction_formula_basis <- function(name, training, newdata) switch(name,
   bs = predict(splines::bs(training, df = 3), newdata))
 
 test_that("nested fixed learners preserve training definitions and chunk invariance", {
+  skip_on_cran()
   f <- prediction_formula_fixture(); train <- f$data
   nd <- train[c(8, 2, 8, 5), ]; nd$temp <- nd$temp+.7
   expressions <- c(scale = "scale(temp)", poly = "poly(temp, 2)",
