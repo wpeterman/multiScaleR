@@ -17,7 +17,7 @@
 # distance-removal      v12-distance-removal       cache-distance-removal.rds       ~15 s
 # bayesian-scales       v13-bayesian-scales        cache-bayesian-scales.rds        ~1 min
 # bayesian-computation  v15-bayesian-computation   cache-bayesian-computation.rds   several min
-# slim-annual-example   v09, v13, v14, v15         bayesian-annual-example.rds      ~5 s
+# slim-bayesian-examples v09, v13, v14, v15        bayesian-*-example.rds           ~5 s
 #
 # Every file is xz compressed. Check the built tarball size after a rebuild,
 # because CRAN asks that packages stay under 5 MB.
@@ -419,6 +419,11 @@ sections[["bayesian-scales"]] <- quote({
                           scales = posterior_scales(fit_ref),
                           passed = summary(fit_ref)$diagnostics$passed)
 
+  # The vignette calls summary(), posterior_scales(), diagnose_bayes_scales(),
+  # and a trace plot of fit$chains on this fit. None of them reads the binned
+  # kernel inputs, so drop them to keep the package small (about 160 KB).
+  fit$specification[c("V", "C", "delta")] <- NULL
+
   cache <- list(fit = fit, precision = precision, seconds = seconds,
                 reference_check = reference_check,
                 package_version = as.character(packageVersion("multiScaleR")),
@@ -498,15 +503,32 @@ sections[["bayesian-computation"]] <- quote({
   save_cache(cache, "cache-bayesian-computation.rds")
 })
 
-# ---- slim the stored annual example (bayesian-annual-example.rds) -----------
-# The annual example was fitted outside this script. It once held five fits,
-# but every vignette, example, and test reads only fits$pooled. The fit_info,
-# comparison, and sensitivity tables keep the summaries of the other four, so
-# drop their draws to keep the package small. Run after replacing the file.
-sections[["slim-annual-example"]] <- quote({
+# ---- slim the stored Bayesian examples --------------------------------------
+# Both example files were fitted outside this script. Run this section after
+# replacing either file. It is safe to run more than once.
+#
+# bayesian-annual-example.rds once held five fits, but every vignette, example,
+# and test reads only fits$pooled. The fit_info, comparison, and sensitivity
+# tables keep the summaries of the other four, so drop their draws.
+#
+# bayesian-prediction-example.rds keeps every second of its 2,000 stored draws.
+# Its sampling diagnostics were computed on the full chains and are stored with
+# the fit, so thinning changes only the Monte Carlo precision of the
+# predictions in v14, not the reported checks.
+sections[["slim-bayesian-examples"]] <- quote({
   path <- file.path("inst", "extdata", "bayesian-annual-example.rds")
   example <- readRDS(path)
   example$fits <- example$fits["pooled"]
+  saveRDS(example, path, compress = "xz")
+
+  path <- file.path("inst", "extdata", "bayesian-prediction-example.rds")
+  example <- readRDS(path)
+  draws <- example$fit$draws
+  if (nrow(draws[[1]]) > 1000) {
+    keep <- seq(1, nrow(draws[[1]]), by = 2)
+    example$fit$draws <- lapply(draws, function(m) m[keep, , drop = FALSE])
+    example$fit$example_provenance$stored_draws <- length(keep)
+  }
   saveRDS(example, path, compress = "xz")
 })
 

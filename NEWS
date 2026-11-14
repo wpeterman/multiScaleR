@@ -1,3 +1,14 @@
+multiScaleR 0.7.42
+
+* The stored prediction example, `bayesian-prediction-example.rds`, keeps
+  1,000 of its 2,000 draws, so the predictions in vignette 14 shift slightly.
+  Its sampling checks were computed on the full chains and are unchanged.
+* The vignette 13 cache no longer stores prepared kernel inputs that the
+  vignette never reads.
+* Vignette maps use 32 colors instead of terra's default 100, which makes
+  their images about a third smaller. Together these changes keep the built
+  package under 5 MB.
+
 multiScaleR 0.7.41
 
 * The stored annual example, `inst/extdata/bayesian-annual-example.rds`, now

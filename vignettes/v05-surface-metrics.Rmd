@@ -12,6 +12,9 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
+# Draw raster maps with 32 colors rather than terra's default 100. The maps
+# look the same, and their stored images are about 40% smaller.
+options(terra.pal = terra::map.pal("viridis", 32))
 library(multiScaleR)
 library(terra)
 
