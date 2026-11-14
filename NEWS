@@ -1,3 +1,13 @@
+multiScaleR 0.7.44
+
+* `multiScale_optim()` screens starting values by default when
+  `kernel_inputs` was prepared with `kernel = "fixed"`. Under a fixed kernel
+  every scale is a hard radius, and a single start cannot move on its stepped
+  likelihood. The new default is `start_strategy = NULL`, which chooses
+  `"screen"` for a fixed kernel with the `refit` backend and `"single"`
+  otherwise. Fixed-kernel estimates can change. Set
+  `start_strategy = "single"` to restore the old behavior.
+
 multiScaleR 0.7.43
 
 * Mark `cross_validate_bayes()`, `cross_validate_mixed()`, the count,
@@ -123,6 +133,9 @@ Changes that can affect existing scripts
 * `library(multiScaleR)` no longer attaches `sf`.
 * Estimated fixed-kernel scales are reported as hard radii, without Hessian
   standard errors. Use `summary(fit, profile = TRUE)` for an interval.
+* `multiScale_optim()` screens starting values by default for
+  `kernel = "fixed"`, so fixed-kernel estimates can change. Set
+  `start_strategy = "single"` to restore the old single start.
 * The vignettes have new names.
 
 Documentation

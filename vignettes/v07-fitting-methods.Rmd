@@ -405,7 +405,7 @@ scale. Compare their scales of effect and their predictions.
 | `survival::clogit()` and `coxph()` starting models | When the formula uses `scale()`, `poly()`, or a spline, fit with `model = TRUE` and `na.action = stats::na.fail`. Recent versions of `survival` otherwise drop the stored center, spread, or knots, and predictions cannot recover the original units |
 | `joint_mixed` | Needs the optional packages `RTMB`, `TMB`, and `glmmTMB`, a Gaussian or exponential kernel, and a `glmmTMB` model. Reports sigma with no standard error, and conditional prediction standard errors only |
 | All backends except `refit` | Match model rows to survey points by row name. Build the model data from `kernel_dat` and keep its row names when you subset |
-| Estimated radius of a hard-edged metric, and `kernel = "fixed"` | Sigma has no standard error. Use `summary(fit, profile = TRUE)` for an interval. With `kernel = "fixed"`, the default single start cannot move, so use `start_strategy = "screen"` or supply `par` |
+| Estimated radius of a hard-edged metric, and `kernel = "fixed"` | Sigma has no standard error. Use `summary(fit, profile = TRUE)` for an interval. With `kernel = "fixed"`, `multiScale_optim()` screens starting values by default, because a single start cannot move. The estimate is then the best screened candidate |
 | `multiScale_bayes()` | Experimental, and printed as such. `aic_tab()` and `bic_tab()` stop with an error for a Bayesian fit |
 
 # Quick reference

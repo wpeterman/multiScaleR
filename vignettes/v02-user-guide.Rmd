@@ -470,20 +470,23 @@ in parallel.
 The optimizer follows the likelihood uphill from its starting values. When the
 likelihood has several peaks or flat steps, a single start can stop short of
 the best fit. The fixed-buffer kernel shows the problem, because its
-likelihood changes only when a whole cell enters or leaves the buffer.
+likelihood changes only when a whole cell enters or leaves the buffer. For
+that reason `multiScale_optim()` screens starting values by default when the
+kernel is fixed, and uses one start for the smooth kernels.
 
 ```{r start-strategy}
 # One kernel_prep() call per kernel
 fixed_inputs <- kernel_prep(pts = pts, raster_stack = land_rast,
                             max_D = 1700, kernel = "fixed", verbose = FALSE)
 
-# Default: one start
-opt_fixed_single <- multiScale_optim(mod, fixed_inputs, verbose = FALSE)
+# One start, the default for the smooth kernels
+opt_fixed_single <- multiScale_optim(mod, fixed_inputs, verbose = FALSE,
+                                     start_strategy = "single")
 
-# Screened start: scan sigma values, run short trial fits, then optimize once
+# Default for a fixed kernel: scan sigma values, run short trial fits, then
+# optimize once from the best of them
 set.seed(1)                    # the trial starts are jittered at random
-opt_fixed <- multiScale_optim(mod, fixed_inputs, verbose = FALSE,
-                              start_strategy = "screen")
+opt_fixed <- multiScale_optim(mod, fixed_inputs, verbose = FALSE)
 
 # Buffer radius (m) and log-likelihood from each strategy
 data.frame(start  = c("single", "screen"),
@@ -508,10 +511,11 @@ so. `diagnostics(opt_fixed)$start_stall` records the details.
 A screened start first scans `screen_n_sigma` log-spaced sigma values for each
 covariate. It then runs `screen_n_jitter` short optimizations of
 `screen_maxit` iterations from randomly shifted candidates and launches one
-full optimization from the best of them. Use it for the fixed-buffer kernel,
-for landscape metrics, for models with several landscape covariates, and
-whenever two runs disagree. For the full Gaussian model above, a screened
-start returns the same estimates as the default.
+full optimization from the best of them. It is already the default for the
+fixed-buffer kernel. Request it with `start_strategy = "screen"` for landscape
+metrics, for models with several landscape covariates, and whenever two runs
+disagree. For the full Gaussian model above, a screened start returns the same
+estimates as the default.
 
 You can also supply starting values through `par`. The optimizer works with
 sigma divided by `max_D`, so starting `land1` at 250 m and `land2` at 500 m is
@@ -978,11 +982,11 @@ plot(opt, prob = 0.99, add_label = FALSE)   # 99% radius, no text under panels
 plot_marginal_effects(opt)                  # expected response across covariates
 plot(profile_sigma(opt, n_pts = 15))        # is each scale identified?
 
-# 5. Guard against a stalled search
+# 5. Guard against a stalled search (a fixed kernel screens starts by default)
 fixed_inputs <- kernel_prep(pts = pts, raster_stack = land_rast,
                             max_D = 1700, kernel = "fixed")
 set.seed(1)
-opt_fixed <- multiScale_optim(mod, fixed_inputs, start_strategy = "screen")
+opt_fixed <- multiScale_optim(mod, fixed_inputs)
 
 # 6. Compare models (each sigma counts as a parameter)
 mod_land <- glm(counts ~ land1 + land2, family = poisson(), data = df)

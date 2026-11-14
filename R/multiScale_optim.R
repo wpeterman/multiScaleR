@@ -439,12 +439,14 @@
 #'   variable, including hard radii. A hard radius ignores that position;
 #'   provide a finite positive placeholder when supplying \code{par}.
 #' @param start_strategy Character. How to choose starting values when
-#'   \code{par = NULL}: \code{"single"} (default) uses one shared default
-#'   start, while \code{"screen"} performs a low-cost prescreen of sigma
-#'   values and short screening optimizations before launching one full
-#'   optimization. Use \code{"screen"} or supply \code{par} when every
-#'   optimized scale is a hard radius, as under \code{kernel = "fixed"}. The
-#'   gradient search cannot leave a single start on that stepped likelihood.
+#'   \code{par = NULL}: \code{"single"} uses one shared default start, while
+#'   \code{"screen"} performs a low-cost prescreen of sigma values and short
+#'   screening optimizations before launching one full optimization. The
+#'   default, \code{NULL}, uses \code{"screen"} when \code{kernel_inputs} was
+#'   prepared with \code{kernel = "fixed"} and the backend is \code{"refit"}
+#'   without a \code{radius_grid}, and \code{"single"} otherwise. Under a
+#'   fixed kernel every optimized scale is a hard radius, and the gradient
+#'   search cannot leave a single start on that stepped likelihood.
 #'   A refit search that returns its starting values gives a warning and
 #'   records \code{start_stall} in \code{\link{diagnostics}}.
 #' @param screen_n_sigma Positive integer. Number of log-spaced sigma values
@@ -1180,7 +1182,7 @@ multiScale_optim <- function(fitted_mod,
                              kernel_inputs,
                              join_by = NULL,
                              par = NULL,
-                             start_strategy = c("single", "screen"),
+                             start_strategy = NULL,
                              screen_n_sigma = 5,
                              screen_n_jitter = 6,
                              screen_maxit = 8,
@@ -1210,7 +1212,15 @@ multiScale_optim <- function(fitted_mod,
     stop("`fitted_mod` must be a fitted model object.")
   }
   user_supplied_par <- !is.null(par)
-  start_strategy <- match.arg(start_strategy)
+  # A fixed kernel makes every optimized scale a hard radius. Its likelihood
+  # changes in steps, so a gradient search cannot leave a single start. Screen
+  # starting values by default in that case. An explicit choice always wins,
+  # and a radius grid keeps its own exhaustive search.
+  if (is.null(start_strategy))
+    start_strategy <- if (identical(kernel_inputs$kernel, "fixed") &&
+                          backend == "refit" && is.null(radius_grid))
+      "screen" else "single"
+  start_strategy <- match.arg(start_strategy, c("single", "screen"))
   validate_scalar_logical(PSOCK, "PSOCK")
   validate_scalar_logical(verbose, "verbose")
   validate_scalar_numeric(screen_n_sigma,

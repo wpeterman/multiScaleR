@@ -13,10 +13,13 @@ running_example <- function(kernel) {
   list(inputs = inputs, mod = mod)
 }
 
-test_that("a fixed-kernel default start that cannot move warns and is recorded", {
+test_that("a fixed-kernel single start that cannot move warns and is recorded", {
   ex <- running_example("fixed")
+  # Since 0.7.42 a fixed kernel screens by default, so request the single
+  # start explicitly to exercise the unscreened stall.
   expect_warning(
-    fit <- multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE),
+    fit <- multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE,
+                            start_strategy = "single"),
     "hard radius.*start_strategy = \"screen\""
   )
   stall <- diagnostics(fit)$start_stall
@@ -47,6 +50,35 @@ test_that("a screened fixed-kernel start that cannot move is described as screen
   expect_identical(stall$reason, "hard_radius")
   expect_true(stall$screened)
   expect_equal(fit$scale_est$Mean, unname(stall$start))
+})
+
+test_that("a fixed kernel screens starting values by default", {
+  ex <- running_example("fixed")
+  set.seed(1)
+  screened <- suppressWarnings(
+    multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE))
+  set.seed(1)
+  explicit <- suppressWarnings(
+    multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE,
+                     start_strategy = "screen"))
+  single <- suppressWarnings(
+    multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE,
+                     start_strategy = "single"))
+  # The default equals an explicit screen and fits better than one start.
+  expect_true(diagnostics(screened)$start_stall$screened)
+  expect_equal(screened$scale_est, explicit$scale_est)
+  expect_gt(as.numeric(logLik(screened$opt_mod)),
+            as.numeric(logLik(single$opt_mod)))
+})
+
+test_that("smooth kernels keep the single default start", {
+  ex <- running_example("gaussian")
+  fit <- multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE)
+  single <- multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE,
+                             start_strategy = "single")
+  expect_null(diagnostics(fit)$start_stall)
+  expect_equal(fit$scale_est, single$scale_est)
+  expect_equal(fit$optim_results$counts, single$optim_results$counts)
 })
 
 test_that("a start where every refit fails warns with the refit remedy", {
