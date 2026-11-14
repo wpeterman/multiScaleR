@@ -1,3 +1,11 @@
+multiScaleR 0.7.43
+
+* Mark `cross_validate_bayes()`, `cross_validate_mixed()`, the count,
+  binary, and positive families of `cross_validate_field()`,
+  `diagnose_bayes_laplace()`, and `multiScale_optim(radius_grid = )` as
+  experimental in their help pages and the vignettes. Their arguments and
+  results may change in a later release without a deprecation period.
+
 multiScaleR 0.7.42
 
 * The stored prediction example, `bayesian-prediction-example.rds`, keeps

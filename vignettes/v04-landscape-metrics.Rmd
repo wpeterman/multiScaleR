@@ -419,7 +419,7 @@ classes.
 The optimizer above searches the radius continuously. You can instead name the
 radii to compare, such as distances that match the home-range sizes of your
 species, and refit the model at each one. Pass them to `radius_grid` with the
-default `refit` backend.
+default `refit` backend. This search is experimental.
 
 ```{r radius-grid}
 # Refit the model at nine radii from 200 to 1,000 m

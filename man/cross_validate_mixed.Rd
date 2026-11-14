@@ -90,6 +90,9 @@ training or for wholly new groups. Integrate over the shared group effect
 when calculating response means and joint group log scores.
 }
 \details{
+This function is experimental. Its arguments and results may change in a
+later release without a deprecation period.
+
 Mixed CV uses maximum-likelihood fits with constant dispersion
   and a Gaussian distribution for the group effects. Given the fitted
   parameters, new groups use the estimated population distribution of

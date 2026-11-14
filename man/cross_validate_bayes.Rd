@@ -118,6 +118,9 @@ posterior predictive density of the held-out observations, with coherent
 random effects shared by observations in the same predicted group.
 }
 \details{
+This function is experimental. Its arguments and results may change in a
+later release without a deprecation period.
+
 The joint score is the negative log of the posterior average of
   the conditional product of observation densities in each assessment
   block. For grouped binomial data, the block product uses one normalized

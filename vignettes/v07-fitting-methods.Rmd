@@ -132,8 +132,9 @@ builds from a raster layer. Four rows need a word of explanation.
 - **Fixed-radius metrics.** A metric with `radius` set has no scale to
   estimate. `kernel_prep()` computes it once and every route treats it as an
   ordinary numeric predictor.
-- **A grid of radii.** With `radius_grid`, `refit` fits the model at every
-  combination of the radii you list and re-estimates any kernel sigma at each.
+- **A grid of radii.** With `radius_grid`, an experimental option, `refit`
+  fits the model at every combination of the radii you list and re-estimates
+  any kernel sigma at each.
   `diagnostics(fit)$radius_profile` keeps the likelihood of every combination.
   An interval for a kernel sigma then treats the chosen radii as known.
   `vignette("v04-landscape-metrics", package = "multiScaleR")` works an

@@ -60,6 +60,9 @@ the same fitted posterior. Inspect this check alongside the fit's original
 optimizer and integration diagnostics.
 }
 \details{
+This function is experimental. Its arguments and results may change in a
+later release without a deprecation period.
+
 The reference uses a mixture of heavy-tailed local proposals and
   a defensive component based on the latent-effect and scale priors. It
   draws response coefficients from their exact Gaussian conditional or a

@@ -125,6 +125,9 @@
 #' posterior predictive density of the held-out observations, with coherent
 #' random effects shared by observations in the same predicted group.
 #'
+#' This function is experimental. Its arguments and results may change in a
+#' later release without a deprecation period.
+#'
 #' @param formula Two-sided Bayesian response formula. Use a data column as the
 #'   response, or \code{cbind(successes, failures)} for grouped binomial data.
 #'   An \code{I()} wrapper is also accepted. Predictor and scale formulas use

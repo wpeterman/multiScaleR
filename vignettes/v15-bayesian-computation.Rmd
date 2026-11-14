@@ -377,8 +377,8 @@ number from a Laplace or uncorrected marginal fit. That number is the
 probability that a year's scale is at or below a distance you name. The
 function draws a fresh, deliberately wide sample around the approximation,
 reweights every draw against the full posterior, and compares the reweighted
-probability with the one the approximation gave. It needs the RTMB and
-posterior packages.
+probability with the one the approximation gave. The function is
+experimental and needs the RTMB and posterior packages.
 
 ```{r laplace-check, eval = FALSE}
 # Probability that each year's scale is 150 m or less, and 350 m or less

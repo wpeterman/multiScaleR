@@ -568,7 +568,9 @@
 #'   starts. \code{iter.max} limits each L-BFGS-B search; \code{eval.max} applies
 #'   to subsequent profile/inference refits, which use conditional fitting.
 #'
-#' @param radius_grid With \code{backend = "refit"}, an optional named list
+#' @param radius_grid Experimental, so its behavior may change in a later
+#'   release without a deprecation period. With \code{backend = "refit"}, an
+#'   optional named list
 #'   of candidate radius vectors, one for each optimized hard-radius predictor.
 #'   For a single hard radius, supply the vector directly or name it in a list.
 #'   Each vector needs at least two distinct radii in the original map units,

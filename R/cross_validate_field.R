@@ -34,6 +34,10 @@
 #' responses use exact Gaussian conditioning at the fitted parameters. Count,
 #' binary and positive responses use Laplace integration. Optional ecological
 #' kernel scales are also refitted inside training.
+#'
+#' The count, binary, and positive response families are experimental. Their
+#' arguments and results may change in a later release without a deprecation
+#' period.
 #' @param formula Two-sided fixed-effects formula with a numeric response column.
 #'   Products, interactions, factors, offsets and trained scale/poly/ns/bs terms
 #'   retain their native meanings. Do not add random effects or penalized smooths;

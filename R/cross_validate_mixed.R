@@ -116,6 +116,9 @@
 #' training or for wholly new groups. Integrate over the shared group effect
 #' when calculating response means and joint group log scores.
 #'
+#' This function is experimental. Its arguments and results may change in a
+#' later release without a deprecation period.
+#'
 #' @param formula Two-sided native mixed-model formula with one grouping
 #'   column, for example \code{count ~ habitat + (1 | site)}. Gaussian models
 #'   also support one block of numeric random slopes such as

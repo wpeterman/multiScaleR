@@ -92,6 +92,9 @@
 #' the same fitted posterior. Inspect this check alongside the fit's original
 #' optimizer and integration diagnostics.
 #'
+#' This function is experimental. Its arguments and results may change in a
+#' later release without a deprecation period.
+#'
 #' @param object A fitted \code{\link{multiScale_bayes}} object from joint
 #'   Laplace or uncorrected marginal Laplace. Retain the original approximation
 #'   draws and geometry.

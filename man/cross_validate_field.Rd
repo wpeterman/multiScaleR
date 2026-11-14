@@ -111,6 +111,10 @@ binary and positive responses use Laplace integration. Optional ecological
 kernel scales are also refitted inside training.
 }
 \details{
+The count, binary, and positive response families are experimental. Their
+arguments and results may change in a later release without a deprecation
+period.
+
 The native fits use glmmTMB and TMB. Every fit checks two deterministic
 training-only covariance starts and records package versions, convergence,
 marginal score and fixed/joint/latent curvature. For Gaussian responses

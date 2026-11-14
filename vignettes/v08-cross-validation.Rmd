@@ -454,8 +454,8 @@ model from its assessment score and then report that score.
 When each site is surveyed several times, a *random intercept* for site lets
 every site have its own baseline count, drawn from a common distribution. It
 accounts for the similarity among visits to one site. `cross_validate_mixed()`
-cross-validates such a model, fitted with `glmmTMB`. Decide which prediction
-you want before you build the folds.
+cross-validates such a model, fitted with `glmmTMB`. The function is
+experimental. Decide which prediction you want before you build the folds.
 
 - **A new site.** Hold out whole sites. The model knows nothing about a
   held-out site, so it averages its prediction over the fitted spread of site
@@ -590,8 +590,8 @@ accounts for the correlation among neighboring held-out points. `cv_tab()`
 therefore compares field models only with other field models, such as a
 Poisson and a negative binomial model on the same folds.
 
-For Gaussian responses the score is exact at the fitted parameters. For the
-other families it rests on an approximation, which in small simulated fields
+For Gaussian responses the score is exact at the fitted parameters. The other
+families are experimental, and their score rests on an approximation, which in small simulated fields
 with known parameters stayed within 0.05 log units per held-out observation of
 an exact calculation. The predicted spread of new observations is less
 reliable once the parameters are estimated. In simulations that held out
@@ -608,7 +608,8 @@ package and runs far longer than the examples above. See
 each fold samples its own posterior. It scores the held-out observations with
 the posterior predictive density, which averages over uncertainty in the
 coefficients, the scales of effect, and the group effects. It is the only CV
-score in the package that carries parameter uncertainty. Every fold runs the
+score in the package that carries parameter uncertainty. The function is
+experimental, like the Bayesian interface it builds on. Every fold runs the
 sampler, so a run takes about as long as one full fit per fold.
 
 Choose the folds from the prediction you have in mind. To forecast a new year,
