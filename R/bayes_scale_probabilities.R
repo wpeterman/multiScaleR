@@ -1,88 +1,111 @@
 #' Check Monte Carlo Precision of Scale Probabilities
 #'
-#' Estimate probabilities that fitted kernel scales fall below specified
-#' thresholds, and diagnose their simulation precision using the original chains.
+#' Estimate the posterior probability that each fitted kernel scale lies at or
+#' below thresholds you name, and report how precisely the original sampling
+#' chains pin down each probability.
 #'
-#' @param object A \code{\link{multiScale_bayes}} fit retaining its original
-#'   unpermuted post-warmup chains from NUTS or slice sampling. Compact and
-#'   approximate fits return an unavailable report because permuted draws
-#'   cannot recover chain order.
-#' @param thresholds A nonempty named list of numeric vectors. Each name selects
-#'   a fitted kernel predictor, and each vector contains distinct finite scale
-#'   thresholds. The thresholds apply to every distinct fitted scale-formula
-#'   combination for that predictor. For example,
-#'   \code{list(habitat = c(100, 250))} checks two scales in projected map units.
-#' @param scale \code{"distance"} (default) supplies positive kernel-scale
-#'   parameters in map units. \code{"log"} supplies their natural logarithms.
-#'   These are the parameters summarized by \code{\link{posterior_scales}},
-#'   not automatically transformed kernel-weight radii.
-#' @param mcse_target Optional absolute Monte Carlo standard error target on the
-#'   probability axis, strictly between zero and one. For example, \code{0.005}
-#'   requests a probability MCSE no greater than half a percentage point.
-#'   The default \code{NULL} reports precision without judging a target.
-#' @return A list containing:
-#'   \describe{
-#'     \item{available, reason}{Whether original chains could be read, and an
-#'       explanation when unavailable. Individual events can have unavailable
-#'       precision even when the chain report is available.}
-#'     \item{raw_diagnostics}{The fit's original diagnostics, unchanged.}
-#'     \item{probabilities}{A data frame with \code{covariate}, \code{group}, and
-#'       representative fitted \code{row}; the supplied \code{threshold} and
-#'       \code{threshold_scale}; estimated event probability \code{estimate};
-#'       indicator \code{mcse}, \code{ess_mean}, and \code{rhat}; \code{constant},
-#'       \code{precision_available}, \code{precision_target_met}, and \code{reason}.
-#'       Mean precision requires finite positive MCSE and mean ESS. Separate
-#'       \code{rhat_available} and \code{rhat_reason} fields describe indicator
-#'       Rhat availability without changing the fit's original diagnostic gates.
-#'       The event includes equality: kernel scale is less than or equal to the
-#'       threshold. Probability estimates and MCSE use the probability axis.
-#'       Undefined diagnostics and unrequested target decisions remain \code{NA}.}
-#'     \item{chain_probabilities}{The same event identifiers plus \code{chain},
-#'       its empirical probability \code{estimate}, and whether its indicator
-#'       is \code{constant}. This retains chain differences without storing draws.}
-#'     \item{chains, iterations}{Numbers of original chains and post-warmup
-#'       iterations per chain, or \code{NA} when unavailable.}
-#'     \item{mcse_target, event, notes}{The requested precision target, event
-#'       definition, and interpretation limits.}
-#'     \item{metadata_establishes_eligibility}{Always \code{FALSE}. This report
-#'       does not change the fit's sampling or derived-scale diagnostic gates.}
-#'   }
-#' @details Each event is evaluated on fitted log scales in map units, avoiding
-#'   overflow from exponentiating distances. The \code{posterior} package
-#'   computes mean ESS, MCSE and rank-normalized Rhat of the binary indicators.
-#'   At least two chains with four retained iterations each are required for
-#'   precision diagnostics. Constant indicators have nonestimable precision,
-#'   even when their empirical probability is zero or one. Nonfinite derived
-#'   log scales remain explicit failures; iterations are never dropped.
+#' @param object A fitted [multiScale_bayes()] object that keeps its original,
+#'   unpermuted post-warmup chains from NUTS (`sampler`) or slice sampling
+#'   (`chains`). Compact, thinned, and approximate fits return an unavailable
+#'   report, because permuted draws cannot recover chain order.
+#' @param thresholds A nonempty named list of numeric vectors. Each name
+#'   selects a fitted landscape predictor, and each vector holds distinct
+#'   finite scale thresholds. Every threshold is applied to every distinct
+#'   fitted combination of scale covariates and groups for that predictor. For
+#'   example, `list(habitat = c(100, 250))` checks two scales in projected map
+#'   units.
+#' @param scale `"distance"` (default) means `thresholds` are positive kernel
+#'   scales in map units. `"log"` means they are natural logs of those
+#'   scales. Thresholds refer to the scale parameters summarized by
+#'   [posterior_scales()], not to transformed kernel-weight radii such as
+#'   those from [kernel_dist()].
+#' @param mcse_target Optional target for the Monte Carlo standard error
+#'   (MCSE) on the probability axis, strictly between 0 and 1. For example,
+#'   `0.005` asks for an MCSE no larger than half a percentage point. The
+#'   default `NULL` reports precision without judging it against a target.
 #'
-#'   Indicator Rhat can be undefined for balanced binary events even when mean
-#'   ESS and MCSE are finite. Its reported value remains \code{NA}, with an
-#'   explicit availability flag and reason. This alone does not make mean
-#'   precision unavailable. Inspect the original and derived-scale mixing
-#'   diagnostics before interpreting a probability's MCSE.
+#' @return A list with these elements.
+#'   * `available`, `reason`: whether the original chains could be read, and
+#'     an explanation when they could not. A single event can lack precision
+#'     estimates even when the report is available.
+#'   * `raw_diagnostics`: the fit's original diagnostics, unchanged.
+#'   * `probabilities`: a data frame with one row per fitted scale combination
+#'     and threshold. `covariate`, `group`, `row`, `threshold`, and
+#'     `threshold_scale` identify the event. `estimate` is the posterior
+#'     probability that the scale is at or below the threshold. `mcse`,
+#'     `ess_mean`, and `rhat` are the Monte Carlo standard error, mean
+#'     effective sample size, and rank-normalized Rhat of the event indicator.
+#'     `constant` flags an indicator that never changed. `precision_available`
+#'     is `TRUE` when the MCSE and mean ESS are finite and positive.
+#'     `precision_target_met` compares `mcse` with `mcse_target`, and is `NA`
+#'     when no target was given. `reason` explains missing precision.
+#'     `rhat_available` and `rhat_reason` report separately whether Rhat could
+#'     be computed. Undefined values are `NA`.
+#'   * `chain_probabilities`: the same event identifiers with `chain`, that
+#'     chain's `estimate`, and whether its indicator is `constant`. Large
+#'     differences among chains signal poor mixing.
+#'   * `chains`, `iterations`: the number of chains and of post-warmup
+#'     iterations per chain, or `NA` when unavailable.
+#'   * `mcse_target`, `event`, `notes`: the requested target, the event
+#'     definition (`"kernel_scale <= threshold"`), and the limits of
+#'     interpretation.
+#'   * `metadata_establishes_eligibility`: always `FALSE`. The report does not
+#'     change the fit's sampling or derived-scale diagnostic gates.
 #'
-#'   MCSE describes computational uncertainty in a probability estimate, not
-#'   posterior uncertainty about the scale or observation sampling variation.
-#'   \code{precision_target_met} only compares that MCSE with the requested
-#'   target. It does not override Rhat, ESS, raw sampler diagnostics, or model
-#'   checks. A small estimated MCSE cannot rule out an unvisited tail or mode.
-#'   Read \code{\link{diagnose_bayes_scales}} alongside this report and compare
-#'   independent runs when consequential probabilities remain uncertain.
+#' @details
+#' # Read the precision
 #'
-#'   The function does not fit a model, change priors, simulate future groups,
-#'   or use stored importance candidates as MCMC chains. Private Gaussian
-#'   projection blocks require a dedicated diagnostic adapter. Reading a full
-#'   retained sampler can require substantial memory; the returned report keeps
-#'   only summaries and retains neither a sampler nor chain arrays.
-#' @seealso \code{\link{diagnose_bayes_scales}},
-#'   \code{\link{posterior_scales}}, \code{\link{predict_scales}}
+#' The MCSE is computational uncertainty in the probability estimate, not
+#' posterior uncertainty about the scale and not observation variation.
+#' `precision_target_met` only compares that MCSE with your target. It
+#' does not override Rhat, ESS, the raw sampler checks, or model checks, and a
+#' small MCSE cannot rule out an unvisited tail or mode. Read
+#' [diagnose_bayes_scales()] alongside this report, and compare independent
+#' runs when a consequential probability remains uncertain. Longer chains
+#' reduce the MCSE.
+#'
+#' # How the events are computed
+#'
+#' Each event is evaluated on fitted log scales in map units, which avoids
+#' overflow from exponentiating distances. The posterior package computes the
+#' mean ESS, MCSE, and rank-normalized Rhat of each binary indicator. At least
+#' two chains with four retained iterations each are needed for precision
+#' diagnostics. A constant indicator has no estimable precision, even when its
+#' probability is exactly zero or one. Indicator Rhat can be undefined for a
+#' balanced binary event even when the MCSE is finite. It is then reported as
+#' `NA` with its own flag and reason, which alone does not make the precision
+#' unavailable. A nonfinite derived log scale is an error, and iterations are
+#' never dropped.
+#'
+#' The function does not fit a model, change priors, simulate new groups, or
+#' treat importance candidates as MCMC chains. Reading a full NUTS sampler can
+#' take substantial memory, but the report keeps only summaries.
+#' `vignette("v15-bayesian-computation", package = "multiScaleR")` shows how to
+#' report a probability with its MCSE.
+#'
+#' @seealso [diagnose_bayes_scales()], [posterior_scales()],
+#'   [predict_scales()], [diagnose_bayes_laplace()],
+#'   [multiScaleR_bayes-class]
 #' @examples
+#' # A stored slice fit that keeps its four original chains
+#' shared <- readRDS(system.file("extdata", "cache-bayesian-scales.rds",
+#'   package = "multiScaleR"))$fit
+#' if (requireNamespace("posterior", quietly = TRUE)) {
+#'   report <- diagnose_bayes_probabilities(shared,
+#'     thresholds = list(land1 = c(200, 300)), mcse_target = 0.01)
+#'   # Probability that sigma for land1 is at most 200 m and at most 300 m
+#'   print(report$probabilities[c("threshold", "estimate", "mcse",
+#'                                "precision_target_met")])
+#'   print(report$chain_probabilities[c("threshold", "chain", "estimate")])
+#' }
+#'
+#' # A compact fit keeps thinned, permuted draws and cannot be checked
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))
-#' report <- diagnose_bayes_probabilities(example$fits$pooled,
-#'   thresholds = list(habitat = c(100, 250)), mcse_target = 0.005)
-#' report$available  # FALSE: this compact example retains no original sampler
-#' report$reason
+#' compact <- diagnose_bayes_probabilities(example$fits$pooled,
+#'   thresholds = list(habitat = c(100, 250)))
+#' compact$available   # FALSE
+#' compact$reason
 #' @export
 diagnose_bayes_probabilities <- function(object, thresholds,
     scale = c("distance", "log"), mcse_target = NULL) {

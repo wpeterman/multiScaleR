@@ -1,4 +1,5 @@
 test_that("Gaussian response intercept integration equals a normalized covariance density", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=4,n_year=3,seed=8321)
   f$data <- f$data[-c(2,7),,drop=FALSE]
@@ -41,6 +42,7 @@ test_that("Gaussian response intercept integration equals a normalized covarianc
 })
 
 test_that("Gaussian nested response partitions preserve independent annual integration", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=4,n_year=3,seed=8321)
   f$data$year_region <- interaction(f$data$year,rep(c("a","a","b","b"),3))
@@ -67,6 +69,7 @@ test_that("Gaussian nested response partitions preserve independent annual integ
 })
 
 test_that("known Gaussian variance nonidentification is retained before fitting", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=4,n_year=3)
   s <- multiScaleR:::.msr_marginal_prepare(count~habitat+temp+(1|key),f$inputs,f$data,

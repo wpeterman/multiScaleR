@@ -41,6 +41,7 @@ test_that("kernel expression leaves retain native algebra and zero derivatives",
 })
 
 test_that("expression eta supports complete AD scores and curvature", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   dat <- data.frame(y = 1:4, h = c(0, -.4, .2, .8), k = c(.3, -.2, .5, .9),
                     group = factor(c("a", "b", "a", "b")))
@@ -91,6 +92,7 @@ test_that("expression profiles preserve all native family likelihoods and joint 
 })
 
 test_that("prepared expressions preserve reference units, complete priors and AD targets", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (surface in c(FALSE, TRUE))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {

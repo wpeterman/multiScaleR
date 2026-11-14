@@ -3,7 +3,7 @@
 \name{prepare_gdr_intervals}
 \alias{prepare_gdr_intervals}
 \alias{print.msr_gdr_intervals}
-\title{Prepare keyed native GDR interval covariates}
+\title{Add Interval-Level Covariates to a Distance-Removal Frame}
 \usage{
 prepare_gdr_intervals(
   object,
@@ -20,84 +20,110 @@ prepare_gdr_intervals(
 \method{print}{msr_gdr_intervals}(x, ...)
 }
 \arguments{
-\item{object}{An \code{unmarkedFrameGDR} with paired histories and its original
-site, primary-period and observation covariates.}
+\item{object}{An \code{unmarkedFrameGDR} with its original counts and its site,
+yearly and observation covariates.}
 
-\item{event_keys}{A data frame with one row per native site row and primary
-period, in native site-major order. Supply original survey identifiers.}
+\item{event_keys}{A data frame with one row per survey event, in the
+frame's order (all primary periods of the first frame row, then the
+second, and so on). Use the original survey identifiers. The names
+\code{.input_row}, \code{.input_row_name} and \code{.interval} are reserved.}
 
-\item{event_id}{Character vector naming the columns of \code{event_keys} that
-uniquely identify each survey. Compound keys are supported.}
+\item{event_id}{Character vector naming the column(s) of \code{event_keys} that
+identify each survey.}
 
-\item{interval_data}{A data frame containing the \code{event_id} columns, the
-interval index, and new observation predictors. It must contain exactly
-one row for every survey and removal interval. Rows may be shuffled;
-\code{alignment} records their explicit mapping to native order.}
+\item{interval_data}{A data frame with the \code{event_id} columns, the interval
+number column and the new covariates. It needs exactly one row for every
+survey and removal interval. Rows can be in any order, and \code{alignment}
+records how they were matched.}
 
-\item{interval_units}{Nonempty time-unit label for the original removal
-durations, such as \code{"minutes"}. No time conversion is performed.}
+\item{interval_units}{Character string naming the time unit of the removal
+intervals, such as \code{"minutes"}. No time conversion is performed.}
 
-\item{interval}{One character string naming the numeric interval-index
-column in \code{interval_data}. Its values must be integers from one through
-the number of removal intervals per primary period. Default: \code{"interval"}.
-This column is retained as an observation predictor.}
+\item{interval}{Character string, default \code{"interval"}. The name of the
+interval number column in \code{interval_data}. Its values must be whole
+numbers from 1 to the number of removal intervals per primary period. The
+column is also added to the observation covariates, so formulas can use
+it.}
 
-\item{site_id}{Optional physical-site columns in \code{event_keys}, passed to
-\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}. Native frame rows need not be physical sites.}
+\item{site_id}{Optional column(s) of \code{event_keys} that identify the
+physical site, passed to \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}. Frame rows need not
+be physical sites.}
 
-\item{effort}{Optional event-order effort vector, passed to
-\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}. Unknown, unsurveyed and surveyed-zero events
-retain their separate meanings.}
+\item{effort}{Optional numeric vector of survey effort, one value per
+event, passed to \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}. Positive values mark
+completed surveys, zero marks unsurveyed events and \code{NA} marks unknown
+effort.}
 
-\item{expected_event_keys}{Optional independently supplied event mapping in
-native frame order, passed to \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}.}
+\item{expected_event_keys}{Optional independent event list in frame
+order, passed to \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}.}
 
 \item{x}{A prepared \code{msr_gdr_intervals} object to print.}
 
-\item{...}{Unused.}
+\item{...}{Not used.}
 }
 \value{
-A list of class \code{msr_gdr_intervals} containing \code{data}, the updated
-native frame; \code{survey_audit}, the original survey audit; \code{alignment}, the
-native event/row/primary/interval positions and matching input row; and
-\code{protocol}, the units, durations, added columns and provider metadata.
-\code{fit_eligibility_established} is always \code{FALSE}. Structural errors stop
-without changing the input; interval errors carry the survey audit.
-Printing reports dimensions and whether the input order changed, returning
-the object invisibly. Full alignment and warning records remain available.
+A list of class \code{msr_gdr_intervals}:
+\itemize{
+\item \code{data}: a copy of \code{object} with the new observation covariates.
+\item \code{survey_audit}: the result of \code{\link[=validate_unmarked_data]{validate_unmarked_data()}} for the frame.
+\item \code{alignment}: one row per observation row in frame order, with the
+event (\code{.event}), frame row (\code{.site_row}), primary period
+(\code{.primary}), interval (\code{.interval}), the matching row of
+\code{interval_data} (\code{.input_row}, \code{.input_row_name}) and the \code{event_keys}
+columns.
+\item \code{protocol}: the survey protocol from the audit (units, distance breaks,
+interval lengths), plus the frame dimensions, the \code{interval_column},
+the \code{added_columns}, any added names that also occur among the site or
+yearly covariates (\code{shared_site_or_annual_names}), whether the input
+order changed (\code{reordered}) and the \code{unmarked} version.
+\item \code{fit_eligibility_established}: always \code{FALSE}.
+}
+
+Printing reports the dimensions and whether the input order changed,
+and returns the object invisibly. If the survey audit finds an error, or
+the interval rows cannot be aligned, the function stops with a condition
+of class \code{msr_gdr_interval_error} carrying \code{survey_audit} and the
+offending \code{input_rows}. The input frame is never changed.
 }
 \description{
-Add observation-interval predictors to a copy of an
-\code{unmarkedFrameGDR}, retaining an explicit record of their alignment.
+Add covariates that can change from one removal interval to the next,
+such as who was listening in each interval, to a copy of an
+\code{unmarkedFrameGDR}. Rows are matched by survey identifier and interval
+number, so the input can be in any order, and the alignment is recorded.
 }
-\details{
-Native GDR observation rows are ordered by frame row, primary period, then
-removal interval. The native observation-covariate setter does not verify
-this layout. This helper checks keys before using that setter. It rejects
-unknown, duplicate, missing or extra survey/interval combinations and any
-attempt to overwrite an existing observation column. Event identifier
-columns are used for alignment; all other supplied columns, including the
-interval index, are added to native observation covariates.
+\section{How rows are aligned}{
+\code{unmarked} orders observation rows by frame row, primary period and then
+removal interval, and its own setter for observation covariates does not
+check that order. This function checks the keys first. It rejects unknown,
+duplicate, missing or extra survey and interval combinations, and any
+attempt to overwrite an existing observation column. The event identifier
+columns are used only for matching. Every other column of
+\code{interval_data}, including the interval number, is added.
 
-The response matrices, existing covariates, distance geometry, durations,
-units, column classes, factor levels and contrasts remain unchanged.
-Missing predictor values are retained, and native model fitting still
-applies its own missingness rules. No records are aggregated or imputed.
-\code{.input_row}, \code{.input_row_name} and \code{.interval} are reserved alignment names
-in \code{event_keys}. Shared site/annual predictor names are recorded for
-review; scale-fitting guards against shadowed optimized site predictors
-remain in force. Use distinct names for fields with different meanings.
-
-Use native formulas such as \code{~ I(interval == 1)} or \code{~ factor(interval)}
-when the observation process justifies them. With equal unit intervals,
-hazards pi in the first interval and b thereafter reproduce the first-time
-law of a simple encounter Markov process regardless of persistence after
-an encounter. First times alone do not estimate that persistence or
-establish a finite corrected density. Unequal native durations retain
-their per-unit probability interpretation. Keep linked complete histories
-when assessing re-detections. This helper adds no likelihood, parameter,
-prior, uncertainty method or conditional-random prediction admission.
+The counts, existing covariates, distance bands, interval lengths, units,
+column classes, factor levels and contrasts are unchanged. Missing values
+are kept, and \code{unmarked} applies its own missing-data rules when fitting.
+Nothing is aggregated or imputed. Added names that also occur among the
+site or yearly covariates are recorded for review. Use distinct names for
+fields with different meanings, because \code{\link[=multiScale_optim]{multiScale_optim()}} will not
+estimate a scale for a site covariate whose name is shadowed this way.
 }
+
+\section{Model the first interval}{
+Use formulas such as \code{~ I(interval == 1)} or \code{~ factor(interval)} when the
+observation process justifies them. With equal unit intervals, hazards pi
+in the first interval and b thereafter reproduce the first-time law of a
+simple encounter Markov process regardless of persistence after an
+encounter. First times alone do not estimate that persistence or
+establish a finite corrected density. Unequal durations keep their
+per-unit probability interpretation. Keep linked complete histories when
+assessing re-detections. This function only arranges data. It adds no
+model terms, parameters or uncertainty methods.
+
+For covariates that are constant within a survey, \code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}
+builds \code{interval_data} for you.
+}
+
 \examples{
 frame <- unmarked::unmarkedFrameGDR(
   yDistance = matrix(c(1, 0, 0, 1), 2, byrow = TRUE),
@@ -106,11 +132,18 @@ frame <- unmarked::unmarkedFrameGDR(
   dist.breaks = c(0, 25, 75), unitsIn = "m",
   period.lengths = c(1, 2, 1))
 keys <- data.frame(site = c("A", "B"), survey = c("s1", "s2"))
+# One row per survey and interval, deliberately out of frame order
 bands <- data.frame(survey = rep(c("s2", "s1"), each = 3),
   interval = rep(c(3, 1, 2), 2),
   observer = factor(c("Ann", "Ann", "Bob", "Bob", "Ann", "Ann")))
 prepared <- prepare_gdr_intervals(frame, keys, "survey", bands,
   interval_units = "minutes", site_id = "site")
+# Observer and interval number, now in frame order
 unmarked::obsCovs(prepared$data)
-prepared$alignment
+# Which input row filled each observation row
+prepared$alignment[, c(".event", ".interval", ".input_row", "survey")]
+}
+\seealso{
+\code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}, \code{\link[=validate_unmarked_data]{validate_unmarked_data()}},
+\code{\link[=prepare_gdr_histories]{prepare_gdr_histories()}}
 }

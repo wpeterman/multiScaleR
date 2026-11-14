@@ -61,6 +61,7 @@ test_that("TMB count includes all components and variance but excludes latent ef
 })
 
 test_that("C and TMB counts handle factors, interactions and mixture parameters", {
+  skip_on_cran()
   fix <- selection_unmarked_fixture()
   for (engine in c("C", "TMB")) {
     for (mixture in c("P", "NB", "ZIP")) {
@@ -80,6 +81,7 @@ test_that("C and TMB counts handle factors, interactions and mixture parameters"
 })
 
 test_that("component formula classes count every free component and exclude fixed ones", {
+  skip_on_cran()
   set.seed(9130)
   dat <- data.frame(Year = factor(rep(1:3, each = 10)), hab = rnorm(30))
   counts <- matrix(rpois(180, 2), nrow = 30)
@@ -130,6 +132,7 @@ test_that("selection scores, ranks and weights match independent unmarked oracle
 })
 
 test_that("profile LL agrees with refits and AICc uses nine parameters", {
+  skip_on_cran()
   fix <- selection_unmarked_fixture()
   sigmas <- c(25, 30, 40)
   prof <- profile_sigma(fix$fit, sigma_values = sigmas, metric = "LL",

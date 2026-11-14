@@ -4,7 +4,7 @@
 \alias{prepare_prediction}
 \alias{predict.multiScaleR_prediction}
 \alias{print.multiScaleR_prediction}
-\title{Prepare a fixed set of multiscale predictions for repeated use}
+\title{Prepare a fixed set of predictions for repeated use}
 \usage{
 prepare_prediction(
   object,
@@ -30,218 +30,263 @@ prepare_prediction(
 \method{print}{multiScaleR_prediction}(x, ...)
 }
 \arguments{
-\item{object}{A fitted \code{multiScaleR} object using \code{profile_glm},
-\code{joint_nb2}, \code{conditional_logit}, or \code{joint_mixed}, or
-containing a supported native-refit model in \code{opt_mod}.}
+\item{object}{A fitted \code{multiScaleR} object from \code{\link[=multiScale_optim]{multiScale_optim()}}, using
+\code{backend = "profile_glm"}, \code{"joint_nb2"}, \code{"conditional_logit"}, or
+\code{"joint_mixed"}, or the default refit backend with a supported native
+model in \code{object$opt_mod}. For \code{predict()}, a snapshot returned by
+\code{prepare_prediction()}.}
 
-\item{newdata, kernel_inputs}{Prediction data and matching prepared spatial
-inputs, with the same requirements as \code{\link{predict.multiScaleR}}.
-The default \code{NULL} for both uses the retained fitting rows.}
+\item{newdata, kernel_inputs}{Prediction rows and matching spatial inputs
+from \code{\link[=kernel_prep]{kernel_prep()}}, with the same requirements as in
+\code{\link[=predict.multiScaleR]{predict.multiScaleR()}}. The default \code{NULL} for both uses the rows
+retained from fitting.}
 
-\item{max_bytes}{A positive finite byte limit for the returned snapshot.
-The default is 64 MiB. Exceeding the limit raises an error. This limit
-applies to retained size, not temporary memory used during preparation.}
+\item{max_bytes}{Positive number. The largest allowed size of the returned
+snapshot, in bytes. The default, \code{64 * 1024^2}, is 64 MiB. A larger
+snapshot raises an error, so use fewer rows or raise the limit. It limits
+the stored size, not the temporary memory used while preparing.}
 
-\item{component}{For unmarked models, the required native prediction
-\code{type}, such as \code{"state"}, \code{"psi"}, \code{"det"}, \code{"col"}, or
-\code{"ext"}, as supported by the fitted model. For \code{joint_mixed},
-optionally select one native glmmTMB prediction type, such as
-\code{"zprob"}; \code{NULL} prepares both response and link predictions.
-Leave \code{NULL} for the analytic GLM and conditional-logistic backends.
-General refit snapshots default to response and link for GLM-like models,
-or linear predictor and risk for Cox models. Other native providers
-require an explicit component.}
+\item{component}{Character scalar naming the native prediction type to
+keep.
+\itemize{
+\item \code{unmarked} models: required. Name one component, such as \code{"state"},
+\code{"det"}, \code{"psi"}, \code{"col"}, or \code{"ext"}, as the fitted model supports.
+\item \code{"joint_mixed"}: optional. Name one native glmmTMB type, such as
+\code{"zprob"}. The default \code{NULL} prepares both \code{"response"} and \code{"link"}.
+\item Other refits: the default \code{NULL} prepares \code{"response"} and \code{"link"} for
+\code{lm}, \code{glm}, glmmTMB, lme4, \code{gls}, and \code{lme} models, and \code{"lp"} and
+\code{"risk"} for Cox models. Other native providers need an explicit
+component.
+\item Analytic and conditional logistic backends: leave \code{NULL}. Their
+snapshots keep every type (\code{"response"}, \code{"link"}, and, for
+conditional logistic fits, \code{"risk"}).
+}}
 
-\item{native_args}{A named list of native prediction controls to bind during
-preparation. For \code{joint_mixed}, supports \code{re.form},
-\code{allow.new.levels}, and \code{na.action}. For unmarked, supports
-\code{backTransform}, \code{na.rm}, \code{appendData}, \code{level}, and
-\code{re.form}. Defaults to an empty list, preserving native defaults.
-General refits additionally support \code{reference} and nlme
-\code{level}, when accepted by the native method. For mgcv GAMs,
-also supports \code{exclude}, \code{terms}, \code{unconditional},
-\code{iterms.type}, and \code{block.size}. The controls and native
-warnings are bound to the snapshot. Unconditional GAM SEs request native
-smoothing-parameter covariance; they do not add kernel-scale uncertainty.
-BAM snapshots also accept \code{discrete}. Set it to \code{FALSE} for
-ordinary \code{iterms} predictions. The optimized discrete provider resets
-\code{iterms} to \code{terms} with its native warning. A smoothing correction
-request is distinct from a correction actually available to the provider.
-Ordinary lm refits also accept native \code{interval} and \code{level}
-controls for mean confidence or future-observation prediction intervals.
-spaMM refits accept \code{variances} and \code{intervals}; cross-row
-covariance attributes require point predictions instead of a snapshot.
-GAM rows retain all formula-input requirements, including excluded-term
-inputs. The unchecked \code{newdata.guaranteed} shortcut is unsupported.
-Selected lme4/spaMM effects and GAM terms are recorded in prediction contracts.
-Supported native S3 control abbreviations are resolved to their full names
-before checking the snapshot allowlist and are recorded by those names.
-spaMM refits use retained native frames to verify fixed features; zero or
-selected effects follow the provider's row requirements. Unsupported native
-SE requests stay explicit errors and are recorded separately from point output.}
+\item{native_args}{A named list of native prediction controls to bind to
+the snapshot. Default \code{list()}, which keeps the native defaults. Changing
+any control later needs a new snapshot. Supported controls:
+\itemize{
+\item \code{"joint_mixed"}: \code{re.form}, \code{allow.new.levels}, and \code{na.action}.
+\item \code{unmarked}: \code{backTransform}, \code{na.rm}, \code{appendData}, \code{level}, and
+\code{re.form}.
+\item Other refits: \code{re.form}, \code{allow.new.levels}, \code{na.action}, \code{reference},
+and \code{level} (such as nlme \code{level = 0}), when the native method accepts
+them. Ordinary \code{lm} refits also accept \code{interval} (\code{"confidence"} for
+mean limits, \code{"prediction"} for future-observation limits). spaMM
+refits accept \code{variances} and \code{intervals}, but cross-row covariance
+needs point predictions instead of a snapshot. mgcv GAMs accept
+\code{exclude}, \code{terms}, \code{unconditional}, \code{iterms.type}, and \code{block.size},
+and BAMs also accept \code{discrete}. \code{unconditional = TRUE} requests the
+native smoothing-parameter covariance, which adds no kernel-scale
+uncertainty.
+}
 
-\item{join_by}{For native-refit spatial predictions, explicit site keys with
-one row per prepared prediction site, in spatial input order. Requires
-both \code{newdata} and \code{kernel_inputs}. See
-\code{\link{prepare_unmarked_data}}. The default \code{NULL} uses strict
-row-name alignment for general refits. Unmarked spatial snapshots require
-explicit keys; without spatial inputs their native data pass unchanged.
-Unsupported for analytic and
-joint mixed-model snapshots.}
+Native argument abbreviations are resolved to their full names before
+the list is checked and are recorded by those names. Selected lme4 and
+spaMM effects and GAM terms are recorded in the prediction contracts.}
+
+\item{join_by}{For native refit and \code{unmarked} spatial predictions, a data
+frame of site keys with one row per prepared site, in \code{kernel_inputs}
+order. It needs both \code{newdata} and \code{kernel_inputs}. \code{unmarked} spatial
+snapshots require it (see \code{\link[=prepare_unmarked_data]{prepare_unmarked_data()}}). The default \code{NULL}
+aligns general refit rows by row name, and \code{unmarked} data without
+spatial inputs pass unchanged. Not used by the analytic, conditional
+logistic, and joint mixed backends.}
 
 \item{include_fixed}{Logical. The default \code{FALSE} keeps fixed-radius
-predictors explicit. For supported spatial snapshots, set \code{TRUE} to
-use the verified fixed-radius preparation in
-\code{\link{prepare_unmarked_data}}. Requires spatial inputs and verified
-row alignment, using explicit site keys for repeated sites and unmarked.
-Analytic GLM/NB2, conditional-logistic, and joint mixed snapshots also
-support this verification, with their existing strict row-ID rules.}
+predictors as explicit inputs in \code{newdata}. Set \code{TRUE} to recompute them
+from the spatial inputs after verifying their training preparation, as
+described in \code{\link[=prepare_unmarked_data]{prepare_unmarked_data()}} and \code{\link[=predict.multiScaleR]{predict.multiScaleR()}}. It
+needs spatial inputs and verified row alignment, with explicit site keys
+for repeated sites and for \code{unmarked} models.}
 
-\item{type, se.fit, uncertainty, interval, level}{Output and uncertainty controls
-passed to \code{\link{predict.multiScaleR}}, with the same defaults and
-safeguards. They change the summary of the fixed prediction design.}
+\item{type, se.fit, uncertainty, interval, level}{Output and uncertainty
+controls for \code{predict()} on a snapshot, with the defaults and checks of
+\code{\link[=predict.multiScaleR]{predict.multiScaleR()}}. For analytic and conditional logistic snapshots
+they choose the scale and the uncertainty summary of the fixed design.
+For joint mixed and refit snapshots, \code{type} selects one prepared
+component (the first one prepared by default), \code{se.fit} selects the
+cached point or standard-error output, and \code{uncertainty} must be
+\code{"conditional"} when standard errors or native interval attributes are
+returned. \code{unmarked} snapshots accept only \code{type}.}
 
-\item{...}{Reserved. Additional arguments, including new prediction data,
-raise an error; create a new snapshot for changed data.}
+\item{...}{For \code{predict()}, any additional argument, including new
+prediction data, raises an error. Prepare a new snapshot for new rows.
+Ignored by \code{print()}.}
 
-\item{x}{A prepared prediction snapshot.}
+\item{x}{A \code{multiScaleR_prediction} snapshot from \code{prepare_prediction()}.}
 }
 \value{
-An object of class \code{multiScaleR_prediction}. Its \code{predict()}
-method returns the same output as \code{predict()} on the original model
-and fixed prediction inputs. \code{max_bytes} counts its R object size.
-Unmarked snapshots return the native \code{predict(object$opt_mod, ...)}
-table, including its \code{Predicted}, \code{SE}, \code{lower}, and
-\code{upper} columns. Mixed snapshots return native glmmTMB vectors or
-standard-error lists for the bound prediction type and controls.
-The named \code{prediction_contract} list describes each prepared output
-type: its target, conditioning, random-effect policy, and uncertainty
-restrictions. This descriptive metadata does not establish fit eligibility
-or interval calibration. Numerical prediction outputs retain their usual
-structure, including native attributes.
+\code{prepare_prediction()} returns an object of class
+\code{multiScaleR_prediction}, printed as a one-line summary of the backend,
+the number of fixed predictions, and the stored size. Its elements are
+internal, except \code{prediction_contract}, a named list with one
+\link{prediction_contract} per prepared output type. Each records the
+quantity, its scale and conditioning, the random-effect policy, and the
+uncertainty restrictions. This metadata does not establish fit
+eligibility or interval calibration.
+
+\code{predict()} on a snapshot returns the same output as
+\code{\link[=predict.multiScaleR]{predict.multiScaleR()}} would return for the original model and fixed
+rows. \code{unmarked} snapshots return the native table with \code{Predicted},
+\code{SE}, \code{lower}, and \code{upper} columns. Joint mixed snapshots return native
+glmmTMB vectors or standard-error lists for the bound type and controls.
+Numerical outputs keep their usual structure, including native
+attributes.
+
+\code{print()} returns the snapshot invisibly.
 }
 \description{
-Prepare a spatial prediction design or native prediction output
-once and retain a compact snapshot for repeated summaries of fixed rows.
+Compute the predictions for one fixed set of rows once and keep them in a
+compact snapshot. For the analytic and conditional logistic backends, the
+snapshot holds the prepared spatial design, so \code{predict()} on it can switch
+between scales and uncertainty choices without rebuilding the kernels. For
+joint mixed, \code{unmarked}, and other native refit models, it holds the native
+numerical outputs for the controls you bind. A snapshot does not add
+uncertainty, update the fit, or predict new locations.
 }
-\details{
-Native GDR models with active formula offsets or TMB zero inflation are
-rejected before fitting, model selection or prediction. In the audited
-unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
-TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
-require separate provider qualification; multiScaleR does not remove offsets,
-switch engines, alter parameter counts or substitute uncertainty estimates.
-Offset-free C ZIP models retain their native likelihood and parameter count.
+\section{What a snapshot keeps}{
+A snapshot binds the coefficients, covariance, selected scales, training
+standardization, row order, choice sets, and native controls of one call.
+It keeps neither raw spatial buffers nor the fitted native model, so it
+can be saved with \code{\link[=saveRDS]{saveRDS()}} and restored with \code{\link[=readRDS]{readRDS()}}. Later changes
+to the original model or data do not update it. Call
+\code{prepare_prediction()} again after changing the model, locations, choice
+sets, metric definitions, distance units, or native controls. New data
+cannot be passed to \code{predict()} on a snapshot.
 
-The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
-\code{MASS::glm.nb}, \code{coxph} and \code{clogit} structures. Other native
-subclasses retain their existing provider path.
-
-Ordinary native LM, GLM and time-fixed unpenalized Cox snapshots
-use the original fitted terms for dot shortcuts and active variables.
-Removed variables do not add prediction inputs or parameters. Their
-original coefficient covariance and kernel-conditional uncertainty remain
-unchanged. New data columns never enter the fitted design.
-
-The snapshot binds coefficients, covariance, spatial scales, training
-standardization, row order, and any choice sets to the supplied model and
-inputs. It does not retain raw spatial buffers or the fitted native model.
-Supported native and analytic models retain trained standard scaling,
-polynomial and spline calls inside nested expressions and formula offsets.
-Native recovery needs one unambiguous learner's attributes per evaluated
-predictor. Missing or ambiguous metadata raises an error rather than
-learning a transformation from prediction rows.
-Later changes to the original model or data do not update the snapshot.
-Call \code{prepare_prediction()} again after changing the model, locations,
-choice sets, metric definitions, or distance units. New data cannot be
-supplied to \code{predict()} on a snapshot.
-
-Reuse avoids rebuilding the spatial engine when requesting several output
-types for the same rows. Uncertainty restrictions remain those of the fitted
-model. Conditional-logistic snapshots without valid choice-set IDs support
-linear predictors and relative scores, but reject response probabilities and
-retain the reason in their response contract. In particular, their SEs require
-\code{uncertainty = "conditional"}; scale uncertainty is not added.
-Snapshots can be saved with \code{saveRDS()} and restored with \code{readRDS()}.
-
-Mixed and unmarked snapshots cache the native numerical prediction outputs
-for the fixed controls, rather than retaining a native model or rebuilding
-its prediction machinery. Native warnings are recorded and repeated when
-the corresponding cached output is requested. Native errors abort preparation.
-Mixed standard errors remain conditional on selected scales. Changing
-random-effect settings requires a new snapshot. Zero random-effect controls
-use formula syntax, independently of its environment; grouping columns may
-be omitted when the native provider permits zero-effect predictions. Native glmmTMB \code{re.form = NA}
-sets random effects to zero and does not integrate over their distribution.
-
-For unmarked without \code{kernel_inputs}, supply native prediction rows
-with spatial covariates on their fitted modeled scale, including raw units
-when selected during native refitting. Ordinary occupancy
-and pcount state/detection terms use original raw training transformations,
-fitted factor contrasts and native component covariance. Missing contrasts
-can be recovered from unambiguous original main-factor columns; other missing
-coding requires explicit training contrasts. Preparation verifies
-the fixed designs and offsets against the retained native fit and reuses
-this metadata for the requested output. Explicit data-frame rows prepare
-only the requested regression component; native frame inputs or omitted
-newdata retain both components for native missing-row removal. ZIP outputs
-retain their native zero-inflation estimate and uncertainty, and all outputs
-retain full model parameter counts and diagnostics. Keep the original covariates and
-fitted designs. Frame subsets retain original known-group columns.
-GDR snapshots likewise freeze the active lambda/phi/dist/rem component's
-original training terms and native covariance. Site, primary-period and
-removal-interval recipes remain distinct. Data-frame rows scope preparation
-to the requested component, and native GDR frames retain all active designs
-and their original missing-input checks. No model or executable TMB tape is
-saved in the numerical snapshot.
-Conditional learned random-effect terms require precomputed training
-predictors. Zero-effect contexts need only their fixed design and offsets,
-and reject a later conditional-effect request. Ordinary native S4 control
-abbreviations use the provider's exact-first matching. Any non-NULL native \code{re.form} sets effects to zero;
-this is not partial-effect selection or integration. With \code{kernel_inputs}, supply explicit \code{join_by} keys and
-native prediction rows. \code{\link{prepare_unmarked_data}} computes spatial
-columns and applies training standardization without changing native
-observation/year ordering or nonspatial factor/offset inputs. Spatial
-snapshots retain prediction row names and site keys in their provenance.
-
-General refit snapshots also cache numerical outputs without retaining the
-fitted native model, formula environments, or raw cell buffers. If a native
-provider lacks standard errors, point predictions remain available and a
-later SE request replays the recorded error. Errors in point predictions
-still abort preparation. These snapshots retain native uncertainty
-distinctions and do not add kernel-scale uncertainty. Native prediction
-intervals and response variances retain the provider's observation noise.
-Cached native intervals or variance attributes require
-\code{uncertainty = "conditional"}, including when \code{se.fit = FALSE}.
-Native controls remain bound to the snapshot; leave the wrapper's
-\code{interval = "none"} when retrieving those native outputs.
-The returned
-table preserves native columns, intervals, missing-value handling, and
-component interpretation. Native standard errors and intervals condition on
-selected spatial scales. Their native confidence level and transformation
-are bound by \code{native_args}, not changed at prediction time.
-For dynamic occupancy, \code{"psi"} describes initial occupancy and
-\code{"col"}/\code{"ext"} describe transitions. These native component
-predictions are distinct from smoothed or projected occupancy trajectories.
+Supported native and analytic models keep their trained standard scaling,
+polynomial, and spline calls, including those inside nested expressions
+and formula offsets. Recovery needs one unambiguous learner's attributes
+per evaluated predictor. Missing or ambiguous metadata raises an error
+rather than learning a transformation from the prediction rows. Ordinary
+native \code{lm}, \code{glm}, and time-fixed unpenalized Cox snapshots use the
+original fitted terms for dot shortcuts and active variables, so removed
+variables add no prediction inputs and new data columns never enter the
+design.
 }
+
+\section{Analytic and conditional logistic snapshots}{
+These snapshots keep the spatial design, so \code{predict()} on them accepts
+the same \code{type}, \code{se.fit}, \code{uncertainty}, \code{interval}, and \code{level} choices
+as \code{\link[=predict.multiScaleR]{predict.multiScaleR()}}, with the same restrictions. Reuse avoids
+rebuilding the spatial engine when you need several summaries of the same
+rows. Conditional logistic snapshots without valid choice-set IDs still
+give linear predictors and relative scores, but they reject response
+probabilities and keep the reason in their response contract. Their
+standard errors need \code{uncertainty = "conditional"}, and no scale
+uncertainty is added.
+}
+
+\section{Native snapshots}{
+Joint mixed, \code{unmarked}, and other refit snapshots cache the native
+numerical outputs for the bound controls, rather than keeping a native
+model or rebuilding its prediction machinery. Native warnings are recorded
+and repeated each time the cached output is requested. A native error in
+the point predictions stops preparation.
+\itemize{
+\item \strong{Joint mixed models.} Point and standard-error outputs are both cached.
+Standard errors stay conditional on the selected scales. Zero
+random-effect controls use formula syntax independently of its
+environment, and grouping columns may be omitted when the provider
+permits zero-effect predictions. glmmTMB \code{re.form = NA} sets random
+effects to zero and does not integrate over their distribution.
+\item \strong{General refits.} If the provider cannot supply standard errors, the
+point predictions remain available and a later standard-error request
+repeats the recorded error. Native prediction intervals and response
+variances keep the provider's observation noise. Cached native intervals
+or variance attributes need \code{uncertainty = "conditional"}, even with
+\code{se.fit = FALSE}. Leave the wrapper's \code{interval = "none"} when you
+retrieve those native outputs. GAM rows keep every formula-input
+requirement, including inputs to excluded terms, and the unchecked
+\code{newdata.guaranteed} shortcut is not supported. spaMM refits use their
+retained native frames to verify fixed features. An unsupported native
+standard-error request stays an explicit error, recorded separately from
+the point output.
+\item \strong{\code{unmarked} models.} \code{predict()} returns the cached native table. Its
+confidence level and back-transformation are fixed by \code{native_args} and
+cannot be changed at prediction time.
+}
+}
+
+\section{Unmarked snapshots}{
+Without \code{kernel_inputs}, supply native prediction rows with spatial
+covariates already on their fitted scale, including raw units when the
+native refit used them. With \code{kernel_inputs}, supply explicit \code{join_by}
+keys and native prediction rows. \code{\link[=prepare_unmarked_data]{prepare_unmarked_data()}} then computes
+the spatial columns and applies the training standardization without
+changing native observation or year ordering or non-spatial factor and
+offset inputs. Spatial snapshots keep the prediction row names and site
+keys in their provenance.
+
+Ordinary occupancy and \code{pcount} state and detection terms use the
+original raw training transformations, fitted factor contrasts, and native
+component covariance. Missing contrasts can be recovered from unambiguous
+original main-factor columns. Other missing coding needs explicit training
+contrasts. Preparation verifies the fixed designs and offsets against the
+retained native fit. Explicit data-frame rows prepare only the requested
+component, while native frame inputs or an omitted \code{newdata} keep both
+components for native missing-row removal. ZIP outputs keep their native
+zero-inflation estimate and uncertainty, and every output keeps the full
+model's parameter count and diagnostics. Keep the original covariates and
+fitted designs. Frame subsets keep the original known-group columns.
+
+\code{gdistremoval()} snapshots likewise freeze the active \code{"lambda"},
+\code{"phi"}, \code{"dist"}, or \code{"rem"} component's original training terms and
+native covariance, with distinct site, primary-period, and
+removal-interval recipes. Data-frame rows limit preparation to the
+requested component, and native GDR frames keep every active design and
+their original missing-input checks. No model or executable TMB tape is
+saved in the snapshot. GDR models with active formula offsets or TMB zero
+inflation are rejected before fitting, model selection, or prediction, as
+\code{\link[=aic_tab]{aic_tab()}} explains.
+
+Conditional learned random-effect terms need precomputed training
+predictors. Zero-effect contexts need only their fixed design and
+offsets, and they reject a later conditional-effect request. Any
+non-\code{NULL} native \code{re.form} sets the effects to zero. It neither selects
+some effects nor integrates over them. For dynamic occupancy, \code{"psi"}
+describes initial occupancy, and \code{"col"} and \code{"ext"} describe transitions.
+These component predictions are distinct from smoothed or projected
+occupancy trajectories.
+}
+
 \examples{
-\dontrun{
-# Prepare once for several summaries at the same locations.
-prepared <- prepare_prediction(fit, newdata = sites, kernel_inputs = inputs)
-predict(prepared)
-predict(prepared, type = "link", se.fit = TRUE,
-        uncertainty = "conditional")
+## Analytic fit from the running example: counts and two landscape layers
+data("landscape_counts")
+data("surv_pts")
+pts <- terra::vect(surv_pts)
+land <- terra::rast(system.file("extdata", "landscape.tif",
+                                package = "multiScaleR"))[[c("land1", "land2")]]
+inputs <- kernel_prep(pts, land, max_D = 1700, kernel = "gaussian",
+                      bin = TRUE, verbose = FALSE)
+dat <- data.frame(landscape_counts, inputs$kernel_dat)
+start <- glm(counts ~ site + land1 + land2, family = poisson(), data = dat)
+fit <- multiScale_optim(start, inputs, backend = "profile_glm",
+                        n_cores = 1, verbose = FALSE)
 
-# Bind a native zero-inflation probability with random effects set to zero.
-zero_prob <- prepare_prediction(mixed_fit, component = "zprob",
-  native_args = list(re.form = NA))
-predict(zero_prob)
+## Prepare three new survey points once. Row names of new_sites match the
+## prepared point IDs.
+new_inputs <- kernel_prep(pts[1:3], land, max_D = 1700, kernel = "gaussian",
+                          bin = TRUE, verbose = FALSE)
+new_sites <- data.frame(site = c(-1, 0, 1))
+prepared <- prepare_prediction(fit, new_sites, new_inputs)
+prepared
 
-# Preserve native unmarked state predictions and their conditional intervals.
-state <- prepare_prediction(unmarked_fit, component = "state")
-predict(state)
-}
+## Several summaries of the same rows, without rebuilding the kernels
+predict(prepared)                                  # expected counts
+predict(prepared, type = "link", se.fit = TRUE)    # log scale, joint SEs
+predict(prepared, interval = "confidence",
+        uncertainty = "conditional")$upper         # upper 95\% limits
+
+## A native unmarked snapshot binds one component. This stored N-mixture
+## fit is used in vignette("v02-user-guide").
+nmix <- readRDS(system.file("extdata", "cache-user-guide-nmix.rds",
+                            package = "multiScaleR"))
+detection <- prepare_prediction(nmix, component = "det")
+head(predict(detection))   # detection probability per survey, 95\% limits
 }
 \seealso{
-\code{\link{predict.multiScaleR}}, \code{\link{prediction_contract}}
+\code{\link[=predict.multiScaleR]{predict.multiScaleR()}}, \link{prediction_contract},
+\link{multiScaleR-prediction}, \code{\link[=prepare_unmarked_data]{prepare_unmarked_data()}}
 }

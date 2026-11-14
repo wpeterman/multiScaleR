@@ -1,4 +1,5 @@
 test_that("kernel limit likelihoods retain normalized densities and offsets", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for(kernel in c("gaussian","exp"))for(family in c("gaussian","poisson","binomial","nbinom2")) {
     f<-bayesian_scale_fixture(n_site=4,n_year=3,kernel=kernel,seed=8321)
@@ -39,6 +40,7 @@ test_that("kernel limit likelihoods retain normalized densities and offsets", {
 })
 
 test_that("Poisson and kernel limits reject a finite-scale identification claim", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f<-bayesian_scale_fixture(n_site=6,n_year=3,seed=8321)
   s<-multiScaleR:::.msr_marginal_prepare(count~habitat+temp,f$inputs,f$data,
@@ -58,6 +60,7 @@ test_that("Poisson and kernel limits reject a finite-scale identification claim"
   expect_error(multiScaleR:::.msr_factorized_limit_spec(s,"invalid"),"kernel limit")
 })
 test_that("fixed-kernel witnesses also support scales without an annual SD", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 6, n_year = 2)
   for (scale_formula in list(~1, ~0 + year)) {
@@ -78,4 +81,3 @@ test_that("fixed-kernel witnesses also support scales without an annual SD", {
     }
   }
 })
-

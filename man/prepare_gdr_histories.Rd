@@ -3,7 +3,7 @@
 \name{prepare_gdr_histories}
 \alias{prepare_gdr_histories}
 \alias{print.msr_gdr_histories}
-\title{Prepare Linked First-Encounter and Complete-History Responses}
+\title{Convert Linked Bird Records into Paired Distance-Removal Counts}
 \usage{
 prepare_gdr_histories(
   histories,
@@ -25,141 +25,200 @@ prepare_gdr_histories(
 \method{print}{msr_gdr_histories}(x, ...)
 }
 \arguments{
-\item{histories}{Numeric or logical matrix with one row per linked individual
-within an event and named source-cell columns. Valid marks are zero or one.
-Missing, nonfinite and other numeric marks remain in the returned matrix
-and are reported for review; they are never converted to zero.}
+\item{histories}{Numeric or logical matrix with one row per individual
+bird at a survey and one named column per source cell (one distance band
+in one time interval). Enter 1 where the bird was recorded and 0
+elsewhere. Any other value, including \code{NA}, is kept as it is and reported
+in \code{findings}; it is never treated as 0.}
 
-\item{history_keys}{Data frame in history-row order, retaining the original
-event and individual identifiers and any additional source metadata.}
+\item{history_keys}{Data frame with one row per row of \code{histories}, in the
+same order, holding the original survey and individual identifiers and
+any other notes you want to keep.}
 
-\item{event_keys}{Data frame in the intended native event order, including
-surveyed events with no recorded individuals. Keys must be unique.}
+\item{event_keys}{Data frame with one row per survey event, in the order
+the count tables should have. Include completed surveys that recorded no
+birds. Event keys must be unique.}
 
-\item{event_id}{Character vector naming columns that identify an event in
-both key tables. Compound identifiers are supported.}
+\item{event_id}{Character vector naming the column(s) that identify a
+survey in both \code{event_keys} and \code{history_keys}.}
 
-\item{individual_id}{Character vector naming individual identifier columns
-in \code{history_keys}. The event/individual combination must be unique.}
+\item{individual_id}{Character vector naming the column(s) of
+\code{history_keys} that identify a bird within a survey. Each survey and
+individual combination must be unique.}
 
-\item{cell_map}{Data frame with \code{column}, \code{interval} and \code{distance_bin}.
-It must map every named history column to exactly one source distance/time
-cell. Interval and distance indices are positive integers. Input columns
-may have any order; the complete rectangular source layout is required.}
+\item{cell_map}{Data frame with columns \code{column} (a column name of
+\code{histories}), \code{interval} and \code{distance_bin} (positive whole numbers). It
+must map every column of \code{histories} to exactly one combination of
+interval and distance band, and every combination must appear once.
+Columns of \code{histories} can be in any order.}
 
-\item{dist_breaks}{Increasing numeric source distance boundaries, beginning
-at zero, in \code{units_in}. Only the final boundary may be infinite. Retain
-outside-radius bins here when they occur in the original records.}
+\item{dist_breaks}{Increasing distance boundaries of the source bands,
+starting at zero, in \code{units_in}. Include bands beyond the survey radius
+when the records have them. Only the last boundary may be \code{Inf}.}
 
-\item{radius}{Positive finite survey radius in \code{units_in}, equal to a source
-distance boundary. Bins cannot be split without finer source measurements.}
+\item{radius}{Survey radius, in \code{units_in}. It must equal one of
+\code{dist_breaks}, because a band cannot be split without finer distances.}
 
-\item{interval_lengths}{Positive integer native removal durations, one per
-interval, measured in \code{interval_units}. Unequal durations are supported.}
+\item{interval_lengths}{Positive whole numbers giving the duration of each
+time interval, in \code{interval_units}. Intervals may differ in length.}
 
-\item{interval_units}{Nonempty time-unit label, such as \code{"seconds"}.
-Values are recorded without conversion.}
+\item{interval_units}{Character string naming the time unit, such as
+\code{"seconds"}. It is recorded, not converted.}
 
-\item{units_in}{Source distance units, \code{"m"} or \code{"km"}.}
+\item{units_in}{Distance units of \code{dist_breaks} and \code{radius}, \code{"m"} or
+\code{"km"}.}
 
-\item{surveyed}{Complete logical vector in event order. Supply \code{TRUE} for
-completed surveys and \code{FALSE} for unsurveyed events. There is no default
-assumption about survey effort. A positive mark at an unsurveyed event
-raises an error.}
+\item{surveyed}{Logical vector with one value per event, in event order,
+with no \code{NA}: \code{TRUE} for a completed survey and \code{FALSE} for an event that
+was not surveyed. A recorded bird at an unsurveyed event is an error.}
 
-\item{expected_event_keys}{Optional independent event mapping in intended
-order. It must contain the \code{event_id} columns. This detects mapping drift;
-a supplied key table cannot prove its own alignment.}
+\item{expected_event_keys}{Optional data frame, built independently, with
+the \code{event_id} columns in the intended event order. The function stops if
+\code{event_keys} differs from it.}
 
-\item{native_frame}{Optional existing single-primary \code{unmarkedFrameGDR}.
-Its two margins, inherited response, finite distance geometry, units and
-durations must match the prepared response. The original survey audit is
-returned. This argument validates data and never evaluates saved callbacks.}
+\item{native_frame}{Optional single-visit \code{unmarkedFrameGDR} built earlier
+from these records. It is audited with \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}, and
+the function stops unless its two count tables, its distance boundaries
+up to the radius and its interval lengths match the prepared results
+exactly. Distances in meters and kilometers are compared in meters,
+without changing either input.}
 
-\item{x}{Prepared \code{msr_gdr_histories} data to print.}
+\item{x}{A prepared \code{msr_gdr_histories} object.}
 
-\item{...}{Unused.}
+\item{...}{Not used.}
 }
 \value{
-A list of class \code{msr_gdr_histories} with:
+A list of class \code{msr_gdr_histories}:
 \itemize{
-\item \code{histories}, \code{history_keys}, \code{event_keys} and \code{cell_map}: unchanged
-source values, order, identifiers and attributes.
-\item \code{native_cells}: the in-radius cell map in distance-major then
-interval order. Rows correspond to columns of \code{first_cells}.
-\item \code{first}: original \code{.history_row}, matched \code{.event}, earliest known
-positive \code{candidate_interval}, unambiguous \code{first_interval} and
-\code{first_distance_bin}, \code{primary_eligible}, \code{history_complete},
-\code{complete_history_eligible}, and the explicit preparation \code{status}.
-\code{history_complete} requires complete binary cells and a unique distance
-state per interval; it is not a judgment that other source marks are
-biological errors.
-Eligibility here concerns data layout, not a fitted model.
-\item \code{events}: \code{.event}, \code{surveyed}, \code{response_complete},
-\code{known_first_records} and \code{unresolved_first_histories} in event order.
-Counts of known records remain available even in quarantined events.
-\item \code{findings}: \code{.history_row}, \code{.cell}, \code{.column}, \code{interval},
-\code{distance_bin}, \code{code} and original numeric \code{value}. History-level
-findings have missing cell/value fields. No source row is deleted.
-\item \code{first_cells}, \code{yDistance}, \code{yRemoval}: paired first-cell counts
-and their exact two margins. Unsurveyed events and events with an
-unresolved first encounter have fully missing response rows; completed
-surveys with no eligible records have observed zero rows.
-\item \code{protocol}: original and finite-circle geometry, distance/time
-units, durations, one-primary layout, response conventions and
-preparation scope. No biological target population is inferred.
-\item \code{surveyed}: the original effort-status vector; \code{survey_audit}:
-optional native audit; \code{fingerprint}: SHA256 of source inputs and
-protocol; \code{summary}: history/event, retained and unresolved counts.
+\item \code{histories}, \code{history_keys}, \code{event_keys} and \code{cell_map}: the inputs,
+unchanged.
+\item \code{first}: one row per bird, with its row in \code{histories}
+(\code{.history_row}), its event (\code{.event}), the first interval with a
+recorded mark (\code{candidate_interval}), the resolved first detection
+(\code{first_interval}, \code{first_distance_bin}; \code{NA} when unresolved),
+whether the bird is counted (\code{primary_eligible}), whether every cell
+holds a valid 0 or 1 with at most one band per interval
+(\code{history_complete}), whether both hold (\code{complete_history_eligible})
+and its \code{status} (see "Read the status of each bird").
+\item \code{events}: one row per event, with \code{surveyed}, \code{response_complete}
+(whether its counts are observed), \code{known_first_records} (birds
+counted) and \code{unresolved_first_histories}.
+\item \code{findings}: one row per problem, with the history row, the cell
+(\code{.cell}, \code{.column}, \code{interval}, \code{distance_bin}), a \code{code} and the
+original \code{value}. Findings about a whole history have missing cell
+fields.
+\item \code{first_cells}: counts of first detections by event (rows) and cell
+inside the radius (columns), ordered by distance band, then interval.
+\item \code{native_cells}: the rows of \code{cell_map} for those columns, in the same
+order.
+\item \code{yDistance} and \code{yRemoval}: the two count tables, events by distance
+band and events by interval, ready for \code{unmarked::unmarkedFrameGDR()}.
+\item \code{protocol}: the source and in-radius distance breaks, the radius,
+units, interval lengths and the column order of \code{first_cells}.
+\item \code{surveyed}, \code{survey_audit} (the audit of \code{native_frame}, or \code{NULL}),
+\code{fingerprint} (a SHA-256 of the inputs) and \code{summary} (counts of
+histories, events, counted birds, complete histories, invalid cells,
+unresolved events and birds first detected outside the radius).
 \item \code{fit_eligibility_established} and
-\code{density_identification_established}: always \code{FALSE}.
+\code{density_identification_established}: always \code{FALSE}. Preparing counts
+does not show that a model fitted to them is valid.
 }
-Printing reports these preparation counts and returns the object invisibly.
-Structural errors carry the implicated \code{history_rows} when recoverable.
+
+Printing reports the summary counts and returns the object invisibly.
+Errors in the inputs stop with a condition of class
+\code{msr_gdr_history_error} whose \code{history_rows} element lists the rows
+involved, when they are known.
 }
 \description{
-Retain original bird histories while deriving paired first-distance/time
-cells and native GDR margins from the first encounter across all distances.
+Turn a matrix of bird records, one row per individual at a survey, into
+the distance and removal count tables of a distance-removal model. The
+function finds each bird's first detection across all distance bands,
+including bands beyond the survey radius, before it applies the radius. It
+keeps every source record, reports what happened to each bird, and never
+deletes or repairs a record.
 }
-\details{
-Determine first encounters before truncating distance. A bird first recorded
-outside the radius remains outside the primary response even if a later
-mark is near the point. Multiple positive distance cells in one interval
-do not determine a unique state for this binned layout. They are retained
-for adjudication and never collapsed into a single distance. Such marks
-may require a different movement or recording model. If earlier or
-first-band marks make the first encounter ambiguous, the event's aggregate
-response is missing pending adjudication, rather than a partial zero count.
+\section{Find each bird's first detection}{
+The first detection is found across all source bands before the radius is
+applied. A bird first recorded beyond the radius stays out of the counts,
+even if a later mark places it near the point. If a bird has marks in more
+than one distance band in the same interval, its distance in that interval
+is not unique. Such marks are kept for review and never collapsed into one
+band. They may call for a model of movement or of the recording process.
 
-A uniquely known in-radius first encounter is retained when only later marks
-are malformed. That history is excluded from the complete-history subset.
-Complete histories of the primary cohort and native first-time margins are
-different responses. Their likelihood constants and conditioning differ.
-Keep re-detections and original outside-radius cells for separate analyses;
-within-count bands are not independent primary visits.
-
-No source correction, probability model, density correction, parameter,
-prior, model-selection admission or uncertainty procedure is added. Empty
-linked histories do not establish the size of an unobserved population.
-Native geometry comparisons convert meters/kilometers to meters only in
-the comparison copy; inputs and native objects remain unchanged.
+A bird is counted when its first detection is known and inside the radius,
+even if a later mark is malformed. That bird is then left out of the
+complete-history subset. When a malformed or multi-band mark falls at or
+before a bird's first detection, the first detection is unresolved, as it
+is for a history with a malformed mark and no detection. The whole event's
+counts then become missing, so that an incomplete count
+cannot pass as an observed zero. The known partial count stays in
+\code{events$known_first_records}, and the source rows stay in \code{histories}.
 }
+
+\section{Read the status of each bird}{
+\tabular{ll}{
+   \code{status} \tab Meaning \cr
+   \code{retained_first} \tab Counted. The history is complete \cr
+   \code{retained_first_incomplete_history} \tab Counted, but a later mark is malformed or spans two bands \cr
+   \code{first_outside_radius} \tab Not counted. The bird was first detected beyond the radius \cr
+   \code{unresolved_first} \tab The first detection cannot be determined. The event's counts are missing \cr
+   \code{no_record} \tab No detections were recorded, and every cell is a valid 0 \cr
+   \code{unsurveyed_history} \tab The history belongs to an event that was not surveyed \cr
+}
+
+
+\code{findings} uses the codes \code{invalid_mark} (a cell that is not 0 or 1, with
+its \code{value}), \code{multiple_distance_bins} (marks in more than one band in an
+interval), and \code{unresolved_first}, \code{first_outside_radius} and
+\code{unsurveyed_history} as in the table.
+}
+
+\section{Read the count tables}{
+Summing the columns of \code{first_cells} over intervals gives \code{yDistance}, and
+summing over distance bands gives \code{yRemoval}, so the two tables always
+have equal row totals. A completed survey with no counted birds has a row
+of zeros. An unsurveyed event, or an event with an unresolved bird, has a
+row of \code{NA}.
+}
+
+\section{Keep the other responses separate}{
+The paired first detections are one response. Complete linked histories of
+the counted birds, re-detections, and marks beyond the radius are others.
+Their likelihoods have different constants and conditioning, so they
+cannot be compared in one AIC table. The time intervals within one count
+are also not independent visits. Keep the source records for any separate
+analysis. Better records of the detected birds do not by themselves
+identify the birds that were never detected.
+
+See the "Prepare your own records" section of
+\code{vignette("v12-distance-removal", package = "multiScaleR")} for a worked
+example.
+}
+
 \examples{
+# Source cells: 2 time intervals by 3 distance bands (0-25 m, 25-75 m and
+# beyond the 75 m radius)
 map <- expand.grid(interval = 1:2, distance_bin = 1:3)
 map$column <- paste0("cell", 1:6)
 h <- matrix(0, 2, 6, dimnames = list(NULL, map$column))
-h[1, c(5, 2)] <- 1 # Outside first, then near: excluded from the circle.
-h[2, 1] <- 1
-h[2, 2] <- 2       # Malformed later mark: the valid first still counts.
+h[1, c(5, 2)] <- 1 # Beyond 75 m first, then near: not counted
+h[2, 1] <- 1       # Interval 1, 0-25 m: counted
+h[2, 2] <- 2       # Malformed later mark: the valid first still counts
 prepared <- prepare_gdr_histories(h,
   history_keys = data.frame(survey = c("a", "a"), bird = c("one", "two")),
-  event_keys = data.frame(survey = c("a", "b")), event_id = "survey",
+  event_keys = data.frame(survey = c("a", "b", "c")), event_id = "survey",
   individual_id = "bird", cell_map = map, dist_breaks = c(0, 25, 75, Inf),
   radius = 75, interval_lengths = c(75, 75), interval_units = "seconds",
-  units_in = "m", surveyed = c(TRUE, FALSE))
-prepared$first
+  units_in = "m", surveyed = c(TRUE, TRUE, FALSE))
+# What happened to each bird
+prepared$first[, c("first_interval", "first_distance_bin", "status")]
+# Survey b is an observed zero. Survey c was not surveyed, so it is NA
+prepared$yDistance
 prepared$yRemoval
+# Both tables are totals of the same first-detection cells
+prepared$first_cells
 }
 \seealso{
-\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}, \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}
+\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}, \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}},
+\code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}
 }

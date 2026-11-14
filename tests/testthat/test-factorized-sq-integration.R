@@ -1,4 +1,5 @@
 test_that("one-group raw-SQ quadrature matches independent normalized values and full derivatives", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
@@ -53,6 +54,7 @@ test_that("group quadrature rejects complete or malformed models before density 
 })
 
 test_that("raw-SQ group quadrature enforces scientific RAM admission before tape entry", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- private_sq_fixture()$spec; g <- .msr_factorized_group(s, 1L)
   launched <- 0L

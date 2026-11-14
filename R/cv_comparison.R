@@ -26,51 +26,141 @@
 
 #' Cross-Validate an Ordinary GLM Reference Model
 #'
-#' Fit a GLM using only each fold's analysis rows, then score its held-out
-#' response predictions. This provides null and nonspatial reference models for
-#' the same folds used to validate estimated ecological scales.
+#' Fit a GLM to the analysis rows of each fold and score its predictions for
+#' the held-out rows. No scales of effect are estimated. Use this function to
+#' build null and nonspatial reference models on the same folds you give
+#' [cross_validate()], so that a scale-of-effect model has a baseline to beat.
 #'
 #' @inheritParams cross_validate
-#' @param data Data frame of raw responses and predictor variables, with unique
-#'   row IDs matching the fold plan. Supply every formula variable explicitly.
-#' @param glm_control Named native \code{stats::glm.control()} controls.
-#' @return A \code{multiScaleR_cv} object as described in
-#'   \code{\link{cross_validate}}, with backend \code{"glm"}, no estimated
-#'   spatial scales, and ordinary GLM fits when \code{keep_fits = TRUE}.
-#'   Compact \code{targets} metadata records used row IDs, observed outcomes,
-#'   trials and frequency weights for guarded model comparison. Optional
-#'   \code{selection_records} have the same contract as \code{cross_validate()}.
-#' @details This adapter supports the same qualified GLM families, outcome and
-#'   frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
-#'   interactions and offsets use native GLM machinery. Supported saved
-#'   \code{scale()}, \code{poly()}, natural-spline and B-spline transformations
-#'   use training constants even inside expressions and offsets. See
-#'   \code{cross_validate()} for supported inputs and custom-recipe limitations.
-#'   All learned preprocessing must occur within the training fit; do not supply
-#'   predictors standardized with assessment data.
+#' @param formula Two-sided model formula, written as for [stats::glm()]. The
+#'   response must be a column of `data`, optionally wrapped in `I()`, or
+#'   `cbind(successes, failures)` for grouped binomial data. Predictors can
+#'   include factors, interactions, offsets, and the data-dependent terms
+#'   `scale()`, `poly()`, `splines::ns()`, and `splines::bs()`. Use `y ~ 1`
+#'   for a null model. Every variable must be a column of `data`.
+#' @param data Data frame with one row per observation, holding the raw
+#'   responses and every predictor. Its row names are the row IDs that the
+#'   folds refer to, and they must be unique. Do not supply predictors
+#'   standardized or transformed with all rows (see "What each fold fits").
+#' @param glm_control Named list of [stats::glm.control()] settings for the
+#'   GLM fitted in each fold. The default keeps the settings of `glm()`.
+#' @param theta Optional NB2 size parameter fixed in advance, one positive
+#'   number. The default `NULL` estimates theta in each fold with
+#'   [MASS::glm.nb()]. A fixed theta is fitted with
+#'   `glm(family = MASS::negative.binomial(theta))` and adds no parameter to
+#'   K. Fix it only from information independent of the assessment outcomes.
+#'   Other families reject it.
+#' @return A list of class `multiScaleR_cv`, with class
+#'   `multiScaleR_distribution_cv` added for `"nbinom2"` and `"Gamma"`. It has
+#'   the elements of a [cross_validate()] result, with these differences.
+#'   `settings$backend` is `"glm"`. `training` holds only the coefficients of
+#'   each fold, plus the frozen nuisance parameter for NB2 and Gamma.
+#'   `diagnostics` holds the convergence record of each fold's GLM, and `fits`
+#'   holds ordinary `glm` objects when `keep_fits = TRUE`. See
+#'   [multiScaleR_cv-class] for every element and how to read each score.
+#' @details
+#' # What each fold fits
 #'
-#' NB2 uses \code{MASS::glm.nb()} when theta is estimated and
-#'   \code{glm(family = MASS::negative.binomial(theta))} when it is fixed.
-#'   Gamma retains its native deviance-based AIC scale when dispersion is
-#'   estimated. Known Gamma dispersion uses the normalized fixed-scale family
-#'   constructed before fitting. Coefficients and native coefficient SEs are
-#'   retained; density dispersion is not a replacement for the SE convention.
-#'   Nuisance parameters and supported training transformations are frozen
-#'   before assessment prediction. See \code{cross_validate()} for their counts,
-#'   support, compact metadata and uncertainty distinctions.
+#' Each fold fits `glm()` to its analysis rows with the declared family and
+#' frequency weights, then predicts the expected response of the assessment
+#' rows. The families, response forms, weights, and scores are those of
+#' [cross_validate()]. Factors, interactions, and offsets use the native GLM
+#' machinery. The constants of `scale()`, `poly()`, `splines::ns()`, and
+#' `splines::bs()` come from the analysis rows, even inside expressions and
+#' offsets. Any other preprocessing that learns from the data must also
+#' happen within the analysis rows of each fold, so do not supply predictors
+#' standardized with all rows. The section "Formula terms that learn from the
+#' data" in [cross_validate()] lists the supported terms and their limits.
+#' Missing values are never dropped silently, and native warnings and failed
+#' folds are kept.
 #'
-#' No ecological scale is estimated here. Use \code{cross_validate()} for
-#'   training-only spatial scale refitting. Predictions use fitted parameters;
-#'   parameter uncertainty is not integrated, observation intervals are not
-#'   provided and calibration is not established. Fold failures and native
-#'   warnings are retained. No missing rows are silently dropped.
+#' # Binomial responses
+#'
+#' A binomial response can be numeric or logical 0/1 values, a two-level
+#' factor (the second level counts as a success), or
+#' `cbind(successes, failures)` for several trials per row. Keep trial counts
+#' in the response and case frequencies in `weights`, because the two are
+#' scored differently.
+#'
+#' * The negative log score of a row is the negative log binomial probability
+#'   of its observed number of successes, given its trials. Rows are averaged
+#'   with their frequency weights.
+#' * The Brier score of a row is the squared error of the predicted success
+#'   probability, averaged over the row's trials. Rows are averaged with
+#'   weights equal to frequency weight x trials, so the pooled Brier score is
+#'   a mean per trial. A row with many trials counts more in the Brier score
+#'   than in the log score.
+#' * A row with zero trials or zero weight stays in `predictions` but
+#'   contributes to neither score.
+#' * An observed outcome given zero probability produces an infinite log
+#'   score. It is kept as is, not clipped.
+#'
+#' # Negative binomial and Gamma responses
+#'
+#' `"nbinom2"` fits [MASS::glm.nb()] when theta is estimated and
+#' `glm(family = MASS::negative.binomial(theta))` when it is fixed, so it
+#' needs the MASS package. `"Gamma"` uses a log link. In each fold the
+#' nuisance parameter (theta, or the Gamma dispersion) is estimated from the
+#' analysis rows, frozen, and used to score the assessment rows. Coefficients
+#' and their native standard errors are those of the native fit. A fixed
+#' Gamma `dispersion` is built into a normalized Gamma family before fitting.
+#' The section "Negative binomial and Gamma responses" in [cross_validate()]
+#' describes how these parameters enter K and the rules they follow.
+#'
+#' ## How to read the Gamma dispersion
+#'
+#' `distribution[[fold]]$dispersion` is the training deviance divided by the
+#' training sum of case frequencies, the value native Gamma AIC uses. It is
+#' held fixed when the held-out Gamma densities are scored. Native
+#' coefficient standard errors use the Pearson dispersion instead, so they
+#' can rest on a different number. The density dispersion does not replace
+#' that coefficient uncertainty. `convention` records the rule that produced
+#' the value, and `estimated` is `FALSE` when you fixed it with `dispersion`.
+#' Supply `theta` or `dispersion` only when the value is known or was fixed
+#' independently of the assessment outcomes.
+#'
+#' # What the scores do and do not include
+#'
+#' Predictions use each fold's fitted parameters as if they were known. They
+#' do not integrate parameter uncertainty, provide prediction intervals, or
+#' establish calibration. Use [cross_validate()] to estimate scales of effect
+#' within the same folds.
 #' @examples
-#' dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
-#' folds <- grouped_cv_folds(rep(letters[1:4], each = 2), k = 2)
-#' cv <- cross_validate_glm(y ~ x, dat, folds, family = "poisson")
-#' cv
-#' @seealso \code{\link{cross_validate}}, \code{\link{cv_tab}},
-#'   \code{\link{select_cv}}
+#' data("landscape_counts")   # counts and a site-level covariate
+#' data("surv_pts")           # survey locations
+#' # Three spatial folds. The simulated coordinates are in meters.
+#' folds <- spatial_cv_folds(crds(vect(surv_pts)), block_size = 1000, k = 3,
+#'                           crs = 32617)
+#'
+#' # Null and site-only reference models on the same folds
+#' null_cv <- cross_validate_glm(counts ~ 1, landscape_counts, folds,
+#'                               family = "poisson")
+#' site_cv <- cross_validate_glm(counts ~ site, landscape_counts, folds,
+#'                               family = "poisson")
+#' site_cv   # pooled held-out scores, lower is better
+#' cv_tab(list(null = null_cv, site = site_cv), metric = "neg_log_score")
+#'
+#' # Negative binomial: theta is estimated in each fold and frozen for scoring
+#' if (requireNamespace("MASS", quietly = TRUE)) {
+#'   nb_cv <- cross_validate_glm(counts ~ site, landscape_counts, folds,
+#'                               family = "nbinom2")
+#'   sapply(nb_cv$distribution, function(d) d$theta)   # small theta: overdispersed
+#' }
+#'
+#' # Gamma model for a strictly positive response
+#' i <- 1:96
+#' positive <- data.frame(
+#'   y = exp(0.2 + 0.35 * sin(i * 0.73)) *
+#'     rep(c(0.3, 0.6, 1.1, 2.4, 0.8, 1.8, 0.4, 1.6), 12),
+#'   x = sin(i * 0.73))
+#' gamma_folds <- grouped_cv_folds(rep(letters[1:12], each = 8), k = 3)
+#' gamma_cv <- cross_validate_glm(y ~ x, positive, gamma_folds, family = "Gamma")
+#' gamma_cv$summary
+#' # Training deviance / sum of case frequencies, frozen for scoring each fold
+#' sapply(gamma_cv$distribution, function(d) d$dispersion)
+#' @seealso [cross_validate()], [cv_tab()], [select_cv()],
+#'   [multiScaleR_cv-class], and
+#'   `vignette("v08-cross-validation", package = "multiScaleR")`.
 #' @export
 cross_validate_glm <- function(formula, data, folds,
     family = c("gaussian", "poisson", "binomial", "nbinom2", "Gamma"), weights = NULL,
@@ -247,61 +337,108 @@ cross_validate_glm <- function(formula, data, folds,
 
 #' Compare Cross-Validated Prediction Scores
 #'
-#' Rank candidate predictions using identical recorded targets and splits.
-#' Lower scores are better. Scores are pooled from assessment occurrences,
-#' preserving frequency weights and binomial trial definitions.
+#' Rank candidate models by one held-out score, after checking that every
+#' candidate was scored on the same folds and the same observations. Lower
+#' scores are better.
 #'
-#' @param mod_list Uniquely named list of complete \code{multiScaleR_cv} results.
-#'   Use identical explicit folds and response/weight definitions for every model.
-#'   Bayesian posterior predictive results use \code{\link{cv_tab}}.
-#'   Complete \code{\link{cross_validate_clogit}} results compare only with the
-#'   same conditional-choice target, complete sets and native partial method.
-#' @param metric One recorded score, selected explicitly: \code{"rmse"},
-#'   \code{"mae"}, \code{"neg_log_score"}, \code{"deviance"} or \code{"brier"}.
-#' @param by_fold Logical. Default \code{FALSE} compares pooled scores.
-#'   \code{TRUE} gives descriptive ranks within each assessment fold.
-#' @return A data frame with \code{Modnames}, \code{Rank}, \code{Score},
-#'   \code{Delta}, \code{Metric}, \code{Unit}, \code{N_assessment},
-#'   \code{N_scored}, \code{Weight_sum}, \code{Warnings} and, for per-fold
-#'   comparisons, \code{Fold}. Ties share their minimum rank. If every score
-#'   is infinite, deltas are \code{NA}. Original candidate fits and diagnostics
-#'   are not modified.
-#' @details Incomplete candidates are rejected as a group; no failed model or
-#'   fold is silently removed. Comparisons match analysis/assessment IDs and all
-#'   used responses, trials and frequency weights. RMSE/MAE can compare qualified
-#'   conditional-mean predictions across qualified Gaussian, Poisson, NB2 and
-#'   Gamma targets on the same observations. NB2 and Poisson log scores can
-#'   compare their count distributions. Continuous/discrete density scores
-#'   cannot be mixed, and Gaussian density scores remain unqualified. Gamma
-#'   density comparisons preserve positive-response and training-dispersion
-#'   guards. Other canonical scores retain their family/link requirements. Conditional-choice comparisons use
-#'   \code{neg_log_score} only, per held-out set, preserving every alternative
-#'   and its membership. They cannot be mixed with Bernoulli/GLM targets.
-#'   Binomial negative log scores refer to
-#'   count probabilities; Brier scores average over individual trials.
+#' @param mod_list Named list of complete cross-validation results to compare,
+#'   for example `list(landscape = cv, null = null_cv)`. The names label the
+#'   rows of the table and must be unique. Every candidate must use identical
+#'   folds, responses, trials, and frequency weights, and the candidates must
+#'   be of compatible kinds (see "What can be compared").
+#' @param metric One score name, chosen explicitly: `"rmse"`, `"mae"`,
+#'   `"neg_log_score"`, `"deviance"`, or `"brier"`. Every candidate must have
+#'   recorded it. There is no default, because the scores answer different
+#'   questions.
+#' @param by_fold Logical. The default `FALSE` ranks the pooled scores. `TRUE`
+#'   ranks the candidates separately within each fold, which shows whether a
+#'   ranking is consistent across folds.
+#' @return A data frame with one row per candidate (per candidate and fold
+#'   when `by_fold = TRUE`), sorted from best to worst. Its columns are:
+#'   * `Modnames`: the candidate's name in `mod_list`.
+#'   * `Rank`: 1 for the best score. Tied scores share the lowest rank.
+#'   * `Score`: the pooled score, or the fold score when `by_fold = TRUE`.
+#'   * `Delta`: `Score` minus the best score, in the units of the score. It is
+#'     `NA` when every score is infinite.
+#'   * `Metric`, `Unit`: the score and what one score refers to, for example
+#'     `"observation"`, `"trial"`, or `"choice_set"`. See
+#'     [multiScaleR_cv-class].
+#'   * `N_assessment`, `N_scored`, `Weight_sum`: the planned assessment
+#'     occurrences, the number that entered the score, and their total
+#'     weight.
+#'   * `Warnings`: the number of warnings recorded while fitting the
+#'     candidate (in that fold when `by_fold = TRUE`). Read them in the
+#'     candidate's `warnings` element.
+#'   * `Fold`: the fold, when `by_fold = TRUE`.
 #'
-#' There is no added complexity penalty, Akaike weight or model probability.
-#'   Fold variation is not an independence-based standard error or calibration
-#'   certificate. Per-fold assessment ranks must not select that fold's model.
-#'   Use \code{\link{select_cv}} for training-only information-criterion selection.
-#'   Choosing a model or tuning rule from pooled CV results requires independent
-#'   assessment or an outer validation layer to evaluate that choice.
+#'   The candidate results themselves are not modified.
+#' @details
+#' # How to read the table
+#'
+#' The best candidate is listed first. `Delta` is each candidate's distance
+#' from it, in the units of the score. For RMSE and MAE that is a difference
+#' in response units, such as animals per survey. For the negative log score,
+#' a `Delta` of D means the best model gave the observed outcomes exp(D)
+#' times the probability, as a geometric mean per observation (per choice set
+#' for conditional choice). The per-fold table from `by_fold = TRUE` is
+#' descriptive. Use it to see whether one fold drives a ranking, never to pick
+#' a model for that fold from its own assessment score.
+#'
+#' # What can be compared
+#'
+#' Every candidate must be complete, with no failed fold. An incomplete
+#' candidate stops the comparison, because a model scored only on its easier
+#' folds would look better than it is. No failed model or fold is removed
+#' silently. Results of different kinds cannot be mixed.
+#'
+#' | Results | Comparisons allowed |
+#' |:---|:---|
+#' | Gaussian, Poisson, and binomial from [cross_validate()] and [cross_validate_glm()] | RMSE and MAE across families on identical observations. The log score, deviance, and Brier score need the same family and link. |
+#' | NB2 or Gamma, alone or with Gaussian or Poisson | RMSE and MAE across these families on identical observations. Log scores between Poisson and NB2 on the same counts. A Gamma log score compares only with another Gamma. |
+#' | [cross_validate_clogit()] | Other conditional-choice results with the same complete sets and partial-likelihood `method`, using `neg_log_score` only. |
+#' | [cross_validate_field()] | Other field results with the same responses, folds, and projected coordinates. Poisson and NB2 share a count target. |
+#' | [cross_validate_mixed()] | Other mixed-model results with the same groups, prediction target, and folds. |
+#' | [cross_validate_bayes()] | Other Bayesian results with the same targets, folds, and blocks, using `neg_log_score` only. |
+#'
+#' A binomial log score refers to the probability of the observed count of
+#' successes, while a Brier score is a mean over individual trials. Field,
+#' mixed-model, and Bayesian log scores are joint scores for blocks of
+#' held-out observations, so they are kept apart from the per-observation
+#' scores of ordinary GLMs.
+#'
+#' # What the table does not do
+#'
+#' The scores carry no penalty for model complexity, and `Delta` is not an
+#' AIC difference, an Akaike weight, or a model probability. The spread of
+#' fold scores is not a standard error, because folds share training data
+#' and are few. If you use the table to choose a model or a tuning rule, the
+#' winning score is optimistic. Evaluate that choice with an independent test
+#' set or an outer validation layer. To score a predeclared rule that picks a
+#' model by training AIC, AICc, or BIC, use [select_cv()].
 #' @examples
-#' dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
-#' folds <- grouped_cv_folds(rep(letters[1:4], each = 2), k = 2)
-#' candidates <- list(null = cross_validate_glm(y ~ 1, dat, folds, "poisson"),
-#'                    trend = cross_validate_glm(y ~ x, dat, folds, "poisson"))
+#' data("landscape_counts")
+#' data("surv_pts")
+#' # Three spatial folds. The simulated coordinates are in meters.
+#' folds <- spatial_cv_folds(crds(vect(surv_pts)), block_size = 1000, k = 3,
+#'                           crs = 32617)
+#' candidates <- list(
+#'   null = cross_validate_glm(counts ~ 1, landscape_counts, folds,
+#'                             family = "poisson"),
+#'   site = cross_validate_glm(counts ~ site, landscape_counts, folds,
+#'                             family = "poisson"))
+#'
+#' # Pooled ranking. Delta is the gap from the best model in animals per survey.
+#' cv_tab(candidates, metric = "rmse")
+#'
+#' # exp(Delta) is how many times more probability the best model gave the
+#' # observed counts, as a geometric mean per survey
 #' cv_tab(candidates, metric = "neg_log_score")
-#' @seealso \code{\link{cross_validate}}, \code{\link{cross_validate_glm}},
-#'   \code{\link{select_cv}}, \code{\link{aic_tab}}
-#' @details Complete \code{\link{cross_validate_field}} results compare joint
-#'   assessment densities or masses for matching response and split targets.
-#'   Poisson and NB2 share a count target. These scores integrate field
-#'   dependence and observation noise at training estimates. Compare these
-#'   results with other joint field scores using the same observations and
-#'   coordinates.
-#'   Complete \code{\link{cross_validate_mixed}} results compare matching
-#'   group targets. Their log scores use one joint density per held-out group.
+#'
+#' # Is the ranking the same in every fold?
+#' cv_tab(candidates, metric = "rmse", by_fold = TRUE)
+#' @seealso [cross_validate()], [cross_validate_glm()], [select_cv()],
+#'   [multiScaleR_cv-class], [aic_tab()], and
+#'   `vignette("v08-cross-validation", package = "multiScaleR")`.
 #' @export
 cv_tab <- function(mod_list, metric, by_fold = FALSE) {
   validate_scalar_logical(by_fold, "by_fold")
@@ -364,83 +501,143 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
 
 #' Validate Training-Only Model Selection Within CV Folds
 #'
-#' Select a candidate using each fold's training likelihood, then evaluate its
-#' already recorded held-out predictions. No additional model fits are run.
+#' Score a model-selection rule rather than a single model. In each fold the
+#' rule picks the candidate with the lowest training AIC, AICc, or BIC, and
+#' the result keeps the held-out predictions that candidate already made. No
+#' models are refitted.
 #'
-#' @inheritParams cv_tab
-#' @param criterion Predeclared training criterion: \code{"AICc"} (default),
-#'   \code{"AIC"} or \code{"BIC"}, calculated with existing
-#'   \code{\link{aic_tab}} or \code{\link{bic_tab}} parameter counts and guards.
-#' @param ties How to handle an exact training-criterion tie. Default
-#'   \code{"error"} retains the fold as failed. \code{"first"} selects the
-#'   first tied candidate in the declared list. No tolerance is added.
-#' @param keep_fits Logical. Default \code{FALSE} keeps compact selection
-#'   records. \code{TRUE} retains the selected training fit per fold in memory.
-#' @return A \code{multiScaleR_cv} result for the selection procedure, with
-#'   \code{selection} metadata containing the criterion, tie policy, candidate
-#'   names, the scoring metrics kept (\code{metrics}) and left out
-#'   (\code{metrics_dropped}), chosen model and native training table per fold, including original
-#'   parameter penalties, and \code{candidate_settings} with each candidate's
-#'   controls. Shared output settings inherit the first candidate, identified
-#'   by \code{settings$controls_from}; use \code{candidate_settings} for the
-#'   complete procedure. NB2/Gamma procedures also retain the actual selected
-#'   \code{settings$fold_settings} and \code{distribution} metadata per fold,
-#'   including when a Poisson or Gaussian reference wins. Selected
-#'   \code{raster_groups} are retained when present.
-#'   Candidate warnings/diagnostics and selection failures
-#'   are retained. Failed selection makes pooled scores \code{NA}.
-#' @details Inputs must retain native training-selection records via
-#'   \code{keep_selection = TRUE} or full fold fits via \code{keep_fits = TRUE},
-#'   share compatible likelihood targets and splits, and record at least one
-#'   scoring metric in common. The selection result is scored on the metrics
-#'   that every candidate recorded. For example, a default Poisson candidate
-#'   records \code{"deviance"} but a default NB2 candidate does not, so their
-#'   selection result keeps \code{"rmse"}, \code{"mae"} and
-#'   \code{"neg_log_score"}. \code{selection$metrics} lists the metrics kept
-#'   and \code{selection$metrics_dropped} those left out. NB2/Poisson
-#'   candidates may share a count target. Gamma/Gaussian
-#'   candidates may share a continuous target using RMSE/MAE. Density scores
-#'   cannot compare different observation measures. Other canonical family/link
-#'   and conditional-choice guards are unchanged.
-#'   Analysis-row identities and response/weight definitions are checked against
-#'   each retained GLM or record. Compact records store native log likelihood,
-#'   native and ecological parameter counts, effective row IDs, outcomes, trials,
-#'   frequencies, formula text, controls and diagnostics. NB2/Gamma records also
-#'   preserve estimated/fixed nuisance metadata and native nuisance counts.
-#'   They retain no model
-#'   environment, design matrix or raw raster. If both representations are
-#'   retained, they must agree exactly. Record-only selection uses the same
-#'   likelihood-signature guards and information-criterion table constructors.
-#'   Selection records cannot reconstruct fits requested by \code{keep_fits}.
-#'   Metadata failures remain selection failures without discarding scored folds.
-#'   Conditional-choice records retain event-based nobs and native
-#'   partial-method/stratum signatures. Alternative counts do not substitute
-#'   for native events in AICc/BIC. Native likelihood comparability, parameter
-#'   counts and numerical guards remain unchanged. Invalid inputs are rejected; criterion
-#'   failures, nonfinite criteria and unresolved ties are retained per fold.
+#' @param mod_list Named list of complete cross-validation results, all scored
+#'   on the same folds and observations. Each must keep its training records
+#'   (`keep_selection = TRUE`) or full fits (`keep_fits = TRUE`). Results from
+#'   [cross_validate_field()] and [cross_validate_mixed()] always keep their
+#'   records.
+#' @param criterion Training criterion, declared in advance: `"AICc"`
+#'   (default), `"AIC"`, or `"BIC"`. It is computed from each candidate's
+#'   training log-likelihood and parameter count K with the same rules as
+#'   [aic_tab()] and [bic_tab()]. AICc needs more training observations than
+#'   K + 1.
+#' @param ties What to do when two candidates have exactly the same training
+#'   criterion. The default `"error"` marks the fold as failed. `"first"`
+#'   picks the tied candidate listed first in `mod_list`. No tolerance is
+#'   applied, so only exact ties count.
+#' @param keep_fits Logical. The default `FALSE` returns compact output.
+#'   `TRUE` also returns the selected training fit of each fold in `fits`.
+#'   This requires every candidate to have been run with `keep_fits = TRUE`,
+#'   because records cannot rebuild a fit.
+#' @return A cross-validation result of the same class as the candidates
+#'   that scores the selection procedure. Each fold's predictions, training
+#'   values, and diagnostics come from the candidate chosen in that fold, and
+#'   `settings$backend` is `"training_selection"`. The result adds
+#'   `selection`, which holds `chosen` (the candidate picked in each fold,
+#'   `NA` where selection failed), `tables` (each fold's training table, with
+#'   every candidate's K, log-likelihood, and criterion), and the `criterion`,
+#'   `ties`, and `candidates`. Results from [cross_validate()],
+#'   [cross_validate_glm()], and [cross_validate_clogit()] also record the
+#'   `metrics` scored and `metrics_dropped`, and each candidate's
+#'   `candidate_settings`. See [multiScaleR_cv-class] for the other elements.
+#' @details
+#' # How the procedure is scored
 #'
-#' Assessment outcomes and CV scores never choose the winner inside a fold.
-#'   The resulting held-out score evaluates the predeclared candidate set and
-#'   selection rule. If those are tuned using these results, use an independent
-#'   test set or outer validation layer. Selection does not integrate parameter
-#'   or selection uncertainty, add intervals or establish calibration.
+#' Suppose your plan is to fit several candidate models and keep the one with
+#' the lowest AICc. Scoring only the winner on held-out data would flatter it,
+#' because it was chosen after seeing all of the data. `select_cv()` scores
+#' the whole plan instead. In each fold it computes the training criterion of
+#' every candidate from its fit to that fold's analysis rows, picks the
+#' lowest, and keeps the held-out predictions that candidate made. Assessment
+#' outcomes and CV scores never choose the winner. The pooled score therefore
+#' evaluates the declared candidate set and rule. If you then tune the
+#' candidate set or the rule using these results, evaluate the final choice
+#' with an independent test set or an outer validation layer.
+#'
+#' # What the candidates must keep
+#'
+#' Run every candidate with `keep_selection = TRUE` (compact records) or
+#' `keep_fits = TRUE` (full fits). A record holds the native training
+#' log-likelihood, the native and ecological parameter counts, the rows that
+#' entered the likelihood, their responses, trials, and frequency weights,
+#' the formula as text, the controls, and the original diagnostics. NB2 and
+#' Gamma records also hold the estimated or fixed nuisance parameter. A
+#' record holds no fitted model, design matrix, raster, or formula
+#' environment, so it is much smaller than a fit, although its row metadata
+#' still grows with the number of observations and folds. Keeping records
+#' adds no fitting and does not change which folds pass their diagnostics.
+#'
+#' Before selecting, the function checks each record or fit against the
+#' fold's analysis rows and the recorded responses and weights. If a
+#' candidate keeps both records and fits, they must agree exactly. A record
+#' that could not be built makes selection fail in that fold, without
+#' changing the candidate's own result. Results that kept fits work without
+#' records. A result that kept neither must be run again with
+#' `keep_selection = TRUE`.
+#'
+#' # Which candidates can be combined
+#'
+#' The candidates must pass the same checks as in [cv_tab()], with identical
+#' folds and observations and comparable likelihoods. NB2 and Poisson
+#' candidates can share a count target. Gamma and Gaussian candidates can
+#' share a continuous target, scored with RMSE or MAE. An information
+#' criterion cannot compare a count likelihood with a continuous density.
+#' Conditional-choice candidates must also share their partial-likelihood
+#' `method`.
+#'
+#' For results from [cross_validate()], [cross_validate_glm()], and
+#' [cross_validate_clogit()], the procedure is scored on the metrics that
+#' every candidate recorded. A default Poisson candidate records `"deviance"`
+#' and a default NB2 candidate does not, so their selection keeps `"rmse"`,
+#' `"mae"`, and `"neg_log_score"`. `selection$metrics` lists the metrics kept
+#' and `selection$metrics_dropped` those left out. Field and mixed-model
+#' candidates must record the same metrics. Bayesian results have no
+#' training likelihood and are rejected.
+#'
+#' Penalties follow the native parameter counts, and scales and shapes
+#' estimated by [multiScale_optim()] count toward K.
+#'
+#' * Conditional choice: the sample size in AICc and BIC is the number of
+#'   choice sets (one event each), not the number of alternatives.
+#' * Spatial fields: the coefficients, field SD, estimated range, and any
+#'   observation dispersion count toward K. The integrated field values add
+#'   nothing. The held-out joint block score is that of the model chosen in
+#'   the fold.
+#' * Mixed models: the sample size is the number of analysis observations.
+#'   The covariance parameters count toward K, and the integrated group
+#'   effects add nothing.
+#'
+#' # Read the result
+#'
+#' Read `complete` and `selection$chosen` first. A fold fails, and the pooled
+#' scores become `NA`, when a criterion cannot be computed, is not finite, or
+#' ties under `ties = "error"`. `selection$tables` shows the training table
+#' behind each choice. For GLM and conditional-choice results, the shared
+#' `settings` are copied from the first candidate, named in
+#' `settings$controls_from`, and `selection$candidate_settings` holds every
+#' candidate's controls. NB2 and Gamma selections also keep the settings
+#' (`settings$fold_settings`) and `distribution` of the model chosen in each
+#' fold, including when a Poisson or Gaussian reference wins. GLM,
+#' conditional-choice, and mixed-model selections also keep every
+#' candidate's warnings and diagnostics in `selection`, and grouped-map
+#' labels (`raster_groups`) are kept for the chosen model. The score does not
+#' integrate parameter or selection uncertainty, add intervals, or establish
+#' calibration.
 #' @examples
-#' dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
-#' folds <- grouped_cv_folds(rep(letters[1:4], each = 2), k = 2)
-#' candidates <- list(null = cross_validate_glm(y ~ 1, dat, folds, "poisson", keep_selection = TRUE),
-#'                    trend = cross_validate_glm(y ~ x, dat, folds, "poisson", keep_selection = TRUE))
-#' selected <- select_cv(candidates, criterion = "AIC", ties = "first")
-#' selected$selection$chosen
-#' @seealso \code{\link{cv_tab}}, \code{\link{cross_validate}},
-#'   \code{\link{cross_validate_glm}}, \code{\link{aic_tab}}, \code{\link{bic_tab}}
-#' @details Complete spatial-field CV candidates also support training-only
-#'   selection using compact native ML likelihood and parameter counts.
-#'   Native coefficients, field SD, estimated range and any observation
-#'   dispersion parameter keep their penalties. Integrated states add zero.
-#'   The held-out joint block score uses the model selected by the training
-#'   criterion in that fold.
-#'   Mixed-model CV candidates use compact native ML likelihoods and include
-#'   their covariance and ecological-scale parameters in training penalties.
+#' data("landscape_counts")
+#' data("surv_pts")
+#' # Three spatial folds. The simulated coordinates are in meters.
+#' folds <- spatial_cv_folds(crds(vect(surv_pts)), block_size = 1000, k = 3,
+#'                           crs = 32617)
+#'
+#' # keep_selection = TRUE stores the training likelihoods that select_cv() reads
+#' candidates <- list(
+#'   null = cross_validate_glm(counts ~ 1, landscape_counts, folds,
+#'                             family = "poisson", keep_selection = TRUE),
+#'   site = cross_validate_glm(counts ~ site, landscape_counts, folds,
+#'                             family = "poisson", keep_selection = TRUE))
+#' selected <- select_cv(candidates, criterion = "AICc")
+#' selected$selection$chosen         # model picked by training AICc in each fold
+#' selected$selection$tables$fold1   # the training table behind the first pick
+#' selected$summary                  # held-out scores of the whole procedure
+#' @seealso [cv_tab()], [cross_validate()], [cross_validate_glm()],
+#'   [multiScaleR_cv-class], [aic_tab()], [bic_tab()], and
+#'   `vignette("v08-cross-validation", package = "multiScaleR")`.
 #' @export
 select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
     ties = c("error", "first"), keep_fits = FALSE) {

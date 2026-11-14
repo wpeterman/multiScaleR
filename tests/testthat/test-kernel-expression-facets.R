@@ -26,6 +26,7 @@ test_that("expression predictions and coefficient curves freeze the original ref
 })
 
 test_that("expression Gaussian coefficient proposals retain their full conditional density", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- prepared_formula_fixture(surface = TRUE)
   form <- count ~ I(habitat^2) * year + I(habitat * other) + poly(temp, 2) + offset(log(effort))
@@ -49,6 +50,7 @@ test_that("expression Gaussian coefficient proposals retain their full condition
 })
 
 test_that("private expression group, zero and limiting targets keep native eta", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- prepared_formula_fixture(two = FALSE)
   form <- count ~ I(habitat^2) * year + poly(temp, 2) + offset(log(effort))

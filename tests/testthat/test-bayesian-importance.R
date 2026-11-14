@@ -16,6 +16,7 @@ test_that("importance proposal density includes the log-SD Jacobian", {
 })
 
 test_that("importance correction recovers a skewed posterior and preserves RNG", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   skip_if_not_installed("posterior", minimum_version = "1.6.0")
   parameters <- list(beta = numeric(), scale_beta = numeric(), scale_z = log(2),
@@ -79,6 +80,7 @@ test_that("importance correction recovers a skewed posterior and preserves RNG",
 })
 
 test_that("batched predictors and conditional response curvature match the posterior", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 6, n_year = 3)
   for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
@@ -111,6 +113,7 @@ test_that("batched predictors and conditional response curvature match the poste
 })
 
 test_that("importance controls fail explicitly for unsupported settings", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture()
   call_fit <- function(control) multiScale_bayes(count ~ habitat, f$inputs, f$data,
@@ -149,6 +152,7 @@ test_that("conditional proposal fallbacks stay normalized and retain every row",
 })
 
 test_that("corrected repeated-site nodes avoid dense site covariance storage", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   skip_if_not_installed("posterior", minimum_version = "1.6.0")
   f <- bayesian_scale_fixture(n_site = 6, n_year = 3)

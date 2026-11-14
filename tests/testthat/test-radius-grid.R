@@ -205,6 +205,7 @@ test_that("joint radii profile the Gaussian bandwidth against independent native
 })
 
 test_that("choice CV trains joint radius, bandwidth and shape fits without assessment outcomes", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   f <- mixed_radius_grid_fixture("expow")
   d <- f$data

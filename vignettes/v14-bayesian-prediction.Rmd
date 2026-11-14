@@ -477,3 +477,5 @@ grid_pred <- predict(forecast_fit, grid_data, kernel_inputs = grid_inputs,
 - **`vignette("v06-year-specific-rasters", package = "multiScaleR")`**, preparing
   landscape inputs when each year has its own map.
 - **`vignette("v01-quickstart", package = "multiScaleR")`**, the core workflow.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.

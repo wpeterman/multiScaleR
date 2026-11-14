@@ -1,280 +1,315 @@
-#' Plot Marginal Effects from a Fitted Model
+#' Plot marginal effects from a fitted model
 #'
-#' Generates marginal effect plots with 95\% intervals for each
-#' covariate in the optimized model stored within a \code{multiScaleR} object.
-#' Each panel sweeps one covariate across its observed range while holding all
-#' other numeric predictors at their sample mean. For categorical predictors,
-#' the grid uses observed levels and other categorical inputs use an observed
-#' reference level. For \code{unmarked} models,
-#' other categorical predictors are held at their first observed level.
+#' @description
+#' Draw one panel per covariate that shows the model's expected response as
+#' that covariate sweeps across its observed range, with every other input
+#' held at a reference value, and a 95% confidence band. Read each curve as
+#' the direction and size of one effect in the covariate's own units, at the
+#' selected scales of effect.
 #'
-#' @param x A fitted \code{multiScaleR} object returned by
-#'   \code{\link{multiScale_optim}}. Must contain \code{opt_mod} (the optimized
-#'   fitted model) and \code{scl_params} (a list with \code{mean} and \code{sd}
-#'   elements for each covariate, used to back-transform scaled covariates to
-#'   their original units for the x-axis). Also accepts \code{multiScaleR_bayes}
-#'   fits for hypothetical fixed-reference covariate curves; see Details.
-#' @param ylab Character scalar. Y-axis label for all marginal effect panels.
-#'   Default: \code{"Estimated response"}.
-#' @param length.out Positive integer. Number of equally spaced points at which
-#'   to evaluate the marginal effect curve for each covariate. Default: \code{100}.
-#' @param type Character. Prediction type for \code{unmarked} models.
-#'   \code{"state"} is the default. Ordinary \code{occu} and \code{pcount}
-#'   fits also accept \code{"det"} for native conditional detection probability;
-#'   \code{"lambda"} is a plotting alias for their state component.
-#'   GDR fits accept their active \code{"lambda"}, \code{"phi"}, \code{"dist"}
-#'   or \code{"rem"} component; \code{"state"} is a plotting alias for lambda.
-#'   Other classes retain their native state or lambda type. Ignored for non-unmarked
-#'   models.
-#' @param link Logical. If \code{TRUE}, predictions are passed through the
-#'   model's inverse link function before plotting (i.e., plotted on the
-#'   response scale). For \code{glm} and spaMM \code{HLfit} objects this is applied
-#'   automatically. Single-predictor GAM and BAM objects inherit that GLM behavior:
-#'   both settings retain response-scale curves. Use \code{predict(..., type = "link")}
-#'   for their native link-scale predictions.
-#'   Set to \code{TRUE} manually if predicted values appear to be on the link
-#'   scale. Default: \code{FALSE}. For a multi-component GAM, \code{FALSE}
-#'   selects native link-scale output and \code{TRUE} selects native
-#'   response-scale output; \code{component} chooses the column.
-#'   Unmarked curves retain the native response scale for both settings.
-#' @param draws For Bayesian fits, a positive number of stored draws to select
-#'   evenly across the retained sample, or explicit draw indices. The default
-#'   \code{NULL} uses at most 1000 evenly spaced draws. Ignored for frequentist
-#'   fits. Bayesian curves use the response scale regardless of \code{link}.
+#' `vignette("v02-user-guide", package = "multiScaleR")` reads these plots for
+#' a count model and an N-mixture model. [multiScaleR-prediction] explains
+#' what the bands include.
 #'
+#' @param x A fitted `multiScaleR` object from [multiScale_optim()]. It must
+#'   hold `opt_mod` (the model refit at the selected scales) and `scl_params`
+#'   (the mean and standard deviation of each optimized covariate, used to put
+#'   the x-axis back in original units). Also accepts a `multiScaleR_bayes`
+#'   fit from [multiScale_bayes()], as described in "Bayesian fits".
+#' @param ylab Character scalar. Y-axis label for every panel. Default
+#'   `"Estimated response"`. When you leave it unset, Cox fits use
+#'   `"Log relative risk"` (or `"Relative risk"` with `link = TRUE`), and GAMs
+#'   with several linear predictors name the native output column.
+#' @param length.out Positive integer. Number of equally spaced values at
+#'   which each numeric curve is evaluated. Default `100`. Larger values give
+#'   smoother curves at a small cost in time.
+#' @param type Character. Component to plot for `unmarked` models, ignored
+#'   for other models. Default `"state"`.
+#'   * `occu()` and `pcount()` fits: `"state"` (occupancy probability or
+#'     expected abundance), `"det"` (detection probability), or `"lambda"`,
+#'     an alias for `"state"`.
+#'   * `gdistremoval()` fits: an active `"lambda"`, `"phi"`, `"dist"`, or
+#'     `"rem"` component, with `"state"` as an alias for `"lambda"`.
+#'   * Other `unmarked` classes: `"state"` or `"lambda"`, as the native model
+#'     names its state component.
+#' @param link Logical. If `TRUE`, predictions are passed through the
+#'   model's inverse link, so the curve is on the response scale. Default
+#'   `FALSE`. The setting matters only for some models:
+#'   * `glm` fits, which include the model in `opt_mod` from the analytic
+#'     backends, and single-predictor GAMs and BAMs always plot the response
+#'     scale. spaMM `HLfit` curves are always transformed too.
+#'   * Cox fits plot the log relative risk with `FALSE` and the relative risk
+#'     with `TRUE`.
+#'   * GAMs with several linear predictors plot the native link-scale output
+#'     with `FALSE` and the native response-scale output with `TRUE`.
+#'     `component` chooses the column.
+#'   * `unmarked`, glmmTMB, lme4, and Bayesian curves use their native
+#'     response scale for both settings.
+#'   * For other models, set `TRUE` if the curve appears to be on the link
+#'     scale.
+#' @param draws For Bayesian fits, either a positive number of stored draws
+#'   to select evenly across the retained sample, or explicit draw indices.
+#'   The default `NULL` uses at most 1000 evenly spaced draws. Ignored for
+#'   other fits.
 #' @param reference_data Optional data frame of raw predictor values for the
-#'   retained fitted rows. Default: \code{NULL}, which keeps existing data
-#'   recovery. Supply unique explicit row names matching the native training
-#'   frame. Rows may be reordered. The supplied values must reproduce the
-#'   fitted features, native design, factor coding and offsets. This option is
-#'   available for retained native LM/GLM, GAM and Cox fits; other structures
-#'   retain their existing data requirements. See Details.
-#' @param component Optional positive integer selecting a native output column
-#'   in a GAM with multiple linear predictors. Required for those fits and
-#'   otherwise must be \code{NULL}. With \code{link = FALSE}, select a linear
-#'   predictor. With \code{link = TRUE}, select a native response column, whose
-#'   interpretation and number depend on the fitted family.
-#'   For ziplss response curves, select \code{component = 1}: the overall
-#'   expected count combines both linear predictors.
-#' @param add_label Logical. If \code{TRUE}, a caption below each panel states
-#'   what the plotted limits include, such as conditioning on the selected
-#'   spatial scales or the treatment of random effects. For Bayesian fits the
-#'   caption also reports the number of draws and the stored status of the fit
-#'   checks. Default: \code{FALSE}, which draws the panels without a caption.
+#'   rows used to fit the model. Default `NULL`, which recovers the data from
+#'   the fitted model. Supply it when the fitted model frame keeps only
+#'   transformed columns, such as `poly(temperature, 2)`. It needs unique row
+#'   names that match the native training frame (rows may be reordered), and
+#'   its values must reproduce the fitted features, design, factor coding, and
+#'   offsets. Available for native LM, GLM, GAM, and Cox fits. See "Supply raw
+#'   reference rows".
+#' @param component Optional positive integer selecting a native output
+#'   column of a GAM with several linear predictors. Required for those fits
+#'   and otherwise must be `NULL`. With `link = FALSE` it selects a linear
+#'   predictor. With `link = TRUE` it selects a native response column, whose
+#'   meaning and number depend on the family. For `mgcv::ziplss()` response
+#'   curves, select `component = 1`, the overall expected count, which
+#'   combines both linear predictors.
+#' @param add_label Logical. If `TRUE`, a caption under each panel states what
+#'   the plotted limits include, such as conditioning on the selected scales
+#'   or the treatment of random effects. Bayesian captions also report the
+#'   number of draws and the stored status of the fit checks. Default `FALSE`,
+#'   which draws the panels without a caption, as suits a figure for
+#'   publication.
 #'
-#' @return A named list of \code{ggplot2} objects, one per covariate. Plots are
-#'   printed as a side effect and the list is returned invisibly. Each plot
-#'   shows:
-#'   \itemize{
-#'     \item The predicted response as a solid line for numeric predictors or
-#'       points for categorical predictors, with x-axis values back-transformed
-#'       to the original (unscaled) units when applicable.
-#'     \item A shaded ribbon or categorical error bars for the 95\% confidence
-#'       interval (when available from the model's \code{predict} method).
-#'       Bayesian curves show posterior medians and central 95\% credible
-#'       intervals, with the retained draw indices and prediction contract
-#'       attached to the returned list. Ordinary unmarked curves also attach
-#'       their native prediction contract, including zero-effect conditioning
-#'       and kernel-conditional confidence limits. Native glmmTMB and lme4
-#'       curves also attach their zero-effect response prediction contract,
-#'       including identified native spatial-field conditioning.
-#'     \item A subtitle noting any polynomial (\code{I(x^2)}) or interaction
-#'       terms that involve the covariate.
-#'   }
+#' @return Invisibly, a named list of `ggplot2` objects, one per plotted
+#'   covariate and named after it. Each plot is also printed. A panel shows:
+#'   * the predicted response as a line for a numeric covariate, or as points
+#'     for the levels of a factor. The x-axis is in the covariate's original
+#'     units, with optimized covariates back-transformed by `x$scl_params`.
+#'   * a shaded band, or error bars for a factor, for the 95% limits when the
+#'     model's prediction method supplies standard errors. Bayesian panels show
+#'     the posterior median and central 95% credible interval.
+#'   * a subtitle naming any `I()` term (such as `I(x^2)`) or interaction that
+#'     involves the covariate.
+#'
+#'   For a frequentist fit, each plot's `data` element holds the plotted
+#'   values: `x`, `fit`, `lwr`, `upr`, and `variable`. The list can carry
+#'   attributes: a
+#'   [prediction_contract] for `unmarked`, glmmTMB, lme4, multi-component GAM,
+#'   and Bayesian fits, `reference_data_contract` when you supply
+#'   `reference_data`, and `draw_ids` for Bayesian fits.
 #'
 #' @details
-#' The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
-#' \code{MASS::glm.nb}, \code{coxph} and \code{clogit} structures. Other native
-#' subclasses retain their existing provider path.
+#' # How each panel is built
 #'
-#' Ordinary native LM, GLM and time-fixed unpenalized Cox curves use fitted
-#' terms to expand dot shortcuts, retain active offset covariates and annotate
-#' interactions. Removed terms do not add panels or prediction inputs.
+#' The focal covariate sweeps from its minimum to its maximum observed value.
+#' A factor uses its observed levels, with one point and interval per level.
+#' Every other numeric input is held at its sample mean. For a standardized
+#' kernel-weighted covariate the mean is 0, the average landscape value at the
+#' survey points. Other non-numeric inputs are held at their first observed
+#' value, which keeps an actual fitted level. Variables that enter only
+#' through an offset are held at their sample mean and get no panel. Numeric
+#' predictors that [multiScale_optim()] did not optimize keep their own units.
 #'
-#' Marginal effects are computed by constructing a \code{newdata} data frame
-#' where the focal covariate sweeps from its minimum to maximum observed value
-#' and all other predictors are held at their sample mean. For kernel-scaled
-#' covariates, whose scaled mean is 0, this is equivalent to holding them at
-#' their average landscape value. Variables used only in model offsets are held
-#' at their sample mean for prediction but do not receive marginal effect panels.
-#' Quoted predictor names retain their original spelling in prediction grids.
-#' Factor contrasts and fixed transformations are evaluated by the fitted model.
-#' For ziplss, response-scale Wald limits propagate the full native coefficient
-#' covariance through both predictors. These are mean confidence limits,
-#' without count noise or uncertainty in the selected ecological scales.
-#' They are not intervals for a future count and may extend below zero.
+#' Panels come from the active model terms. For ordinary `lm`, `glm`,
+#' `MASS::glm.nb`, and time-fixed, unpenalized Cox and `clogit` fits, the
+#' fitted terms expand dot shortcuts, keep active offset covariates, and
+#' annotate interactions. Removed terms add no panel or prediction input.
+#' Quoted predictor names keep their original spelling. Factor contrasts and
+#' fixed transformations are evaluated by the fitted model, and the plotting
+#' grid never relearns a learned transformation. When `x$opt_mod` wraps
+#' another fitted model, the nested model is used to find the predictors,
+#' recover the data, and predict.
 #'
-#' Native GAM curves retain the saved factor coding for interaction-only
-#' factors, including when session contrast options change after fitting.
+#' With an interaction, each panel is one slice of the interaction surface,
+#' at the mean of the interacting variable. A message says so, and the panel
+#' subtitle names the variables held at their mean.
 #'
-#' For \code{glm} and most GLM-family models, predictions are transformed via
-#' the inverse link function automatically (e.g., \code{exp()} for Poisson
-#' log-link models). Confidence intervals are constructed from
-#' \code{predict(..., se.fit = TRUE)} using \eqn{\pm 1.96 \times SE}.
+#' # Scale of the curves and their limits
 #'
-#' Native link-scale limits are transformed to the response scale and ordered
-#' for increasing or decreasing links. Limits with nonfinite standard errors,
-#' invalid native link/family endpoints, or an inverse-link pole inside the
-#' interval are unavailable and produce a warning. Fitted values remain native;
-#' the method does not clip or repair invalid confidence limits.
+#' * **GLMs.** Predictions and their standard errors are computed on the link
+#'   scale. The limits are the estimate plus and minus 1.96 standard errors,
+#'   transformed by the inverse link (for example `exp()` for a Poisson log
+#'   link) and ordered for increasing or decreasing links. Limits with
+#'   nonfinite standard errors, invalid endpoints for the link or family, or
+#'   an inverse-link pole inside the interval are not shown, with a warning.
+#'   Fitted values stay native, and the method does not clip or repair
+#'   invalid limits.
+#' * **Models without a link**, such as `lm`: the estimate plus and minus 1.96
+#'   standard errors.
+#' * **glmmTMB and lme4:** native response predictions, including
+#'   zero-inflation and truncated-family means, with native response-scale
+#'   Wald limits when available.
+#' * **spaMM:** the linear predictor and its native fixed-effect variance
+#'   (`fixefVar`), transformed through the inverse link. The response variance
+#'   is not used as an interval for the mean.
+#' * **pscl `zeroinfl`:** class-specific predictions with their own limits.
+#' * **`mgcv::ziplss()`:** response-scale Wald limits that propagate the full
+#'   native coefficient covariance through both linear predictors. They can
+#'   extend below zero.
 #'
-#' For \code{unmarked} models, \code{predict(mod, newdata, type = type)} is
-#' used, and lower/upper bounds come from the \code{lower} and \code{upper}
-#' columns of the returned data frame.
-#' Predictors are recovered from the selected component's formula, so factor
-#' contrasts such as \code{Year2} are not mistaken for data columns. Factors
-#' receive one point and confidence interval per observed level. Site keys
-#' not used as fixed predictors and detection-only predictors do not receive
-#' state-effect panels.
-#' Numeric predictors not optimized by \code{multiScale_optim()} retain their
-#' original units and are held at their sample mean in other panels.
+#' Every frequentist band is a confidence band for the expected response. It
+#' holds the selected scales of effect at their estimates, even for the
+#' analytic backends, and it adds no observation noise, so it is not an
+#' interval for a future count.
 #'
-#' Native GDR models with active formula offsets or TMB zero inflation are
-#' rejected before fitting, model selection or prediction. In the audited
-#' unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
-#' TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
-#' require separate provider qualification; multiScaleR does not remove offsets,
-#' switch engines, alter parameter counts or substitute uncertainty estimates.
-#' Offset-free C ZIP models retain their native likelihood and parameter count.
+#' # Random effects
 #'
-#' For \code{unmarked} random-effects models, prediction uses
-#' \code{re.form = NA}, which sets random effects to zero. These curves are
-#' conditional predictions at the stated covariate values, not averages over
-#' years, sites, or the random-effect distribution. Confidence intervals are
-#' conditional on the fitted spatial scale.
-#' Ordinary \code{pcount} (Poisson, negative-binomial or ZIP) and \code{occu}
-#' curves use the same checked native prediction target as point rows, prepared
-#' outputs and raster chunks. ZIP curves retain the overall expected abundance,
-#' including structural zeros, rather than substituting conditional abundance.
-#' Native coefficient covariance and confidence bounds are retained. Ordinary
-#' state and detection curves prepare only their own original training basis;
-#' unrelated component metadata is not required. This does not remove native
-#' ZIP target dependencies or change full model parameter counts or diagnostics.
-#' Detection curves use the original observation-row covariates for trained
-#' transformations and confidence limits. State curves use original site rows.
-#' Detection is conditional on occupancy for \code{occu}; for \code{pcount},
-#' it is the per-individual survey detection probability. Fixed
-#' scaling, polynomial and spline calls and transformed offsets use original
-#' raw covariates before site removal. The plotting grid never relearns them.
-#' GDR curves use the original component's site, primary-period or removal-
-#' interval rows and its fitted design. Spline knots, polynomial recipes,
-#' nested scaling and factor interactions remain fixed at training. Lambda
-#' retains its native abundance/density parameter, phi is availability, dist
-#' is the native distance-detection parameter and rem is the interval removal
-#' parameter. Inactive components do not acquire a curve. These are native
-#' component references, not survey averages or random-effect marginal means.
-#' Factor coding uses retained or unambiguously recoverable original metadata.
-#' Zero-effect curves need only the checked fixed design and offsets; unused
-#' learned random slopes or new grouping variables are not evaluated. Conditional
-#' random-effect predictions retain their original random-design requirements.
-#' Other unmarked classes requiring that fallback stop rather than return a
-#' different basis or derived-state prediction. Active terms select panels:
-#' removed terms and random-only groups are excluded, while admitted quoted
-#' names and fixed logical expressions retain their raw inputs. A logical pipe
-#' within \code{I()} is a fixed operation, not a random-effect declaration.
-#' The native unmarked parser may reject pipe-containing names or fixed
-#' expressions before fitting. Precompute such fixed inputs and use safe
-#' column names when that occurs; this plotting adapter cannot change a
-#' formula rejected by the native fitting function.
+#' Mixed-model and `unmarked` curves set the random effects to zero
+#' (`re.form = NA`). These are predictions at the stated covariate values for
+#' a group with zero deviation, not averages over sites, years, or the
+#' random-effect distribution. To show a curve for each year, build your own
+#' prediction grid conditioned on that year with the fitted factor coding.
+#' Zero-effect curves need only the fixed design and offsets. They do not
+#' evaluate unused learned random slopes or need new grouping variables.
 #'
-#' For models with interaction terms, a message is printed explaining that each
-#' panel represents a conditional slice (at the mean of the interacting
-#' variable) rather than the full interaction surface.
+#' # Unmarked models
 #'
-#' \code{HLfit} (spaMM) and \code{zeroinfl} (pscl) models are handled with
-#' class-specific prediction calls.
-#' spaMM curves set random effects to zero, evaluate the linear predictor, and
-#' transform native link-scale \code{fixefVar} limits through the inverse link.
-#' Its response variance is not used as a confidence interval for the mean.
-
-#' When \code{x$opt_mod} is a wrapper object around another fitted model,
-#' \code{plot_marginal_effects()} uses the nested analysis model for predictor
-#' discovery, data recovery, and prediction when possible.
+#' Panels use the variables of the selected component's formula, recovered
+#' by column name. Factor contrasts such as `Year2` are coefficient labels,
+#' not data columns, so the factor itself gets one point per observed level.
+#' Site keys that are not fixed predictors, and detection-only predictors,
+#' get no state panels. Other factors are held at their first observed
+#' level. Curves stay on the native response scale for both `link` settings,
+#' and their limits are the native `lower` and `upper` confidence limits.
 #'
-#' Supplied \code{reference_data} is matched to retained fitted row IDs and
-#' checked against the evaluated training features, full native coefficient
-#' design or smooth basis, contrasts and formula offsets. Large exact finite
-#' comparisons avoid temporary comparison copies; any difference retains the
-#' complete original tolerance check. Native prediction batches remain intact.
-#' Missing inputs,
-#' nonfinite values, unknown levels and mismatches raise an error. Offsets
-#' supplied outside the formula and unsupported nested learned transformations
-#' are rejected. Supported native nested calls use a single standard learner's
-#' original retained attributes. The default package refitter can also
-#' recover supported Cox recipes while the original training rows are
-#' available. Precompute the predictor if its recipe is ambiguous or
-#' missing. For native conditional-logistic fits with
-#' learned predictors, retain the model frame with \code{model = TRUE} and
-#' fit complete choice sets using \code{na.action = stats::na.fail}. Some
-#' survival versions discard training attributes when applying omission.
-#' This verifies observable feature equivalence. It cannot prove
-#' unique original raw values from a square, polynomial or other many-to-one
-#' transformation, and it does not refit the model. Cox strata and cluster-only
-#' inputs use their first observed reference value in other panels, preserving
-#' an actual fitted group. The returned list records
-#' this distinction in its \code{reference_data_contract} attribute.
-#' For analytic expression designs, selected spatial predictors are rebuilt
-#' from the verified fitted preparation. Native refit references must carry
-#' the fitted, standardized spatial columns. Unmarked and Bayesian curves
-#' retain their existing structured data and posterior-reference contracts.
+#' * **`occu()` and `pcount()`.** State curves use the original site rows,
+#'   and detection curves use the original observation rows. Detection is
+#'   conditional on occupancy for `occu()`. For `pcount()` it is the
+#'   probability of detecting each individual on one survey. Curves for
+#'   Poisson, negative binomial, and ZIP `pcount()` fits use the same checked
+#'   native target as point, snapshot, and raster predictions. ZIP state
+#'   curves keep the overall expected abundance, including structural zeros.
+#'   Each component prepares only its own training basis, and fixed scaling,
+#'   polynomial, and spline calls and transformed offsets use the original
+#'   raw covariates before site removal.
+#' * **`gdistremoval()`.** Curves use the component's own site,
+#'   primary-period, or removal-interval rows and its fitted design, with
+#'   spline knots, polynomial recipes, nested scaling, and factor
+#'   interactions fixed at training. `"lambda"` is the native abundance or
+#'   density parameter, `"phi"` is availability, `"dist"` is the native
+#'   distance-detection parameter, and `"rem"` is the removal parameter.
+#'   Inactive components have no curve. These are native component values,
+#'   not survey averages or random-effect marginal means. GDR models with
+#'   active formula offsets or TMB zero inflation are rejected, as
+#'   [aic_tab()] explains.
+#' * **Other classes** that would need a different basis or a derived state
+#'   prediction stop rather than plot one.
 #'
-#' For a GAM with multiple linear predictors, select \code{component} explicitly.
-#' Link curves use the selected predictor's active variables. Response curves
-#' consider all component inputs because a response column may depend on
-#' several predictors. Native response meanings are preserved. For example,
-#' \code{mgcv::gaulss()} returns mean and reciprocal standard deviation, while
-#' multinomial response columns are category probabilities. Limits use native
-#' standard errors on the selected output scale and condition on fitted
-#' smoothing parameters and ecological scales. They do not add observation
-#' noise or represent the package's full Bayesian scale uncertainty. The
-#' returned \code{prediction_contract} identifies the native output column.
+#' Factor coding uses retained or unambiguously recoverable original
+#' metadata. A logical pipe inside `I()`, such as `I(a | b)`, is a fixed
+#' operation, not a random-effect declaration, but the native `unmarked`
+#' parser can reject it, or a column name containing a pipe, before fitting.
+#' Then precompute the logical predictor as a named column, or rename the
+#' column. For complete logical inputs, `I(as.integer(a) + as.integer(b) > 0)`
+#' expresses the same OR without a pipe. With missing values, precompute
+#' `a | b` to keep R's missing-value logic.
 #'
-#' Mixed-model curves set response random effects to zero. glmmTMB curves use
-#' native response predictions, including zero inflation or truncated-family
-#' means, with native response-scale Wald limits when available. This is a
-#' prediction at zero random effects, not an average over their distribution.
-#' Frequentist limits condition on the selected spatial scales. Cox panels
-#' default to log relative risk; exponentiation gives a relative risk score,
-#' not an occurrence or survival probability.
+#' # Supply raw reference rows
+#'
+#' A fitted model frame can keep `poly(temperature, 2)`, `I(elevation^2)`, or
+#' a compound offset without the raw columns behind them. A square cannot
+#' recover the sign of its input, and an orthogonal polynomial needs its
+#' fitted prediction metadata. If you kept the raw predictors, pass them as
+#' `reference_data`, with row names that identify the fitted rows:
+#'
+#' ```
+#' fit_rows <- row.names(fit$opt_mod$model)
+#' reference <- training_data[match(fit_rows, row.names(training_data)), ]
+#' row.names(reference) <- fit_rows
+#' plot_marginal_effects(fit, reference_data = reference)
+#' ```
+#'
+#' The rows are matched by ID and checked against the evaluated training
+#' features, the full native coefficient design or smooth basis, the factor
+#' contrasts, and the formula offsets. Missing rows or inputs, nonfinite
+#' values, new levels, and mismatches raise an error. Transformations and
+#' contrasts are taken from the fit, not relearned from the supplied rows or
+#' the plotting grid. Supported nested calls use a single standard learner's
+#' original retained attributes, and the default refitter can also recover
+#' supported Cox recipes while the original training rows are available.
+#' Precompute a predictor whose recipe is ambiguous or missing. For native
+#' conditional logistic fits with learned predictors, keep the model frame
+#' with `model = TRUE` and fit complete choice sets with
+#' `na.action = stats::na.fail`, because some survival versions drop training
+#' attributes when they omit rows.
+#'
+#' For native refits, the reference must also hold the final fitted spatial
+#' columns in their fitted units, standardized by default. The analytic
+#' backends instead rebuild the selected kernel values from their verified
+#' preparation. Passing the check establishes that the supplied rows
+#' reproduce the fitted features. It cannot prove a unique raw value behind a
+#' square, polynomial, or other many-to-one transformation, and it does not
+#' refit the model. The `reference_data_contract` attribute records this.
+#' Offsets supplied outside the formula, unsupported native structures,
+#' matrix-valued raw inputs, and nested learned transformations without
+#' recoverable metadata are rejected. `unmarked` and Bayesian curves keep
+#' their own data requirements.
+#'
+#' # GAMs with several linear predictors
+#'
+#' Select `component` explicitly. Link curves use the selected predictor's
+#' active variables. Response curves consider every component's inputs,
+#' because one response column can depend on several predictors. Native
+#' response meanings are kept. For example, `mgcv::gaulss()` returns the mean
+#' and the reciprocal standard deviation, and multinomial response columns
+#' are category probabilities. Limits use native standard errors on the
+#' selected output scale and condition on the fitted smoothing parameters and
+#' scales of effect. Native GAM curves keep the saved factor coding of
+#' interaction-only factors when session contrast options change. The
+#' returned [prediction_contract] identifies the native output column.
+#'
+#' # Cox and step-selection models
+#'
+#' Cox panels, including native `survival::clogit()` fits and the conditional
+#' logistic backend, default to the log relative risk. `link = TRUE`
+#' exponentiates it to a relative risk or relative selection score. Neither
+#' is a probability of occurrence or survival, or a probability within a
+#' choice set. Strata and cluster-only inputs are held at their first
+#' observed value, which keeps an actual fitted group.
+#'
+#' # Bayesian fits
 #'
 #' Bayesian panels use the stored marginal response-coefficient draws and the
-#' original pooled reference normalization. They hold each landscape covariate
-#' at a hypothetical grid of values while keeping the remaining covariates at
-#' their reference values. Coefficient draws retain their fitted posterior
-#' variation, but the landscape is not reevaluated at each draw's kernel scales.
-#' Response random effects are zero and observation noise is excluded. Use
-#' \code{\link{predict.multiScaleR_bayes}} with matched spatial inputs for
-#' location-specific posterior expectations. A plotted credible interval does
-#' not establish convergence or calibration; existing fit diagnostics remain
-#' relevant and their stored status is shown in the caption when
-#' \code{add_label = TRUE}.
+#' original pooled reference normalization. Each landscape covariate sweeps a
+#' hypothetical grid of values while the others stay at their reference
+#' values. The coefficient draws keep their posterior variation, but the
+#' landscape is not reevaluated at each draw's kernel scales. Response random
+#' effects are zero, and observation noise is excluded. Use
+#' [predict.multiScaleR_bayes()] with matched spatial inputs for
+#' location-specific posterior expectations. A credible band does not
+#' establish convergence or calibration, so check the fit diagnostics. Their
+#' stored status appears in the caption when `add_label = TRUE`.
+#'
+#' @seealso [multiScaleR-prediction], [predict.multiScaleR()],
+#'   [prediction_contract], [multiScale_optim()], and
+#'   `vignette("v02-user-guide", package = "multiScaleR")`.
 #'
 #' @examples
+#' ## Running example: counts at 100 survey points and two landscape layers
+#' data("landscape_counts")
+#' data("surv_pts")
+#' pts <- terra::vect(surv_pts)
+#' land <- terra::rast(system.file("extdata", "landscape.tif",
+#'                                 package = "multiScaleR"))[[c("land1", "land2")]]
+#' inputs <- kernel_prep(pts, land, max_D = 1700, kernel = "gaussian",
+#'                       bin = TRUE, verbose = FALSE)
+#' dat <- data.frame(landscape_counts, inputs$kernel_dat)
+#' start <- glm(counts ~ site + land1 + land2, family = poisson(), data = dat)
+#' fit <- multiScale_optim(start, inputs, backend = "profile_glm",
+#'                         n_cores = 1, verbose = FALSE)
+#'
+#' ## Expected count across each covariate, others at their means. The bands
+#' ## are 95% limits that hold the scales of effect at their estimates.
+#' curves <- plot_marginal_effects(fit, ylab = "Expected count")
+#' names(curves)
+#'
+#' ## The values behind one panel. land1 is back on its original scale, the
+#' ## kernel-weighted proportion of habitat around a point.
+#' head(curves$land1$data)
+#'
 #' \donttest{
-#' data('pts')
-#' data('count_data')
-#' hab <- terra::rast(system.file('extdata', 'hab.tif', package = 'multiScaleR'))
-#'
-#' kernel_inputs <- kernel_prep(pts = pts,
-#'                              raster_stack = hab,
-#'                              max_D = 250,
-#'                              kernel = 'gaussian')
-#'
-#' mod <- glm(y ~ hab, family = poisson, data = count_data)
-#' opt <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs)
-#'
-#' ## Default marginal effect plot on the response scale
-#' plot_marginal_effects(opt)
-#'
-#' ## Custom y-axis label
-#' plot_marginal_effects(opt, ylab = "Predicted abundance")
-#'
-#' ## Finer evaluation grid
-#' plot_marginal_effects(opt, length.out = 200)
-#'
-#' ## Add a caption stating what the confidence limits include
-#' plot_marginal_effects(opt, add_label = TRUE)
+#' ## A caption stating what the limits include, useful while exploring
+#' plot_marginal_effects(fit, ylab = "Expected count", add_label = TRUE)
 #' }
+#'
+#' ## Expected abundance from a stored N-mixture fit, with native 95%
+#' ## confidence limits
+#' nmix <- readRDS(system.file("extdata", "cache-user-guide-nmix.rds",
+#'                             package = "multiScaleR"))
+#' plot_marginal_effects(nmix, type = "state", ylab = "Expected abundance")
 #'
 #' @export
 #' @importFrom unmarked coef predict
@@ -282,8 +317,6 @@
 #' @importFrom ggplot2 ggplot aes geom_ribbon geom_line xlab ylab labs
 #' @importFrom cowplot theme_cowplot
 #' @importFrom utils globalVariables
-#' @noMd
-
 plot_marginal_effects <- function(x,
                                   ylab = "Estimated response",
                                   length.out = 100,

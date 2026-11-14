@@ -2,18 +2,31 @@
 % Please edit documentation in R/print_methods.R
 \name{print.multiScaleR_data}
 \alias{print.multiScaleR_data}
-\title{Print method for multiScaleR_data}
+\title{Print prepared multiScaleR inputs}
 \usage{
 \method{print}{multiScaleR_data}(x, ...)
 }
 \arguments{
-\item{x}{A \code{multiScaleR_data} object}
+\item{x}{A \code{multiScaleR_data} object.}
 
-\item{...}{Ignored}
+\item{...}{Ignored.}
 }
 \value{
-Invisibly returns the input \code{multiScaleR_data} object
+Invisibly returns \code{x}.
 }
 \description{
-Print method for objects of class \code{multiScaleR_data}.
+Prints a short report of a \code{\link[=kernel_prep]{kernel_prep()}} object: the number
+of points and covariates, the kernel, the binning, and the distance
+bounds.
+}
+\examples{
+data(pts)
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
+inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                      kernel = "gaussian", verbose = FALSE)
+inputs
+}
+\seealso{
+\link[=multiScaleR_data-class]{multiScaleR_data}, \code{\link[=kernel_prep]{kernel_prep()}}.
 }

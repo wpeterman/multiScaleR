@@ -2,16 +2,31 @@
 % Please edit documentation in R/data_files.R
 \name{surv_pts}
 \alias{surv_pts}
-\title{Spatial sample points}
+\title{Survey points for the vignette example}
 \format{
-An sf class point object:
-\describe{
-\item{pts}{ --> 100 spatial point locations}
+An \code{sf} point object with 100 features, no coordinate reference
+system, and coordinates in the map units of \code{landscape.tif}. Its one
+attribute column, \code{obs}, is a numeric column carried over from the
+simulation; the vignettes use \code{landscape_counts$counts} as the response.
 }
+\source{
+Simulated for this package.
 }
 \usage{
 data(surv_pts)
 }
 \description{
-Example point file for use with vignette document example
+Locations of the 100 survey points that go with \link{landscape_counts} and the
+\code{landscape.tif} raster.
+}
+\examples{
+data(surv_pts)
+land <- terra::rast(system.file("extdata", "landscape.tif",
+                                package = "multiScaleR"))
+terra::plot(land$land1)
+terra::points(terra::vect(surv_pts), pch = 19)
+}
+\seealso{
+\link{landscape_counts}, \link{landscape},
+\code{vignette("v01-quickstart", package = "multiScaleR")}.
 }

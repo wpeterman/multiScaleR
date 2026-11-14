@@ -2,35 +2,101 @@
 % Please edit documentation in R/gdr_response_field_covariance.R
 \name{vcov,unmarkedFitGDRField-method}
 \alias{vcov,unmarkedFitGDRField-method}
-\title{Covariance for Native GDR Response Fields}
+\title{Covariance Matrix for a Distance-Removal Model with a Fixed-Range Field}
 \usage{
 \S4method{vcov}{unmarkedFitGDRField}(object, type, altNames = TRUE, method = "hessian", fixedOnly = TRUE, ...)
 }
 \arguments{
-\item{object}{A fitted \link[=unmarkedFitGDRField-class]{unmarkedFitGDRField}.}
+\item{object}{An \link[=unmarkedFitGDRField-class]{unmarkedFitGDRField} returned
+by \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}.}
 
-\item{type}{Optional active component. If omitted, return all regression
-components in native \code{coef()} order.}
+\item{type}{Optional character naming one component: \code{"lambda"}
+(abundance), \code{"dist"} (distance) or \code{"rem"} (removal). If omitted, all
+components are returned together, in the order of \code{coef(object)}.}
 
-\item{altNames}{Logical; default \code{TRUE} uses native component-prefixed names.}
+\item{altNames}{Logical, default \code{TRUE}. \code{TRUE} labels rows and columns
+with component prefixes, such as \code{lambda(Int)}, as \code{coef()} does.}
 
-\item{method}{Native interface control. Only \code{"hessian"} is qualified;
-bootstrap covariance requires a separately validated field bootstrap.}
+\item{method}{Character. Only \code{"hessian"}, the default, is available. It
+returns the covariance computed from the curvature of the likelihood
+during fitting. Bootstrap covariance is not available for this model.}
 
-\item{fixedOnly}{Logical; default \code{TRUE} returns regression covariance.
-\code{FALSE} also includes physical random-field/observer coefficients.}
+\item{fixedOnly}{Logical, default \code{TRUE}. \code{TRUE} returns the fixed
+regression coefficients only. \code{FALSE} adds the field value of every block
+(labeled \code{lambda(b_lambda)}) and any observer intercepts in the distance
+component.}
 
-\item{...}{Reserved controls. Unrecognized arguments stop.}
+\item{...}{Not used. Unrecognized arguments stop the call.}
 }
 \value{
-A named covariance matrix aligned with \code{coef(object, ...)}. Physical
-abundance states use their original Gaussian SD and fixed correlation.
-Full fixed/latent cross-terms are retained. This covariance holds ecological
-scales and correlation range fixed and adds no observation noise.
+A square numeric matrix with row and column names matching
+\code{coef(object, type, altNames = altNames, fixedOnly = fixedOnly)}. Entries
+are on the link scale of each coefficient: log for abundance and
+distance, logit for removal. Block field values are physical deviations
+on the log density scale, not TMB's internal whitened values. The square
+roots of the diagonal are the standard errors.
 }
 \description{
-Return retained joint covariance on the same physical coefficient scales as
-\code{coef()}, without rerunning a TMB tape. Cross-component and fixed/field
-covariance are retained. Native log-SD parameters remain in the diagnostic
-packet and parameter penalty, rather than being added to regression output.
+Return the covariance matrix of the coefficients of a model fitted by
+\code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}. The matrix is retained from the fit, so this
+method does not rerun TMB. It matches \code{coef()} on the link scale and keeps
+the covariances between components and between the fixed coefficients and
+the field values.
+}
+\details{
+The log SDs of the random effects are estimated parameters, but they are
+not rows of this matrix. Use \code{unmarked::sigma(object)} to see the field SD
+with its confidence limits.
+
+The matrix treats the ecological scales of effect and the correlation
+range as known, and it contains no observation noise. \code{confint()} uses it
+for normal (Wald) intervals, and
+\link[=predict,unmarkedFitGDRField-method]{predict()} uses it for standard
+errors.
+}
+\examples{
+\donttest{
+# The field needs unmarked 1.5.2 and TMB 1.9.25.
+if (requireNamespace("TMB", quietly = TRUE) &&
+    utils::packageVersion("unmarked") == "1.5.2" &&
+    utils::packageVersion("TMB") == "1.9.25") {
+  # Eight survey blocks 1 km apart, six point counts in each
+  block <- factor(rep(paste0("b", 1:8), each = 6))
+  hab <- rep(seq(-1, 1, length.out = 6), 8)
+  shift <- c(-0.4, -0.3, -0.1, 0, 0.1, 0.2, 0.35, 0.4)[block]
+  sim <- sim_dat_gdr(density = exp(log(400) + 0.5 * hab + shift),
+    distance_scale = 40, removal = 0.2, dist_breaks = c(0, 25, 50, 75),
+    interval_lengths = c(2, 3, 5), interval_units = "minutes",
+    site_covs = data.frame(hab = hab, block = block), seed = 1)
+  template <- unmarked::gdistremoval(lambdaformula = ~ hab + (1 | block),
+    removalformula = ~ 1, distanceformula = ~ 1, data = sim$observed,
+    keyfun = "halfnorm", mixture = "P", output = "density",
+    unitsOut = "kmsq", K = 60, engine = "TMB",
+    starts = c(log(400), 0, log(40), qlogis(0.2), log(0.3)))
+  block_xy <- cbind(x = 500000 + 1000 * (as.integer(block) - 1),
+                    y = 4400000)
+  rownames(block_xy) <- rownames(unmarked::siteCovs(sim$observed))
+  cold <- c("beta_lambda[1]" = log(300), "beta_lambda[2]" = 0,
+            "beta_dist[1]" = log(30), "beta_rem[1]" = qlogis(0.4),
+            "lsigma_lambda[1]" = log(0.5))
+  settings <- list(method = "BFGS", se = TRUE, threads = 1L,
+                   control = list(maxit = 2500L, reltol = 1e-10))
+  field_fit <- fit_gdr_response_field(template, block_xy, crs = 32617,
+    range = 2000, cold_starts = list(cold = cold),
+    audit_dir = tempfile("gdr-field-"), tmb_settings = settings)
+
+  # Abundance coefficients: covariance and standard errors (log scale)
+  V <- vcov(field_fit, type = "lambda")
+  print(V)
+  print(sqrt(diag(V)))
+  # All components together: abundance, distance, then removal
+  print(round(vcov(field_fit), 4))
+  # Adding the eight block field values gives a 10 x 10 matrix
+  print(dim(vcov(field_fit, type = "lambda", fixedOnly = FALSE)))
+}
+}
+}
+\seealso{
+\code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}, \link[=unmarkedFitGDRField-class]{unmarkedFitGDRField},
+\link{predict,unmarkedFitGDRField-method}
 }

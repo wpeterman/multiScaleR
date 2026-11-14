@@ -46,6 +46,7 @@ test_that("shared scales, annual cells and fixed trends retain their formula mea
 })
 
 test_that("the joint marginal objective retains only the required random densities", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- bayesian_scale_fixture(n_site = 4, n_year = 3, kernel = kernel)
@@ -90,6 +91,7 @@ test_that("the joint marginal objective retains only the required random densiti
 })
 
 test_that("Gaussian response-effect integration matches the analytic likelihood", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
   s <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp + (1 | site),
@@ -122,6 +124,7 @@ test_that("Gaussian response-effect integration matches the analytic likelihood"
 })
 
 test_that("annual integration has the right zero-SD limit and a quadrature reference", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
   s <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp, f$inputs, f$data,
@@ -153,6 +156,7 @@ test_that("annual integration has the right zero-SD limit and a quadrature refer
 })
 
 test_that("independent conditional refinement verifies a unique Gaussian mode", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 10, n_year = 4)
   s <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp + (1 | site),
@@ -174,6 +178,7 @@ test_that("independent conditional refinement verifies a unique Gaussian mode", 
 })
 
 test_that("the private fitter recovers a positive year SD with shared site effects", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 20, n_year = 5, seed = 8321)
   response <- count ~ habitat + temp + (1 | site)
@@ -215,6 +220,7 @@ test_that("the private fitter recovers a positive year SD with shared site effec
 })
 
 test_that("the private fitter retains zero-SD fits without claiming calibrated intervals", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 12, n_year = 4, annual = FALSE)
   f$data$temp <- rep(seq(-1, 1, length.out = 12), 4)

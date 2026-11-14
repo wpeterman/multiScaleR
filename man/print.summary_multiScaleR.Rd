@@ -2,22 +2,41 @@
 % Please edit documentation in R/print_methods.R
 \name{print.summary_multiScaleR}
 \alias{print.summary_multiScaleR}
-\title{Print method for summary_multiScaleR}
+\title{Print a summary of a multiScaleR fit}
 \usage{
 \method{print}{summary_multiScaleR}(x, dimension = NULL, ...)
 }
 \arguments{
-\item{x}{A \code{summary_multiScaleR} object}
+\item{x}{A \code{summary_multiScaleR} object from \code{\link[=summary.multiScaleR]{summary.multiScaleR()}}.}
 
-\item{dimension}{Character. \code{"2d"} or \code{"1d"}. Selects which
-distance table is printed first. By default, use the definition stored in
-\code{x}; summaries saved before this switch existed retain 1D reporting.}
+\item{dimension}{Character, \code{"2d"} or \code{"1d"}. Selects which distance table
+is printed first. The default, \code{NULL}, uses the definition stored in \code{x};
+summaries saved before this choice existed print the 1D table first.}
 
-\item{...}{Ignored}
+\item{...}{Ignored.}
 }
 \value{
-Invisibly returns the input \code{summary_multiScaleR} object
+Invisibly returns \code{x}.
 }
 \description{
-Print method for objects of class \code{summary_multiScaleR}.
+Prints the object returned by \code{\link[=summary.multiScaleR]{summary.multiScaleR()}}: the
+estimated scales with their intervals, the scale distances under both
+definitions, the fitted model, any warnings, and the follow-up
+recommendation.
+}
+\examples{
+data(pts)
+data(count_data)
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
+inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                      kernel = "gaussian", verbose = FALSE)
+fit <- multiScale_optim(glm(y ~ hab, family = poisson, data = count_data),
+                        inputs, verbose = FALSE)
+s <- summary(fit)
+print(s, dimension = "1d")   # line-based distances first
+}
+\seealso{
+\code{\link[=summary.multiScaleR]{summary.multiScaleR()}}, \code{\link[=kernel_dist]{kernel_dist()}} for the two distance
+definitions.
 }

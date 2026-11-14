@@ -333,149 +333,192 @@
 
 # AIC table ---------------------------------------------------------------
 #' @author Bill Peterman
-#' @title multiScaleR model selection
+#' @title Rank models by AIC or AICc
 #'
-#' @description Creates a model selection table ranked by AIC or AICc for a
-#' list of fitted models. Mixed lists containing both \code{multiScaleR}
-#' objects and plain model objects (e.g., \code{glm}) are supported, allowing
-#' comparison of scale-optimized models against fixed-scale alternatives.
+#' @description Build a model-selection table ranked by AICc (the default) or
+#' AIC for a list of fitted models. Each estimated scale of effect (sigma), and
+#' each estimated kernel shape, counts as a parameter, so a scale-optimized
+#' model competes fairly with fixed-scale or non-spatial alternatives in the
+#' same list. Lists can mix `multiScaleR` objects with plain fitted models
+#' such as `glm` objects.
 #'
-#' @param mod_list List containing fitted \code{multiScaleR} objects (from
-#'   \code{\link{multiScale_optim}}) and/or plain fitted model objects (e.g.,
-#'   \code{glm}, \code{lm}). All models must have been fit to the same set of
-#'   observations; an error is raised if sample sizes differ.
-#' @param AICc Logical. If \code{TRUE} (default), the second-order corrected
-#'   AIC (AICc) is used. Set to \code{FALSE} for standard AIC. AICc is
-#'   recommended when the ratio of observations to parameters is small
-#'   (n / K < 40 is a common rule of thumb).
-#' @param mod_names Optional character vector of model names. Length must equal
-#'   \code{length(mod_list)}. By default, names are constructed as
-#'   \code{[kernel=...; family=...]right-hand-side-formula} for \code{multiScaleR} objects.
-#' @param verbose Logical. If \code{TRUE}, the table is also printed to the
-#'   console. Default: \code{FALSE}.
-#' @param ... Additional arguments (not used).
+#' `vignette("v02-user-guide", package = "multiScaleR")` compares kernels and
+#' model structures with these tables, including an N-mixture model.
 #'
-#' @return A data frame of class \code{"aictab"} (from the \code{AICcmodavg}
-#' package) sorted by ascending AIC(c), containing:
-#' \describe{
-#'   \item{\code{Modnames}}{Model name (from \code{mod_names} or auto-generated).}
-#'   \item{\code{K}}{Number of fitted likelihood parameters, including
-#'     ancillary parameters such as negative-binomial dispersion (or native
-#'     effective degrees of freedom for GAMs), plus optimized
-#'     scale and shape parameters for \code{multiScaleR} models.}
-#'   \item{\code{AICc} or \code{AIC}}{Information criterion value.}
-#'   \item{\code{Delta_AICc} or \code{Delta_AIC}}{Difference from the top model.}
-#'   \item{\code{ModelLik}}{Relative likelihood (\code{exp(-0.5 * Delta)}).}
-#'   \item{\code{AICcWt} or \code{AICWt}}{Akaike weight.}
-#'   \item{\code{LL}}{Log-likelihood.}
-#'   \item{\code{Cum.Wt}}{Cumulative Akaike weight.}
-#' }
+#' @param mod_list A list of fitted models: `multiScaleR` objects from
+#'   [multiScale_optim()], plain fitted models (for example `glm` or `lm`), or
+#'   both. Every model must be fitted to the same observations with a
+#'   comparable likelihood (see "Check that models are comparable"). Bayesian
+#'   fits, cross-validation results, and private spatial prototypes are
+#'   rejected.
+#' @param AICc Logical. If `TRUE` (the default), rank by the second-order
+#'   corrected AIC (AICc). Set `FALSE` for standard AIC. AICc is recommended
+#'   when the number of observations is small relative to the number of
+#'   parameters (n / K < 40 is a common rule of thumb). AICc requires
+#'   n > K + 1 for every model and raises an error otherwise. Use
+#'   `AICc = FALSE` in that case.
+#' @param mod_names Optional character vector of model names, one per model
+#'   in `mod_list`. By default, `multiScaleR` objects are labeled
+#'   `[kernel=...; family=...]` followed by the right-hand side of the model
+#'   formula. `unmarked` labels name the model class and, where present, the
+#'   mixture, so Poisson, negative binomial, and ZIP alternatives get distinct
+#'   labels.
+#' @param verbose Logical. If `TRUE`, the table is also printed to the
+#'   console. Default `FALSE`.
+#' @param ... Not used.
+#'
+#' @return A data frame of class `"aictab"` (from the AICcmodavg package),
+#' sorted from the best (smallest) criterion value, with one row per model:
+#' * `Modnames`: model name, from `mod_names` or the default label.
+#' * `K`: number of estimated parameters. It counts the fitted likelihood
+#'   parameters, including ancillary ones such as negative binomial
+#'   dispersion (or native effective degrees of freedom for GAMs), plus each
+#'   estimated scale and shape of a `multiScaleR` model.
+#' * `AICc` or `AIC`: the information criterion. Smaller is better.
+#' * `Delta_AICc` or `Delta_AIC`: difference from the best model. Models
+#'   within about 2 units of the best are generally considered to have
+#'   comparable support.
+#' * `ModelLik`: relative likelihood of the model, `exp(-0.5 * Delta)`.
+#' * `AICcWt` or `AICWt`: Akaike weight, the relative support for each model
+#'   within this set. Weights sum to 1.
+#' * `LL`: maximized log-likelihood.
+#' * `Cum.Wt`: cumulative Akaike weight.
+#'
+#' When a likelihood was adjusted (see "Count parameters"), the table carries
+#' a `likelihood_adjustments` attribute.
 #'
 #' @export
 #'
 #' @details
-#' Native unmarked labels retain their model class and, where present, mixture
-#' code, so Poisson, NB and ZIP alternatives have distinct default labels. This
-#' does not substitute a GLM family or change any fitted parameter penalty.
+#' # Count parameters
 #'
-#' GDR comparisons check both distance and removal histories and their stored
-#' survey protocol, including primary layout, distance bins/units and removal
-#' durations. Equal paired totals are insufficient. Equivalent meter/kilometer
-#' distance geometry is converted to meters in the comparison copy; fitted
-#' objects and native units are unchanged. Harmonize time units and event
-#' definitions before comparison; a native frame does not store
-#' a removal-time unit label. Mixture and distance-key alternatives may share
-#' the same observed target. Check integration-cutoff sensitivity separately.
+#' For a `multiScaleR` object, the log-likelihood and parameter count come
+#' from the refit model in `opt_mod`, and each estimated sigma (and shape, for
+#' `kernel = "expow"`) is added to `K`. The AIC printed by the native model in
+#' `opt_mod` leaves those parameters out. Hard-radius metrics in an `"expow"`
+#' model add their estimated radius but no shape, and fixed-radius metrics add
+#' neither. Plain models in the list get no sigma. Otherwise the native
+#' log-likelihood degrees of freedom are used when available, so negative
+#' binomial dispersion counts as one parameter. Missing or inconsistent
+#' parameter metadata and non-finite log-likelihoods raise an error rather
+#' than guessing from predictor names.
 #'
-#' Native GDR models with active formula offsets or TMB zero inflation are
-#' rejected before fitting, model selection or prediction. In the audited
-#' unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
-#' TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
-#' require separate provider qualification; multiScaleR does not remove offsets,
-#' switch engines, alter parameter counts or substitute uncertainty estimates.
-#' Offset-free C ZIP models retain their native likelihood and parameter count.
+#' * **`unmarked` models.** The native AIC and log-likelihood determine the
+#'   count. It includes every abundance or occupancy coefficient, every
+#'   detection coefficient, factor contrasts, mixture parameters, and
+#'   estimated random-effect standard deviations. Optimizer and TMB
+#'   free-parameter metadata are checked for agreement when present. Latent
+#'   abundances and realized random effects add nothing. For example, four
+#'   abundance coefficients, three detection coefficients, and one
+#'   random-effect standard deviation give eight native parameters, or nine
+#'   with one estimated Gaussian scale. A table of fixed coefficients can
+#'   therefore show fewer parameters than the fitted count.
+#' * **The `K` argument of `unmarked::pcount()`** is an upper bound for the
+#'   abundance sum in the likelihood, not a parameter count. Check that the
+#'   log-likelihood does not change when you refit with a larger bound.
+#' * **spaMM `HLfit` models.** `spaMM::DoF()` supplies the full count,
+#'   including estimated residual, covariance, and correlation parameters.
+#'   Realized random effects are not counted. The native default
+#'   log-likelihood target is kept (`p_v` for ordinary maximum likelihood,
+#'   `p_bv` for REML), so absolute REML criteria can differ from spaMM's
+#'   marginal AIC, which uses `p_v`.
+#' * **mgcv negative binomial BAMs.** The table checks the native fit against
+#'   the normalized count likelihood. A retained outer scale flag can
+#'   otherwise add one to both the reported log-likelihood and the parameter
+#'   count, even though the family scale is one. Verified fits use the
+#'   normalized likelihood and native effective degrees of freedom plus an
+#'   estimated theta, with no extra scale parameter. A fixed theta adds no
+#'   parameter. The `likelihood_adjustments` attribute records the native and
+#'   used likelihoods and regression-model counts for the affected models,
+#'   before the scale and shape parameters are added. With large case
+#'   weights, verification checks the native AIC arithmetic and a rescaled
+#'   response-density comparison at the original tolerance, and records that
+#'   method. Reported likelihoods keep the original weights. Unknown
+#'   inconsistencies raise an error, and fitted coefficients, covariance, and
+#'   diagnostics are unchanged.
 #'
-#' The table is constructed using \code{\link[AICcmodavg]{aictabCustom}} from
-#' the \code{AICcmodavg} package. For \code{multiScaleR} objects, the optimized
-#' (refitted) model stored in \code{opt_mod} is used for log-likelihood and
-#' parameter count. The sigma parameter (and shape for \code{"expow"}) is added
-#' to K automatically. Private spatial prototypes are rejected because they
-#' have no qualified maximized marginal likelihood; conditional response
-#' densities and posterior objectives are not substitutes.
-#' For plain model objects in a mixed list, sigma is not
-#' added to K. The fitted model's log-likelihood degrees of freedom are used
-#' when available, so negative-binomial dispersion contributes one parameter.
-#' A native mgcv negative-binomial BAM is checked against the normalized count
-#' likelihood. A retained outer scale flag can otherwise add one to both
-#' the reported log-likelihood and parameter count, even though its family
-#' scale is one. Verified occurrences use the normalized likelihood and
-#' native effective degrees of freedom plus estimated theta, with no extra
-#' scale parameter. Fixed theta adds no parameter. The table's
-#' \code{likelihood_adjustments} attribute records native and used likelihoods
-#' and regression-model counts for affected input positions, before adding
-#' ecological scale or shape parameters to the table's K. Unknown inconsistencies raise an
-#' error. For large case weights, verification checks native AIC arithmetic and
-#' a rescaled response-density comparison at the original tolerance. Reported
-#' likelihoods retain the original weights; counts and fitted objects are unchanged.
-#' An adjustment verified this way records its verification method.
-#' Fitted coefficients, covariance and diagnostics remain unchanged.
-#' For \code{unmarkedFit} models, native AIC and log-likelihood metadata
-#' determine the count, including detection coefficients, factor contrasts,
-#' mixture parameters, and estimated random-effect variances. Optimizer and
-#' TMB free-parameter metadata are checked for agreement when present. Latent
-#' random effects and the integration limit \code{K} are not counted. A displayed
-#' fixed-coefficient count can therefore be smaller than the fitted count.
-#' Mixed \code{unmarked::pcount} models retain their native marginal likelihood.
-#' Comparisons recover actually used visits from the stored component formulas,
-#' including formula-specific missing observations and omitted sites. Equal raw
-#' count matrices and site totals alone do not establish comparability. Missing
-#' or inconsistent used-response metadata raises an error without raw-data fallback.
-#' Native site counts and original response-row identities are retained when
-#' no site covariates are supplied, including null and detection-only models.
-#' AICc and BIC use retained site rows, not visits or random-effect realizations.
-#' With repeated groups spanning rows, this convention does not establish a
-#' universally valid small-sample correction or effective independent sample size.
-#' Check native fit diagnostics and stability to the \code{pcount} integration
-#' limit; finite criteria and optimizer code zero do not certify fit quality.
-#' Missing or inconsistent parameter metadata and non-finite log-likelihoods
-#' raise an error instead of guessing from predictor names.
-#' Hard-radius metrics in native expow mixtures contribute their estimated
-#' radius but no inapplicable shape parameter. Fixed-radius metrics contribute
-#' neither an estimated radius nor shape.
+#' # Check that models are comparable
 #'
-#' When native metadata can be recovered, comparison also checks used row IDs,
+#' Information criteria compare models only when they describe the same
+#' observations with comparable likelihoods. The table checks the number of
+#' observations and, when native metadata can be recovered, the used row IDs,
 #' response values, binomial trials, likelihood weights, and the likelihood's
-#' response measure. Binomial counts and proportions with their trial weights
-#' are compared on the same count representation. Logical \code{FALSE}/\code{TRUE}
-#' binomial outcomes, including success/failure columns, compare as zero/one
-#' values when trial totals and likelihood weights agree. Original fitted
-#' responses, covariance and parameter counts are retained. Zero-weight GLM rows and
-#' removed unmarked sites are excluded from the used-observation count.
-#' For Cox and conditional-logistic fits, AICc and BIC use the event count
-#' reported by native \code{logLik} metadata. Each supported one-used-step
-#' choice set contributes one event. All alternative rows are still checked
-#' for comparability. This follows the native survival BIC convention; it does
-#' not adjust for dependence among steps or animals or establish AICc validity
-#' for a particular sampling design. Missing event-count metadata raises an error.
-#' For spaMM \code{HLfit} models, \code{spaMM::DoF()} supplies the full
-#' parameter count, including estimated residual, covariance and correlation
-#' parameters. Realized random effects are not counted as parameters. The native
-#' default log-likelihood target is retained (\code{p_v} for ordinary ML,
-#' \code{p_bv} for REML); absolute REML criteria can therefore differ from
-#' spaMM's marginal AIC, which uses \code{p_v}. The same-design restriction
-#' below applies to those restricted-likelihood comparisons.
+#' response measure. Zero-weight GLM rows and removed `unmarked` sites are
+#' excluded from the used observations. Binomial counts and proportions with
+#' their trial weights are compared on the same count scale, and logical
+#' `FALSE`/`TRUE` outcomes, including success and failure columns, compare as
+#' 0 and 1 when trial totals and weights agree. Fitted responses, covariance,
+#' and parameter counts are not changed.
 #'
-#' ML and REML fits cannot be mixed; REML comparisons require the same
-#' recoverable fixed-effect design. Cox partial-likelihood comparisons require
-#' matching methods and equivalent stratum partitions. These checks cannot
-#' certify metadata unavailable from a native provider, and the user must
-#' still establish scientific comparability of the likelihoods.
+#' * **N-mixture models.** Mixed `unmarked::pcount()` models keep their
+#'   native marginal likelihood. Two models can share sites and the original
+#'   count matrix yet use different visits when a detection covariate has
+#'   missing values. The table recovers the visits each model used from its
+#'   component formulas, including formula-specific missing observations and
+#'   omitted sites, and stops when they differ. Equal count matrices and site
+#'   totals alone do not establish comparability, and missing or inconsistent
+#'   used-response metadata raises an error without falling back on raw
+#'   data. Null abundance models and detection-only models without site
+#'   covariates keep the native site count and their original response-row
+#'   identities.
+#' * **Distance-removal models.** `gdistremoval()` comparisons check both
+#'   distance and removal histories and their stored survey protocol,
+#'   including the primary-period layout, distance bins and units, and
+#'   removal durations. Equal paired totals are not enough. Distances in
+#'   meters and kilometers are converted to meters in the comparison copy,
+#'   and the fitted objects keep their native units. Harmonize time units and
+#'   event definitions before comparing, because a native frame does not
+#'   store a removal-time unit. Mixture and distance-key alternatives may
+#'   share the same observed target. Check sensitivity to the integration
+#'   cutoff separately.
+#' * **Maximum likelihood and REML.** ML and REML fits cannot be mixed, and
+#'   REML comparisons require the same recoverable fixed-effect design.
+#' * **Cox and conditional logistic models.** Partial-likelihood comparisons
+#'   require matching methods and equivalent stratum partitions.
 #'
-#' Bayesian posterior fits are rejected. A posterior mode or penalized target
-#' is not a maximized sampling likelihood for AIC or BIC. Posterior predictive
-#' comparison requires a separate workflow with its own target and diagnostics.
-#' AICc tables raise an error if any model has \code{n <= K + 1}; use
-#' \code{AICc = FALSE} for an AIC table in that case.
+#' These checks cannot certify metadata that a native provider does not
+#' store. You still need to establish that the likelihoods are
+#' scientifically comparable.
+#'
+#' # Sample size for AICc and BIC
+#'
+#' * **`unmarked` models.** AICc and BIC use the retained site rows, not visits or
+#'   random-effect realizations. When groups repeat across rows, this
+#'   convention does not establish a valid small-sample correction or an
+#'   effective independent sample size.
+#' * **Cox and conditional logistic models.** AICc and BIC use the event count from
+#'   the native log-likelihood metadata, so each supported choice set with
+#'   one used step contributes one event, while every alternative row is
+#'   still checked for comparability. This follows the native survival
+#'   BIC convention. It does not adjust for dependence among steps or animals
+#'   or establish that AICc is valid for a particular sampling design. Missing
+#'   event-count metadata raises an error.
+#'
+#' A finite criterion and an optimizer code of zero do not establish
+#' convergence, identifiability, or interval calibration. Read the native
+#' fit diagnostics, including the gradient and curvature when available.
+#'
+#' # Models the table rejects
+#'
+#' * **Bayesian fits** from [multiScale_bayes()]. A posterior mode or
+#'   penalized target is not a maximized sampling likelihood for AIC or BIC.
+#'   Posterior predictive comparison needs a separate workflow with its own
+#'   target and diagnostics.
+#' * **Cross-validation results**, which hold held-out scores rather than a
+#'   maximized likelihood. Use [cv_tab()] or [select_cv()].
+#' * **Private spatial prototypes**, which have no qualified maximized
+#'   marginal likelihood. Conditional response densities and posterior
+#'   objectives are not substitutes.
+#' * **`gdistremoval()` models with active formula offsets or TMB zero
+#'   inflation.** These are rejected before fitting, model selection, or
+#'   prediction. In the audited `unmarked` 1.5.2 provider, offsets did not
+#'   enter the fitted likelihood, and the TMB ZIP likelihood ignored its
+#'   zero-inflation parameter. These combinations need separate provider
+#'   qualification. multiScaleR does not remove offsets, switch engines,
+#'   alter parameter counts, or substitute uncertainty estimates. Offset-free
+#'   C-engine ZIP models keep their native likelihood and parameter count.
+#'
+#' The table itself is built with [AICcmodavg::aictabCustom()].
 #'
 #' @usage
 #' aic_tab(mod_list,
@@ -486,6 +529,10 @@
 #' @rdname aic_tab
 #' @importFrom insight find_formula get_loglikelihood get_parameters n_obs
 #' @importFrom AICcmodavg aictabCustom bictabCustom
+#'
+#' @seealso [bic_tab()], [multiScale_optim()], [cv_tab()] for comparisons by
+#'   held-out prediction, and
+#'   `vignette("v08-cross-validation", package = "multiScaleR")`.
 #'
 #' @examples
 #' ## Bundled counts simulated with a habitat scale of 75 map units
@@ -500,9 +547,16 @@
 #'                                   n_cores = 1, verbose = FALSE)
 #' models <- list(spatial = spatial_model, fixed = fixed_model, null = null_model)
 #'
-#' ## The spatial model pays for one extra estimated sigma parameter.
+#' ## The fixed model already uses the true 75-unit scale, so the spatial model
+#' ## reaches the same log-likelihood and pays for one extra parameter (sigma).
 #' aic_tab(models, AICc = FALSE, mod_names = names(models))
 #' aic_tab(models, AICc = TRUE, mod_names = names(models))
+#'
+#' ## K for a stored N-mixture fit: three abundance coefficients, one
+#' ## detection coefficient, and two estimated scales
+#' nmix <- readRDS(system.file("extdata", "cache-user-guide-nmix.rds",
+#'                             package = "multiScaleR"))
+#' aic_tab(list(nmix), mod_names = "bin1 + cont2")
 aic_tab <- function(mod_list,
                     AICc = TRUE,
                     mod_names = NULL,
@@ -574,68 +628,62 @@ aic_tab <- function(mod_list,
 
 # BIC table ---------------------------------------------------------------
 #' @author Bill Peterman
-#' @title multiScaleR model selection
+#' @title Rank models by BIC
 #'
-#' @description Creates a model selection table ranked by BIC for a list of
-#' fitted models. Mixed lists containing both \code{multiScaleR} objects and
-#' plain model objects are supported.
+#' @description Build a model-selection table ranked by BIC (the Bayesian
+#' information criterion) for a list of fitted models. As in [aic_tab()], each
+#' estimated scale of effect (sigma) and kernel shape counts as a parameter,
+#' and lists can mix `multiScaleR` objects with plain fitted models.
 #'
-#' @param mod_list List containing fitted \code{multiScaleR} objects (from
-#'   \code{\link{multiScale_optim}}) and/or plain fitted model objects. All
-#'   models must have been fit to the same observations and comparable
-#'   likelihoods, including matching responses, weights, and likelihood measure.
-#' @param mod_names Optional character vector of model names. Length must equal
-#'   \code{length(mod_list)}. By default, names are constructed as
-#'   \code{[kernel=...; family=...]right-hand-side-formula} for \code{multiScaleR} objects.
-#' @param verbose Logical. If \code{TRUE}, the table is also printed to the
-#'   console. Default: \code{FALSE}.
-#' @param ... Additional arguments (not used).
+#' @param mod_list A list of fitted models: `multiScaleR` objects from
+#'   [multiScale_optim()], plain fitted models, or both. Every model must be
+#'   fitted to the same observations with a comparable likelihood, including
+#'   matching responses, weights, and likelihood measure. Bayesian fits,
+#'   cross-validation results, and private spatial prototypes are rejected.
+#' @param mod_names Optional character vector of model names, one per model
+#'   in `mod_list`. By default, `multiScaleR` objects are labeled
+#'   `[kernel=...; family=...]` followed by the right-hand side of the model
+#'   formula.
+#' @param verbose Logical. If `TRUE`, the table is also printed to the
+#'   console. Default `FALSE`.
+#' @param ... Not used.
 #'
-#' @return A data frame of class \code{"bictab"} (from the \code{AICcmodavg}
-#' package) sorted by ascending BIC, containing:
-#' \describe{
-#'   \item{\code{Modnames}}{Model name.}
-#'   \item{\code{K}}{Number of fitted likelihood parameters, including
-#'     ancillary parameters such as negative-binomial dispersion (or native
-#'     effective degrees of freedom for GAMs), plus optimized
-#'     scale and shape parameters for \code{multiScaleR} models.}
-#'   \item{\code{BIC}}{Bayesian information criterion value.}
-#'   \item{\code{Delta_BIC}}{Difference from the top model.}
-#'   \item{\code{BICWt}}{BIC weight.}
-#'   \item{\code{Cum.Wt}}{Cumulative BIC weight.}
-#'   \item{\code{LL}}{Log-likelihood.}
-#' }
+#' @return A data frame of class `"bictab"` (from the AICcmodavg package),
+#' sorted from the best (smallest) BIC, with one row per model:
+#' * `Modnames`: model name.
+#' * `K`: number of estimated parameters, counted as in [aic_tab()]: the
+#'   fitted likelihood parameters (including ancillary ones such as negative
+#'   binomial dispersion, or native effective degrees of freedom for GAMs)
+#'   plus each estimated scale and shape of a `multiScaleR` model.
+#' * `BIC`: the Bayesian information criterion. Smaller is better.
+#' * `Delta_BIC`: difference from the best model.
+#' * `BICWt`: BIC weight, the relative support for each model within this
+#'   set. Weights sum to 1.
+#' * `Cum.Wt`: cumulative BIC weight.
+#' * `LL`: maximized log-likelihood.
+#'
+#' A `likelihood_adjustments` attribute is added when a likelihood was
+#' adjusted, as described in [aic_tab()].
 #'
 #' @details
-#' The table is constructed using \code{\link[AICcmodavg]{bictabCustom}} from
-#' the \code{AICcmodavg} package. BIC penalizes model complexity more heavily
-#' than AIC as sample size grows, and is often preferred when the goal is
-#' identifying the single best-supported model rather than model averaging.
-#' Sigma (and shape for \code{"expow"}) is counted in K.
-#' The GDR offset and TMB ZIP restrictions in \code{\link{aic_tab}} also apply.
-#' Fitted parameter counts and log-likelihood validation follow
-#' \code{\link{aic_tab}}, including all estimated components of unmarked models.
-#' The same checked negative-binomial BAM adjustment and
-#' \code{likelihood_adjustments} attribute apply. This retains estimated theta
-#' while excluding a nonexistent extra scale parameter.
-#' spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
-#' components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
-#' for its restricted-likelihood interpretation. Mixed \code{unmarked::pcount}
-#' models use the same actual-visit checks and retained-site-row convention
-#' described there, including frames with no site covariates. Repeated-group
-#' sampling assumptions still need justification.
+#' BIC penalizes each parameter by the log of the sample size rather than by
+#' 2, so it penalizes complexity more heavily than AIC once there are more
+#' than about 7 observations. It is often preferred when the goal is the
+#' single best-supported model rather than model averaging.
 #'
-#' The same recoverable response, row, weight, ML/REML, and partial-likelihood
-#' checks apply. Logical and numeric binomial outcomes use the same checked
-#' zero/one comparison described in \code{\link{aic_tab}}. Inapplicable
-#' hard-radius shape positions are excluded.
-#' Bayesian posterior fits are rejected; the name BIC does not make a posterior
-#' target a sampling likelihood.
-#' Private spatial prototypes are also rejected; conditional response densities
-#' do not supply a maximized marginal likelihood.
-#' Cox and conditional-logistic penalties use the native likelihood event
-#' count, keeping all alternative rows for comparison checks. See
-#' \code{\link{aic_tab}} for the sampling-design qualification.
+#' Every rule in [aic_tab()] applies here: the parameter count (including all
+#' estimated components of `unmarked` models, spaMM degrees of freedom, and
+#' the checked negative binomial BAM adjustment), the comparability checks
+#' (responses, rows, weights, binomial outcomes, ML and REML, partial
+#' likelihoods, used `pcount()` visits, and distance-removal protocols), the
+#' sample-size conventions (retained site rows for `unmarked` models and
+#' native event counts for Cox and conditional logistic models), and the
+#' rejected models. Inapplicable hard-radius shape positions are excluded
+#' from `K`. Calling the criterion BIC does not make a posterior target a
+#' sampling likelihood, so Bayesian fits are rejected here too.
+#'
+#' The table itself is built with [AICcmodavg::bictabCustom()].
+#'
 #' @export
 #'
 #' @usage
@@ -645,62 +693,24 @@ aic_tab <- function(mod_list,
 #'         ...)
 #' @rdname bic_tab
 #'
+#' @seealso [aic_tab()], [multiScale_optim()], and
+#'   `vignette("v02-user-guide", package = "multiScaleR")`.
+#'
 #' @examples
-#' ## Simulate data
-#' set.seed(555)
+#' ## Bundled counts simulated with a habitat scale of 75 map units
+#' data("pts")
+#' data("count_data")
+#' hab <- terra::rast(system.file("extdata", "hab.tif", package = "multiScaleR"))
+#' prepared <- kernel_prep(pts, hab, max_D = 300, sigma = 75, verbose = FALSE)
+#' dat <- data.frame(y = count_data$y, prepared$kernel_dat)
+#' fixed_model <- glm(y ~ hab, family = poisson(), data = dat)
+#' null_model <- glm(y ~ 1, family = poisson(), data = dat)
+#' spatial_model <- multiScale_optim(fixed_model, prepared, par = 75 / 300,
+#'                                   n_cores = 1, verbose = FALSE)
 #'
-#' points <- vect(cbind(c(5,7,9,11,13),
-#'                      c(13,11,9,7,5)))
-#'
-#' mat_list <- list(r1 = rast(matrix(rnorm(20^2),
-#'                                   nrow = 20)),
-#'                  r2 = rast(matrix(rnorm(20^2),
-#'                                   nrow = 20)))
-#' rast_stack <- rast(mat_list)
-#' kernel_inputs <- kernel_prep(pts = points,
-#'                              raster_stack = rast_stack,
-#'                              max_D = 5,
-#'                              kernel = 'gaussian',
-#'                              sigma = NULL)
-#' ## Example response data
-#' y <- rnorm(5)
-#'
-#' ## Create data frame with raster variables
-#' dat <- data.frame(y = y,
-#'                   kernel_inputs$kernel_dat)
-#' mod1 <- glm(y ~ r1,
-#'             data = dat)
-#' mod2 <- glm(y ~ r2,
-#'             data = dat)
-#' mod3 <- glm(y ~ r1 + r2,
-#'             data = dat)
-#'
-#' ## NOTE: This code is only for demonstration
-#' ## Optimization results will have no meaning
-#'
-#' opt_mod1 <- multiScale_optim(fitted_mod = mod1,
-#'                              kernel_inputs = kernel_inputs,
-#'                              par = NULL,
-#'                              n_cores = NULL)
-#'
-#' opt_mod2 <- multiScale_optim(fitted_mod = mod2,
-#'                              kernel_inputs = kernel_inputs,
-#'                              par = NULL,
-#'                              n_cores = NULL)
-#' opt_mod3 <- multiScale_optim(fitted_mod = mod3,
-#'                              kernel_inputs = kernel_inputs,
-#'                              par = NULL,
-#'                              n_cores = NULL)
-#'
-#'  ## BIC table
-#'  mod_list <- list(opt_mod1, opt_mod2, opt_mod3)
-#'
-#'  bic_tab(mod_list = mod_list)
-#'
-#'  ## BIC table with specified names
-#'  bic_tab(mod_list = mod_list,
-#'          mod_names = c('mod1', 'mod2', 'mod3'))
-
+#' ## BIC charges log(75), about 4.3, for the estimated sigma, versus 2 in AIC
+#' bic_tab(list(spatial_model, fixed_model, null_model),
+#'         mod_names = c("spatial", "fixed", "null"))
 bic_tab <- function(mod_list,
                     mod_names = NULL,
                     verbose = FALSE,

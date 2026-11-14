@@ -32,6 +32,7 @@ test_that("conditional CDFs retain separated modes and asymmetric probability ma
 })
 
 test_that("annual reconstruction preserves the prior when landscape response is absent", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
   for (unit in c(1, 1000)) {
@@ -55,6 +56,7 @@ test_that("annual reconstruction preserves the prior when landscape response is 
 })
 
 test_that("shared scale reconstruction is deterministic and rejects spurious uniforms", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
   s <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp, f$inputs, f$data,
@@ -69,6 +71,7 @@ test_that("shared scale reconstruction is deterministic and rejects spurious uni
 })
 
 test_that("shifted references agree with direct integration across response families", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- bayesian_scale_fixture(n_site = 3, n_year = 2)

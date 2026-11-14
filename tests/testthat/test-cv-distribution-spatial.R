@@ -79,6 +79,7 @@ cv_distribution_spatial_fixture <- function() {
 }
 
 test_that("spatial NB/Gamma folds preserve frozen mean/SQ predictions, native density and ecological penalties", {
+  skip_on_cran()
   skip_if_not_installed("MASS")
   z <- cv_distribution_spatial_fixture()
   expect_identical(z$planned, 17L)

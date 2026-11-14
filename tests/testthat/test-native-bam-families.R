@@ -61,6 +61,7 @@ native_bam_family_fixture <- local({
 # Shared prediction helpers are loaded from helper-native-bam.R.
 
 test_that("binomial and Poisson BAM points and snapshots preserve native formulas", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   cases <- native_bam_family_fixture()
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
@@ -89,6 +90,7 @@ test_that("binomial and Poisson BAM points and snapshots preserve native formula
 })
 
 test_that("binomial and Poisson BAM maps and curves retain response semantics", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   cases <- native_bam_family_fixture()
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
@@ -152,6 +154,7 @@ test_that("binomial and Poisson BAM tables preserve family and native penalty co
 })
 
 test_that("non-Gaussian BAM workers retain native parallel shapes and serial values", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   cases <- native_bam_family_fixture()
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old), add = TRUE)
@@ -186,6 +189,7 @@ test_that("non-Gaussian BAM workers retain native parallel shapes and serial val
 })
 
 test_that("optimized binomial and Poisson BAM predictions retain exact native batches", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   # Reuse the existing failure-retaining fixture, including every fit gate.
   cases <- native_bam_family_fixture()

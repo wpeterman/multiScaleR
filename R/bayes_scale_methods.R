@@ -38,71 +38,121 @@
 
 #' Summarize Posterior Landscape Scales
 #'
-#' Report shared or group-specific landscape scales in projected map units,
-#' including their posterior uncertainty and mass outside the reference range.
+#' Report the scale of each landscape predictor in projected map units, for
+#' every distinct combination of scale-formula covariates and groups, with its
+#' posterior uncertainty and the posterior mass outside the range of the
+#' prepared inputs.
 #'
-#' @param object A \code{\link{multiScale_bayes}} fit with posterior draws
-#'   from sampling or either approximation. Prepared objects have no draws.
-#' @param level Central posterior interval probability; default 0.95.
-#' @param draws Optional positive integer limiting the number of stored
-#'   posterior draws used. Draws are selected at evenly spaced positions.
-#'   The default \code{NULL} uses all stored posterior draws.
-#' @param scale Summary scale: \code{"distance"} (default) gives projected
-#'   map units; \code{"log"} gives natural log distances in those map units.
-#'   Log summaries avoid exponentiating very large distances and provide
-#'   finite-moment summaries under the documented group-SD priors.
-#' @param estimator \code{"draws"} (default) summarizes the stored posterior
-#'   draws. For importance-corrected fits, \code{"weighted"} instead summarizes
-#'   all retained production candidates using their normalized importance
-#'   weights. This avoids additional resampling error. It requires
-#'   \code{draws = NULL} and a fit with importance correction.
-#' @return A data frame with one row per predictor and distinct scale-formula
-#'   covariate combination. \code{covariate} identifies the landscape predictor;
-#'   \code{group} labels the scale predictors; \code{row} is a representative
-#'   observation row. \code{mean}, \code{median}, \code{sd}, \code{lower}, and
-#'   \code{upper} summarize the stored draws in map units, or log map units
-#'   when \code{scale = "log"}. The \code{mean} and \code{sd} are empirical
-#'   draw summaries; a finite sample does not establish that the corresponding
-#'   posterior moment exists. Exponentiate log-scale medians and interval
-#'   limits to express them as distances. Exponentiating a log mean gives a
-#'   geometric summary, not an arithmetic posterior mean.
-#'   Weighted summaries use empirical inverse-CDF quantiles and the population
-#'   SD of the finite weighted candidate distribution. They do not increase
-#'   importance effective sample size, correct an unseen mode, or establish
-#'   that an arithmetic posterior moment exists.
-#'   \code{p_below_min_D} and \code{p_above_max_D} give posterior mass outside
-#'   the input reference range. These are truncation and resolution diagnostics,
-#'   not automatic evidence of a biological boundary.
-#' @details For \code{~1 + (1 | year)}, each row describes one fitted year's
-#'   scale after partial pooling. A median is not a separately optimized annual
-#'   estimate. The shared log-scale intercept describes a population median;
-#'   it differs from the arithmetic mean of annual scales. Intervals describe
-#'   uncertainty conditional on the likelihood, priors, maps, and binning.
+#' @param object A fitted [multiScale_bayes()] object with posterior draws,
+#'   from sampling or either approximation. A prepared object has no draws and
+#'   gives an error.
+#' @param level Probability of the central posterior interval; default 0.95.
+#' @param draws Optional positive integer number of stored draws to use, taken
+#'   at evenly spaced positions. The default `NULL` uses every stored draw.
+#'   Fewer draws run faster and add simulation noise.
+#' @param scale `"distance"` (default) reports scales in projected map units.
+#'   `"log"` reports natural log distances in those units. Log summaries avoid
+#'   exponentiating very large distances, and their means and SDs stay finite
+#'   under the default group-SD prior (see "Read means of long-tailed
+#'   distances").
+#' @param estimator `"draws"` (default) summarizes the stored draws, for every
+#'   method. `"weighted"` summarizes all retained production candidates of an
+#'   importance-corrected fit with their normalized importance weights, which
+#'   avoids the extra noise of resampling. It requires `draws = NULL` and a
+#'   fit made with `control = list(correction = "importance")`.
 #'
-#'   A random scale effect is \eqn{\tau z}, with standard-normal \eqn{z}
-#'   and half-normal \eqn{\tau} whose prior scale is \eqn{s}. Its prior
-#'   exponential moment of order \eqn{r} exists only when \eqn{rs < 1}.
-#'   Consequently, \code{scale_group_sd = 0.5} places annual distance variance
-#'   at the infinite-moment boundary; \code{scale_group_sd >= 1} also permits
-#'   an infinite arithmetic distance mean. A binned likelihood can retain
-#'   these tails because very large distances approach uniform weighting
-#'   within the extracted neighborhood. Prefer medians and interval quantiles
-#'   for distance inference, and \code{scale = "log"} for means and SDs.
-#'   Log-scale SD here measures uncertainty in a fitted year's log distance;
-#'   it differs from the between-year population SD in \code{summary(object)}.
-#' @seealso \code{\link{multiScale_bayes}}, \code{\link{plot.multiScaleR_bayes}},
-#'   \code{\link{diagnose_bayes_scales}};
-#'   \code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
-#'   \code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
+#' @return A data frame with one row per landscape predictor and distinct
+#'   combination of scale-formula covariates and groups.
+#'   * `covariate`: the landscape predictor.
+#'   * `group`: a label for the combination, such as `"year=2021"`, or
+#'     `"shared"` for a predictor with a single scale.
+#'   * `row`: a representative observation row with that combination.
+#'   * `mean`, `median`, `sd`, `lower`, `upper`: the posterior mean, median,
+#'     and SD, and the limits of the central `level` credible interval. Values
+#'     are in map units, or in log map units when `scale = "log"`. For log
+#'     summaries, `exp()` of the median and the limits gives distances, but
+#'     `exp()` of the mean gives a geometric mean, not the arithmetic mean
+#'     distance.
+#'   * `p_below_min_D`, `p_above_max_D`: the posterior probability that the
+#'     scale lies below `min_D` or above `max_D` of the prepared inputs. These
+#'     flag truncation and resolution limits. They are not evidence of a
+#'     biological boundary.
+#'
+#'   `mean` and `sd` summarize a finite set of draws. A finite value does not
+#'   show that the corresponding posterior moment exists. With
+#'   `estimator = "weighted"`, quantiles are empirical inverse-CDF quantiles of
+#'   the weighted candidates and `sd` is the SD of that finite weighted
+#'   population.
+#'
+#' @details
+#' # Read annual scales after partial pooling
+#'
+#' For a scale formula such as `~1 + (1 | year)`, each row describes one
+#' fitted year's scale after partial pooling. Its median is not a separately
+#' estimated annual value. The shared log-scale intercept describes a
+#' population median, which differs from the arithmetic mean of the annual
+#' scales. Intervals are conditional on the likelihood, the priors, the maps,
+#' and the binning. With `scale = "log"`, `sd` measures uncertainty in one
+#' year's log distance. It differs from the between-year SD reported in
+#' `summary(object)$group_sd`.
+#'
+#' # Read means of long-tailed distances
+#'
+#' A random scale effect is \eqn{\tau z}{tau z}, with standard-normal z and a
+#' half-normal tau whose prior scale is s (`scale_group_sd`). Its prior
+#' exponential moment of order r exists only when \eqn{r s < 1}{r s < 1}. The
+#' default `scale_group_sd = 0.5` therefore places the variance of annual
+#' distances at the boundary where it becomes infinite, and
+#' `scale_group_sd >= 1` also allows an infinite arithmetic mean distance. The
+#' binned likelihood can keep these tails, because very large distances
+#' approach uniform weighting within the extracted neighborhood. Report medians
+#' and interval limits for distances, and use `scale = "log"` when you need
+#' means and SDs.
+#'
+#' # Summarize importance-corrected fits directly
+#'
+#' For a fit made with `correction = "importance"`, `estimator = "weighted"`
+#' summarizes the retained candidate population with its normalized weights
+#' instead of the resampled draws. Both target the same posterior. The weighted
+#' version avoids multinomial resampling noise, but it neither raises the
+#' importance effective sample size nor recovers a posterior region the
+#' candidates missed. Candidates with zero weight are dropped. The cautions
+#' about infinite distance moments still apply.
+#'
+#' [plot.multiScaleR_bayes()] uses the weighted estimator by default for
+#' corrected fits, while this function and `summary()` default to the draws.
+#' Request `estimator = "weighted"` in both to keep a table and a plot
+#' consistent.
+#'
+#' Weighted summaries are only as precise as the candidate population.
+#' `importance_max` in the `control` list of [multiScale_bayes()] is a cap, and
+#' a population that passes its checks at a smaller size stops there. To
+#' require more candidates for precise quantiles, raise `importance_min` as
+#' well, as in `control = list(correction = "importance",
+#' importance_min = 65536, importance_max = 131072)`. Larger populations cost
+#' more and do not guarantee a chosen quantile error. Check the retained count
+#' in `fit$diagnostics$candidates`, and compare independently seeded fits.
+#'
+#' @seealso [multiScale_bayes()], [multiScaleR_bayes-class],
+#'   [plot.multiScaleR_bayes()], [predict_scales()],
+#'   [diagnose_bayes_scales()], [kernel_dist()];
+#'   `vignette("v13-bayesian-scales", package = "multiScaleR")` and
+#'   `vignette("v15-bayesian-computation", package = "multiScaleR")`.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))
-#' fit <- example$fits$pooled  # compact draws from an actual annual-scale fit
+#' fit <- example$fits$pooled  # compact draws from an annual-scale NUTS fit
 #' annual <- posterior_scales(fit)
-#' annual[c("group", "median", "lower", "upper")]
-#' # Distances and central 95% credible intervals are in meters in this example.
+#' annual[c("group", "median", "lower", "upper", "p_below_min_D")]
+#' # Sigma for each year in meters, with central 95% credible intervals.
+#' # Part of each posterior lies below min_D (100 m, one raster cell).
+#'
 #' posterior_scales(fit, scale = "log")[c("group", "mean", "sd")]
-#' # Log-distance SD measures uncertainty in one year's scale, not variation among years.
+#' # The log-distance SD measures uncertainty in one year's scale, not the
+#' # variation among years.
+#'
+#' # Convert the median sigma to the radius holding 90% of the kernel weight
+#' kernel_dist(sigma = annual$median[1], kernel = "gaussian")
 #' @export
 posterior_scales <- function(object, level = 0.95, draws = NULL,
                              scale = c("distance", "log"),
@@ -163,8 +213,9 @@ posterior_scales <- function(object, level = 0.95, draws = NULL,
 }
 
 #' @rdname multiScale_bayes
-#' @param object A \code{multiScaleR_bayes} object.
-#' @param ... Reserved for method extensions; unsupported arguments cause an error.
+#' @param object A `multiScaleR_bayes` object from `multiScale_bayes()`,
+#'   prepared or fitted.
+#' @param ... Not used. Supplying any further argument is an error.
 #' @export
 summary.multiScaleR_bayes <- function(object, ...) {
   if (length(list(...))) stop("Unused summary arguments.", call. = FALSE)
@@ -208,7 +259,7 @@ summary.multiScaleR_bayes <- function(object, ...) {
 }
 
 #' @rdname multiScale_bayes
-#' @param x A \code{multiScaleR_bayes} object to print.
+#' @param x A `multiScaleR_bayes` object to print, prepared or fitted.
 #' @export
 print.multiScaleR_bayes <- function(x, ...) {
   if (length(list(...))) stop("Unused print arguments.", call. = FALSE)
@@ -237,124 +288,194 @@ print.multiScaleR_bayes <- function(x, ...) {
 
 #' Predict Means from a Bayesian Scale Model
 #'
-#' Predict fitted or new-observation means using joint scale, coefficient,
-#' and random-effect uncertainty. New groups require an explicit decision
-#' about sampling their effects or fixing their deviations at zero.
+#' Predict expected responses, or linear predictors, at fitted or new
+#' observations. Each prediction carries the joint posterior uncertainty in
+#' the scales, the coefficients, and the random effects. A site or year that
+#' was not in the fitted data needs an explicit choice, either drawing its
+#' effect from the estimated spread among groups or setting it to zero.
 #'
-#' @param object A \code{\link{multiScale_bayes}} fit with posterior draws
+#' @param object A fitted [multiScale_bayes()] object with posterior draws,
 #'   from sampling or either approximation.
-#' @param newdata \code{NULL} (default) uses the fitted observations. Otherwise
-#'   a nonempty data frame containing fixed covariates, offsets and included
-#'   grouping variables. Response values are neither needed nor used.
-#' @param type \code{"response"} (default) returns expected response values,
-#'   or \code{"link"} returns the linear predictor. Binomial response values
-#'   are success probabilities, including for grouped-binomial data.
-#' @param re.form \code{NULL} (default) includes fitted response random effects.
-#'   \code{NA} sets response random effects to zero while retaining fitted
-#'   group-specific landscape scales. This does not integrate over random effects.
-#' @param summary Logical. Return posterior summaries (default \code{TRUE})
-#'   or a draws-by-observations matrix (\code{FALSE}).
-#' @param level Central posterior interval probability; default 0.95.
-#' @param draws Optional number of evenly spaced posterior draws to use;
-#'   \code{NULL} uses all draws.
-#' @param kernel_inputs Matching prepared inputs for \code{newdata}, from
-#'   \code{\link{kernel_prep}} or \code{\link{kernel_prep_by_group}}.
-#'   Required for new observations and otherwise \code{NULL}. Use the fitted
-#'   kernel, predictor definitions and physical map units. Numerical
-#'   \code{unit_conv} normalizers may differ and are converted internally;
-#'   this does not convert coordinate systems or physical units.
-#'   Kernel means require bins. Weighted SQ requires matching source/metric
-#'   specifications and raw buffers, with the fitted reference normalization.
-#' @param row_id Name of a \code{newdata} column matching unique prepared
-#'   \code{binned$point_ids}, or \code{kernel_dat} row names for surface-only
-#'   inputs. Observation keys may repeat. \code{NULL} uses
-#'   the fitted row-ID column when retained, or new-data row names otherwise.
-#'   Supply it explicitly for older saved objects. Used only with new data.
-#' @param scale_re.form \code{NULL} (default) includes fitted or explicitly
-#'   sampled scale random effects. \code{NA} fixes all scale deviations at zero.
-#'   This is separate from \code{re.form}, which controls response effects.
-#' @param new_scale_levels,new_response_levels Separate policies for unseen
-#'   included scale and response group levels: \code{"error"} (default),
-#'   \code{"sample"}, or \code{"zero"}. Sampling draws one new standard-normal
-#'   effect per group and complete posterior vector, multiplied by that vector's
-#'   group SD. Rows in the same group share it. Zeroing new effects gives a
-#'   conditional reference, not a population average. Known effects retain
-#'   their fitted draws. These policies do not create new fixed-factor coefficients.
-#' @param seed Optional positive integer seed for new effects. When supplied,
-#'   the caller's random-number state is restored, including on failure.
-#' @param include_fixed Logical. With new data and matching spatial inputs,
-#'   \code{TRUE} recomputes declared fixed-radius predictors using their original
-#'   preparation means and sample SDs. The default \code{FALSE} requires these
-#'   columns explicitly. Source, metric, radius, kernel, and resolution must
-#'   match the fitted preparation, including its \code{max_D} buffer extent.
-#'   This adds no scale parameters or uncertainty.
-#' @param ... Reserved for future extensions; unused arguments cause an error.
-#' @return With \code{summary = TRUE}, a data frame in the supplied observation
-#'   order containing \code{row}, \code{point_id}, \code{mean}, \code{median},
-#'   \code{sd}, \code{lower}, and \code{upper}. Otherwise a numeric matrix.
-#'   New-data summaries also include \code{new_scale_level} and
-#'   \code{new_response_level}, indicating unseen groups in included components.
-#'   New-data outputs have a \code{new_groups} attribute with \code{component},
-#'   \code{covariate}, \code{group}, \code{level} and \code{action}, recording
-#'   which new levels were sampled or fixed at zero.
-#'   Intervals describe uncertainty in expected responses or linear predictors;
-#'   they do not include a new observation's sampling variation. These are
-#'   marginal intervals for individual observations, not a simultaneous band.
-#'   When new effects are sampled, they also include variation among new groups.
-#'   The mean and SD are empirical draw summaries. A finite Monte Carlo result
-#'   does not establish that the corresponding posterior or new-group moment
-#'   exists; medians and quantiles are preferable for heavy-tailed predictions.
-#'   Summaries have a \code{prediction_contract} attribute describing the target,
-#'   included effects, uncertainty, and stored original-parameter map. Its
-#'   diagnostic status reports the fit's existing status; prediction does not
-#'   make a failed fit eligible. Raw draw matrices keep their existing attributes.
-#' @details Fitting standardization, fixed-effect bases and contrasts are reused.
-#'   Fixed covariate learners \code{scale()}, \code{poly()}, \code{splines::ns()}
-#'   and \code{splines::bs()} retain their training definitions inside ordinary
-#'   expressions such as \code{I(scale(temp))} and transformed offsets. The same
-#'   constants apply to single rows, batches and coefficient effect curves.
-#'   For older fits, reconstructed calls must reproduce the retained training
-#'   formula values using original stored data; otherwise prediction stops.
-#'   Namespace-qualify custom functions with these learner names, or precompute
-#'   their predictors. Existing dynamic-kernel expression restrictions apply.
+#' @param newdata `NULL` (default) uses the fitted observations.
+#'   Otherwise a nonempty data frame of new observations that holds the fixed
+#'   covariates, the offset variables, and the grouping variables of every
+#'   component you include. Response values are neither needed nor used.
+#' @param type `"response"` (default) returns expected responses, which are
+#'   expected counts for Poisson and NB2 models, success probabilities for
+#'   binomial models (also for grouped binomial data), and means for Gaussian
+#'   models. `"link"` returns the linear predictor.
+#' @param re.form `NULL` (default) includes the response random effects. `NA`
+#'   sets them all to zero while keeping group-specific scales. This is a
+#'   reference prediction, not an average over the random effects.
+#' @param summary Logical. `TRUE` (default) returns posterior summaries.
+#'   `FALSE` returns the matrix of draws by observations.
+#' @param level Probability of the central interval; default 0.95.
+#' @param draws Optional positive integer number of evenly spaced posterior
+#'   draws to use. The default `NULL` uses every draw. Fewer draws save time
+#'   and memory at a cost in simulation precision.
+#' @param kernel_inputs Prepared landscape inputs for `newdata`, from
+#'   [kernel_prep()] or [kernel_prep_by_group()]. Required with new data and
+#'   `NULL` otherwise. Use the fitted kernel, predictor definitions, and
+#'   physical map units. See "Match new rows to their landscapes" in
+#'   [predict.multiScaleR_bayes()].
+#' @param row_id Name of the column in `newdata` that matches each row to an
+#'   entry of `kernel_inputs$binned$point_ids`, or to a row name of
+#'   `kernel_inputs$kernel_dat` for surface-only inputs. IDs may repeat. The
+#'   default `NULL` uses the fitted row-ID column when the fit kept it, and
+#'   the row names of `newdata` otherwise. Supply it for fits saved by older
+#'   versions of the package. Used only with new data.
+#' @param scale_re.form `NULL` (default) includes the fitted scale random
+#'   effects and any sampled new ones. `NA` sets every scale deviation to
+#'   zero. It is separate from `re.form`, which controls response effects.
+#' @param new_scale_levels,new_response_levels What to do with a group level
+#'   that was not in the fitted data, set separately for scale and response
+#'   random effects. `"error"` (default) stops, `"sample"` draws a new effect,
+#'   and `"zero"` sets the new effect to zero. A sampled effect is one
+#'   standard-normal value per new group and posterior draw, multiplied by
+#'   that draw's group SD, and shared by every row in the group. Zeroing gives
+#'   a typical-group reference, not a population average. Known groups keep
+#'   their fitted effects. Neither choice creates a coefficient for a new
+#'   level of a fixed factor.
+#' @param seed Optional positive integer seed for sampled new effects. Your
+#'   own random-number state is restored afterward, even when prediction
+#'   fails.
+#' @param include_fixed Logical. With new data, `TRUE` recomputes declared
+#'   fixed-radius landscape predictors from `kernel_inputs`, using their
+#'   original preparation means and SDs. The default `FALSE` requires those
+#'   columns in `newdata`. Source, metric, radius, kernel, and resolution must
+#'   match the fitted preparation, including its `max_D` buffer extent. This
+#'   adds no scale parameters or uncertainty.
+#' @param ... Not used. Supplying any further argument is an error.
 #'
-#'   Prediction does not refit the model, learn a new scale reference or condition
-#'   on response values in \code{newdata}. An unseen fixed year factor remains an
-#'   error, even when random-effect sampling is enabled. A hierarchical response
-#'   year term or a scientifically justified numeric trend is needed for future
-#'   response years. Exchangeable annual effects alone impose no temporal trend
-#'   or autocorrelation. \code{\link{predict_scales}} can predict annual scales
-#'   separately when the response formula still contains fixed year effects.
+#' @return With `summary = TRUE`, a data frame with one row per observation,
+#'   in the supplied order.
+#'   * `row`: the position of the observation.
+#'   * `point_id`: its prepared landscape ID.
+#'   * `mean`, `median`, `sd`, `lower`, `upper`: summaries of the predicted
+#'     quantity on the scale set by `type`. `lower` and `upper` bound the
+#'     central `level` credible interval.
+#'   * `new_scale_level`, `new_response_level` (new data only): whether the
+#'     row belongs to an unseen group of an included scale or response
+#'     component.
 #'
-#'   Use one batch for joint predictions across rows. Within that batch, all
-#'   new observations in one grouping term and level share their new effect
-#'   for each posterior vector. Distinct terms and groups follow the model's
-#'   conditional independence, while joint posterior parameter dependence is
-#'   retained. Separate calls generate separate new effects; do not combine
-#'   independently generated batches to infer joint spatial or annual uncertainty.
+#'   With `summary = FALSE`, a numeric matrix with one row per posterior draw
+#'   and one column per observation.
 #'
-#'   Setting effects to zero is not integration over group variation. With a
-#'   nonlinear link or kernel, the two predictions generally differ. Grouping
-#'   columns used only by omitted components may be absent. New fixed-factor
-#'   levels are always rejected. Formula transforms must remain available in
-#'   base/stats or through explicit package namespaces; precompute caller-defined
-#'   transforms as covariate columns. Older fits without design metadata must
-#'   reproduce their stored training matrix before new predictions are allowed.
-#'   Prediction-aware bases such as \code{scale()} and \code{poly()} retain
-#'   their training definitions. Arbitrary expressions such as
-#'   \code{I(x - mean(x))} evaluate their mean on the new batch by R formula
-#'   rules; precompute with training constants when that is not intended.
+#'   Results for new data carry a `new_groups` attribute, a data frame with
+#'   `component`, `covariate`, `group`, `level`, and `action` that lists each
+#'   unseen level and whether it was sampled or set to zero. Summaries also
+#'   carry a `prediction_contract` attribute that describes the target, the
+#'   included effects, the uncertainty, and the stored parameter map (see
+#'   [prediction_contract]). Its diagnostic status repeats the fit's own
+#'   status. Prediction does not make a failed fit eligible.
 #'
-#'   New kernels use the neighborhoods actually prepared. Larger predicted
-#'   scales cannot recover missing distant landscape cells. The method uses
-#'   stored joint draws, including resamples from corrected fits, and does not
-#'   validate failed fit diagnostics. Nonfinite new predictions cause an error
-#'   without clipping or replacing draws. Large draws-by-observations matrices
-#'   require memory; \code{draws} reduces size at a cost in simulation precision.
-#' @seealso \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
-#'   \code{\link{prediction_contract}},
-#'   \code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
-#'   \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
+#' @details
+#' # What the intervals include
+#'
+#' Intervals describe uncertainty in the expected response or the linear
+#' predictor. They include uncertainty in the scales, the coefficients, and
+#' the fitted group effects, and, when new effects are sampled, the variation
+#' among new groups. They leave out the scatter of a single new observation
+#' around its mean. Use [simulate.multiScaleR_bayes()] for that. Each interval
+#' is marginal for one observation, not a simultaneous band. `mean` and `sd`
+#' summarize a finite set of draws and do not show that the corresponding
+#' moment exists, so prefer the median and the interval limits for
+#' long-tailed predictions.
+#'
+#' # Match new rows to their landscapes
+#'
+#' `kernel_inputs` supplies the prepared bins for the prediction locations and
+#' maps. Each prepared location has one unique entry in `binned$point_ids`,
+#' and `row_id` matches every row of `newdata` to one of them. Rows can come
+#' in any order and can repeat, as for repeated visits to one location. Build
+#' the inputs with [kernel_prep()] or [kernel_prep_by_group()], as in
+#' `vignette("v06-year-specific-rasters", package = "multiScaleR")`. Keep the
+#' fitted kernel, predictor definitions, and projected map units. The
+#' numerical distance normalizer `unit_conv` may differ and is converted
+#' internally, but that does not convert coordinate systems or physical
+#' units. Kernel means need bins. Weighted SQ needs matching source and
+#' metric specifications and the raw cell buffers.
+#'
+#' Prediction reuses the fitted reference center and spread, the contrasts,
+#' and the formula bases. It never standardizes the new rows on their own,
+#' never learns a new scale reference, and never refits the model or uses
+#' responses in `newdata`. A new kernel uses only the neighborhood you
+#' prepared, so a predicted scale larger than `max_D` cannot draw on cells
+#' beyond it.
+#'
+#' # Choose how to treat new groups
+#'
+#' `vignette("v14-bayesian-prediction", package = "multiScaleR")` compares
+#' the choices in a table. A few rules matter for every call. An unseen level
+#' of a fixed year factor, such as `factor(year)`, is always an error, under
+#' every policy. To predict response years you have not surveyed, use a
+#' random intercept for year or a scientifically justified numeric trend.
+#' Exchangeable annual effects impose no trend or autocorrelation.
+#' [predict_scales()] can still predict a new year's scale when the response
+#' formula has fixed year effects. Setting new effects to zero is not
+#' integration over group variation, and with a nonlinear link or kernel the
+#' two predictions generally differ. Grouping columns used only by a
+#' component you leave out with `re.form = NA` or `scale_re.form = NA` may be
+#' absent from `newdata`.
+#'
+#' # Predict jointly across rows
+#'
+#' Put every row whose joint prediction matters into one call. Within a call,
+#' all new rows in the same grouping term and level share one new effect for
+#' each posterior draw. Distinct terms and groups follow the model's
+#' conditional independence, and the joint posterior dependence among
+#' parameters is kept. Separate calls draw separate new effects, so do not
+#' combine independently generated batches to infer joint spatial or annual
+#' uncertainty or a total. For a total of expected values, set
+#' `summary = FALSE` and sum each row of the matrix with `rowSums()`.
+#'
+#' The full matrix of draws by observations is built even when
+#' `summary = TRUE`, at 8 bytes per value. When you need only an interval for
+#' each location of a large map, predict smaller batches and keep their
+#' summaries, or lower `draws` at a cost in simulation precision.
+#'
+#' # Use formula transformations safely
+#'
+#' `scale()`, `poly()`, `splines::ns()`, and `splines::bs()` keep their
+#' training definitions inside ordinary expressions such as `I(scale(temp))`
+#' and in transformed offsets, so single rows, batches, and effect curves use
+#' the same constants. An expression such as `I(x - mean(x))` instead takes
+#' its mean from the new batch, by ordinary R formula rules. Compute such a
+#' covariate with training constants before fitting when you need the
+#' original centering. Transforms must come from base R or stats, or carry an
+#' explicit package namespace. Custom functions defined only in the fitting
+#' workspace are not saved with the model, so compute them as covariate
+#' columns instead. New levels of a fixed factor are always rejected. For
+#' fits saved without design metadata, the rebuilt formula must reproduce the
+#' stored training matrix from the original data, or prediction stops. Give
+#' a namespace prefix to any custom function that reuses a learner name such
+#' as `scale`.
+#'
+#' # Know what prediction cannot fix
+#'
+#' Prediction passes the fitted posterior forward. It does not repair failed
+#' sampling, an inaccurate approximation, or a misspecified observation
+#' model, and it does not check the fit's diagnostics, so inspect
+#' `summary(object)$diagnostics` first. Every method uses its stored joint
+#' draws. For an importance-corrected fit these are resampled candidates, so
+#' prediction has the finite precision of those resamples rather than a fresh
+#' weighted integration.
+#'
+#' Prediction stops on unmatched IDs, new fixed-factor levels, unavailable
+#' formula transforms, incompatible kernel inputs, and nonfinite results. It
+#' never clips scales to the input limits or replaces a problematic draw.
+#'
+#' To test predictions, hold out data at the level you intend to predict. A
+#' held-out visit at a known site and year is easier to predict than a whole
+#' new site or year, and repeated sites or years are not independent
+#' validation replicates. [cross_validate_bayes()] refits the model without
+#' the held-out rows and scores them.
+#'
+#' @seealso [multiScale_bayes()], [multiScaleR_bayes-class],
+#'   [posterior_scales()], [prediction_contract], [predict_scales()],
+#'   [simulate.multiScaleR_bayes()], [cross_validate_bayes()],
+#'   [multiScaleR-prediction] for prediction across the package;
+#'   `vignette("v14-bayesian-prediction", package = "multiScaleR")`.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))
@@ -362,13 +483,24 @@ print.multiScaleR_bayes <- function(x, ...) {
 #' fitted_means <- predict(fit, draws = 100)
 #' head(fitted_means[c("point_id", "median", "lower", "upper")])
 #' # Expected counts at the fitted rows, including fitted site effects.
-#' # The draw limit keeps this demonstration short; use all draws for final summaries.
-#' # simulate() additionally includes observation variation.
-#' new_surveys <- example$data[1:3, ]
-#' new_surveys$count <- NULL
+#' # The draw limit keeps this demonstration short. Use all draws for
+#' # final summaries.
+#'
+#' # New surveys at known site-years reuse their annual maps and group effects
+#' new_surveys <- example$data[1:3, c("site", "year", "site_year")]
 #' predict(fit, new_surveys, kernel_inputs = example$inputs,
 #'   row_id = "site_year", draws = 100)
-#' # These rows reuse known annual maps and group effects for new surveys.
+#' # simulate() would add the scatter of individual counts.
+#'
+#' # A fit with random year intercepts can predict new sites and years
+#' forecast <- readRDS(system.file("extdata", "bayesian-prediction-example.rds",
+#'   package = "multiScaleR"))
+#' future <- predict(forecast$fit, forecast$newdata,
+#'   kernel_inputs = forecast$kernel_inputs, row_id = "site_year",
+#'   new_scale_levels = "sample", new_response_levels = "sample",
+#'   draws = 200, seed = 802)
+#' future[c("point_id", "median", "lower", "upper", "new_response_level")]
+#' attr(future, "new_groups")   # the unseen levels and what was done to them
 #' @exportS3Method stats::predict
 predict.multiScaleR_bayes <- function(object, newdata = NULL,
                                       type = c("response", "link"), re.form = NULL,

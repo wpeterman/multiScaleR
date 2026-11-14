@@ -69,6 +69,7 @@ test_that("shared-scale bin caching preserves the posterior kernel calculation",
 })
 
 test_that("the slice scale posterior agrees with independent Gaussian quadrature", {
+  skip_on_cran()
   f <- bayesian_scale_fixture(n_site = 24L, n_year = 1L)
   f$data$count <- rnorm(nrow(f$data), sd = .45)
   formula <- count ~ habitat + offset(log(effort))

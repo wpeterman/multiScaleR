@@ -7,70 +7,116 @@
 cv_tab(mod_list, metric, by_fold = FALSE)
 }
 \arguments{
-\item{mod_list}{Uniquely named list of complete \code{multiScaleR_cv} results.
-Use identical explicit folds and response/weight definitions for every model.
-Bayesian posterior predictive results use \code{\link{cv_tab}}.
-Complete \code{\link{cross_validate_clogit}} results compare only with the
-same conditional-choice target, complete sets and native partial method.}
+\item{mod_list}{Named list of complete cross-validation results to compare,
+for example \code{list(landscape = cv, null = null_cv)}. The names label the
+rows of the table and must be unique. Every candidate must use identical
+folds, responses, trials, and frequency weights, and the candidates must
+be of compatible kinds (see "What can be compared").}
 
-\item{metric}{One recorded score, selected explicitly: \code{"rmse"},
-\code{"mae"}, \code{"neg_log_score"}, \code{"deviance"} or \code{"brier"}.}
+\item{metric}{One score name, chosen explicitly: \code{"rmse"}, \code{"mae"},
+\code{"neg_log_score"}, \code{"deviance"}, or \code{"brier"}. Every candidate must have
+recorded it. There is no default, because the scores answer different
+questions.}
 
-\item{by_fold}{Logical. Default \code{FALSE} compares pooled scores.
-\code{TRUE} gives descriptive ranks within each assessment fold.}
+\item{by_fold}{Logical. The default \code{FALSE} ranks the pooled scores. \code{TRUE}
+ranks the candidates separately within each fold, which shows whether a
+ranking is consistent across folds.}
 }
 \value{
-A data frame with \code{Modnames}, \code{Rank}, \code{Score},
-\code{Delta}, \code{Metric}, \code{Unit}, \code{N_assessment},
-\code{N_scored}, \code{Weight_sum}, \code{Warnings} and, for per-fold
-comparisons, \code{Fold}. Ties share their minimum rank. If every score
-is infinite, deltas are \code{NA}. Original candidate fits and diagnostics
-are not modified.
+A data frame with one row per candidate (per candidate and fold
+when \code{by_fold = TRUE}), sorted from best to worst. Its columns are:
+\itemize{
+\item \code{Modnames}: the candidate's name in \code{mod_list}.
+\item \code{Rank}: 1 for the best score. Tied scores share the lowest rank.
+\item \code{Score}: the pooled score, or the fold score when \code{by_fold = TRUE}.
+\item \code{Delta}: \code{Score} minus the best score, in the units of the score. It is
+\code{NA} when every score is infinite.
+\item \code{Metric}, \code{Unit}: the score and what one score refers to, for example
+\code{"observation"}, \code{"trial"}, or \code{"choice_set"}. See
+\link[=multiScaleR_cv-class]{multiScaleR_cv}.
+\item \code{N_assessment}, \code{N_scored}, \code{Weight_sum}: the planned assessment
+occurrences, the number that entered the score, and their total
+weight.
+\item \code{Warnings}: the number of warnings recorded while fitting the
+candidate (in that fold when \code{by_fold = TRUE}). Read them in the
+candidate's \code{warnings} element.
+\item \code{Fold}: the fold, when \code{by_fold = TRUE}.
+}
+
+The candidate results themselves are not modified.
 }
 \description{
-Rank candidate predictions using identical recorded targets and splits.
-Lower scores are better. Scores are pooled from assessment occurrences,
-preserving frequency weights and binomial trial definitions.
+Rank candidate models by one held-out score, after checking that every
+candidate was scored on the same folds and the same observations. Lower
+scores are better.
 }
-\details{
-Incomplete candidates are rejected as a group; no failed model or
-fold is silently removed. Comparisons match analysis/assessment IDs and all
-used responses, trials and frequency weights. RMSE/MAE can compare qualified
-conditional-mean predictions across qualified Gaussian, Poisson, NB2 and
-Gamma targets on the same observations. NB2 and Poisson log scores can
-compare their count distributions. Continuous/discrete density scores
-cannot be mixed, and Gaussian density scores remain unqualified. Gamma
-density comparisons preserve positive-response and training-dispersion
-guards. Other canonical scores retain their family/link requirements. Conditional-choice comparisons use
-\code{neg_log_score} only, per held-out set, preserving every alternative
-and its membership. They cannot be mixed with Bernoulli/GLM targets.
-Binomial negative log scores refer to
-count probabilities; Brier scores average over individual trials.
-
-There is no added complexity penalty, Akaike weight or model probability.
-Fold variation is not an independence-based standard error or calibration
-certificate. Per-fold assessment ranks must not select that fold's model.
-Use \code{\link{select_cv}} for training-only information-criterion selection.
-Choosing a model or tuning rule from pooled CV results requires independent
-assessment or an outer validation layer to evaluate that choice.
-
-Complete \code{\link{cross_validate_field}} results compare joint
-assessment densities or masses for matching response and split targets.
-Poisson and NB2 share a count target. These scores integrate field
-dependence and observation noise at training estimates. Compare these
-results with other joint field scores using the same observations and
-coordinates.
-Complete \code{\link{cross_validate_mixed}} results compare matching
-group targets. Their log scores use one joint density per held-out group.
+\section{How to read the table}{
+The best candidate is listed first. \code{Delta} is each candidate's distance
+from it, in the units of the score. For RMSE and MAE that is a difference
+in response units, such as animals per survey. For the negative log score,
+a \code{Delta} of D means the best model gave the observed outcomes exp(D)
+times the probability, as a geometric mean per observation (per choice set
+for conditional choice). The per-fold table from \code{by_fold = TRUE} is
+descriptive. Use it to see whether one fold drives a ranking, never to pick
+a model for that fold from its own assessment score.
 }
+
+\section{What can be compared}{
+Every candidate must be complete, with no failed fold. An incomplete
+candidate stops the comparison, because a model scored only on its easier
+folds would look better than it is. No failed model or fold is removed
+silently. Results of different kinds cannot be mixed.\tabular{ll}{
+   Results \tab Comparisons allowed \cr
+   Gaussian, Poisson, and binomial from \code{\link[=cross_validate]{cross_validate()}} and \code{\link[=cross_validate_glm]{cross_validate_glm()}} \tab RMSE and MAE across families on identical observations. The log score, deviance, and Brier score need the same family and link. \cr
+   NB2 or Gamma, alone or with Gaussian or Poisson \tab RMSE and MAE across these families on identical observations. Log scores between Poisson and NB2 on the same counts. A Gamma log score compares only with another Gamma. \cr
+   \code{\link[=cross_validate_clogit]{cross_validate_clogit()}} \tab Other conditional-choice results with the same complete sets and partial-likelihood \code{method}, using \code{neg_log_score} only. \cr
+   \code{\link[=cross_validate_field]{cross_validate_field()}} \tab Other field results with the same responses, folds, and projected coordinates. Poisson and NB2 share a count target. \cr
+   \code{\link[=cross_validate_mixed]{cross_validate_mixed()}} \tab Other mixed-model results with the same groups, prediction target, and folds. \cr
+   \code{\link[=cross_validate_bayes]{cross_validate_bayes()}} \tab Other Bayesian results with the same targets, folds, and blocks, using \code{neg_log_score} only. \cr
+}
+
+
+A binomial log score refers to the probability of the observed count of
+successes, while a Brier score is a mean over individual trials. Field,
+mixed-model, and Bayesian log scores are joint scores for blocks of
+held-out observations, so they are kept apart from the per-observation
+scores of ordinary GLMs.
+}
+
+\section{What the table does not do}{
+The scores carry no penalty for model complexity, and \code{Delta} is not an
+AIC difference, an Akaike weight, or a model probability. The spread of
+fold scores is not a standard error, because folds share training data
+and are few. If you use the table to choose a model or a tuning rule, the
+winning score is optimistic. Evaluate that choice with an independent test
+set or an outer validation layer. To score a predeclared rule that picks a
+model by training AIC, AICc, or BIC, use \code{\link[=select_cv]{select_cv()}}.
+}
+
 \examples{
-dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
-folds <- grouped_cv_folds(rep(letters[1:4], each = 2), k = 2)
-candidates <- list(null = cross_validate_glm(y ~ 1, dat, folds, "poisson"),
-                   trend = cross_validate_glm(y ~ x, dat, folds, "poisson"))
+data("landscape_counts")
+data("surv_pts")
+# Three spatial folds. The simulated coordinates are in meters.
+folds <- spatial_cv_folds(crds(vect(surv_pts)), block_size = 1000, k = 3,
+                          crs = 32617)
+candidates <- list(
+  null = cross_validate_glm(counts ~ 1, landscape_counts, folds,
+                            family = "poisson"),
+  site = cross_validate_glm(counts ~ site, landscape_counts, folds,
+                            family = "poisson"))
+
+# Pooled ranking. Delta is the gap from the best model in animals per survey.
+cv_tab(candidates, metric = "rmse")
+
+# exp(Delta) is how many times more probability the best model gave the
+# observed counts, as a geometric mean per survey
 cv_tab(candidates, metric = "neg_log_score")
+
+# Is the ranking the same in every fold?
+cv_tab(candidates, metric = "rmse", by_fold = TRUE)
 }
 \seealso{
-\code{\link{cross_validate}}, \code{\link{cross_validate_glm}},
-\code{\link{select_cv}}, \code{\link{aic_tab}}
+\code{\link[=cross_validate]{cross_validate()}}, \code{\link[=cross_validate_glm]{cross_validate_glm()}}, \code{\link[=select_cv]{select_cv()}},
+\link[=multiScaleR_cv-class]{multiScaleR_cv}, \code{\link[=aic_tab]{aic_tab()}}, and
+\code{vignette("v08-cross-validation", package = "multiScaleR")}.
 }

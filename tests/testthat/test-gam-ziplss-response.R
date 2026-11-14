@@ -54,6 +54,7 @@ zip_coefficient_gradient <- function(model, data, training, multiplier = 1, cont
 }
 
 test_that("ziplss response uncertainty uses both predictors and signed covariance", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- zip_response_fixture(); dat <- f$data
   native <- utils::getS3method("predict", "gam", envir = asNamespace("mgcv"))

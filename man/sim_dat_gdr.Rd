@@ -23,99 +23,153 @@ sim_dat_gdr(
 \method{print}{msr_gdr_simulation}(x, ...)
 }
 \arguments{
-\item{density}{Numeric vector of expected bird densities, in birds per square
-kilometer, one value per survey site. Zero density is allowed. Evaluate
-ecological formulas or prepared kernel covariates before supplying this
-vector; density is on the response scale, not the log scale.}
+\item{density}{Numeric vector of expected bird densities, in birds per
+square kilometer, one value per survey point. Zero is allowed. This is
+the response scale, not the log scale. Compute any ecological formula
+or kernel-weighted covariate effect first, for example
+\code{exp(log(400) + 0.5 * habitat)}.}
 
-\item{distance_scale}{Positive numeric scalar or vector with one value per
-site. This is the half-normal detection standard deviation, in \code{units_in}.
-It is distinct from an ecological kernel's scale of effect.}
+\item{distance_scale}{Positive number, or one per point. The standard
+deviation (sigma) of the half-normal detection function, in \code{units_in}.
+Detection falls to about 61\% of its maximum at this distance. It is
+unrelated to the kernel scale of effect.}
 
-\item{removal}{Numeric per-time-unit singing/detection probabilities in
-\verb{[0, 1]}. Supply a scalar, a vector with one value per site, or a matrix
-with sites in rows and removal intervals in columns. Matrix entries allow
-interval-specific probabilities, matching native GDR removal designs.}
+\item{removal}{Probability, between 0 and 1, that a bird present is first
+detected during one unit of interval time. Supply one number, one value
+per point, or a matrix with points in rows and removal intervals in
+columns for interval-specific probabilities.}
 
-\item{dist_breaks}{Increasing numeric distance boundaries starting at zero,
-in \code{units_in}. The last boundary is the point-survey radius.}
+\item{dist_breaks}{Increasing numeric distance boundaries starting at
+zero, in \code{units_in}. The last boundary is the survey radius.}
 
-\item{interval_lengths}{Positive integer durations of the removal intervals,
-measured in \code{interval_units}. Unequal durations are supported.}
+\item{interval_lengths}{Positive whole numbers giving the duration of each
+removal interval, in \code{interval_units}. Intervals may differ in length.}
 
-\item{interval_units}{One nonempty time-unit label, for example \code{"minutes"}.}
+\item{interval_units}{Character string naming the time unit of
+\code{interval_lengths}, for example \code{"minutes"}. It is recorded, not
+converted.}
 
-\item{units_in}{Distance units, \code{"m"} or \code{"km"}.}
+\item{units_in}{Distance units, \code{"m"} (default) or \code{"km"}.}
 
-\item{site_covs}{Optional data frame of actual or prepared site covariates,
-with one row per density. Factors, transformations supplied as columns,
-and year assignments are retained in the native frame.
-Native character-to-factor conversion and its warning are preserved.}
+\item{site_covs}{Optional data frame of site covariates, one row per point,
+such as kernel-weighted landscape covariates from \code{\link[=kernel_prep]{kernel_prep()}}.
+Columns are copied into the observed frame unchanged. As in \code{unmarked},
+character columns are converted to factors with a warning.}
 
-\item{event_keys}{Optional data frame with one row per site, retaining the
-original event identifiers separately from covariates. Supplying keys does
-not aggregate, reorder, or validate their scientific interpretation; use
-\code{\link[=validate_unmarked_data]{validate_unmarked_data()}} to audit them.}
+\item{event_keys}{Optional data frame with one row per point holding the
+original survey identifiers. It is returned unchanged, separate from the
+covariates, for use with \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}.}
 
-\item{seed}{Nonnegative integer simulation seed. The caller's random-number
-state is restored, including its absence when no state existed initially.}
+\item{seed}{Nonnegative whole number used as the random seed. Your random
+number state is restored afterward, so the simulation does not change
+later random draws in your session.}
 
-\item{return_joint}{Logical; return the site-by-distance-by-removal count
-array as \code{joint}. The default avoids retaining this intermediate array.}
+\item{return_joint}{Logical, default \code{FALSE}. If \code{TRUE}, also return the
+simulated counts by point, distance band and interval as \code{joint}.}
 
-\item{provenance}{Named list retaining caller-supplied generating formulas,
-coefficients, kernel definitions, fixed reference transformations, raster
-years, or other design information. Values are recorded without evaluation.}
+\item{provenance}{Optional named list of notes about how the inputs were
+made, such as the generating formula, coefficients or the kernel scale
+used for a covariate. It is stored in \code{design$provenance} without being
+evaluated.}
 
 \item{x}{An object returned by \code{sim_dat_gdr()}.}
 
-\item{...}{Reserved for compatibility with the generic print function.}
+\item{...}{Not used.}
 }
 \value{
-A list with class \code{msr_gdr_simulation} containing \code{observed}, an
-\code{unmarkedFrameGDR}; \code{truth}, a data frame
-with site row, expected density, expected circle abundance, realized latent
-abundance, distance and removal detection probabilities, total observation
-probability, expected observed count, and realized observed count;
-\code{probabilities}, distance-bin and first-removal-interval probability
-matrices; \code{joint}, the optional joint count array (otherwise \code{NULL});
-\code{event_keys}; and \code{design}. The latter records units, survey area in square
-kilometers, distance/removal parameters, breaks/durations, seed/RNG kind,
-assumptions, native package version, and caller provenance. Truth and
-provenance are not inserted into the observed frame's covariates.
-Printing the result shows a compact survey and unit summary and returns
-the object invisibly. It does not call the native frame printer.
+A list of class \code{msr_gdr_simulation}:
+\itemize{
+\item \code{observed}: the \code{unmarkedFrameGDR} to analyze, with the distance and
+removal tables, \code{site_covs}, distance breaks, units and interval
+lengths. It holds no true values.
+\item \code{truth}: a data frame with one row per point. See "Read the truth".
+\item \code{probabilities}: a list with \code{distance}, a points by distance-band
+matrix of the probability that a bird in the circle is detected in each
+band, and \code{removal}, a points by interval matrix of the probability that
+a bird is first detected in each interval.
+\item \code{joint}: the points by distance band by interval array of simulated
+counts when \code{return_joint = TRUE}, otherwise \code{NULL}.
+\item \code{event_keys}: as supplied.
+\item \code{design}: the settings used, including \code{density_units}
+(\code{"birds/km2"}), \code{area_km2} (the survey circle), \code{distance_scale} and
+\code{removal} per point, the breaks, interval lengths and units, the \code{seed}
+and \code{RNGkind}, the model assumptions (\code{mixture = "P"},
+\code{keyfun = "halfnorm"}, one primary period, closed population), the
+\code{unmarked} version and \code{provenance}.
+}
+
+Printing shows a short summary of the number of points, bands and
+intervals, the density range and the units, and returns the object
+invisibly. The full frame and truth stay in the object.
 }
 \description{
-Generate single-primary point surveys with Poisson abundance, a half-normal
-distance key, and first-detection removal intervals. Paired margins describe
-the same birds. Observed data and generating truth are returned separately.
+Simulate single-visit point counts in which each bird is recorded by
+distance band and by the time interval of its first detection. Abundance
+is Poisson, detection by distance follows a half-normal curve, and
+detection over time follows a removal (first-detection) process. The two
+count tables describe the same birds. The observed data and the true
+values used to generate them are returned separately, so you can fit a
+model to the data and compare its estimates with the truth.
 }
-\details{
-Survey area is \code{pi * radius_km^2}. Expected abundance is density times this
-area. A bird's distance and removal categories are independent conditional
-on the supplied site parameters. First-removal probabilities account for
-survival through all preceding intervals; durations convert per-unit
-probability \code{p} to \code{1 - (1 - p)^duration}.
-
-Independent Poisson counts are drawn for every observed joint category and
-the unobserved category. Their sum is Poisson latent abundance, and their
-conditional allocation given that sum is multinomial. This avoids a loop
-over birds or repeated full multinomial draws. Both margins are derived
-from these same joint counts.
-
-This baseline assumes a closed population within the survey radius and one
-primary occasion. It does not simulate movement across the radius,
-negative-binomial or zero-inflated abundance, annual availability, or random
-detection heterogeneity. Those require separate models and validation.
-This helper does not change \code{\link[=sim_dat_unmarked]{sim_dat_unmarked()}} or fit any model.
+\section{How the counts are generated}{
+The survey area is \code{pi * radius^2}, in square kilometers, and expected
+abundance is density times that area. Detection by distance and by time
+are independent for each bird. The probability of a first detection in an
+interval accounts for not being detected in earlier intervals, and an
+interval of duration \code{t} has detection probability \code{1 - (1 - p)^t} for
+per-unit probability \code{p}. The function draws independent Poisson counts
+for every combination of distance band and interval, plus one for birds
+never detected. Their sum is the Poisson abundance in the circle, and both
+count tables are totals of the same simulated counts, so their row totals
+always match.
 }
+
+\section{Read the truth}{
+\tabular{lll}{
+   Quantity \tab Where \tab How to read it \cr
+   Expected density \tab \code{truth$expected_density} \tab Birds per square km, before imperfect detection \cr
+   Expected abundance \tab \code{truth$expected_abundance} \tab Expected birds in the survey circle: density times \code{design$area_km2} \cr
+   Realized abundance \tab \code{truth$realized_abundance} \tab Birds simulated in the circle, a Poisson draw around the expectation \cr
+   Distance detection \tab \code{truth$distance_probability} \tab Chance that a bird in the circle is detected by distance, averaged over the circle \cr
+   Removal detection \tab \code{truth$removal_probability} \tab Chance that a bird is first detected at some point during the count \cr
+   Overall detection \tab \code{truth$observation_probability} \tab The product of the two, the share of birds an observer records \cr
+   Expected observations \tab \code{truth$expected_observed} \tab Expected count after both detection processes \cr
+   Realized observations \tab \code{truth$realized_observed} \tab Birds recorded, equal to the row totals of both count tables \cr
+   Distance scale \tab \code{design$distance_scale} \tab Half-normal sigma, in \code{units_in} \cr
+   Your notes \tab \code{design$provenance} \tab Whatever you passed in \code{provenance} \cr
+}
+
+
+The truth never enters the observed frame, so it cannot leak into fitted
+covariates. \code{truth$site_row} gives the frame row of each point.
+}
+
+\section{What the simulator covers}{
+The simulator covers single-visit Poisson surveys with a half-normal
+distance function and equal or unequal whole-number interval lengths. It
+assumes a closed population inside the radius. It does not simulate
+repeat visits with availability, negative binomial or zero-inflated
+abundance, movement across the radius, or random variation in detection.
+It fits no model and leaves \code{\link[=sim_dat_unmarked]{sim_dat_unmarked()}} unchanged. See the
+"Simulate a survey with a known scale of effect" section of
+\code{vignette("v12-distance-removal", package = "multiScaleR")} for a full
+example.
+}
+
 \examples{
+# Three points: two with birds and one with density zero
 sim <- sim_dat_gdr(density = c(100, 200, 0), distance_scale = 40,
   removal = 0.3, dist_breaks = c(0, 25, 75),
   interval_lengths = c(1, 2, 1), interval_units = "minutes", seed = 24)
-sim$truth
-sim
+sim                        # compact summary
+# Truth behind the counts: about 1.8 and 3.5 birds expected in the circle
+sim$truth[, c("expected_density", "expected_abundance",
+              "realized_abundance", "realized_observed")]
+# The same birds by distance band and by time interval
 sim$observed@yDistance
 sim$observed@yRemoval
+}
+\seealso{
+\code{\link[=validate_unmarked_data]{validate_unmarked_data()}}, \code{\link[=prepare_gdr_histories]{prepare_gdr_histories()}},
+\code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}
 }

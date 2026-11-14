@@ -16,6 +16,7 @@ sq_numeric_log_density <- function(record, population) {
 }
 
 test_that("numeric group tapes preserve native joint targets across groups and parameter changes", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
@@ -61,6 +62,7 @@ test_that("numeric group tapes preserve native joint targets across groups and p
 })
 
 test_that("cached conditional latent distributions match ordinary and independent native integrals", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   cases <- expand.grid(kernel = c("gaussian", "exp"), kind = c("gaussian", "poisson", "response"))
   for (i in seq_len(nrow(cases))) {
@@ -107,6 +109,7 @@ test_that("cached conditional latent distributions match ordinary and independen
 })
 
 test_that("group numeric tape freezes source data and rejects malformed layouts before recording", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- private_sq_fixture()$spec; g <- .msr_factorized_group(s, 2L)
   p <- private_sq_parameters(g); p$scale_z <- p$response_z <- numeric()

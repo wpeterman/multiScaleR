@@ -130,8 +130,11 @@ s_dat <- sim_dat_unmarked(alpha = 1,
                           raster_stack = rs,
                           max_D = 220,
                           user_seed = 123)
+# True abundance rises with bin1 (beta = 0.75) and falls with cont1 (-0.75)
 plot(s_dat$df$y ~ s_dat$df$bin1)
 plot(s_dat$df$y ~ s_dat$df$cont1)
+# Observed counts: one row per site, one column per repeated survey
+head(s_dat$y)
 ## unmarked analysis
 kernel_inputs <- kernel_prep(pts = s_dat$pts,
                              raster_stack = rs,

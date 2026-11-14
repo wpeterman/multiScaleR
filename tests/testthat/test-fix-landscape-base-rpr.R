@@ -33,6 +33,7 @@ test_that("landscape_var warns that base does not apply to msidi and msiei", {
 })
 
 test_that("msidi values are unchanged and shdi still responds to base", {
+  skip_on_cran()
   default <- fix_cover_mean(landscape_var("cover", metric = "msidi", radius = 500))
   with_base <- fix_cover_mean(suppressWarnings(
     landscape_var("cover", metric = "msidi", radius = 500, base = 2)))

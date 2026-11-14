@@ -3,7 +3,7 @@
 
 # multiScaleR <img src="man/figures/logo.png" alt="multiScaleR package logo" align="right" height="150"/>
 
-README last updated: 2026-11-13
+README last updated: 2026-11-14
 
 <!-- Status badges. Kept in a table (not a "badges: start/end" block) so that
      pkgdown shows them on the home page instead of moving them to the sidebar. -->
@@ -16,11 +16,27 @@ README last updated: 2026-11-13
 
 ## Overview
 
-multiScaleR is an R package to identify the scale of effect of spatial
-environmental variables in regression analyses.
+The *scale of effect* is the distance over which a landscape variable
+influences an ecological response. multiScaleR estimates it directly. It
+weights the raster cells around each survey point with a distance kernel
+and chooses the kernel scale (sigma) that maximizes the likelihood of
+your regression model. You fit your model once at starting values, and
+multiScaleR searches over scales, reports each one with its uncertainty,
+and helps you compare, check, and map the result.
 
-Functions to simulate data with known scales of effect are included with
-this package.
+multiScaleR works with:
+
+- linear, generalized linear, additive, and mixed models;
+- occupancy and abundance models from `unmarked`, including
+  distance-removal models;
+- step-selection models fitted with `survival::clogit()` or `amt`;
+- Bayesian models in which a scale of effect can vary among years or
+  with a covariate.
+
+It also computes kernel-weighted landscape and surface metrics,
+cross-validates models with spatial or grouped folds, maps predictions
+across a landscape, and simulates data with known scales of effect so
+you can test a design before collecting data.
 
 ## Installation
 
@@ -64,7 +80,35 @@ remotes::install_github("wpeterman/multiScaleR",
 library(multiScaleR) # Load the package
 ```
 
-## Vignettes
+## A first example
+
+The package includes simulated counts at 75 points, generated with a
+habitat effect whose true scale of effect (sigma) is 75 map units.
+
+``` r
+library(multiScaleR)
+data(pts)          # survey points
+data(count_data)   # counts at each point
+hab <- terra::rast(system.file("extdata", "hab.tif", package = "multiScaleR"))
+
+# 1. Weight the habitat raster around each point with a Gaussian kernel
+inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                      kernel = "gaussian")
+
+# 2. Fit your model once, at the starting scale
+start_model <- glm(y ~ hab, family = poisson, data = count_data)
+
+# 3. Estimate the scale of effect
+fit <- multiScale_optim(start_model, inputs)
+summary(fit)   # sigma, its interval, and the distance holding 90% of the weight
+plot(fit)      # the fitted kernel weight curve
+```
+
+The estimated sigma is close to the simulated value of 75, and
+`summary()` converts it into the distance that contains 90% of the
+kernel’s weight, which is the number to report as the scale of effect.
+
+## Learn more
 
 The vignettes work through simulated data and explain how to read each
 result. Start with the quick start and the user guide, then turn to the
@@ -91,81 +135,32 @@ website](https://wpeterman.github.io/multiScaleR/articles/).
 | [14. Predict new sites and years from a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.html) | `v14-bayesian-prediction` |
 | [15. Choose and check a Bayesian computation method](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.html) | `v15-bayesian-computation` |
 
-## Bayesian scale estimation
+Reference topics in the help system give the details that the vignettes
+leave out:
 
-Estimate one shared scale per landscape predictor or model scales as a
-function of measured covariates and groups. Use `method = "slice"` for
-full posterior sampling without a Stan toolchain. Install `posterior` to
-assess chain mixing and simulation precision.
+| Help topic | What it covers |
+|:---|:---|
+| `?multiScaleR` | Package overview and the main functions, step by step |
+| `?"multiScaleR-kernels"` | Kernel families, sigma, hard radii, and effective distance |
+| `?"multiScaleR-fitting-methods"` | The fitting backends and the uncertainty each reports |
+| `?"multiScaleR-prediction"` | What each prediction represents and how uncertain it is |
+| `?"multiScaleR-glossary"` | Plain-language definitions of the terms used |
 
-``` r
-check_bayes_setup(method = "slice")
-vignette("v13-bayesian-scales", package = "multiScaleR")
-# Before fitting, simulate_bayes_prior() checks a prepared model's implications.
+`NEWS` lists the changes in each version, including the switch to planar
+(2D) kernel distances in version 0.7.4.
 
-fit <- multiScale_bayes(
-  counts ~ site + land1 + land2, kernel_inputs, dat,
-  family = "poisson", method = "slice", seed = 5211
-)
-summary(fit)$diagnostics             # inspect chain mixing
-diagnose_bayes_scales(fit)$quantiles  # check simulation error of scale quantiles
-posterior_scales(fit)                # one distance and credible interval per layer
-plot(fit)
-```
+## Experimental tools
 
-The vignette displays actual fitted results from an artificial
-annual-map example, including shared and independent controls,
-predictive checks and prior sensitivity. Compact stored draws let you
-read it without rerunning MCMC. NUTS sampling uses RTMB, tmbstan, rstan,
-and posterior. Preparation can be checked without them using
-`method = "prepare"`. `predict_scales()` predicts scales for unobserved
-years. `predict()` and `simulate()` accept new observations and matching
-prepared landscapes, with explicit choices for new year and site
-effects. Read
-`vignette("v14-bayesian-prediction", package = "multiScaleR")` for a
-worked forecast, shared group effects and joint totals. Future responses
-require a response formula that supports unseen years; a fixed year
-factor cannot supply a new coefficient. Approximation methods remain
-experimental, and numerical convergence does not establish interval
-accuracy. For the alternative computations, actual matched outputs and
-interpretation of their numerical checks, read
-`vignette("v15-bayesian-computation", package = "multiScaleR")`.
+`cross_validate_bayes()`, `cross_validate_mixed()`, the count, binary,
+and positive families of `cross_validate_field()`,
+`diagnose_bayes_laplace()`, and the `radius_grid` argument of
+`multiScale_optim()` are experimental. Their arguments and results may
+change in a later release without a deprecation period.
 
-## Kernel distance reporting
+## Citation
 
-Starting with version 0.7.4, `kernel_dist()`, kernel plots, and the
-selected summary distance default to `dimension = "2d"`: the radius
-containing the requested share of an ideal kernel’s total weight on a
-plane. At 90%, a Gaussian kernel with sigma = 300 m has a planar radius
-of about 644 m, compared with the original line-based distance of about
-493 m. Raster edges, missing cells, cell geometry, and `max_D` can
-change the weight actually retained at a site.
-
-Set `dimension = "1d"` in `kernel_dist()`, `plot_kernel()`, `plot(fit)`,
-or `summary(fit)` to restore the original definition. Summary `opt_dist`
-and `opt_distance` follow that selection; `opt_dist_1d` and
-`opt_dist_2d` always identify the two definitions explicitly. This
-reporting switch does not change the fitted sigma, coefficients, or
-likelihood. Simulation extents, projection windows, and stored
-optimization warnings retain their historical 1D cutoffs. See
-`vignette("v02-user-guide", package = "multiScaleR")` for interpretation
-and migration examples.
-
-## Marginal effects for unmarked models
-
-Version 0.7.4 fixes marginal-effect plots for models with factors such
-as `Year`, extra site-ID columns, and repeated site-year rows linked by
-`join_by`. Predictors are recovered from the state or abundance formula.
-Numeric predictors are held at their observed means and categorical
-predictors at their first observed values in other panels. Factors
-receive a point and confidence interval for each observed level.
-
-For random-effects models, plots set site effects to zero explicitly.
-These are conditional predictions, not averages over years, sites, or
-the random-effect distribution. Their intervals are conditional on the
-selected scale. See `?plot_marginal_effects` for supported prediction
-types and factor contrast handling. Existing fitted objects can be
-plotted without rerunning scale optimization.
+Run `citation("multiScaleR")` to cite the paper that describes the
+method and the package version you used.
 
 <p align="center">
 

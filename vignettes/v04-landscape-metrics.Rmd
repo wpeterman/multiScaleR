@@ -695,6 +695,8 @@ ed_multi  <- kernel_scale.raster(
 - **`vignette("v02-user-guide", package = "multiScaleR")`**, kernels,
   intervals, and model selection in depth.
 - The help page `?msr_vars` defines every supported metric.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.
 
 # References
 

@@ -1,4 +1,5 @@
 test_that("neutral raw SQ joint density and every derivative block match an independent target", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
     for (annual in c(FALSE, TRUE)) {
@@ -27,6 +28,7 @@ test_that("neutral raw SQ joint density and every derivative block match an inde
 })
 
 test_that("raw SQ likelihood and AD coordinates are invariant to physical distance re-expression", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- private_sq_fixture(kernel, family)
@@ -51,6 +53,7 @@ test_that("raw SQ likelihood and AD coordinates are invariant to physical distan
 })
 
 test_that("private group metadata and Gaussian response density follow reordered observations", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) {
     f <- private_sq_fixture(kernel, response = TRUE)

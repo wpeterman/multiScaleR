@@ -2,34 +2,116 @@
 % Please edit documentation in R/profile_glm_uncertainty.R
 \name{vcov.multiScaleR}
 \alias{vcov.multiScaleR}
-\title{Covariance for an analytic multiscale GLM}
+\title{Covariance matrices for an analytic multiscale fit}
 \usage{
 \method{vcov}{multiScaleR}(object, type = c("joint", "conditional"), ...)
 }
 \arguments{
-\item{object}{A \code{multiScaleR} fit with \code{backend = "profile_glm"}
-or \code{backend = "joint_nb2"}. For \code{backend = "joint_mixed"},
-only conditional native covariance is available.}
+\item{object}{A \code{multiScaleR} fit from \code{backend = "profile_glm"} or
+\code{backend = "joint_nb2"}. A \code{backend = "joint_mixed"} fit returns only
+native conditional covariance. Other backends raise an error. Use
+\code{vcov(object$opt_mod)} for their coefficient covariance conditional on the
+selected scales.}
 
-\item{type}{\code{"joint"} returns observed-information covariance of log
-kernel parameters, regression coefficients, and log dispersion (when
-present). \code{"conditional"} returns coefficient covariance with kernel
-parameters held fixed and dispersion estimated. At an exact Poisson
-boundary it also holds dispersion at that boundary; joint covariance
-remains unavailable.}
+\item{type}{\code{"joint"} (the default) or \code{"conditional"}.
+\itemize{
+\item \code{"joint"} returns the observed-information covariance of the log kernel
+parameters, the regression coefficients, and the log dispersion when the
+family has one.
+\item \code{"conditional"} returns the coefficient covariance with the kernel
+parameters held fixed and the dispersion estimated. At the exact Poisson
+boundary of a \code{"joint_nb2"} fit it also holds the dispersion at that
+boundary, and joint covariance is unavailable there.
+}}
 
-\item{...}{Passed to native \code{vcov()} for \code{joint_mixed}; otherwise reserved.}
+\item{...}{Passed to native \code{vcov()} for \code{"joint_mixed"}. Otherwise unused.}
 }
 \value{
-A named covariance matrix. Joint covariance is unavailable at
-parameter bounds or when identifiability diagnostics fail; in that case
-this method raises an error rather than reporting a misleading Wald result.
-For \code{joint_mixed} with \code{type = "conditional"}, returns the native
-glmmTMB covariance list by model component, conditional on selected scales.
+A numeric covariance matrix with named rows and columns, as
+described in Details. For \code{"joint_mixed"} with \code{type = "conditional"},
+the native glmmTMB covariance list, one matrix per model component,
+conditional on the selected scales.
 }
 \description{
-Covariance for an analytic multiscale GLM
+Return the covariance matrix of the estimated parameters from a
+\code{\link[=multiScale_optim]{multiScale_optim()}} fit made with an analytic backend. The joint matrix
+covers the kernel parameters and the regression coefficients together, and
+it is what \code{\link[=predict.multiScaleR]{predict.multiScaleR()}} uses for joint uncertainty. The
+conditional matrix covers the coefficients with the kernel parameters held
+at their estimates. \link{multiScaleR-prediction} explains when each kind of
+uncertainty applies.
+}
+\section{Read the joint matrix}{
+Rows and columns are named by parameter:
+\itemize{
+\item \verb{log_scale:<covariate>}: \code{log(sigma / u)}, the natural log of that
+covariate's sigma after dividing it by the internal distance unit
+\code{u = object$kernel_inputs$unit_conv}. Dividing by \code{u} shifts the log by a
+constant, so the variance equals the variance of log(sigma) in map units.
+\item \verb{log_shape:<covariate>}: the log shape parameter, for \code{kernel = "expow"}.
+\item \verb{beta:<term>}: a regression coefficient on the link scale, named after
+its model-matrix column, for example \code{beta:(Intercept)}. A standardized
+kernel-weighted covariate's coefficient describes one standard deviation
+of that covariate.
+\item A final dispersion row when the family has one: \code{log_theta} for a
+negative binomial model and \code{log_residual_sd} for a Gaussian model.
+}
+
+The square root of a diagonal element is a standard error on that
+parameter's scale. For sigma, a 95\% Wald interval in map units is
+\verb{sigma x exp(-1.96 x SE)} to \verb{sigma x exp(1.96 x SE)}, where \code{SE} is the
+standard error of \code{log_scale}. These are the limits that \code{summary(object)}
+reports, and \code{object$scale_est$SE} is \verb{sigma x SE}. Off-diagonal elements
+show how the estimates trade off, and \code{\link[stats:cov2cor]{stats::cov2cor()}} turns them into
+correlations.
+
+Joint covariance is unavailable for fits at a parameter bound or when the
+identifiability checks fail. In that case \code{type = "joint"} raises an error
+that lists \code{object$uncertainty$reasons}, rather than reporting a misleading
+Wald result. The conditional matrix remains available.
+}
+
+\section{Read the conditional matrix}{
+The conditional matrix holds only the \verb{beta:} rows. It answers how
+uncertain the coefficients are if the scales of effect are exactly their
+estimates, which is also what \code{vcov(object$opt_mod)} and
+\code{summary(object$opt_mod)} describe.
+}
+
+\examples{
+## Running example: counts at 100 survey points, two landscape layers
+data("landscape_counts")
+data("surv_pts")
+pts <- terra::vect(surv_pts)
+land <- terra::rast(system.file("extdata", "landscape.tif",
+                                package = "multiScaleR"))[[c("land1", "land2")]]
+inputs <- kernel_prep(pts, land, max_D = 1700, kernel = "gaussian",
+                      bin = TRUE, verbose = FALSE)
+dat <- data.frame(landscape_counts, inputs$kernel_dat)
+start <- glm(counts ~ site + land1 + land2, family = poisson(), data = dat)
+fit <- multiScale_optim(start, inputs, backend = "profile_glm",
+                        n_cores = 1, verbose = FALSE)
+
+## Joint covariance of the two log scales and four coefficients
+V <- vcov(fit)
+round(V, 4)
+
+## 95\% Wald limits for sigma, in meters, from the log-scale standard errors.
+## They match the limits in summary(fit).
+se_log <- sqrt(diag(V))[c("log_scale:land1", "log_scale:land2")]
+sigma <- stats::setNames(fit$scale_est$Mean, rownames(fit$scale_est))
+round(cbind(sigma, lower = sigma * exp(-qnorm(0.975) * se_log),
+            upper = sigma * exp(qnorm(0.975) * se_log)))
+
+## Correlations show how the scale and coefficient estimates trade off
+round(cov2cor(V), 2)
+
+## Coefficient standard errors with and without scale uncertainty
+round(cbind(joint = sqrt(diag(V))[-(1:2)],
+            conditional = sqrt(diag(vcov(fit, type = "conditional")))), 3)
 }
 \seealso{
-\code{\link{multiScale_optim}}, \code{\link{predict.multiScaleR}}
+\code{\link[=predict.multiScaleR]{predict.multiScaleR()}} for predictions that use these matrices,
+\link{multiScaleR-prediction}, \code{\link[=multiScale_optim]{multiScale_optim()}}, and
+\code{vignette("v09-estimates-and-intervals", package = "multiScaleR")}.
 }

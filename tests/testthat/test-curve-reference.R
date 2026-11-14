@@ -229,6 +229,7 @@ test_that("retained conditional Cox curves verify raw bases, strata and compound
 })
 
 test_that("multi-component GAM curves select native link and response columns explicitly", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- refit_spatial_fixture(); dat <- f$data
   dat$y <- dat$y + as.integer(dat$site)^2

@@ -14,46 +14,67 @@ check_bayes_setup(
 \method{print}{multiScaleR_bayes_setup}(x, ...)
 }
 \arguments{
-\item{method}{Inference method to check: \code{"sample"} (default) needs
-RTMB, tmbstan, rstan, and posterior; \code{"laplace"} and
-\code{"marginal"} need RTMB. \code{"slice"} and \code{"prepare"} need
-no optional packages for serial fitting. Install posterior (version
-1.6.0 or later) for slice chain diagnostics.}
+\item{method}{Computation method to check, as in \code{\link[=multiScale_bayes]{multiScale_bayes()}}.
+\code{"sample"} (default, NUTS) needs RTMB, tmbstan, rstan, and posterior.
+\code{"laplace"} and \code{"marginal"} need RTMB. \code{"slice"} and \code{"prepare"} need
+no optional packages to run in one process. Slice chain diagnostics need
+posterior (version 1.6.0 or later).}
 
-\item{correction}{\code{"none"} (default) or \code{"importance"} for
-\code{method = "marginal"}. Importance correction also needs posterior.}
+\item{correction}{\code{"none"} (default) or \code{"importance"}. Importance
+correction applies only to \code{method = "marginal"} and also needs
+posterior.}
 
-\item{cores}{Requested worker limit. Values greater than one also check
-processx for fitting methods. Preparation uses one process.}
+\item{cores}{Requested number of worker processes; default 1. A value
+greater than one also checks processx, which parallel fits need. It has
+no effect for \code{"prepare"}, which always uses one process.}
 
-\item{x}{A setup-check object.}
+\item{x}{A \code{multiScaleR_bayes_setup} object from \code{check_bayes_setup()}.}
 
-\item{...}{Reserved for extensions; unsupported arguments cause an error.}
+\item{...}{Not used. Supplying any further argument is an error.}
 }
 \value{
-A \code{multiScaleR_bayes_setup} list with \code{method},
-\code{correction}, \code{ready} (whether package checks passed),
-\code{packages} (a data frame with \code{package}, \code{minimum},
-installed \code{version}, \code{loadable}, \code{meets_version},
-\code{passed}, and a diagnostic \code{message}), and \code{notes}.
-A passed check does not certify a working compiler, successful sampling,
-convergence, or adequate memory. Fit a small model next.
+An object of class \code{multiScaleR_bayes_setup}, a list with these
+elements.
+\itemize{
+\item \code{method}, \code{correction}: the settings checked.
+\item \code{ready}: \code{TRUE} when every listed package loads and meets its minimum
+version.
+\item \code{packages}: a data frame with one row per package and columns
+\code{package}, \code{minimum} (the minimum version, or \code{NA} when any version
+works), installed \code{version}, \code{loadable}, \code{meets_version}, \code{passed}, and
+a diagnostic \code{message} that says what to install or update.
+\item \code{notes}: what the check does and does not cover.
+}
+
+Printing the object lists the packages and the notes, and returns it
+invisibly. A passed check does not certify a working compiler,
+successful sampling, convergence, or adequate memory. Fit a small model
+next.
 }
 \description{
-Check whether the R packages needed by a Bayesian inference method can be
-loaded and meet the package's minimum versions. Nothing is installed, no
-model is fitted, and compiler or sampling performance is not tested.
+Check whether the R packages that a \code{\link[=multiScale_bayes]{multiScale_bayes()}} computation
+method needs can be loaded and meet the package's minimum versions.
+Nothing is installed, no model is fitted, and neither the compiler nor
+sampling performance is tested.
 }
 \details{
-Preparation can validate your data and formulas before installing
-sampling software. For installation instructions, including Windows
-toolchain guidance, see
-\code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
+Preparation (\code{method = "prepare"}) validates your data and
+formulas before you install any sampling software. Installing the NUTS
+packages from source can require a C++ compiler, which on Windows comes
+with Rtools. \code{vignette("v13-bayesian-scales", package = "multiScaleR")}
+covers installation, and
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")} compares
+the methods.
 }
 \examples{
-check_bayes_setup(method = "prepare")
-check_bayes_setup(method = "slice", cores = 2)
+check_bayes_setup(method = "prepare")  # always ready: nothing to install
+
+# Packages for slice sampling on two workers. `ready` is FALSE when
+# processx is missing. The message column says what to install.
+setup <- check_bayes_setup(method = "slice", cores = 2)
+setup$ready
+setup$packages[c("package", "loadable", "passed")]
 }
 \seealso{
-\code{\link{multiScale_bayes}}
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}
 }

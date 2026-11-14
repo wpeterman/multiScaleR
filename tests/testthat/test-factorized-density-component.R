@@ -1,4 +1,5 @@
 test_that("ordinary density components match native full integrals in both coordinates", {
+  skip_on_cran()
   preparations <- 0L; points <- 0L; maximum <- 0
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
@@ -68,6 +69,7 @@ test_that("mean wrapper parity and strict population layouts preserve evaluation
 })
 
 test_that("ordinary raw evaluations reach neither tape nor optimizer boundaries", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- .msr_marginal_reduce(private_sq_fixture()$spec, "scale")
   p <- private_sq_parameters(s); p$scale_z <- p$response_z <- numeric()

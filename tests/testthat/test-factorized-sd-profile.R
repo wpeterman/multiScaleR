@@ -24,6 +24,7 @@ response_profile_covariance_nll <- function(spec, p, sd) {
 }
 
 test_that("response SD traces retain exact covariance targets, starts and fixed-SD witnesses", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- response_sd_profile_fixture()
   before <- serialize(f$spec, NULL); rng <- .Random.seed
@@ -142,6 +143,7 @@ test_that("profile scope and identification failures stop before fitting", {
 })
 
 test_that("conditional selection preserves lower ineligible and competing starts", {
+  skip_on_cran()
   f <- response_sd_profile_fixture()
   calls <- 0L
   local_mocked_bindings(.msr_response_profile_attempt = function(spec, sd, initial, iter.max) {

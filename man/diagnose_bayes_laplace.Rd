@@ -14,80 +14,145 @@ diagnose_bayes_laplace(
 )
 }
 \arguments{
-\item{object}{A fitted \code{\link{multiScale_bayes}} object from joint
-Laplace or uncorrected marginal Laplace. Retain the original approximation
-draws and geometry.}
+\item{object}{A fitted \code{\link[=multiScale_bayes]{multiScale_bayes()}} object from
+\code{method = "laplace"}, or from \code{method = "marginal"} without importance
+correction, with its approximation draws and geometry intact. The check
+needs the RTMB and posterior (version 1.6.0 or later) packages.}
 
-\item{thresholds}{Named list of fitted scale thresholds as in
-\code{\link{diagnose_bayes_probabilities}}. Each predictor's thresholds
-are checked for every distinct fitted scale-formula combination.}
+\item{thresholds}{Named list of scale thresholds, as in
+\code{\link[=diagnose_bayes_probabilities]{diagnose_bayes_probabilities()}}. Each name selects a fitted landscape
+predictor, and each vector holds distinct finite thresholds, such as
+\code{list(habitat = c(150, 350))}. Every threshold is checked for every
+distinct fitted combination of scale covariates and groups, such as each
+year.}
 
-\item{scale}{Threshold units. \code{"distance"} (default) uses map units.
-\code{"log"} uses their natural logarithm. The event is a fitted kernel
-scale less than or equal to the threshold.}
+\item{scale}{Units of \code{thresholds}. \code{"distance"} (default) uses map units
+and needs positive values. \code{"log"} uses natural log map units. The event
+is a fitted kernel scale less than or equal to the threshold.}
 
-\item{tolerance}{Absolute probability difference to check. Default
-\code{0.05}. Choose a threshold and tolerance relevant to the inference.}
+\item{tolerance}{Absolute difference in probability that matters for your
+inference, strictly between 0 and 1; default 0.05. Choose it, and the
+thresholds, before looking at the results.}
 
-\item{candidates}{Number of fresh importance candidates. Default 16384.
-The validation study used 65536. Increasing the budget can reduce
-simulation error when the proposal overlaps the posterior sufficiently.
-The reference retains all candidates for weight and event diagnostics,
-so memory use grows with this count and the fitted parameter dimension.}
+\item{candidates}{Number of fresh importance candidates, at least 2000;
+default 16384. The validation study used 65536. More candidates can
+reduce simulation error when the proposal overlaps the posterior well.
+Every candidate is kept for the weight and event diagnostics, so memory
+use grows with this number and with the number of parameters.}
 
-\item{seed}{Optional positive integer seed for the assessment. A supplied
-seed preserves the caller's random-number state.}
+\item{seed}{Optional positive integer seed for the assessment. Your own
+random-number state is restored afterward.}
 }
 \value{
-A list with \code{available} indicating whether importance ratios
-and reference summaries could be calculated. A reference that fails
-overlap checks still has \code{available = TRUE}. Its \code{reason} explains
-why the event statuses remain unresolved. The report includes the
-original \code{raw_diagnostics}, importance
-\code{overlap} checks, counts of posterior density rechecks
-(\code{target_evaluation}), and a \code{probabilities} table. Each row
-identifies the fitted scale combination and threshold, then reports
-the approximation and reference CDF estimates, weighted reference MCSE,
-signed difference and numerical bounds, indicator ESS, the absolute
-difference between two halves of the reference, and a status. Settings
-retain the \code{candidates}, \code{seed}, and \code{tolerance}, plus
-coefficient-proposal and defensive-draw counts. An unavailable reference
-records a \code{reason} and leaves assessment statuses unresolved.
+A list with these elements.
+\itemize{
+\item \code{available}: \code{TRUE} when importance ratios and reference summaries
+could be calculated. A reference that fails its overlap checks is still
+available, but its statuses stay \code{"unresolved"}.
+\item \code{reason}: why the reference is unavailable, why it failed its overlap
+checks, or that the original fit failed its own diagnostics. An empty
+string otherwise.
+\item \code{raw_diagnostics}: the fit's original \code{diagnostics}, unchanged.
+\item \code{overlap}: the importance checks of the reference (\code{passed},
+\code{pareto_k}, \code{ess}, \code{min_tail_ess}, \code{max_weight}, \code{split_cdf_error}), or
+\code{NULL} when the reference is unavailable.
+\item \code{target_evaluation}: counts of posterior density evaluations and of
+rechecks of invalid values.
+\item \code{probabilities}: a data frame with one row per fitted scale combination
+and threshold. \code{covariate}, \code{group}, \code{row}, \code{threshold}, and
+\code{threshold_scale} identify the event. \code{approximation} is the
+probability from the fit's draws and \code{reference} the importance-weighted
+probability, with its Monte Carlo standard error \code{reference_mcse}.
+\code{difference} is the approximation minus the reference, and
+\code{difference_lower} and \code{difference_upper} bound it numerically.
+\code{indicator_ess} is the effective sample size of the reference event
+indicator, \code{split_reference_difference} the absolute difference between
+the two halves of the reference, and \code{status} the verdict described in
+"Read the status".
+\item \code{candidates}, \code{seed}, \code{tolerance}: the settings used.
+\item \code{coefficient_proposal}: the number of fallback coefficient proposals
+(\code{fallbacks}) and the largest remaining Newton step (\code{max_step}).
+\item \code{defensive_draws}: the number of candidates drawn from the defensive
+prior component.
+\item \code{metadata_establishes_eligibility}: always \code{FALSE}.
+}
 }
 \description{
-Compare selected scale probabilities with a fresh importance estimate of
-the same fitted posterior. Inspect this check alongside the fit's original
-optimizer and integration diagnostics.
+Check the probability that each fitted scale lies at or below a distance
+you name, as reported by a joint Laplace or uncorrected marginal Laplace
+fit, against a fresh importance-weighted estimate of the same posterior.
+Read this check alongside the fit's own optimizer and integration
+diagnostics.
 }
 \details{
 This function is experimental. Its arguments and results may change in a
 later release without a deprecation period.
+}
+\section{Read the status}{
+\tabular{lll}{
+   \code{status} \tab Meaning \tab What to do \cr
+   \code{"discrepancy"} \tab The numerical bounds on the difference lie wholly beyond \code{tolerance} on one side \tab Do not report the approximate probability. Sample the model \cr
+   \code{"within_tolerance"} \tab Both bounds lie inside \code{tolerance} \tab You can report the approximate probability, for this threshold only \cr
+   \code{"unresolved"} \tab Every other case, including a reference too imprecise or overlapping the posterior too poorly to decide \tab Treat the probability as unchecked. Raise \code{candidates}, or sample \cr
+}
 
-The reference uses a mixture of heavy-tailed local proposals and
-a defensive component based on the latent-effect and scale priors. It
-draws response coefficients from their exact Gaussian conditional or a
-normalized heavy-tailed conditional proposal for other families. The
-full posterior density and actual mixture density determine all weights.
-Neither the approximation nor its draws are replaced.
 
-The reference must pass the package's importance overlap checks and
-the event must have indicator ESS at least 400. Its independent sample
-halves must differ by no more than the smaller of 0.05 and
-\code{tolerance}. The numerical bounds combine three-standard-error
-uncertainty for the weighted reference with Wilson bounds for the
-original approximate draws. A \code{"discrepancy"} lies wholly beyond
-the tolerance on either side. \code{"within_tolerance"} places both
-numerical bounds inside the tolerance. Other cases are
-\code{"unresolved"}. A constant reference indicator or a failed original
-fit diagnostic leaves the assessment unresolved.
+An event can be resolved only when the reference passes the package's
+importance overlap checks, the original fit passed its own diagnostics, the
+event has an indicator ESS of at least 400, and the two independent halves
+of the reference differ by no more than the smaller of 0.05 and
+\code{tolerance}. The bounds combine three standard errors of the weighted
+reference with Wilson bounds for the original approximate draws. A constant
+reference indicator also leaves the event unresolved. Expect
+\code{"unresolved"} often, and read it as "not checked", not as "close enough".
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")} reports how
+often each status occurred in simulations.
+}
 
-This exploratory assessment targets only the requested fitted scale
-probabilities. A heavy-tailed proposal can miss posterior regions.
-The report does not certify approximation accuracy, general calibration,
-held-out predictions, or the fit's original diagnostics. Compare with a
-full posterior fit when the conclusions depend on these probabilities.
-Requires RTMB and posterior.
+\section{How the reference is built}{
+Candidates come 80\% from heavy-tailed local proposals around the
+approximation and 20\% from a defensive component based on the latent-effect
+and scale priors. Response coefficients are drawn from their exact Gaussian
+conditional, or from a normalized heavy-tailed conditional proposal for
+other families. The full posterior density and the actual mixture density
+determine every weight. Neither the approximation nor its draws are
+replaced.
+
+This exploratory check targets only the requested scale probabilities. A
+heavy-tailed proposal can still miss posterior regions. The report does not
+certify approximation accuracy, general calibration, held-out predictions,
+or the fit's original diagnostics. Compare with a full posterior fit
+whenever your conclusions depend on these probabilities.
+}
+
+\examples{
+\donttest{
+if (requireNamespace("RTMB", quietly = TRUE) &&
+    requireNamespace("posterior", quietly = TRUE)) {
+  example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
+    package = "multiScaleR"))
+  # A joint Laplace fit of the annual model, which takes about a second
+  fast_fit <- multiScale_bayes(count ~ habitat + factor(year) + (1 | site),
+    example$inputs, example$data, scales = list(habitat = ~1 + (1 | year)),
+    row_id = "site_year", family = "nbinom2",
+    priors = list(scale_median = 250, scale_group_sd = 0.5),
+    method = "laplace", seed = 527001)
+
+  # Probability that each year's sigma is 150 m or less. The smallest
+  # candidate budget keeps this example short. The validation study used
+  # 65536 candidates.
+  check <- diagnose_bayes_laplace(fast_fit,
+    thresholds = list(habitat = 150), candidates = 2000, seed = 127)
+  print(check$reason)   # empty when the reference and the fit passed
+  print(check$probabilities[c("group", "approximation", "reference",
+                              "status")])
+  # "unresolved" means the probability was not checked, not that it is
+  # close enough.
+}
+}
 }
 \seealso{
-\code{\link{multiScale_bayes}}, \code{\link{diagnose_bayes_probabilities}}
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}, \code{\link[=diagnose_bayes_probabilities]{diagnose_bayes_probabilities()}},
+\code{\link[=posterior_scales]{posterior_scales()}}, \link[=multiScaleR_bayes-class]{multiScaleR_bayes};
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
 }

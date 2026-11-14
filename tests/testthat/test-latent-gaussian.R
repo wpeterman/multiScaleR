@@ -20,6 +20,7 @@ test_that("proper Gaussian blocks have normalized densities and exact coordinate
 })
 
 test_that("Gaussian block derivatives match independent dense precision calculations", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   A <- diag(3); C <- matrix(c(2,.2,.1,.2,1,.3,.1,.3,1.5),3)
   block <- multiScaleR:::.msr_gaussian_block(A,C)
@@ -38,6 +39,7 @@ test_that("Gaussian block derivatives match independent dense precision calculat
 })
 
 test_that("IID projection adapters reproduce scale and response grouping effects", {
+  skip_on_cran()
   f <- bayesian_scale_fixture(n_site=4,n_year=3)
   original <- prepare_bayesian_fixture(f)$specification
   p <- original$parameters; p$scale_z[] <- c(-.2,.1,.3)

@@ -121,6 +121,7 @@ bam_extended_native <- function(entry, data, type, optimized, controls = list())
 }
 
 test_that("Gamma and NB BAM points and snapshots preserve native targets and warnings", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   cases <- native_bam_extended_fixture()
   expect_length(cases, 18L)
@@ -159,6 +160,7 @@ test_that("Gamma and NB BAM points and snapshots preserve native targets and war
 })
 
 test_that("Gamma and NB BAM maps use exact native callback batches", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
   callback <- .msr_native_raster_eval
@@ -204,6 +206,7 @@ test_that("Gamma and NB BAM maps use exact native callback batches", {
 })
 
 test_that("Gamma and NB BAM curves keep conditional means and raw reference axes", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
@@ -242,6 +245,7 @@ test_that("Gamma and NB BAM curves keep conditional means and raw reference axes
 })
 
 test_that("NB BAM selection counts actual scale and theta parameters exactly once", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   for (entry in native_bam_extended_fixture()) {
     model <- entry$model; before <- model; labels <- c("wrapped", "native")
@@ -294,6 +298,7 @@ test_that("NB BAM selection counts actual scale and theta parameters exactly onc
 })
 
 test_that("Gamma and NB BAM workers retain native matrices and conditional covariance", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old), add = TRUE)
   pool <- parallel::makePSOCKcluster(2L); on.exit(parallel::stopCluster(pool), add = TRUE)

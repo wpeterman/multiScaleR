@@ -2,17 +2,39 @@
 % Please edit documentation in R/data_files.R
 \name{landscape_counts}
 \alias{landscape_counts}
-\title{Example data frame}
+\title{Simulated counts for the vignette example}
 \format{
-A data frame with 100 rows and 2 columns. Data were simulated from a Poisson distribution with an intercept of 0.25; land1 effect = -0.5; site effect = 0.3; land2 effect = 0.7. True simulated Gaussian scale effects (sigma): land1 = 250; land2 = 500. For use with package vignette.
-\describe{
-\item{counts}{ --> Simulated counts at spatial locations}
-\item{site}{   --> A habitat variable measured at the site}
+A data frame with 100 rows, one per point in \link{surv_pts}, and 2
+columns:
+\itemize{
+\item \code{counts}: integer count at each point.
+\item \code{site}: a habitat variable measured at the point itself, which has no
+scale of effect.
 }
+}
+\source{
+Simulated for this package.
 }
 \usage{
 data(landscape_counts)
 }
 \description{
-Example count data to be used vignette document example
+Simulated counts at the 100 points in \link{surv_pts}, used as the running
+example in the vignettes with the \code{landscape.tif} raster.
+}
+\details{
+Counts were simulated from a Poisson distribution with an
+intercept of 0.25 and log-scale coefficients of -0.5 for \code{land1}, 0.3 for
+\code{site}, and 0.7 for \code{land2}. The true Gaussian scales of effect (sigma) are
+250 map units for \code{land1} and 500 for \code{land2}. The \code{land1} and \code{land2}
+covariates are not stored here; build them from \link{landscape} with
+\code{\link[=kernel_prep]{kernel_prep()}}.
+}
+\examples{
+data(landscape_counts)
+summary(landscape_counts)
+}
+\seealso{
+\link{surv_pts}, \link{landscape},
+\code{vignette("v01-quickstart", package = "multiScaleR")}.
 }

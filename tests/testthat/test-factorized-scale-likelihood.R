@@ -1,4 +1,5 @@
 test_that("factorized kernel densities agree and remain differentiable in extreme tails", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for(kernel in c("gaussian","exp")) for(family in c("gaussian","poisson","binomial","nbinom2")) {
     f <- bayesian_scale_fixture(n_site=4,n_year=3,kernel=kernel)
@@ -21,6 +22,7 @@ test_that("factorized kernel densities agree and remain differentiable in extrem
 })
 
 test_that("ordinary binomial likelihoods retain finite extreme-logit values", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=4,n_year=3)
   f$data$count <- as.integer(f$data$count>2)
@@ -38,6 +40,7 @@ test_that("ordinary binomial likelihoods retain finite extreme-logit values", {
 })
 
 test_that("concentrated Gaussian integrals retain finite audited derivatives", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=20,n_year=5,seed=8321)
   s <- multiScaleR:::.msr_marginal_prepare(count~habitat+temp,f$inputs,f$data,
@@ -61,6 +64,7 @@ test_that("concentrated Gaussian integrals retain finite audited derivatives", {
 })
 
 test_that("a second integration coordinate resolves very large annual SDs", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=4,n_year=3)
   s <- multiScaleR:::.msr_marginal_prepare(count~habitat+temp,f$inputs,f$data,
@@ -81,6 +85,7 @@ test_that("a second integration coordinate resolves very large annual SDs", {
 })
 
 test_that("adaptive factorized integration has independent values and derivatives", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=4,n_year=3)
   s <- multiScaleR:::.msr_marginal_prepare(count~habitat+temp,f$inputs,f$data,
@@ -116,6 +121,7 @@ test_that("adaptive factorized integration has independent values and derivative
 })
 
 test_that("factorized fitting preserves exact reduced models and rejects coupled years", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=12,n_year=4,annual=FALSE)
   f$data$temp <- rep(seq(-1,1,length.out=12),4)

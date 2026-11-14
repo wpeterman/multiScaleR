@@ -64,6 +64,7 @@ unmarked_trained_reference <- function(model, type, rows, backTransform = TRUE, 
 }
 
 test_that("unmarked trained point tables retain native component targets and SEs", {
+  skip_on_cran()
   f <- unmarked_trained_fixture()
   expect_identical(f$calls, 6L)
   provider <- body(unmarked:::make_mod_matrix)
@@ -348,6 +349,7 @@ unmarked_zero_slope_fixture <- function() {
 }
 
 test_that("zero-effect admission does not require unused learned random slopes", {
+  skip_on_cran()
   f <- unmarked_zero_slope_fixture(); expect_identical(f$calls, 2L)
   rows <- unmarked_trained_fixture()$rows
   for (name in names(f$fits)) {
@@ -379,6 +381,7 @@ test_that("zero-effect admission does not require unused learned random slopes",
 })
 
 test_that("ordinary unmarked curves share original native point targets", {
+  skip_on_cran()
   inherited <- unmarked_trained_fixture(); extra <- unmarked_zero_slope_fixture()
   models <- c(inherited$fits, stats::setNames(extra$fits, c("slope_P", "slope_NB")))
   old <- options("contrasts"); on.exit(options(old), add = TRUE)
@@ -440,6 +443,7 @@ test_that("ordinary S4 control aliases match native semantics before target admi
 })
 
 test_that("checked ordinary contexts survive two-worker prediction transfer", {
+  skip_on_cran()
   f <- unmarked_trained_fixture(); model <- f$fits$P
   rows <- model@data@siteCovs[f$rows, , drop = FALSE]
   thin <- list(object = list(opt_mod = model), type = "state", se.fit = TRUE,
@@ -459,6 +463,7 @@ test_that("checked ordinary contexts survive two-worker prediction transfer", {
 # Reuse the SAME eight failure-cached software fixture sites above. No new fit,
 # sampler, recovery, profile or timing constructor is introduced here.
 test_that("ordinary detection curves retain observation-trained native targets", {
+  skip_on_cran()
   inherited <- unmarked_trained_fixture(); extra <- unmarked_zero_slope_fixture()
   models <- c(inherited$fits, stats::setNames(extra$fits, c("slope_P", "slope_NB")))
   old <- options("contrasts"); on.exit(options(old), add = TRUE)
@@ -505,6 +510,7 @@ test_that("ordinary detection curves retain observation-trained native targets",
 })
 
 test_that("ordinary lambda plotting aliases and zero-only curve metadata agree", {
+  skip_on_cran()
   inherited <- unmarked_trained_fixture(); extra <- unmarked_zero_slope_fixture()
   models <- c(inherited$fits, stats::setNames(extra$fits, c("slope_P", "slope_NB")))
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
@@ -557,6 +563,7 @@ test_that("unqualified native subclasses keep their original metadata", {
 
 # Reuse the same eight deterministic software fits; no additional fit sites.
 test_that("requested unmarked point contexts ignore unrelated component metadata", {
+  skip_on_cran()
   f <- unmarked_trained_fixture()
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   for (name in names(f$fits)) for (type in c("state", "det")) {

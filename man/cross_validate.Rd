@@ -25,247 +25,388 @@ cross_validate(
 \method{print}{multiScaleR_cv}(x, ...)
 }
 \arguments{
-\item{formula}{Two-sided GLM formula. The response is a data column or
-\code{cbind(successes, failures)}. An \code{I()} wrapper is also accepted.
-Predictor expressions, interactions, factors, offsets and supported learned
-transformations use the existing backend's native formula machinery.
-Supply every variable in \code{data} or the prepared spatial inputs.}
+\item{formula}{Two-sided model formula, written as for \code{\link[stats:glm]{stats::glm()}}. The
+response must be a column of \code{data}, optionally wrapped in \code{I()}, or
+\code{cbind(successes, failures)} for grouped binomial data. Create any other
+transformed response as a column before the call. Predictors can include
+factors, interactions, offsets, and the data-dependent terms described in
+"Formula terms that learn from the data". Every variable must be a column
+of \code{data} or a covariate prepared in \code{kernel_inputs}, and at least one
+predictor must be a covariate whose scale is optimized.}
 
-\item{data}{Data frame containing raw responses and nonspatial formula
-variables. Unique row names must match the prepared spatial row IDs.
-Prepared spatial columns are rebuilt inside each fold, replacing any
-supplied values. No fitting rows are silently omitted for missing values.}
+\item{data}{Data frame with one row per observation, holding the raw
+responses and every nonspatial predictor. Its row names are the row IDs.
+They must be unique and must be the same set of IDs as the row names of
+\code{kernel_inputs$kernel_dat}. The folds refer to rows by these IDs. Spatial
+covariate columns are rebuilt inside every fold, so any values \code{data}
+holds for them are ignored. Rows with missing values are never dropped
+silently, so a fold that contains one fails.}
 
-\item{kernel_inputs}{A \code{multiScaleR_data} object from
-\code{\link{kernel_prep}} with cell-level distances and source values
-retained. Use \code{store_cell_data = TRUE}. Its buffer, initial scales,
-metric definitions and other controls must be chosen independently of the
-assessment outcomes. Modern \code{\link{kernel_prep_by_group}} inputs
-are supported when their named \code{raster_group} map aligns with prepared
-row IDs. Lean-only preparation is not supported.}
+\item{kernel_inputs}{A \code{multiScaleR_data} object from \code{\link[=kernel_prep]{kernel_prep()}} or
+\code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}} for the same observations. It must keep the
+cell-level distances and values (\code{store_cell_data = TRUE}, the default),
+because every fold rebuilds its covariates from the raw cells. Lean
+objects are rejected. Choose \code{max_D}, the starting scales, and any metric
+definitions without looking at the assessment outcomes.}
 
-\item{folds}{Uniquely named list of explicit splits. Each split contains
-nonempty character vectors \code{analysis} and \code{assessment} of row
-IDs. They must be disjoint within a split. Splits can omit rows for spatial
-buffers and can repeat assessment rows across splits. Keep dependent sites,
-animals or other sampling groups together when defining the splits.}
+\item{folds}{Named list of explicit splits, for example from
+\code{\link[=grouped_cv_folds]{grouped_cv_folds()}} or \code{\link[=spatial_cv_folds]{spatial_cv_folds()}}. Each split is a list of two
+character vectors of row IDs, \code{analysis} and \code{assessment}, which must not
+overlap. A row can be left out of a split entirely (for example, by a
+spatial buffer) and can be assessed in more than one split. Keep rows that
+share a site, animal, or other sampling unit on the same side of every
+split.}
 
-\item{family}{Character response family: \code{"gaussian"} uses the identity
-link, \code{"poisson"}, \code{"nbinom2"} and \code{"Gamma"} use log links,
-and \code{"binomial"} uses the logit link. Lowercase \code{"gamma"} is an
-alias. NB2 means variance equals mean plus mean squared divided by theta;
-Gamma variance equals dispersion times mean squared. The default is
-\code{"gaussian"}. Other links and quasi-likelihood targets are unqualified.}
+\item{family}{Character response family. Choose \code{"gaussian"} (identity
+link, the default), \code{"poisson"} (log), \code{"binomial"} (logit), \code{"nbinom2"}
+(negative binomial, log), or \code{"Gamma"} (log). Lowercase \code{"gamma"} is
+accepted. For \code{"nbinom2"} the variance is mu + mu^2 / theta, where mu is
+the expected count and theta the size parameter, so a small theta means
+strong extra variation. For \code{"Gamma"} the variance is dispersion x mu^2.
+Other links and quasi-likelihood families are not supported.}
 
-\item{backend}{Scale-fitting backend passed to \code{\link{multiScale_optim}}.
-\code{"profile_glm"} remains the default, except that Gamma and fixed-theta
-NB2 default to their required native \code{"refit"} route. Estimated NB2
-also supports \code{"joint_nb2"}. Explicit incompatible backends are
-rejected. Existing starts, convergence, cold/limiting, curvature and
-kernel/metric guards remain in force.}
+\item{backend}{Fitting route for the scales, passed to
+\code{\link[=multiScale_optim]{multiScale_optim()}}. The default \code{"profile_glm"} is the fast analytic
+route. \code{"refit"} refits the GLM at every trial scale and accepts formula
+terms the default rejects, such as a spline of an optimized covariate
+without fixed knots. \code{"joint_nb2"} estimates the scales, coefficients,
+and theta together, and applies only to \code{family = "nbinom2"} with \code{theta}
+estimated. If you leave \code{backend} unset, \code{"Gamma"} and an NB2 model with
+a fixed \code{theta} use \code{"refit"}, the only route they support. Naming another
+backend for them is an error. The usual starting-value, convergence, and
+kernel or metric checks of \code{\link[=multiScale_optim]{multiScale_optim()}} apply in every fold. See
+\link{multiScaleR-fitting-methods}.}
 
-\item{weights}{Optional nonnegative integer frequency weights, one per data
-row in its supplied order. Names, when present, must match that order.
-Gaussian weights must all equal one. Binomial trials belong in the
-two-column response, separately from frequency weights; weighted proportions
-are not accepted. A backend may impose stricter native weight requirements.}
+\item{weights}{Optional case frequencies, one nonnegative whole number per
+row of \code{data} in the same order. If the vector has names, they must equal
+the row names. A weight of 3 counts the row three times. A weight of 0
+keeps the row in the records but out of the fit and the scores. The
+default \code{NULL} gives every row a weight of one. Gaussian models accept
+only weights of one. For binomial data, put the trial counts in a
+\code{cbind(successes, failures)} response, not in \code{weights}. Weighted
+proportions are rejected. Some scale-fitting backends add their own
+weight requirements.}
 
-\item{optim_args}{Named list of additional \code{multiScale_optim()} controls,
-such as \code{par} or \code{profile_control}. To profile hard radii
-jointly with any smooth bandwidths or shapes in each training split,
-supply \code{radius_grid} with the native refit backend.
-The preparation radius must yield finite values with positive training
-spread for the initial fit. With spatial native refits,
-\code{covariate_transform = "raw"} keeps optimized predictors in their
-kernel/metric units for both initial training fits and later prediction.
-Fixed-metric transforms still use training rows only. Defaults preserve that backend's
-controls. Starts must be selected without assessment outcomes. Object/data
-arguments, custom refit functions, worker pools and parallel controls cannot
-be replaced. Each fold uses one fit worker.}
+\item{optim_args}{Named list of extra \code{\link[=multiScale_optim]{multiScale_optim()}} arguments used
+in every fold, such as \code{par} or \code{profile_control}. Supply \code{radius_grid}
+with \code{backend = "refit"} to profile hard radii, together with any smooth
+scales, in each training split. Supply \code{covariate_transform = "raw"} with
+\code{backend = "refit"} to keep optimized covariates in their own units (see
+"Keep optimized covariates in their own units"). Arguments that supply
+data, the starting model, a custom refit function, parallel workers,
+\code{backend}, or \code{verbose} are reserved. Every fold runs on one worker. The
+default \code{list()} keeps the backend's own defaults. Choose starting values
+without using the assessment outcomes.}
 
-\item{glm_control}{Named list from \code{stats::glm.control()}, used for each
-initial training-only GLM. The default keeps native GLM controls.}
+\item{glm_control}{Named list of \code{\link[stats:glm.control]{stats::glm.control()}} settings for the
+initial GLM fitted to the analysis rows of each fold. The default keeps
+the settings of \code{glm()}.}
 
-\item{metrics}{Optional character vector of score names. Defaults are
-\code{c("rmse", "mae")} for Gaussian, \code{c("rmse", "mae",
-"neg_log_score", "deviance")} for Poisson, and
-\code{c("neg_log_score", "brier")} for binomial. NB2/Gamma default to
-\code{c("rmse", "mae", "neg_log_score")}. Their nuisance-dependent
-deviances are not comparison metrics. Lower values are better.}
+\item{metrics}{Optional character vector of scores to record. The defaults
+depend on \code{family}. They are \code{c("rmse", "mae")} for Gaussian,
+\code{c("rmse", "mae", "neg_log_score", "deviance")} for Poisson,
+\code{c("neg_log_score", "brier")} for binomial, and
+\code{c("rmse", "mae", "neg_log_score")} for NB2 and Gamma. You can request a
+subset of the defaults, but not other scores. NB2 and Gamma leave out the
+deviance because its value depends on theta or the dispersion, which
+makes it unsuitable for comparing models. Lower is better for every
+score, and the \link[=multiScaleR_cv-class]{multiScaleR_cv} page defines each one.}
 
-\item{keep_fits}{Logical. Default \code{FALSE} keeps compact predictions,
-scales and diagnostics. Set \code{TRUE} to retain full fold models in memory
-for inspection; this can use substantially more memory.}
+\item{keep_fits}{Logical. The default \code{FALSE} keeps the predictions, scores,
+fold estimates, and compact diagnostics. \code{TRUE} also keeps the full fitted
+model of every fold in \code{fits}, which can use much more memory. You need
+full fits only to inspect the fold models or to have \code{\link[=select_cv]{select_cv()}} return
+the selected fits.}
 
-\item{keep_selection}{Logical. Default \code{FALSE} does not retain native
-training-selection records. Set \code{TRUE} to use \code{\link{select_cv}}
-without keeping full fits. Records are captured from each actual training
-fit and add no model fitting or diagnostic eligibility.}
+\item{keep_selection}{Logical. \code{TRUE} keeps a compact record of each fold's
+training likelihood and parameter count in \code{selection_records}, which is
+what \code{\link[=select_cv]{select_cv()}} needs when \code{keep_fits = FALSE}. The records come from
+the fits already run, so they add no fitting time. The default is
+\code{FALSE}.}
 
-\item{theta}{Optional finite positive NB2 size fixed before CV, or \code{NULL}
-(default) to estimate it separately in each training set. Fixed theta adds
-no nuisance parameter to K and requires \code{backend = "refit"} for scales.
-Do not choose theta from assessment outcomes. Other families reject it.}
+\item{theta}{Optional NB2 size parameter fixed in advance, one positive
+number. The default \code{NULL} estimates theta separately from the analysis
+rows of each fold. A fixed theta adds no parameter to K (the parameter
+count used by AIC) and requires the \code{"refit"} backend. Fix it only from
+information independent of the assessment outcomes. Other families
+reject it.}
 
-\item{dispersion}{Optional finite positive Gamma dispersion fixed before CV,
-or \code{NULL} (default) for the native training Gamma AIC convention,
-deviance divided by the sum of frequency weights. Fixed dispersion adds
-no nuisance parameter to K. It is supplied to a scoped known-dispersion
-family before fitting, with its normalized density and native coefficient
-SE convention. Other families reject it.}
+\item{dispersion}{Optional Gamma dispersion fixed in advance, one positive
+number. The default \code{NULL} estimates it in each fold as the training
+deviance divided by the sum of the frequency weights, the value native
+Gamma AIC uses. A fixed dispersion adds no parameter to K and is built
+into the Gamma density before fitting. Fix it only from information
+independent of the assessment outcomes. Other families reject it.}
 
-\item{x}{A \code{multiScaleR_cv} result.}
+\item{x}{A \code{multiScaleR_cv} result, for \code{print()}.}
 
-\item{...}{Reserved for future print controls.}
+\item{...}{Not used. Reserved for future print controls.}
 }
 \value{
-An object of class \code{multiScaleR_cv}, additionally inheriting
-\code{multiScaleR_distribution_cv} for NB2/Gamma, a list containing:
-\describe{
-\item{\code{summary}}{Pooled scores with columns \code{metric},
-\code{estimate}, scoring \code{unit}, planned \code{n_assessment},
-\code{n_scored}, \code{weight_sum} and \code{complete}. Estimates are
-\code{NA} if any planned fold fails.}
-\item{\code{metrics}}{The same score columns per \code{fold}. RMSE is the
-square root of pooled squared errors, not the average of fold RMSEs.}
-\item{\code{predictions}}{Every planned assessment occurrence, including
-failed folds: \code{fold}, \code{row_id}, \code{observed} response/count,
-\code{trials}, response-scale \code{prediction}, frequency \code{weight},
-\code{eligible} scoring flag and requested score columns. The \code{rmse}
-column stores squared errors. Failed predictions/scores are \code{NA}.
-NB2/Gamma add \code{distribution_family}, frozen training \code{theta}
-or \code{dispersion}, and the existing joint-NB2 \code{poisson_limit}
-flag. Inapplicable nuisance columns are \code{NA}.}
-\item{\code{distribution}}{NB2/Gamma training distribution metadata per
-fold: family, theta/dispersion, estimated/fixed convention, Poisson-limit
-flag, native rank/K, log likelihood, effective nobs, deviance and weight
-total. A failed training distribution may leave an element \code{NULL}.}
-\item{\code{fold_results}}{Per-fold \code{fold}, \code{n_analysis},
-\code{n_assessment} and \code{status} (\code{"scored"} or \code{"failed"}).}
-\item{\code{folds}, \code{assessment_counts}}{The explicit split plan and
-named counts of assessment occurrences for every input row, including
-unassessed rows. Repeated assessment occurrences each enter pooled scores.}
-\item{\code{training}}{Per-fold initial/fitted normalization,
-coefficients on the link scale, scales in map units, unitless shapes,
-frozen bin reference and optimizer/start
-records when available. Failed preparation can leave an element empty.}
-\item{\code{diagnostics}, \code{warnings}, \code{errors}}{Original scale-fit
-diagnostics, initial/final GLM convergence metadata and captured messages
-per fold. Failures are retained and never retried automatically.}
-\item{\code{prediction_contracts}}{Existing prediction contracts per fold,
-retaining the native conditioning and uncertainty distinctions.}
-\item{\code{raster_groups}}{For grouped raster inputs, named fixed-map
-labels for analysis/assessment IDs per fold, retained even on failure.
-Otherwise \code{NULL}. These are input maps, not fitted random effects.}
-\item{\code{targets}}{Compact used-row responses, trials and weights for
-guarded comparison with \code{\link{cv_tab}}. Never used in fitting.}
-\item{\code{selection_records}}{Native training likelihood, complete
-parameter counts, effective row IDs, outcomes/trials/frequencies, formula
-text, controls, diagnostics and metadata failures when
-\code{keep_selection = TRUE}; otherwise \code{NULL}. These compact records
-support \code{\link{select_cv}} without full fold models. Each record has
-\code{version}, \code{controls}, \code{diagnostics}, metadata \code{warnings},
-\code{data} and, on extraction failure, an \code{error} message.
-Successful \code{data} contains \code{logLik} on the natural-log scale;
-\code{native_K}, \code{ecological_K} and their total \code{K}; effective
-\code{nobs} and \code{observation_ids}; analysis-row \code{targets};
-\code{response_layout}, native likelihood \code{signature}, \code{formula}
-text, \code{family} and \code{link}. These are provenance from the fit;
-preserve them unchanged. Records cannot reconstruct native models.}
-\item{\code{fits}}{Full fold fits when \code{keep_fits = TRUE}; otherwise
-\code{NULL}. These fits use only their own training data.}
-\item{\code{complete}, \code{settings}, \code{call}}{Whether all planned
-folds were scored, family/backend/metric settings and the original call.
-Completion does not certify diagnostic eligibility or calibration.}
-}
+\code{cross_validate()} returns a list of class \code{multiScaleR_cv}, with
+class \code{multiScaleR_distribution_cv} added for \code{"nbinom2"} and \code{"Gamma"}.
+Read \code{complete} first, then \code{summary} (pooled scores), \code{metrics} (scores
+per fold), \code{predictions} (one row per held-out observation),
+\code{fold_results}, and \code{training} (the scales and coefficients estimated in
+each fold). See \link[=multiScaleR_cv-class]{multiScaleR_cv} for every element and how to read
+each score. \code{print()} shows how many folds were scored and the pooled
+scores, and returns \code{x} invisibly.
 }
 \description{
-Refit ecological scales and GLM coefficients using only each training set,
-then score predictions for the explicitly held-out rows. A fold is one
-training and assessment split. This function supports ordinary Gaussian,
-Poisson, binomial, NB2 and Gamma GLMs and runs folds sequentially.
+Estimate the scales of effect and the GLM coefficients again inside every
+fold, using only that fold's training rows, then score the predictions for
+the rows it holds out. A \emph{fold} is one split of the data into \emph{analysis}
+rows, which fit the model, and \emph{assessment} rows, which are held out and
+predicted. Use this function to ask how well a scale-of-effect model
+predicts observations it never saw.
 }
-\details{
-Raw spatial buffers are reused without changing them. Initial spatial
-normalization and pooled representative bin distances are learned from the
-training rows only. The bin domain is fixed from the declared buffer and,
-for modern preparation, the raster cell-size envelope. Intersecting cells
-can have centers beyond the nominal buffer; their values are retained.
-The geometric domain is independent of assessment data. Legacy stored inputs
-without cell geometry retain the original strict buffer-center gate; rebuild
-them with the current preparation function if it rejects their distances.
-Assessment values use the frozen training bins and normalization. Existing
-coefficient, scale, shape and numerical-diagnostic calculations are unchanged.
-Grouped raster maps select fixed source covariates by row. Their group map
-is validated before fitting and subset with the buffers. Scales and
-coefficients use the pooled training rows; assessment preprocessing remains
-frozen. Map labels do not introduce annual/random effects, extra fitted
-parameters or spatially varying scales. Explicit formula group effects keep
-their native fitting, parameter counts and new-level prediction guards.
-
-Supported learned formula transformations keep analysis-row constants for
-assessment prediction. These include bare or namespaced \code{scale()},
-\code{poly()}, \code{splines::ns()} and \code{splines::bs()}, including calls
-inside arithmetic, \code{I()}, pointwise functions and offsets. Spatial fits
-use their final fitted training predictors, not initial-scale values. Original
-formulas, coefficients, coefficient SEs, likelihoods, K and numerical guards
-are unchanged. Retained fits carry the same repaired prediction terms.
-Predeclared numeric transform arguments remain fixed, and native abbreviated
-scale arguments keep their meanings. Formula variables must still be supplied
-explicitly; this does not permit formula-environment predictor fallback.
-Recovery evaluates only these known learners with numeric inputs and supported
-pointwise arguments; arbitrary user functions are not re-executed to infer
-preprocessing. Other learned operations, such as \code{mean(x)} inside a
-formula or a custom transformation, need an explicit recipe trained within
-each analysis split and applied unchanged to its assessment rows. Unsupported
-arguments to a known learner produce a retained fold failure. Existing backend
-restrictions on expressions involving optimized spatial predictors still apply.
-
-Negative log scores retain Poisson/binomial likelihood constants and average
-over positive-weight observations using frequency weights. Binomial Brier
-scores average squared prediction errors across trials, weighted by frequency
-times trial count. Zero-trial rows contribute no score. Infinite log scores
-correctly record an observed outcome assigned zero probability. Point scores
-use fitted parameters; this function adds no parameter uncertainty, observation
-intervals, calibration claim or new eligibility for guarded methods.
-
-Use identical folds and assessment targets when comparing candidate models.
-If CV scores also choose a kernel, metric or model, assess the selected
-procedure with outer validation or an independent test set. These scores
-complement \code{\link{aic_tab}}; they are not AIC values or Akaike weights.
-
-Read \code{complete} first. Inspect failed folds and original diagnostics
-before ranking models. Partial fold scores remain available for diagnosis,
-while an incomplete pooled summary stays \code{NA}. This stage does not
-score GAMs, mixed, unmarked or Bayesian fits. Use \code{\link{cross_validate_field}}
-for joint spatial-field scoring with Gaussian, count, binary or positive responses. See
-\code{\link{grouped_cv_folds}} and \code{\link{spatial_cv_folds}} for
-deterministic whole-group and spatial-grid fold construction.
-NB2 and Gamma held-out negative log scores use complete normalized densities
-with nuisance parameters learned only from analysis rows. Gamma uses its
-native AIC deviance scale when dispersion is estimated; this differs from
-the Pearson scale used for native coefficient SEs. Fixed Gamma constructs
-its declared density before fitting, rather than setting only a native
-dispersion field that would leave Gamma's AIC estimator inconsistent.
-Estimated nuisance parameters each add one to native K; known ones add zero.
-Native nobs counts positive-weight rows, not the sum of frequency weights.
-NB2 counts must be nonnegative integers and Gamma outcomes strictly positive,
-including zero-weight rows. Native theta/convergence warnings retain failed
-folds. No score integrates parameter uncertainty or supplies observation
-intervals. The exact Poisson limit is available only when the original
-joint-NB2 fit verifies and flags it; no large finite theta substitutes for it.
-Joint-NB2 initializes coefficients with a native fixed-size GLM (theta = 1),
-then estimates dispersion through the original joint engine and boundary
-checks. The initializer's fixed size is not a fixed fitted theta or a prior.
+\section{How each fold is fitted}{
+Suppose you estimated sigma, the kernel scale, once from all of the data
+and then cross-validated only the regression. Every held-out row would
+already have helped choose the scale that defines its own predictors, and
+the scores would flatter the model. \code{cross_validate()} avoids this by
+repeating the whole fit inside each fold, using the analysis rows alone.
+\enumerate{
+\item Rebuild each spatial covariate from the raw cells at the starting scales
+in \code{kernel_inputs}, then center and scale it with the analysis-row mean
+and standard deviation. Each covariate must have a positive, finite
+standard deviation in the analysis rows.
+\item Fit the initial GLM to the analysis rows.
+\item Estimate the scales and coefficients with \code{\link[=multiScale_optim]{multiScale_optim()}}. No fit
+to the full data is used as a starting point.
+\item Rebuild the assessment covariates with the fitted scales, the training
+standardization, and the training distance bins, then predict the
+expected response and score it.
 }
+
+The fold fails if the initial GLM, the final GLM, or the scale optimizer
+does not converge. Folds run one after another, and a failed fold is
+recorded and never retried.
+}
+
+\section{Build the folds}{
+Row names tie the pieces together. Before any fitting, the function checks
+that every split names known, unique IDs and that its analysis and
+assessment rows do not overlap. It cannot check ecological independence
+from the IDs you supply. Keep observations that share a site, animal, year,
+or other sampling unit on the same side of each split, and choose the
+design before you look at any scores.
+
+Rows left out of a split, such as those removed by a buffer, are neither
+fitted nor scored in that split. A row assessed in several splits is
+scored each time, every occurrence enters the pooled scores, and
+\code{assessment_counts} records how often each row was assessed. A factor level
+present in the assessment rows but absent from the analysis rows makes that
+fold fail at prediction. No zero effect is substituted.
+\code{vignette("v08-cross-validation", package = "multiScaleR")} compares
+random, grouped, spatial, and buffered fold designs on the same model.
+}
+
+\section{Choose a family and scores}{
+\tabular{llll}{
+   \code{family} \tab Link \tab Default \code{metrics} \tab Backend when unset \cr
+   \code{"gaussian"} \tab identity \tab \code{rmse}, \code{mae} \tab \code{"profile_glm"} \cr
+   \code{"poisson"} \tab log \tab \code{rmse}, \code{mae}, \code{neg_log_score}, \code{deviance} \tab \code{"profile_glm"} \cr
+   \code{"binomial"} \tab logit \tab \code{neg_log_score}, \code{brier} \tab \code{"profile_glm"} \cr
+   \code{"nbinom2"} \tab log \tab \code{rmse}, \code{mae}, \code{neg_log_score} \tab \code{"profile_glm"}, or \code{"refit"} with a fixed \code{theta} \cr
+   \code{"Gamma"} \tab log \tab \code{rmse}, \code{mae}, \code{neg_log_score} \tab \code{"refit"} \cr
+}
+
+
+Lower is better for every score. RMSE and MAE judge only the predicted
+mean, in the units of the response. The negative log score judges the
+whole predicted distribution, so it also penalizes a model that is too
+confident. Binomial responses can be 0/1 numbers, logical values, a
+two-level factor, or \code{cbind(successes, failures)}. \code{\link[=cross_validate_glm]{cross_validate_glm()}}
+explains how binomial log and Brier scores are weighted, and
+the \link[=multiScaleR_cv-class]{multiScaleR_cv} page defines every score.
+\subsection{Negative binomial and Gamma responses}{
+
+Both families carry a nuisance parameter, a parameter of the response
+distribution that is not part of the mean model. It is theta for NB2 and
+the dispersion for Gamma. Unless you fix it with \code{theta} or \code{dispersion},
+each fold estimates it from the analysis rows and freezes it to score the
+assessment rows. The negative log score therefore uses a complete,
+normalized density that the held-out outcomes did not help shape. The
+frozen value of each fold is stored in \code{distribution} and repeated in the
+\code{theta} and \code{dispersion} columns of \code{predictions}.
+\itemize{
+\item An estimated nuisance parameter adds one to the native K, and a fixed one
+adds zero. The native \code{nobs} counts rows with positive weight, not the
+sum of the weights.
+\item Estimated Gamma dispersion is the training deviance divided by the sum of
+the frequency weights, the value native Gamma AIC uses. It differs from
+the Pearson dispersion that \code{summary()} uses for coefficient standard
+errors, and it does not replace that standard-error convention. A fixed
+Gamma dispersion is built into the Gamma density before fitting, so the
+likelihood, AIC, and K agree. Setting only the \code{dispersion} field of a
+native Gamma family would leave its AIC estimating the dispersion from
+the deviance.
+\item NB2 responses must be nonnegative whole numbers and Gamma responses
+strictly positive, including rows with zero weight.
+\item A theta warning from the native NB2 fit, such as a reached iteration
+limit, makes the fold fail. The warning is kept in \code{warnings}.
+\item \code{backend = "joint_nb2"} starts the coefficients from a GLM with
+theta = 1 and then estimates theta jointly with the scales. That
+starting value is neither a fixed theta nor a prior. A fold reports an
+infinite theta, the exact Poisson limit, only when the joint fit verifies
+and flags that limit. A large finite theta never stands in for it.
+}
+
+A Gamma model for a strictly positive response uses the same call, and the
+backend switches to \code{"refit"} on its own, for example
+\code{cross_validate(mass ~ habitat, dat, inputs, folds, family = "Gamma")}.
+Compare NB2 and Poisson candidates with the negative log score on the same
+counts. \code{\link[=cv_tab]{cv_tab()}} lists the comparisons each family allows.
+}
+}
+
+\section{Formula terms that learn from the data}{
+Some formula terms learn constants from the data. \code{scale()} learns a mean
+and standard deviation, \code{poly()} learns polynomial coefficients, and
+\code{splines::ns()} and \code{splines::bs()} learn knots. In each fold these
+constants come from the analysis rows and are reused unchanged for the
+assessment rows. This holds with or without a \verb{base::}, \verb{stats::}, or
+\verb{splines::} prefix, and inside arithmetic, \code{I()}, pointwise functions such
+as \code{log()}, and offsets. For spatial covariates the constants come from the
+final fitted training values, not the starting-scale values. Arguments you
+fix in the formula, such as \code{knots}, stay fixed. Coefficients, standard
+errors, likelihoods, and K are those of the native fit, and fits kept with
+\code{keep_fits = TRUE} carry the same training constants.
+
+Only these four functions are recognized, and only with numeric inputs and
+supported arguments. An unsupported argument makes the fold fail. Any other
+operation that learns from the data, such as \code{mean(x)} inside a formula or
+your own transformation function, is not detected. Compute it within each
+analysis split and apply it unchanged to the assessment rows, or the scores
+will leak assessment information. For the same reason, do not supply
+predictors standardized with all rows. Every variable must still be a
+column of \code{data} or a prepared covariate. Variables are never taken from
+the formula's environment.
+
+With the default \code{"profile_glm"} backend, a spline of an optimized
+covariate needs fixed \code{knots} and \code{Boundary.knots} and no \code{df}. Otherwise
+the fold fails with a message that names the fix. \code{backend = "refit"}
+accepts adaptive splines.
+}
+
+\section{Keep optimized covariates in their own units}{
+By default each fold centers and scales every optimized covariate with its
+analysis-row mean and standard deviation, so a coefficient is the effect of
+a one standard deviation change. With \code{backend = "refit"}, the setting
+\code{optim_args = list(covariate_transform = "raw")} skips that final step for
+the optimized covariates. They keep the units of their kernel or metric
+calculation, such as a kernel-weighted proportion of habitat. Use this when
+a fixed spline knot or another formula constant is meant in those units.
+
+The initial fit and every scale refit within a fold use the same units,
+and prediction applies a center of zero and a scale of one. Covariates
+whose scales are not optimized are still standardized with analysis-row
+values, and normalization applied upstream, such as the reference
+normalization of surface metrics, is unchanged. Assessment rows never
+choose the transformation, the knots, or the scale. Decide on raw units,
+and on any knots in those units, before you look at the results. Because a
+change of units can alter a constrained or nonlinear model, compare the
+two versions by their held-out scores rather than assume they are
+equivalent.
+}
+
+\section{Use separate maps for groups of surveys}{
+Inputs from \code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}, which take each row's covariates
+from its own map (for example, the map of its survey year), are supported.
+Before fitting, the function checks that the named \code{raster_group} labels
+align with the prepared row IDs. It records the map labels of each fold's
+analysis and assessment rows in \code{raster_groups}. Standardization and
+distance bins still come from the pooled analysis rows. The map labels are
+fixed inputs. They add no random effects, no extra parameters, and no
+scales that vary among maps. Group effects you write in the formula, such
+as a year factor, keep their native fit, parameter count, and new-level
+check. See \code{vignette("v06-year-specific-rasters", package = "multiScaleR")}.
+}
+
+\section{Distance bins and the extraction envelope}{
+When \code{kernel_inputs} holds distance-binned summaries (\code{\link[=kernel_prep]{kernel_prep()}} with
+\code{bin = TRUE}, the default), each fold rebuilds them. The bin edges span
+\code{max_D} plus half a cell diagonal, so cells that intersect the buffer but
+whose centers lie just beyond \code{max_D} keep their values. These edges depend
+on the declared geometry only, not on any data. The representative
+distance of each bin is the mean cell distance in that bin over the
+analysis rows, and the assessment rows reuse it. Inputs saved by older
+versions of \code{\link[=kernel_prep]{kernel_prep()}} lack the cell geometry and keep the stricter
+rule that every cell center lies within \code{max_D}. If such inputs are
+rejected, prepare them again with the current \code{\link[=kernel_prep]{kernel_prep()}}.
+}
+
+\section{Check every fold before comparing models}{
+Read \code{complete} first. \code{TRUE} means every planned fold was fitted and
+scored. When a fold fails, \code{complete} is \code{FALSE} and the pooled scores in
+\code{summary} are \code{NA}. The scores of the folds that finished, the failed
+assessment rows, the diagnostics, and the warnings all stay available, and
+\code{errors} names the stage and message of each failure. \code{\link[=cv_tab]{cv_tab()}} and
+\code{\link[=select_cv]{select_cv()}} refuse an incomplete result rather than rank a model on its
+easier folds. A complete result says only that the calculations finished,
+so inspect \code{diagnostics} and \code{warnings} before you rank models.
+}
+
+\section{What the scores do and do not include}{
+The predictions and scores treat each fold's fitted parameters as known.
+They do not average over uncertainty in the coefficients or scales, give
+prediction intervals, or establish calibration. Compare candidates only on
+identical folds, assessment rows, responses, and weights, which \code{\link[=cv_tab]{cv_tab()}}
+checks for you. The scores complement \code{\link[=aic_tab]{aic_tab()}} but are not AIC values
+or Akaike weights. If you use the scores to choose a model, kernel, or
+metric, the winning score is optimistic. Assess the chosen procedure with
+an outer validation layer or an independent test set. \code{\link[=select_cv]{select_cv()}} scores
+a predeclared training-AIC rule without this bias, because the assessment
+outcomes never choose the winner within a fold.
+
+\code{cross_validate()} fits GLMs. For other model structures use
+\code{\link[=cross_validate_mixed]{cross_validate_mixed()}} (a random intercept for repeated surveys),
+\code{\link[=cross_validate_clogit]{cross_validate_clogit()}} (step selection), \code{\link[=cross_validate_field]{cross_validate_field()}} (a
+spatial random field), or \code{\link[=cross_validate_bayes]{cross_validate_bayes()}} (Bayesian models). GAMs
+and \code{unmarked} models have no cross-validation function.
+\code{\link[=cross_validate_glm]{cross_validate_glm()}} scores reference models without scales on the same
+folds.
+}
+
 \examples{
-# Explicit folds can be checked before any fitting is attempted.
-ids <- paste0("site", 1:6)
-folds <- list(first = list(analysis = ids[1:4], assessment = ids[5:6]),
-              second = list(analysis = ids[3:6], assessment = ids[1:2]))
-intersect(folds$first$analysis, folds$first$assessment) # no overlap
+data("landscape_counts")   # counts and one site-level covariate
+data("surv_pts")           # 100 survey locations
+pts <- vect(surv_pts)
+
+# Folds are lists of row IDs, so build and check them before any fitting.
+# The simulated coordinates are in meters, and crs = 32617 declares that.
+folds <- spatial_cv_folds(crds(pts), block_size = 1000, k = 3, crs = 32617)
+folds   # rows fitted (analysis) and held out (assessment) in each fold
+
+\donttest{
+land <- rast(system.file("extdata", "landscape.tif", package = "multiScaleR"))
+inputs <- kernel_prep(pts = pts, raster_stack = land[[c("land1", "land2")]],
+                      max_D = 1000, kernel = "gaussian", verbose = FALSE)
+# Row names of dat match those of inputs$kernel_dat ("1" to "100")
+dat <- data.frame(landscape_counts, inputs$kernel_dat)
+
+# Scales and coefficients are estimated from the analysis rows of each fold
+cv <- cross_validate(counts ~ site + land1 + land2, data = dat,
+                     kernel_inputs = inputs, folds = folds,
+                     family = "poisson", keep_selection = TRUE)
+cv            # pooled held-out scores, lower is better
+cv$complete   # TRUE: every fold was fitted and scored
+
+# Sigma (map units) estimated in each fold. Similar values across folds
+# suggest that no single block of surveys drives the estimated scales.
+round(sapply(cv$training, function(fold) fold$scale_est$Mean))
+
+# Compare with a reference model that has no landscape covariates
+site_cv <- cross_validate_glm(counts ~ site, dat, folds, family = "poisson",
+                              keep_selection = TRUE)
+cv_tab(list(landscape = cv, site_only = site_cv), metric = "rmse")
+}
 }
 \seealso{
-\code{\link{kernel_prep}}, \code{\link{multiScale_optim}},
-\code{\link{prepare_prediction}}, \code{\link{aic_tab}}
+\link[=multiScaleR_cv-class]{multiScaleR_cv} for the returned object,
+\code{\link[=cross_validate_glm]{cross_validate_glm()}} for reference models, \code{\link[=cv_tab]{cv_tab()}} and \code{\link[=select_cv]{select_cv()}}
+to compare candidates, \code{\link[=grouped_cv_folds]{grouped_cv_folds()}} and \code{\link[=spatial_cv_folds]{spatial_cv_folds()}} to
+build folds, and \code{vignette("v08-cross-validation", package = "multiScaleR")}
+for the full workflow.
 }

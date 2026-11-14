@@ -2,7 +2,7 @@
 % Please edit documentation in R/aic_tab.R
 \name{bic_tab}
 \alias{bic_tab}
-\title{multiScaleR model selection}
+\title{Rank models by BIC}
 \usage{
 bic_tab(mod_list,
         mod_names = NULL,
@@ -10,127 +10,86 @@ bic_tab(mod_list,
         ...)
 }
 \arguments{
-\item{mod_list}{List containing fitted \code{multiScaleR} objects (from
-\code{\link{multiScale_optim}}) and/or plain fitted model objects. All
-models must have been fit to the same observations and comparable
-likelihoods, including matching responses, weights, and likelihood measure.}
+\item{mod_list}{A list of fitted models: \code{multiScaleR} objects from
+\code{\link[=multiScale_optim]{multiScale_optim()}}, plain fitted models, or both. Every model must be
+fitted to the same observations with a comparable likelihood, including
+matching responses, weights, and likelihood measure. Bayesian fits,
+cross-validation results, and private spatial prototypes are rejected.}
 
-\item{mod_names}{Optional character vector of model names. Length must equal
-\code{length(mod_list)}. By default, names are constructed as
-\code{[kernel=...; family=...]right-hand-side-formula} for \code{multiScaleR} objects.}
+\item{mod_names}{Optional character vector of model names, one per model
+in \code{mod_list}. By default, \code{multiScaleR} objects are labeled
+\verb{[kernel=...; family=...]} followed by the right-hand side of the model
+formula.}
 
 \item{verbose}{Logical. If \code{TRUE}, the table is also printed to the
-console. Default: \code{FALSE}.}
+console. Default \code{FALSE}.}
 
-\item{...}{Additional arguments (not used).}
+\item{...}{Not used.}
 }
 \value{
-A data frame of class \code{"bictab"} (from the \code{AICcmodavg}
-package) sorted by ascending BIC, containing:
-\describe{
-\item{\code{Modnames}}{Model name.}
-\item{\code{K}}{Number of fitted likelihood parameters, including
-ancillary parameters such as negative-binomial dispersion (or native
-effective degrees of freedom for GAMs), plus optimized
-scale and shape parameters for \code{multiScaleR} models.}
-\item{\code{BIC}}{Bayesian information criterion value.}
-\item{\code{Delta_BIC}}{Difference from the top model.}
-\item{\code{BICWt}}{BIC weight.}
-\item{\code{Cum.Wt}}{Cumulative BIC weight.}
-\item{\code{LL}}{Log-likelihood.}
+A data frame of class \code{"bictab"} (from the AICcmodavg package),
+sorted from the best (smallest) BIC, with one row per model:
+\itemize{
+\item \code{Modnames}: model name.
+\item \code{K}: number of estimated parameters, counted as in \code{\link[=aic_tab]{aic_tab()}}: the
+fitted likelihood parameters (including ancillary ones such as negative
+binomial dispersion, or native effective degrees of freedom for GAMs)
+plus each estimated scale and shape of a \code{multiScaleR} model.
+\item \code{BIC}: the Bayesian information criterion. Smaller is better.
+\item \code{Delta_BIC}: difference from the best model.
+\item \code{BICWt}: BIC weight, the relative support for each model within this
+set. Weights sum to 1.
+\item \code{Cum.Wt}: cumulative BIC weight.
+\item \code{LL}: maximized log-likelihood.
 }
+
+A \code{likelihood_adjustments} attribute is added when a likelihood was
+adjusted, as described in \code{\link[=aic_tab]{aic_tab()}}.
 }
 \description{
-Creates a model selection table ranked by BIC for a list of
-fitted models. Mixed lists containing both \code{multiScaleR} objects and
-plain model objects are supported.
+Build a model-selection table ranked by BIC (the Bayesian
+information criterion) for a list of fitted models. As in \code{\link[=aic_tab]{aic_tab()}}, each
+estimated scale of effect (sigma) and kernel shape counts as a parameter,
+and lists can mix \code{multiScaleR} objects with plain fitted models.
 }
 \details{
-The table is constructed using \code{\link[AICcmodavg]{bictabCustom}} from
-the \code{AICcmodavg} package. BIC penalizes model complexity more heavily
-than AIC as sample size grows, and is often preferred when the goal is
-identifying the single best-supported model rather than model averaging.
-Sigma (and shape for \code{"expow"}) is counted in K.
-The GDR offset and TMB ZIP restrictions in \code{\link{aic_tab}} also apply.
-Fitted parameter counts and log-likelihood validation follow
-\code{\link{aic_tab}}, including all estimated components of unmarked models.
-The same checked negative-binomial BAM adjustment and
-\code{likelihood_adjustments} attribute apply. This retains estimated theta
-while excluding a nonexistent extra scale parameter.
-spaMM \code{HLfit} parameter penalties sum all native \code{spaMM::DoF()}
-components, retaining its default log-likelihood target. See \code{\link{aic_tab}}
-for its restricted-likelihood interpretation. Mixed \code{unmarked::pcount}
-models use the same actual-visit checks and retained-site-row convention
-described there, including frames with no site covariates. Repeated-group
-sampling assumptions still need justification.
+BIC penalizes each parameter by the log of the sample size rather than by
+2, so it penalizes complexity more heavily than AIC once there are more
+than about 7 observations. It is often preferred when the goal is the
+single best-supported model rather than model averaging.
 
-The same recoverable response, row, weight, ML/REML, and partial-likelihood
-checks apply. Logical and numeric binomial outcomes use the same checked
-zero/one comparison described in \code{\link{aic_tab}}. Inapplicable
-hard-radius shape positions are excluded.
-Bayesian posterior fits are rejected; the name BIC does not make a posterior
-target a sampling likelihood.
-Private spatial prototypes are also rejected; conditional response densities
-do not supply a maximized marginal likelihood.
-Cox and conditional-logistic penalties use the native likelihood event
-count, keeping all alternative rows for comparison checks. See
-\code{\link{aic_tab}} for the sampling-design qualification.
+Every rule in \code{\link[=aic_tab]{aic_tab()}} applies here: the parameter count (including all
+estimated components of \code{unmarked} models, spaMM degrees of freedom, and
+the checked negative binomial BAM adjustment), the comparability checks
+(responses, rows, weights, binomial outcomes, ML and REML, partial
+likelihoods, used \code{pcount()} visits, and distance-removal protocols), the
+sample-size conventions (retained site rows for \code{unmarked} models and
+native event counts for Cox and conditional logistic models), and the
+rejected models. Inapplicable hard-radius shape positions are excluded
+from \code{K}. Calling the criterion BIC does not make a posterior target a
+sampling likelihood, so Bayesian fits are rejected here too.
+
+The table itself is built with \code{\link[AICcmodavg:bictabCustom]{AICcmodavg::bictabCustom()}}.
 }
 \examples{
-## Simulate data
-set.seed(555)
+## Bundled counts simulated with a habitat scale of 75 map units
+data("pts")
+data("count_data")
+hab <- terra::rast(system.file("extdata", "hab.tif", package = "multiScaleR"))
+prepared <- kernel_prep(pts, hab, max_D = 300, sigma = 75, verbose = FALSE)
+dat <- data.frame(y = count_data$y, prepared$kernel_dat)
+fixed_model <- glm(y ~ hab, family = poisson(), data = dat)
+null_model <- glm(y ~ 1, family = poisson(), data = dat)
+spatial_model <- multiScale_optim(fixed_model, prepared, par = 75 / 300,
+                                  n_cores = 1, verbose = FALSE)
 
-points <- vect(cbind(c(5,7,9,11,13),
-                     c(13,11,9,7,5)))
-
-mat_list <- list(r1 = rast(matrix(rnorm(20^2),
-                                  nrow = 20)),
-                 r2 = rast(matrix(rnorm(20^2),
-                                  nrow = 20)))
-rast_stack <- rast(mat_list)
-kernel_inputs <- kernel_prep(pts = points,
-                             raster_stack = rast_stack,
-                             max_D = 5,
-                             kernel = 'gaussian',
-                             sigma = NULL)
-## Example response data
-y <- rnorm(5)
-
-## Create data frame with raster variables
-dat <- data.frame(y = y,
-                  kernel_inputs$kernel_dat)
-mod1 <- glm(y ~ r1,
-            data = dat)
-mod2 <- glm(y ~ r2,
-            data = dat)
-mod3 <- glm(y ~ r1 + r2,
-            data = dat)
-
-## NOTE: This code is only for demonstration
-## Optimization results will have no meaning
-
-opt_mod1 <- multiScale_optim(fitted_mod = mod1,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-
-opt_mod2 <- multiScale_optim(fitted_mod = mod2,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-opt_mod3 <- multiScale_optim(fitted_mod = mod3,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-
- ## BIC table
- mod_list <- list(opt_mod1, opt_mod2, opt_mod3)
-
- bic_tab(mod_list = mod_list)
-
- ## BIC table with specified names
- bic_tab(mod_list = mod_list,
-         mod_names = c('mod1', 'mod2', 'mod3'))
+## BIC charges log(75), about 4.3, for the estimated sigma, versus 2 in AIC
+bic_tab(list(spatial_model, fixed_model, null_model),
+        mod_names = c("spatial", "fixed", "null"))
+}
+\seealso{
+\code{\link[=aic_tab]{aic_tab()}}, \code{\link[=multiScale_optim]{multiScale_optim()}}, and
+\code{vignette("v02-user-guide", package = "multiScaleR")}.
 }
 \author{
 Bill Peterman

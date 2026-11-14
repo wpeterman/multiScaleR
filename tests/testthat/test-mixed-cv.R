@@ -69,6 +69,7 @@ test_that("Gaussian mixed CV agrees with independent dense conditioning", {
 })
 
 test_that("non-Gaussian CV matches direct integration over the group effect", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   f <- mixed_cv_fixture()
   d <- f$data
@@ -143,6 +144,7 @@ test_that("mixed CV comparison, selection and scoring use training outcomes only
 })
 
 test_that("mixed CV refits ecological scales within the training split", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   set.seed(60)
   n <- 72L

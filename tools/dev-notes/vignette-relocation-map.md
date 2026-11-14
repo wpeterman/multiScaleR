@@ -20,34 +20,34 @@ Rewritten as "What Your Estimates and Intervals Mean" (929 lines to about 345).
 | Original lines | Content | Destination | Status |
 |:---------------|:--------|:------------|:-------|
 | 19-29 | Opening and prerequisites | Rewritten in place (section 1) | done |
-| 31-38 | Dot formulas, removed variables, and retained transformations in `lm`, `glm`, and Cox predictions | `?predict.multiScaleR` details | pending, help-page phase |
-| 39-48 | `plot_marginal_effects(type = "det" / "state" / "lambda")` for `occu()` and `pcount()` fits | `?plot_marginal_effects` | pending, help-page phase |
+| 31-38 | Dot formulas, removed variables, and retained transformations in `lm`, `glm`, and Cox predictions | `?predict.multiScaleR` details | done (0.7.47 help-page phase; see below) |
+| 39-48 | `plot_marginal_effects(type = "det" / "state" / "lambda")` for `occu()` and `pcount()` fits | `?plot_marginal_effects` | done (0.7.47 help-page phase; see below) |
 | 50-71 | Likelihood, marginal likelihood, and posterior targets; workflow table | Rewritten in place (section 5) | done |
 | 73-77 | Hierarchical marginal-likelihood fitting is development work | `tools/dev-notes/validation-status.md` | done |
 | 79-88 | Analytic backend table | Simplified table kept (section 2) | done |
-| 90-113 | Weighted SQ requirements, fixed-radius metrics, `covariate_transform = "raw"`, shared preparation | `feature-compatibility` vignette and the fitting-methods help topic | vignette half done (`feature-compatibility`); fitting-methods help topic pending |
-| 115-153 | Binary and grouped-binomial responses, weights, comparison with `glm()` | User Guide, binomial occurrence section, and `?multiScale_optim` | vignette half done (User Guide, "Model binary occurrence"); `?multiScale_optim` pending |
+| 90-113 | Weighted SQ requirements, fixed-radius metrics, `covariate_transform = "raw"`, shared preparation | `feature-compatibility` vignette and the fitting-methods help topic | done (0.7.47 help-page phase; see below) |
+| 115-153 | Binary and grouped-binomial responses, weights, comparison with `glm()` | User Guide, binomial occurrence section, and `?multiScale_optim` | done (0.7.47 help-page phase; see below) |
 | 155-161 | Integrated likelihoods versus fixed-predictor GLMs | First four sentences folded into section 5; last sentence to `validation-status.md` | done |
-| 163-191 | Parameter counting and used observations for `unmarked::pcount` comparisons; `K` as an integration bound | User Guide, `unmarked` section. One sentence kept in section 5 | partial: K and `pcount` in the User Guide; random-effect SD counting and effective-sample-size caveats pending for `?aic_tab` |
+| 163-191 | Parameter counting and used observations for `unmarked::pcount` comparisons; `K` as an integration bound | User Guide, `unmarked` section. One sentence kept in section 5 | done (0.7.47 help-page phase; see below) |
 | 193-237 | Step-selection models with `backend = "conditional_logit"` and `amt` | New step-selection vignette | done in `step-selection`, except `amt` movement corrections, AICc/BIC event counts, and factor interactions (not verified, not carried) |
 | 239-271 | Reading a prepared Bayesian specification (`method = "prepare"`) | `bayesian-scales` vignette | done |
 | 273-317 | Expected response versus observation replicate | Rewritten in place with `simulate()` added (section 4). Full treatment stays in `bayesian-prediction` | done |
 | 319-333 | Known and unseen groups, response versus scale year effects | `bayesian-prediction` vignette (already its owner) | done (offsets from this block not mentioned) |
-| 335-348 | Uncertainty by prediction route; `re.form = NA`; unmarked components | Table merged into sections 2 and 6. `re.form` and unmarked component detail to `?predict.multiScaleR` | partial |
-| 350-356 | `prepare_prediction()` snapshots | `?prepare_prediction` | pending, help-page phase |
+| 335-348 | Uncertainty by prediction route; `re.form = NA`; unmarked components | Table merged into sections 2 and 6. `re.form` and unmarked component detail to `?predict.multiScaleR` | done (0.7.47 help-page phase; see below) |
+| 350-356 | `prepare_prediction()` snapshots | `?prepare_prediction` | done (0.7.47 help-page phase; see below) |
 | 358-388 | Units, support, numerical precision | Rewritten in place (sections 7 and 8) | done |
 | 390-402 | Quick reference | Replaced with a code block, function table, and See also | done |
-| 404-479 | `cross_validate()` workflow, scores, nuisance parameters | `cross-validation` vignette and `?cross_validate` | partial: workflow and scores done; Gamma dispersion and nuisance detail pending for `?cross_validate`, `?cross_validate_glm` |
+| 404-479 | `cross_validate()` workflow, scores, nuisance parameters | `cross-validation` vignette and `?cross_validate` | done (0.7.47 help-page phase; see below) |
 | 481-517 | Grouped and spatial folds, `select_cv()`, `cross_validate_clogit()` | `cross-validation` vignette | done |
 | 519-537 | Private likelihood prediction components | `validation-status.md` | done |
-| 539-554 | Recovery of learned transformations in native predictions | `?predict.multiScaleR` | pending, help-page phase |
+| 539-554 | Recovery of learned transformations in native predictions | `?predict.multiScaleR` | done (0.7.47 help-page phase; see below) |
 | 556-643 | glmmTMB spatial response fields, point and raster prediction | New spatial-fields vignette | done in `spatial-response-fields`, except the `response_field_geometry()` raster route (fails on real fits; see code issues) |
-| 645-694 | Unmarked effect curves, raw reference rows, GAM and Cox notes | `?plot_marginal_effects`, `?prepare_prediction` | pending, help-page phase |
-| 696-720 | Component-specific unmarked prediction preparation | `?prepare_prediction` | pending, help-page phase |
+| 645-694 | Unmarked effect curves, raw reference rows, GAM and Cox notes | `?plot_marginal_effects`, `?prepare_prediction` | done (0.7.47 help-page phase; see below) |
+| 696-720 | Component-specific unmarked prediction preparation | `?prepare_prediction` | done (0.7.47 help-page phase; see below) |
 | 722-752 | Private GDR response-field references and correlation-range prerequisites | `validation-status.md` | done |
-| 754-839 | Native fixed-range GDR abundance fields (`fit_gdr_response_field()`) | Distance-removal vignette (user part) and `?fit_gdr_response_field` | partial: user part in the distance-removal vignette; field map step fails; covariance detail pending for `?fit_gdr_response_field` |
-| 841-858 | Gaussian response-field cross-validation | `cross-validation` vignette and `?cross_validate_field` | done as a short section; detail pending for `?cross_validate_field` |
-| 860-900 | GDR optimizer points and `tmb_settings` | `?make_gdr_refitter` | pending, help-page phase |
+| 754-839 | Native fixed-range GDR abundance fields (`fit_gdr_response_field()`) | Distance-removal vignette (user part) and `?fit_gdr_response_field` | done (0.7.47 help-page phase; see below) |
+| 841-858 | Gaussian response-field cross-validation | `cross-validation` vignette and `?cross_validate_field` | done (0.7.47 help-page phase; see below) |
+| 860-900 | GDR optimizer points and `tmb_settings` | `?make_gdr_refitter` | done (0.7.47 help-page phase; see below) |
 | 902-929 | Remaining development gates; private finite-cutoff reference | `validation-status.md` | done |
 
 ## `vignettes/quickstart.Rmd`
@@ -145,3 +145,65 @@ in `tests/testthat/`.
 Five per-vignette cache scripts (`data-raw/cache_*.R`) and their
 `inst/extdata/*-cache.rds` files (about 0.7 MB together) need folding into the
 single regeneration script decided earlier.
+
+## Help-page phase (0.7.47, 2026-11-14)
+
+Every row above that read "pending" or "partial", and every block in the
+rollout table, was assigned to a help page. Destinations:
+
+- `?predict.multiScaleR`, `?"multiScaleR-prediction"` (new topic),
+  `?plot_marginal_effects`, `?prepare_prediction`, `?prepare_unmarked_data`,
+  `?aic_tab`: inference-contracts 31-48, 335-356, 539-554, 645-720, 163-191;
+  feature-compatibility 31-48, 268-344, 464-698; Guide 779-781, 834-898;
+  distance-removal-audits 580-626; bayesian-scales 253-260.
+- `?"multiScaleR-fitting-methods"` (new topic) and `?multiScale_optim`:
+  inference-contracts 90-153 (including the AIC/BIC logical versus numeric
+  binomial check, verified 2026-11-14); Guide 744-769 (`join_by` layout);
+  feature-compatibility 160-172 (expow shape for hard radii).
+- `?cross_validate`, `?cross_validate_glm`, `?cross_validate_field`,
+  `?cross_validate_clogit`, `?select_cv`, `class?multiScaleR_cv`:
+  inference-contracts 404-479, 841-858; cross-validation 114-140, 166-171,
+  231-258, 277-285, 355-416, 483-505, 516-552, 577-600.
+- `?fit_gdr_response_field`, `?make_gdr_refitter`, `?validate_unmarked_data`,
+  `?sim_dat_gdr`, `?prepare_gdr_histories`, `?expand_gdr_intervals`:
+  inference-contracts 754-839, 860-900; distance-removal-audits 27-38,
+  67-89, 104-123, 191-204, 247-272, 430-490.
+- `?multiScale_bayes`, `?predict.multiScaleR_bayes`, `?predict_scales`,
+  `?posterior_scales`, `?simulate.multiScaleR_bayes`,
+  `class?multiScaleR_bayes`: bayesian-scales 193-228; bayesian-prediction
+  97-109, 148-170, 274-299, 343-409; bayesian-computation 367-398.
+- `?msr_vars`, `?kernel_scale.raster`, `?kernel_dist`,
+  `?"multiScaleR-kernels"` (new topic), `?sim_dat`, `?sim_rast`,
+  `?estimate_multiscale_ram`, `?profile_sigma`: bayesian-scales 230-283
+  (summary and links only); landscape_metric_covariates 80-153 and
+  surface_metric_covariates 80-87 (formula tables taken from the code);
+  Guide 340-342, 396, 465-472, 926-956, 1178-1251; feature-compatibility
+  240-266.
+
+Not carried, because they describe development status or could not be
+verified against the code: SQ interval coverage; private hierarchical and
+marginal-likelihood prototypes; simulation-evidence claims for
+`conditional_beta`; GAM `I(z > 0)` logical-type retention; Bayesian
+prediction sharing the native preparation; "assessment predictors use frozen
+references across bins"; a "Gaussian covariance gives a smoother field" note;
+"`include_fixed` does not control site scenarios" for the field route;
+"native mixture codes distinguish AIC/BIC labels"; the removal-observer
+failures and speed-comparison lines (already archived in
+`validation-status.md`). The guide's claim that `match_buffer` needs
+`fft = TRUE` was false (both engines agree to 1.8e-14) and is corrected.
+
+## Code issues found in the help-page phase (not fixed; for Bill)
+
+| Issue | Evidence |
+|:------|:---------|
+| GDR field route returns sigma SE 3.4e-30 with a zero-width interval and no warning | Reproduced under 0.7.46 with the v12 cache recipe (EPSG:32617 assigned): land1 sigma 238.6 m. Script and log in the session scratchpad (`gdrex/field_map3.*`) |
+| CLUMPY sign for disaggregated classes | Code gives +1 for G = 0 when P < 0.5 (`(G - P)/(-P)`), matching landscapemetrics 2.2.1 but not FRAGSTATS (-1) or the v04 reading of the -1 to 1 range. `src/landscape_metrics_cpp.cpp` near line 495 and `R/landscape_metrics.R` |
+| `sim_rast()` spectrum | Covariance is not ifftshifted before `fft`; half the eigenvalues are negative and clamped to 0, so realized covariance is not the stated exponential (opposite quadrants correlate at 0.995 on a 100 x 100 layer). `sill` has no effect after min-max rescaling; small `dim` gives NaN layers |
+| `sim_dat()` inputs | An `sf` `n_points` miscounts points; `kernel = "expow"` with `max_D = NULL` errors; rasters whose extent does not start at 0 fail |
+| `cross_validate()` with `profile_glm` | Returns an empty `prediction_contracts` list; `refit` returns one per fold |
+| Gaussian `cross_validate_field()` on small data | Folds often fail with "Declared spatial-field training starts disagree" |
+| One-row GDR field prediction | Row name becomes `lsigma_lambda` (`R/gdr_response_field_predict.R` about line 74; needs `unname()`) |
+| Analytic `predict()` | `profile_glm` and `joint_nb2` silently ignore unknown `...` arguments (for example `re.form`) where other backends stop |
+| `.msr_native_prediction_rows` | Defaults `type = "state"` for non-field `unmarkedFitGDR`, probably not a valid native type (untested; no stored GDR fit) |
+| `bayesian-annual-example.rds` | `fits$pooled` predates the current format (no `inference_metadata` or `specification$row_id`), so `predict()` needs `row_id` |
+| Cosmetic | NB2 and Gamma CV `diagnostics$initial_glm` carry `NA`-named NULL entries; field CV column `observation_predictive_SE` holds an SD |

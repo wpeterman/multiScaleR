@@ -8,6 +8,7 @@ choice_cv_data <- function() {
 }
 
 test_that("native choice references, null likelihoods and event penalties agree", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   z <- choice_cv_data(); d <- z$data; coxph <- survival::coxph; strata <- survival::strata
   for (method in c("exact", "efron", "breslow")) {

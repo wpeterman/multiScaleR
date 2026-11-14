@@ -30,6 +30,7 @@ test_that("native spatial covariance layouts stay distinct from iid effects and 
 })
 
 test_that("native response fields retain point prediction, uncertainty and parameter penalties", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   for (family in c("poisson", "gaussian")) {
     f <- native_response_field_fixture(family)

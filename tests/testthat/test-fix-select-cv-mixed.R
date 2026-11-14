@@ -63,6 +63,7 @@ test_that("select_cv leaves unmixed candidate lists unchanged and rejects disjoi
 })
 
 test_that("select_cv handles mixed Poisson and NB2 cross_validate() candidates", {
+  skip_on_cran()
   skip_if_not_installed("MASS")
   data("landscape_counts", package = "multiScaleR", envir = environment())
   data("surv_pts", package = "multiScaleR", envir = environment())

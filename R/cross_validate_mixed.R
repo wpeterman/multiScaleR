@@ -112,93 +112,106 @@
 #' Cross-Validate Mixed-Effects Models
 #'
 #' Refit a mixed model in every analysis split and score the observations
-#' held out from it. Choose whether prediction is for groups represented in
-#' training or for wholly new groups. Integrate over the shared group effect
-#' when calculating response means and joint group log scores.
+#' held out from it. A *random intercept* gives each group, such as a site,
+#' its own baseline drawn from a common distribution, which accounts for the
+#' similarity among repeated surveys of that group. Choose whether prediction
+#' is for groups represented in training or for wholly new groups. Response
+#' means and joint group log scores integrate over the shared group effect.
 #'
 #' This function is experimental. Its arguments and results may change in a
 #' later release without a deprecation period.
 #'
 #' @param formula Two-sided native mixed-model formula with one grouping
-#'   column, for example \code{count ~ habitat + (1 | site)}. Gaussian models
-#'   also support one block of numeric random slopes such as
-#'   \code{(1 + habitat | site)}. Use explicit predictors and formula offsets.
-#'   The response is a data column, or \code{cbind(successes, failures)} for
-#'   grouped binomial data with positive trial counts.
+#'   column, for example `count ~ habitat + (1 | site)`. Gaussian models also
+#'   support one block of numeric random slopes such as
+#'   `(1 + habitat | site)`. Other families allow one random intercept. Use
+#'   explicit predictors (no `.`) and formula offsets. The response is a data
+#'   column, or `cbind(successes, failures)` for grouped binomial data with
+#'   positive trial counts.
 #' @param data Raw data frame with unique row names. The names identify rows
 #'   in the split plan and, if supplied, in the prepared raw-cell buffers.
 #' @param folds Named list of explicit analysis and assessment row-ID splits.
-#'   Use \code{\link{grouped_cv_folds}} or \code{\link{spatial_cv_folds}} to hold
-#'   out entire groups. Use explicit splits within groups for existing-group
-#'   prediction.
-#' @param family Character response family. Choose \code{"gaussian"} (identity,
-#'   default), \code{"poisson"} (log), \code{"binomial"} (logit),
-#'   \code{"nbinom2"} (log), or \code{"Gamma"} (log).
-#' @param prediction Character prediction target. \code{"new_group"} (default)
-#'   requires each assessment group to be absent from analysis in that split.
-#'   \code{"existing_group"} requires every assessment group to have analysis
-#'   observations in that split.
-#' @param kernel_inputs Optional raw-cell \code{multiScaleR_data} object for
-#'   training-only ecological scale fitting with native refits. The default
-#'   \code{NULL} fits the supplied formula without scale optimization.
-#' @param optim_args Named list of extra serial \code{\link{multiScale_optim}}
-#'   controls. Use only with \code{kernel_inputs}.
-#' @param metrics Character vector of \code{"neg_log_score"}, \code{"rmse"},
-#'   \code{"mae"}, or \code{"brier"} (binomial only). By default, report the
-#'   joint group log score and RMSE, or the joint group log score and Brier
-#'   score for binomial responses. The log score is summed across assessment
-#'   groups and divided by the number of assessment rows. Binomial RMSE and
-#'   MAE compare the expected success probability with the observed fraction
-#'   of successes. Brier score averages squared probability error over trials.
-#' @param control A \code{glmmTMB::glmmTMBControl()} list for the native
-#'   analysis fits. The default uses native controls.
+#'   Use [grouped_cv_folds()] or [spatial_cv_folds()] to hold out entire
+#'   groups. Use explicit splits within groups, such as later visits, for
+#'   existing-group prediction.
+#' @param family Character response family. Choose `"gaussian"` (identity,
+#'   default), `"poisson"` (log), `"binomial"` (logit), `"nbinom2"` (log), or
+#'   `"Gamma"` (log).
+#' @param prediction Character prediction target. `"new_group"` (default)
+#'   predicts groups absent from training, so each assessment group must have
+#'   no analysis rows in that split, and its prediction averages over the
+#'   fitted distribution of group effects. `"existing_group"` predicts new
+#'   observations of groups seen in training, so every assessment group must
+#'   have analysis rows in that split, and its prediction conditions on them.
+#' @param kernel_inputs Optional raw-cell `multiScaleR_data` object for
+#'   estimating the scales of effect from the analysis rows by native refits.
+#'   The default `NULL` fits the supplied formula without scale optimization.
+#' @param optim_args Named list of extra serial [multiScale_optim()]
+#'   controls. Use only with `kernel_inputs`. `profile_control` and the
+#'   arguments this function sets itself are reserved.
+#' @param metrics Character vector of `"neg_log_score"`, `"rmse"`, `"mae"`,
+#'   or `"brier"` (binomial only). By default, report the joint group log
+#'   score and RMSE, or the joint group log score and Brier score for
+#'   binomial responses. The log score is summed across assessment groups and
+#'   divided by the number of assessment rows. Binomial RMSE and MAE compare
+#'   the expected success probability with the observed fraction of
+#'   successes. The Brier score averages the squared probability error over
+#'   trials.
+#' @param control A `glmmTMB::glmmTMBControl()` list for the native analysis
+#'   fits. The default `NULL` uses `glmmTMBControl()`.
 #' @param integration_tol Relative tolerance for the one-dimensional adaptive
-#'   integration in non-Gaussian groups. The default is \code{1e-8}.
-#' @param keep_fits Logical. Retain the fitted model for each successfully
-#'   scored fold. Defaults to \code{FALSE}.
+#'   integration over the group effect in non-Gaussian models. The default is
+#'   `1e-8`.
+#' @param keep_fits Logical. Retain the fitted model of each successfully
+#'   scored fold. Defaults to `FALSE`.
 #'
-#' @return An object of class \code{multiScaleR_mixed_cv} and
-#'   \code{multiScaleR_cv}. \code{predictions} contains the fold and row ID,
-#'   group ID, observed response, trials, integrated response mean, and an
-#'   eligibility flag. \code{joint_scores} has one table per scored fold with
-#'   the number of held-out rows and the negative log predictive density
-#'   for each group. \code{summary} and \code{metrics} give pooled and
-#'   fold-specific scores. \code{training} retains analysis IDs, native
-#'   coefficients, covariance, dispersion, and any fitted ecological scales.
-#'   \code{selection_records} stores the native analysis log likelihood,
-#'   its row count and parameter counts. \code{settings}, \code{folds},
-#'   \code{targets}, and \code{prediction_contracts} identify the comparison.
-#'   \code{fold_results}, \code{errors}, \code{diagnostics}, and \code{warnings}
-#'   retain failed folds and native convergence information.
-#'   \code{fits} is optional. A failed fold makes pooled scores unavailable.
+#' @return A list of class `multiScaleR_mixed_cv`, which inherits from
+#'   `multiScaleR_cv`. `summary` and `metrics` hold the pooled and per-fold
+#'   scores, `predictions` the integrated response mean of each held-out row,
+#'   `joint_scores` the joint log score of each held-out group, and
+#'   `training` the coefficients, random-effect covariance, dispersion, and
+#'   any fitted scales of each fold. Compact `selection_records` are always
+#'   kept. A failed fold makes the pooled scores `NA`. The mixed model
+#'   section of [multiScaleR_cv-class] describes every element.
 #'
-#' @details Mixed CV uses maximum-likelihood fits with constant dispersion
-#'   and a Gaussian distribution for the group effects. Given the fitted
-#'   parameters, new groups use the estimated population distribution of
-#'   effects. Existing groups condition that distribution on their analysis
-#'   responses. Gaussian response models use exact multivariate Normal
-#'   conditioning. For other families the function integrates over one group
-#'   intercept with adaptive quadrature. Each assessment group contributes one
-#'   joint predictive density. Parameter, ecological-scale and model-selection
-#'   uncertainty are outside these plug-in predictions.
+#' @details
+#' # How predictions and scores are made
 #'
-#'   Use \code{\link{cv_tab}} to compare complete results with the same
-#'   observation support, group assignments, prediction target and splits.
-#'   Use \code{\link{select_cv}} to evaluate a training information-criterion
-#'   selection rule. Its sample size for the criterion is the native number
-#'   of analysis observations. Estimated covariance parameters count toward
-#'   the penalty. Integrated group effects do not count individually.
-#'   Native fitting, preprocessing and selection use analysis observations.
+#' Mixed CV uses maximum-likelihood fits with constant dispersion and a
+#' Gaussian distribution for the group effects. Given the fitted parameters,
+#' new groups use the estimated population distribution of effects. Existing
+#' groups condition that distribution on their analysis responses. Gaussian
+#' response models use exact multivariate normal conditioning. For other
+#' families the function integrates over one group intercept with adaptive
+#' quadrature. Each assessment group contributes one joint predictive
+#' density, because all of its rows share one unknown group effect.
+#' Parameter, ecological-scale, and model-selection uncertainty are outside
+#' these plug-in predictions. Native fitting, preprocessing, and selection
+#' use the analysis observations only.
 #'
-#' @seealso \code{\link{cross_validate}}, \code{\link{cross_validate_field}},
-#'   \code{\link{cv_tab}}, \code{\link{select_cv}}
+#' # Compare and select models
+#'
+#' Use [cv_tab()] to compare complete results with the same observation
+#' support, group assignments, prediction target, and splits. A joint group
+#' score is not on the same footing as the per-observation scores of
+#' [cross_validate_glm()], so the two cannot be mixed. Use [select_cv()] to
+#' evaluate a training information-criterion selection rule. Its sample size
+#' is the native number of analysis observations. Estimated covariance
+#' parameters count toward the penalty, and integrated group effects do not
+#' count individually. `vignette("v08-cross-validation", package =
+#' "multiScaleR")` shows new-site and later-visit designs.
+#'
+#' @seealso [cross_validate()], [cross_validate_field()], [cv_tab()],
+#'   [select_cv()], and [multiScaleR_cv-class].
 #' @examples
 #' if (requireNamespace("glmmTMB", quietly = TRUE)) {
 #'   surveys <- glmmTMB::Salamanders
+#'   # Hold out whole sites, so every prediction is for a new site
 #'   folds <- grouped_cv_folds(surveys$site, k = 3, ids = rownames(surveys))
+#'   # One fold keeps the example fast
 #'   cv <- cross_validate_mixed(count ~ spp + (1 | site), surveys,
 #'     folds[1], family = "poisson")
-#'   cv$summary
+#'   cv$summary   # joint log score per held-out row, and RMSE in counts
 #' }
 #' @export
 cross_validate_mixed <- function(formula, data, folds,

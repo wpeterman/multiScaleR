@@ -1,4 +1,5 @@
 test_that("prepared products preserve native designs, fixed references and normalized priors", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (surface in c(FALSE, TRUE))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
@@ -48,6 +49,7 @@ test_that("prepared products preserve native designs, fixed references and norma
 })
 
 test_that("expanded coefficient proposals use the complete native Gaussian geometry", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (surface in c(FALSE, TRUE)) {
     f <- prepared_formula_fixture(surface = surface)
@@ -104,6 +106,7 @@ test_that("prepared interaction predictions retain basis, row identity and uncer
 })
 
 test_that("private group, zero and fixed-kernel paths use the expanded coefficient layout", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- prepared_formula_fixture(two = FALSE)
   s <- .msr_marginal_prepare(f$formula, f$inputs, f$data, f$scales, "gaussian",

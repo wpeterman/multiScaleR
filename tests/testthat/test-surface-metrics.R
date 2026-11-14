@@ -892,6 +892,7 @@ test_that("sdr integrates through kernel_prep and projection", {
 })
 
 test_that("prepared surface neighbors preserve exact radius and missing-cell semantics", {
+  skip_on_cran()
   elevation <- surface_test_raster(111)
   ki <- kernel_prep(surface_test_points(elevation), elevation, max_D = 120,
     scale_vars = msr_vars(slope = surface_var("elevation", "sdq"),

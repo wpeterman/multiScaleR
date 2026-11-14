@@ -1,4 +1,5 @@
 test_that("unique-nearest SQ retains scaled analytic values and two log-scale derivatives", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   buffers <- list(list(d = c(0, 1), v = c(0, 1)))
   for (kernel in c("gaussian", "exp")) for (rate in c(3, 30, 300, 600, 700)) {
@@ -25,6 +26,7 @@ test_that("unique-nearest SQ retains scaled analytic values and two log-scale de
 })
 
 test_that("unique-nearest finite saturation keeps explicit finite AD endpoints", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   buffers <- list(list(d = c(0, 1), v = c(0, 1)))
   for (kernel in c("gaussian", "exp")) for (t in c(-1000, 1000)) {
@@ -39,6 +41,7 @@ test_that("unique-nearest finite saturation keeps explicit finite AD endpoints",
 })
 
 test_that("unique-nearest prepared SQ retains full large-SD nuisance derivatives", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   maximum <- c(value = 0, gradient = 0, hessian = 0)
   for (kernel in c("gaussian", "exp"))

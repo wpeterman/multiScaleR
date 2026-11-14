@@ -1,4 +1,5 @@
 test_that("native Gaussian field CV estimates ranges and retains exact joint scores", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   for (covariance in c("exponential", "gaussian")) {
     f <- field_cv_fixture(covariance); x <- f$result
@@ -102,6 +103,7 @@ test_that("field CV compares joint targets and selects only from training criter
 })
 
 test_that("field CV preserves learned products, factors, offsets and native columns", {
+  skip_on_cran()
   f <- field_cv_fixture(); d <- f$data
   d$group <- factor(rep(c("a", "b"), length.out = nrow(d)))
   form <- y ~ I(scale(mean, , TRUE)) * group + I(rough^2) + splines::ns(z, df = 3) + offset(log(exposure))
@@ -122,6 +124,7 @@ test_that("field CV preserves learned products, factors, offsets and native colu
 })
 
 test_that("field folds refit actual mean and weighted-SQ scales using training only", {
+  skip_on_cran()
   f <- field_cv_fixture(kernel = TRUE); x <- f$result
   expect_true(x$complete)
   for (name in names(x$folds)) {

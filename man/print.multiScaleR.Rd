@@ -2,24 +2,42 @@
 % Please edit documentation in R/print_methods.R
 \name{print.multiScaleR}
 \alias{print.multiScaleR}
-\title{Print method for multiScaleR}
+\title{Print a multiScaleR fit}
 \usage{
 \method{print}{multiScaleR}(x, dimension = c("2d", "1d"), prob = 0.9, ...)
 }
 \arguments{
-\item{x}{A \code{multiScaleR} object}
+\item{x}{A \code{multiScaleR} object.}
 
-\item{dimension}{Character. \code{"2d"} (default) prints the ideal planar
-radius first; \code{"1d"} prints the original line-based distance first.}
+\item{dimension}{Character. \code{"2d"} (default) prints the ideal planar radius
+first; \code{"1d"} prints the original line-based distance first.}
 
-\item{prob}{Numeric between 0 and 1 (exclusive). Cumulative kernel-weight
-proportion used for distances. Default: \code{0.9}.}
+\item{prob}{Numeric between 0 and 1 (exclusive). Proportion of cumulative
+kernel weight used for the distances. Default: \code{0.9}.}
 
-\item{...}{Ignored}
+\item{...}{Ignored.}
 }
 \value{
-Invisibly returns the input \code{multiScaleR} object
+Invisibly returns \code{x}.
 }
 \description{
-Print method for objects of class \code{multiScaleR}.
+Prints a fit from \code{\link[=multiScale_optim]{multiScale_optim()}}: the kernel, the
+estimated scales with their standard errors, the scale distances, the
+fitted model, any warnings, and the follow-up recommendation. Use
+\code{\link[=summary.multiScaleR]{summary.multiScaleR()}} for intervals.
+}
+\examples{
+data(pts)
+data(count_data)
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
+inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                      kernel = "gaussian", verbose = FALSE)
+fit <- multiScale_optim(glm(y ~ hab, family = poisson, data = count_data),
+                        inputs, verbose = FALSE)
+fit                      # same as print(fit)
+print(fit, prob = 0.5)   # distances holding half of each kernel's weight
+}
+\seealso{
+\link[=multiScaleR-class]{multiScaleR}, \code{\link[=summary.multiScaleR]{summary.multiScaleR()}}.
 }

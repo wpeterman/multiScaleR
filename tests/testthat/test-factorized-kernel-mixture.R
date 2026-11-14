@@ -19,6 +19,7 @@ test_that("group mixtures retain exact endpoints and stable zero-density arithme
 })
 
 test_that("mixtures are over annual group joint densities with preserved native normalizers", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (surface in c(FALSE, TRUE)) for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))

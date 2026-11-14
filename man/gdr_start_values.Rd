@@ -2,69 +2,76 @@
 % Please edit documentation in R/gdr_start_values.R
 \name{gdr_start_values}
 \alias{gdr_start_values}
-\title{Inspect Native GDR Constructor Start Coordinates}
+\title{List the Starting-Value Order of a Distance-Removal Model}
 \usage{
 gdr_start_values(model)
 }
 \arguments{
-\item{model}{An \code{unmarkedFitGDR} from the qualified unmarked 1.5.2 layout.
-Stored fixed coefficients, log-SDs, optimizer values and constructor block
-metadata must be complete and consistent. Existing offset and TMB ZIP
-restrictions remain in force. A finite coordinate snapshot does not
-establish that the model converged or is eligible for inference.}
+\item{model}{An \code{unmarkedFitGDR} fitted by \code{unmarked::gdistremoval()} with
+\code{unmarked} 1.5.2, using the C or TMB engine. Its stored estimates and
+optimizer values must be complete and agree with each other. Models with
+\code{offset()} terms and zero-inflated TMB models are not supported. Finite
+values do not show that the model converged.}
 }
 \value{
-A plain list with:
+A plain list:
 \itemize{
-\item \code{starts}: unnamed numeric constructor starts on the native link
-scales. Log-SDs remain log-SDs; latent random modes are not included.
-\item \code{map}: \code{constructor_position}, native \code{block}, \code{within_block},
-\code{fitted_position}, \code{component}, \code{kind} (\code{"regression"} or \code{"log_sd"}),
-and the original stored coefficient or variance \code{label}.
-\item \code{fitted_values}: the original fixed optimizer vector, including
-its names and order; \code{coordinate_count}: its length, not a new AIC
-parameter-count estimate; \code{random_modes_omitted}: the stored number
-of latent coordinates in each native component.
-\item \code{optimizer}: stored scalar \code{value} and \code{convergence} when present.
-Nonfinite diagnostic values are retained; they do not validate a fit.
-\item \code{provider}: unmarked version, native engine and, for TMB, the
-installed TMB version. \code{format_version} identifies the snapshot schema.
-\item \code{fingerprint}: SHA256 of this coordinate snapshot. It does not
-identify the complete data, likelihood, controls or prediction context.
-\item \code{qualification}: coordinate-only scope.
-\code{fit_eligibility_established}, \code{likelihood_evaluated} and
-\code{uncertainty_evaluated} are all \code{FALSE}.
+\item \code{starts}: an unnamed numeric vector of the fitted values in starting
+order, on the link scales (log, logit, and log for SDs). Random-effect
+values are not included.
+\item \code{map}: a data frame with one row per element of \code{starts}:
+\code{constructor_position}, the TMB parameter \code{block} (such as
+\code{"beta_lambda"} or \code{"lsigma_lambda"}), \code{within_block} (position in the
+block), \code{fitted_position} (position in the fitted optimizer vector),
+\code{component} (\code{"lambda"}, \code{"dist"}, \code{"rem"} and so on), \code{kind}
+(\code{"regression"} or \code{"log_sd"}) and \code{label}, the coefficient or variance
+name stored by \code{unmarked}. For a TMB-engine model, paste \code{block} and
+\code{within_block} as \code{"beta_lambda[1]"} to name a start for
+\code{\link[=make_gdr_refitter]{make_gdr_refitter()}}.
+\item \code{fitted_values}: the fitted optimizer vector with its own names and
+order. \code{coordinate_count} is its length, not a count for AIC.
+\code{random_modes_omitted} gives the number of random-effect values left
+out in each component.
+\item \code{optimizer}: the stored objective \code{value} and \code{convergence} code, as
+reported by the fit.
+\item \code{provider}: the \code{unmarked} version, the engine and, for TMB, the TMB
+version. \code{format_version} identifies the layout of this list.
+\item \code{fingerprint}: a SHA-256 of this list. It does not identify the data,
+settings or likelihood.
+\item \code{fit_eligibility_established}, \code{likelihood_evaluated} and
+\code{uncertainty_evaluated}: always \code{FALSE}. The function only reads stored
+values.
 }
 }
 \description{
-Extract stored numeric optimizer values in the original constructor order,
-retaining a reversible component and within-component position map.
+Read the fitted coefficient and log SD values of an \code{unmarked}
+distance-removal (GDR) model in the order that \code{unmarked::gdistremoval()}
+expects for its \code{starts} argument, with a map that names the model
+component and position of each value. Use it to build extra starting
+values for \code{\link[=make_gdr_refitter]{make_gdr_refitter()}} and \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}.
 }
-\details{
-Native TMB incoming starts and fitted optimizer coordinates can have different
-orders. For example, the constructor may place NB dispersion after the
-regression and variance blocks, while the fitted vector places it beside
-abundance. Repeated coefficient labels do not resolve this difference.
-The map uses the native block and its within-block position, checking every
-coordinate against the stored component values before returning starts.
-
-This function reads stored metadata only. It does not call a saved likelihood,
-update, score, Hessian, covariance or TMB tape, and it leaves the fitted model
-unchanged. A failed or nonconverged fit can still have finite coordinates;
-its stored diagnostics retain their original interpretation. Nonfinite or
-inconsistent coordinates stop rather than being dropped or repaired.
-
-The list can be saved with \code{saveRDS()} without serializing a fitted model or
-executable objective. Restoring an objective still requires the original
-data, transformations, formulas and evaluated controls, plus all original
-numerical and scientific checks. The snapshot is not a likelihood cache or
-a portable fitted model. It does not restore latent modes or qualify native
-TMB likelihood-only fitting; top-level \code{se = FALSE} and optimizer controls
-do not establish that behavior in the inspected provider.
-
-Priors, normalized targets, parameter penalties, diagnostics, native
-coefficient covariance and uncertainty distinctions are unchanged.
+\section{Why the order matters}{
+With the TMB engine, the order of the \code{starts} argument can differ from
+the order of the fitted optimizer vector. For example, \code{unmarked} may
+place the negative binomial dispersion after the regression and variance
+blocks in the starts, but next to abundance in the fitted vector. Repeated
+coefficient labels cannot resolve this, so the map identifies each value
+by its block and position and checks every value against the stored
+estimates.
 }
+
+\section{What the function does not do}{
+It reads stored values only. It does not evaluate the likelihood, its
+gradient or Hessian, and it leaves the model unchanged. A failed or
+nonconverged fit can still have finite values, and its stored diagnostics
+keep their meaning. Nonfinite or inconsistent values stop with an error
+rather than being dropped or repaired.
+
+The list can be saved with \code{saveRDS()} without saving a fitted model. It
+cannot restore a fit. Refitting still needs the original data,
+transformations, formulas and optimizer settings.
+}
+
 \examples{
 frame <- unmarked::unmarkedFrameGDR(matrix(c(0, 0, 1, 0), 2, byrow = TRUE),
   matrix(c(0, 0, 0, 1, 0, 0), 2, byrow = TRUE),
@@ -74,9 +81,12 @@ point <- unmarked::gdistremoval(data = frame, engine = "C", K = 30,
   starts = c(log(8), log(40), qlogis(.3)), se = FALSE,
   control = list(maxit = 0))
 snapshot <- gdr_start_values(point)
+# Log density, log distance scale and logit removal, in starting order
 snapshot$starts
-snapshot$map
+# Component, block position and stored label of each value
+snapshot$map[, c("block", "within_block", "component", "kind", "label")]
 }
 \seealso{
-\code{\link[=make_gdr_refitter]{make_gdr_refitter()}}, \code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}
+\code{\link[=make_gdr_refitter]{make_gdr_refitter()}}, \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}},
+\code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}
 }

@@ -341,3 +341,5 @@ plot(pred_2 / pred_1)                  # change in expected count between years
   of effect vary among years.
 - **`vignette("v09-estimates-and-intervals", package = "multiScaleR")`**, what each
   estimate and interval includes.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.

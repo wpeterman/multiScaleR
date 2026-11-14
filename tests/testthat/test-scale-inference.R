@@ -53,6 +53,7 @@ test_that("weak-effect inference finds the boundary and reports an unresolved sc
 })
 
 test_that("bootstrap refits are reproducible, audit failures, and preserve RNG", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 80)
   x <- suppressWarnings(profile_glm_fit(f))
   set.seed(919)
@@ -123,6 +124,7 @@ test_that("failed bootstrap pairs remain visible and dispersion cache is exact",
 })
 
 test_that("zero-effect diagnostics recover oscillating reduced NB2 fits", {
+  skip_on_cran()
   for (seed in c(733072L, 733090L)) {
     # Initial conditional GLM iterations can warn for these difficult data.
     f <- suppressWarnings(profile_glm_fixture(n = 100, seed = seed, theta = .5))

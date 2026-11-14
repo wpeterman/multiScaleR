@@ -1,4 +1,5 @@
 test_that("physical SQ coordinates preserve normalized values and every nuisance derivative", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
@@ -34,6 +35,7 @@ test_that("physical SQ coordinates preserve normalized values and every nuisance
 })
 
 test_that("physical coordinate quadrature preserves the original physical units and response covariance", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) {
     f <- private_sq_fixture(kernel, response = TRUE)
@@ -67,6 +69,7 @@ test_that("physical coordinate quadrature preserves the original physical units 
 })
 
 test_that("physical component retains strict group and pre-tape RAM failure behavior", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- private_sq_fixture()$spec; g <- .msr_factorized_group(s, 1L)
   expect_error(.msr_factorized_group_scale_integral(s), "one recoded")

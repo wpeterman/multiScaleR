@@ -60,6 +60,7 @@ logical_glm_numbers <- function(x) x[c("coefficients", "fitted.values",
   "boundary", "iter", "y")]
 
 test_that("logical profile responses preserve fixed-scale native likelihood and rows", {
+  skip_on_cran()
   cases <- logical_binomial_cases()
   for (entry in cases) {
     model <- entry$model; before <- serialize(logical_glm_numbers(model), NULL)
@@ -217,6 +218,7 @@ test_that("logical formulas and invalid response boundaries keep explicit contra
 })
 
 test_that("logical posterior preparation retains ordinary and AD point targets", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) {
     entry <- logical_binomial_cases()[[paste0(kernel, "_unit_numeric")]]

@@ -380,3 +380,5 @@ r_wide   <- kernel_scale.raster(land_rast, multiScaleR = fit,
   one fitted model onto the map from each survey year.
 - **`vignette("v14-bayesian-prediction", package = "multiScaleR")`**, predicting
   new sites and years from a Bayesian fit.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.

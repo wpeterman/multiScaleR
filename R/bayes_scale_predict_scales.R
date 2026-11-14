@@ -1,101 +1,162 @@
 #' Predict Landscape Scales for New Covariates and Groups
 #'
-#' Propagate joint posterior uncertainty into scales at new scale-formula
-#' covariates, including new years when the model contains annual random effects.
+#' Carry joint posterior uncertainty into the scale of each landscape
+#' predictor at new values of the scale-formula covariates, including years
+#' that were not surveyed when the scale formula has a random year effect.
+#' This predicts the scale itself, so no prepared landscape is needed.
 #'
-#' @param object A fitted \code{\link{multiScale_bayes}} object with stored
-#'   joint posterior draws from sampling or either approximation.
-#' @param newdata A nonempty data frame containing the fixed scale-formula
-#'   covariates and any included scale grouping variables. Responses and
-#'   response-only covariates are not needed. Prepared landscape bins are not
-#'   required because this function predicts the scale distribution itself.
-#' @param new_levels Policy for unseen scale random-effect levels:
-#'   \code{"error"} (default) requires an explicit decision;
-#'   \code{"sample"} draws a new standardized group effect for each joint
-#'   posterior vector; \code{"zero"} fixes new deviations at zero.
-#'   Known levels retain their fitted effects. This does not create coefficients
-#'   for an unseen fixed-factor level.
-#' @param re.form \code{NULL} (default) includes scale random effects;
-#'   \code{NA} sets all scale deviations to zero. This is a reference prediction,
-#'   not integration over group variation. Response effects are not used here.
-#' @param level Central interval probability; default 0.95.
-#' @param draws Optional positive number of evenly spaced stored posterior
-#'   vectors; \code{NULL} uses all stored vectors.
-#' @param summary Logical; default \code{TRUE} returns interval summaries.
-#'   Repeated active scale combinations are computed once, avoiding a large
-#'   draws-by-all-observations matrix when many rows share a year's scale.
-#'   \code{FALSE} returns one draws-by-new-observations matrix per predictor.
-#' @param scale \code{"distance"} (default) returns projected map units;
-#'   \code{"log"} returns natural log distances in those map units.
-#' @param seed Optional positive integer seed for new effects. Supplying it
-#'   restores the caller's random-number state, including on failure.
-#' @details Supported fixed scale-formula learners retain their training
-#'   constants inside nested expressions, including \code{I(scale(temp))} and
-#'   polynomial or spline bases. Older retained fits require verified recovery
-#'   from original training data. Single rows and batches use the same basis.
+#' @param object A fitted [multiScale_bayes()] object with stored joint
+#'   posterior draws, from sampling or either approximation.
+#' @param newdata A nonempty data frame that holds the fixed scale-formula
+#'   covariates and the grouping variables of any included scale random
+#'   effects. Responses, response-only covariates, and prepared landscape bins
+#'   are not needed.
+#' @param new_levels What to do with a scale group level that was not in the
+#'   fitted data. `"error"` (default) stops and asks for a decision.
+#'   `"sample"` draws a new standardized group effect for each joint posterior
+#'   vector. `"zero"` sets the new deviation to zero. Known levels keep their
+#'   fitted effects. Neither choice creates a coefficient for an unseen level
+#'   of a fixed factor.
+#' @param re.form `NULL` (default) includes the scale random effects. `NA`
+#'   sets every scale deviation to zero, a reference value rather than an
+#'   average over group variation. Response effects are never used here.
+#' @param level Probability of the central interval; default 0.95.
+#' @param draws Optional positive integer number of evenly spaced stored
+#'   posterior vectors to use. The default `NULL` uses every vector.
+#' @param summary Logical. `TRUE` (default) returns interval summaries and
+#'   computes each repeated scale combination once, which avoids a large
+#'   matrix when many rows share one year's scale. `FALSE` returns one matrix
+#'   of draws by new observations for each landscape predictor.
+#' @param scale `"distance"` (default) returns projected map units. `"log"`
+#'   returns natural log distances in those units.
+#' @param seed Optional positive integer seed for sampled new effects. Your
+#'   own random-number state is restored afterward, even when prediction
+#'   fails.
 #'
-#'   Summary tables have a \code{prediction_contract} attribute describing
-#'   their posterior target, included scale effects, and uncertainty. Setting
-#'   effects to zero remains a reference calculation rather than integration
-#'   over group variation. Metadata does not establish diagnostic eligibility
-#'   or calibration; raw draw lists retain their existing attributes.
-#' @return With \code{summary = TRUE}, a data frame with one row per predictor
-#'   and distinct active scale-formula combination. \code{covariate} names the
-#'   predictor, \code{group} labels the covariates and groups, and \code{row}
-#'   indexes a representative row of \code{newdata}. \code{new_level} identifies
-#'   rows containing an unseen included scale group. \code{distribution} is
-#'   \code{"conditional_posterior"}, \code{"new_group_predictive"}, or
-#'   \code{"zero_deviation_reference"}. \code{mean}, \code{median}, \code{sd},
-#'   \code{lower}, and \code{upper} summarize the finite draw distribution on
-#'   the requested scale. Prefer distance medians and quantiles when arithmetic
-#'   moments are poorly defined; see \code{\link{posterior_scales}}.
-#'   \code{p_below_min_D} and \code{p_above_max_D} use the fitted input reference
-#'   range, not an unsupplied future map's coverage.
+#' @return With `summary = TRUE`, a data frame with one row per landscape
+#'   predictor and distinct active combination of scale covariates and groups.
+#'   * `covariate`: the landscape predictor.
+#'   * `group`: a label for the covariates and groups of the row, such as
+#'     `"year=2026"`.
+#'   * `row`: a representative row of `newdata`.
+#'   * `new_level`: whether the row contains an unseen scale group.
+#'   * `distribution`: which question the row answers. See "Read the
+#'     distribution column".
+#'   * `mean`, `median`, `sd`, `lower`, `upper`: summaries of the draws on the
+#'     requested scale, with the central `level` interval. Prefer the median
+#'     and the limits for distances. See [posterior_scales()] for why the
+#'     arithmetic mean and SD of a distance can be poorly defined.
+#'   * `p_below_min_D`, `p_above_max_D`: the probability that the scale lies
+#'     below `min_D` or above `max_D` of the fitted inputs. See "Read the
+#'     support columns".
 #'
-#'   With \code{summary = FALSE}, a named list of numeric matrices retains every
-#'   new observation column in its supplied order. Repeated rows within a group
-#'   share its effect. Both forms have a small \code{new_groups} attribute with
-#'   \code{component}, \code{covariate}, \code{group}, \code{level} and
-#'   \code{action}; it identifies the explicitly sampled or zeroed new levels.
-#' @details A new year's sampled effect is shared by that year's rows within
-#'   one posterior vector. Different new years are independent conditional on
-#'   the population parameters, whose posterior dependence is retained.
-#'   Effects for separate model components follow their specified independence.
-#'   Separate calls sample independently unless their complete random-number
-#'   streams coincide; use a single batch to retain within-group dependence.
+#'   With `summary = FALSE`, a named list with one numeric matrix per
+#'   landscape predictor. Each matrix has one row per posterior vector and one
+#'   column per row of `newdata`, in the supplied order. Rows in the same new
+#'   group share its effect.
 #'
-#'   New-group intervals include variation among future groups as well as
-#'   uncertainty about population parameters. They are marginal prediction
-#'   intervals, not simultaneous bands or estimates of a realized future year's
-#'   scale after observing its responses. Exchangeable annual effects do not
-#'   impose temporal autocorrelation. A fitted numeric trend extrapolates under
-#'   that trend assumption; an unseen fixed year factor is an error.
-#'   Zeroing effects does not compute a population-averaged distance.
+#'   Both forms carry a `new_groups` attribute with `component`, `covariate`,
+#'   `group`, `level`, and `action`, listing the unseen levels that were
+#'   sampled or set to zero. Summaries also carry a `prediction_contract`
+#'   attribute (see [prediction_contract]) that describes the target, the
+#'   included scale effects, and the uncertainty. It does not establish
+#'   diagnostic eligibility or calibration.
 #'
-#'   The method uses stored joint draws, including stored resamples for an
-#'   importance-corrected fit. It does not add effective posterior information
-#'   or validate a failed fit. Nonfinite distance calculations cause an error;
-#'   use log summaries for extreme scales. Formula transforms must remain
-#'   available in base/stats or through an explicit package namespace. Fitted
-#'   contrasts and prediction-aware bases such as \code{scale()} and
-#'   \code{poly()} are reused. An expression such as
-#'   \code{I(x - mean(x))} evaluates its mean on the supplied new batch by
-#'   ordinary R formula rules. Use a prediction-aware basis or precomputed
-#'   training constants when the original centering must be retained.
-#' @seealso \code{\link{posterior_scales}},
-#'   \code{\link{prediction_contract}},
-#'   \code{\link{predict.multiScaleR_bayes}},
-#'   \code{\link{simulate.multiScaleR_bayes}},
-#'   \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
+#' @details
+#' # Read the distribution column
+#'
+#' * `"conditional_posterior"`: a surveyed group, using its estimated
+#'   deviation.
+#' * `"new_group_predictive"`: the range of scales a new group could have.
+#'   Its interval carries uncertainty in the typical scale and in the
+#'   between-group SD, plus the variation among groups. It is a marginal
+#'   prediction interval, not a simultaneous band and not an estimate of a
+#'   new year's scale after its responses are observed.
+#' * `"zero_deviation_reference"`: the new group placed exactly at the
+#'   typical scale (with `new_levels = "zero"`), or every group with
+#'   `re.form = NA`. Its interval keeps uncertainty in the typical scale but
+#'   leaves out variation among groups, so it is narrower without being a
+#'   more precise forecast.
+#'
+#' The zero-deviation reference is not the average scale over years. With
+#' \eqn{\log D_y = a + \tau z_y}{log D_y = a + tau z_y}, even for fixed a and
+#' tau the mean of \eqn{D_y}{D_y} over years is
+#' \eqn{\exp(a + \tau^2/2)}{exp(a + tau^2 / 2)}, while the zero-deviation
+#' scale is \eqn{\exp(a)}{exp(a)}. Averaging over the uncertainty in a and tau
+#' also depends on their posterior dependence.
+#'
+#' # Read the support columns
+#'
+#' `p_below_min_D` and `p_above_max_D` refer to the range of the fitted
+#' inputs. They say nothing about the coverage of a future map you have not
+#' supplied. The distance priors have no upper or lower bound, so these
+#' probabilities matter when much of the posterior lies outside the distances
+#' your maps resolve. A scale below `min_D` is finer than one raster cell.
+#'
+#' To check a future map, compare the scale draws with that map's `max_D`.
+#' The scale parameter is not the reach of the kernel. Under an ideal,
+#' untruncated planar kernel, the radius that holds 95% of the weight is
+#' `kernel_dist(prob = 0.95, sigma = 1, kernel = fit$specification$kernel)`
+#' times the scale. The examples compute both probabilities. Neither measures
+#' actual cell coverage near raster edges or gaps, which you should inspect
+#' separately. A smaller future buffer renormalizes a more truncated kernel.
+#' If larger neighborhoods are scientifically needed, rebuild comparable
+#' fitting and prediction inputs and refit, rather than changing the
+#' predictor's support only at prediction time.
+#'
+#' # Predict new groups jointly
+#'
+#' A new year's sampled effect is shared by all of that year's rows within one
+#' posterior vector. Different new years are independent given the population
+#' parameters, whose posterior dependence is kept. Effects for separate model
+#' components follow their specified independence. Separate calls draw
+#' separate new effects, so put rows that belong together in one batch.
+#' Exchangeable annual effects impose no temporal autocorrelation. A fitted
+#' numeric trend extrapolates under that trend assumption, and an unseen
+#' level of a fixed year factor is an error.
+#'
+#' # Know the limits
+#'
+#' The method uses the stored joint draws, which for an importance-corrected
+#' fit are stored resamples. It adds no posterior information and does not
+#' validate a failed fit. A nonfinite distance stops with an error, so use
+#' `scale = "log"` for extreme scales. Fitted contrasts and prediction-aware
+#' bases such as `scale()`, `poly()`, and the splines keep their training
+#' constants, including inside nested expressions such as `I(scale(temp))`.
+#' Fits saved by older versions need verified recovery from the original
+#' training data. An expression such as `I(x - mean(x))` takes its mean from
+#' the new batch by ordinary R formula rules, so use a prediction-aware basis
+#' or precomputed training constants when the original centering matters.
+#' Formula transforms must come from base R or stats, or carry an explicit
+#' package namespace.
+#'
+#' @seealso [posterior_scales()], [prediction_contract],
+#'   [predict.multiScaleR_bayes()], [simulate.multiScaleR_bayes()],
+#'   [kernel_dist()], [multiScaleR_bayes-class];
+#'   `vignette("v14-bayesian-prediction", package = "multiScaleR")`.
 #' @examples
-#' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
+#' example <- readRDS(system.file("extdata", "bayesian-prediction-example.rds",
 #'   package = "multiScaleR"))
-#' future <- data.frame(year = c("2026", "2027"))
-#' predict_scales(example$fits$pooled, future,
-#'   new_levels = "sample", draws = 100, seed = 12)
-#' # These intervals include new-year variation and pooling-SD uncertainty.
-#' # A fixed response factor(year) still prevents predicting future counts;
-#' # forecasting the scale distribution alone does not invent that coefficient.
+#' fit <- example$fit   # habitat scale varies among years 2021 to 2025
+#' years <- data.frame(year = c("2025", "2026"))   # 2026 was not surveyed
+#'
+#' # A surveyed year, then a new year drawn from the spread among years
+#' predict_scales(fit, years, new_levels = "sample", draws = 500,
+#'   seed = 801)[c("group", "distribution", "median", "lower", "upper")]
+#' # The reference: the new year placed at the typical scale
+#' predict_scales(fit, years[2, , drop = FALSE], new_levels = "zero",
+#'   draws = 500)[c("group", "distribution", "median", "lower", "upper")]
+#'
+#' # Can a future map of the same extent hold the new year's kernel?
+#' log_D <- predict_scales(fit, years[2, , drop = FALSE], new_levels = "sample",
+#'   scale = "log", summary = FALSE, draws = 500, seed = 806)$habitat
+#' max_D <- example$kernel_inputs$max_D   # 1200 m for the future inputs
+#' radius_per_D <- kernel_dist(prob = 0.95, sigma = 1,
+#'   kernel = fit$specification$kernel)
+#' mean(log_D > log(max_D))                       # scale itself beyond max_D
+#' mean(log_D + log(radius_per_D) > log(max_D))   # 95% radius beyond max_D
+#' # The second probability is larger, because the kernel reaches past its
+#' # scale parameter.
 #' @export
 predict_scales <- function(object, newdata,
     new_levels = c("error", "sample", "zero"), re.form = NULL,

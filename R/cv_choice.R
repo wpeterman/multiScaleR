@@ -160,87 +160,154 @@ logLik.msr_cv_choice_null <- function(object, ...) {
 
 #' Cross-Validate Conditional Choices in Complete Matched Sets
 #'
-#' Refit native conditional-logistic coefficients and, optionally, ecological
-#' scales within explicit training folds. Score the probability of the used
-#' alternative among every alternative in each held-out choice set.
+#' Cross-validate a step-selection model or another conditional logistic
+#' model. In each fold, refit the coefficients, and optionally the scales of
+#' effect, using the analysis rows, then score the probability the model
+#' gives the used alternative among all alternatives of each held-out choice
+#' set. A *choice set* is one used alternative together with the available
+#' alternatives it was chosen from, for example one observed step and its
+#' random steps.
 #'
-#' @param formula Two-sided formula with a direct numeric/logical zero/one case
-#'   column and one bare \code{strata(choice_id)} term. Fixed factors,
-#'   interactions, offsets and supported learned transformations use native terms.
-#' @param data Data frame containing explicit formula variables and unique row
-#'   IDs matching \code{folds} and, when supplied, prepared spatial inputs.
-#' @param folds Explicit named analysis/assessment row-ID splits. Every choice
-#'   set must remain wholly in training, assessment or excluded rows in each split.
-#'   Use whole-animal groups when assessment concerns transfer to new animals.
-#' @param kernel_inputs Optional raw-cell \code{multiScaleR_data}. Default
-#'   \code{NULL} fits an ordinary native reference. Otherwise scales and learned
-#'   normalization/bin references are refit only on analysis rows.
-#' @param backend Spatial backend, \code{"conditional_logit"} (default) or
-#'   \code{"refit"}. Pass \code{radius_grid} through \code{optim_args} with
-#'   \code{"refit"} to profile hard radii and any smooth scales in each
-#'   training split.
-#'   Existing kernel, metric and numerical-admission guards apply.
-#' @param method Native one-case partial-likelihood method, \code{"exact"}
-#'   (default), \code{"efron"} or \code{"breslow"}.
-#' @param cox_control Named native \code{survival::coxph.control()} settings.
+#' @param formula Two-sided formula. The response is a numeric or logical
+#'   column coded 1 for the used alternative and 0 for the available ones.
+#'   The right side holds the predictors and one bare `strata(choice_id)`
+#'   term naming the column that identifies each choice set. Factors,
+#'   interactions, offsets, and the data-dependent terms `scale()`, `poly()`,
+#'   `splines::ns()`, and `splines::bs()` are allowed. A dot (`.`) expands to
+#'   the columns of `data`, so remove the set ID from it, for example
+#'   `case_ ~ . - step + strata(step)`.
+#' @param data Data frame with one row per alternative, holding the case
+#'   column, the set ID, and every predictor. Its row names are the row IDs
+#'   used by `folds` and, when supplied, by `kernel_inputs`. They must be
+#'   unique.
+#' @param folds Named list of explicit splits of row IDs, as in
+#'   [cross_validate()]. Every choice set must lie wholly in the analysis
+#'   rows, wholly in the assessment rows, or wholly outside the split.
+#'   [grouped_cv_folds()] applied to the set IDs, or to animal IDs, does
+#'   this. See "Build folds that keep choice sets whole".
+#' @param kernel_inputs Optional `multiScaleR_data` object from
+#'   [kernel_prep()] or [kernel_prep_by_group()] with the cell-level data
+#'   kept, one prepared row per alternative. The default `NULL` fits an
+#'   ordinary conditional logistic reference model without scales. When it is
+#'   supplied, each fold also estimates the scales, and learns the
+#'   standardization and distance bins, from its analysis rows only.
+#' @param backend Scale-fitting route used with `kernel_inputs`, either
+#'   `"conditional_logit"` (default) or `"refit"`. Supply
+#'   `optim_args = list(radius_grid = ...)` with `"refit"` to profile hard
+#'   radii, together with any smooth scales, in each training split. The
+#'   usual kernel, metric, and numerical checks of [multiScale_optim()]
+#'   apply. Ignored when `kernel_inputs` is `NULL`.
+#' @param method Partial-likelihood method passed to [survival::clogit()],
+#'   one of `"exact"` (default), `"efron"`, or `"breslow"`. These are rules
+#'   for tied event times. With one used alternative per set they give the
+#'   same likelihood, but the method is recorded, and [cv_tab()] and
+#'   [select_cv()] compare only candidates that declare the same method.
+#' @param cox_control Named list of [survival::coxph.control()] settings for
+#'   the native training fit. The default keeps the settings of
+#'   `coxph.control()`.
 #' @inheritParams cross_validate
-#' @return A \code{multiScaleR_choice_cv} object inheriting \code{multiScaleR_cv}.
-#'   Standard CV fields retain their meanings with the following target-specific
-#'   definitions. \code{predictions} retains every alternative, its \code{choice}
-#'   ID, zero/one \code{observed} case, uncentered \code{linear_predictor},
-#'   within-set \code{prediction} probability and natural-log \code{log_probability}.
-#'   Only used alternatives are \code{eligible}; their \code{neg_log_score} is
-#'   the negative log choice probability. \code{summary}/\code{metrics} average
-#'   over choice sets, with \code{unit = "choice_set"}, set counts and a separate
-#'   \code{n_alternatives} count. \code{fold_results} counts alternative rows.
-#'   \code{targets} binds all used row IDs, cases and set membership.
-#'   \code{training}, \code{diagnostics}, \code{warnings}, \code{errors},
-#'   \code{raster_groups}, \code{fits} and opt-in \code{selection_records} retain
-#'   their contracts described in \code{\link{cross_validate}}. Choice records
-#'   use version 2, native partial-method/stratum signatures and event-based
-#'   \code{nobs}. Failed folds retain every planned alternative and pooled
-#'   estimates remain \code{NA}. Inspect original diagnostics before comparison.
-#' @details Each set needs one used alternative and at least two alternatives.
-#'   Weights, missing-row omission, robust clustering, penalized/special Cox terms
-#'   and generic censored survival responses are outside this adapter. No rows
-#'   are silently dropped. Predictions use saved training terms without assigning
-#'   an effect to new set labels. Log scores are calculated directly in log space,
-#'   including when a displayed probability underflows to zero.
+#' @return A list of class `multiScaleR_choice_cv`, which inherits from
+#'   `multiScaleR_cv`. Its `summary` holds the negative log score of the
+#'   used alternative, averaged over held-out choice sets, and `predictions`
+#'   holds one row per alternative with its probability within its set. The
+#'   other elements follow [cross_validate()]. The conditional-choice section
+#'   of [multiScaleR_cv-class] lists every difference. `print()` shows how
+#'   many folds were scored and the pooled score, and returns `x` invisibly.
+#' @details
+#' # Build folds that keep choice sets whole
 #'
-#'   A zero-coefficient native fit receives a CV-only likelihood adapter when
-#'   survival retains a scalar null likelihood. Its value must agree with the
-#'   exact complete-set offset likelihood before native K = 0 and event counts
-#'   can be used. Other native Cox fits are not altered. Inconsistent or missing
-#'   native metadata remains a failure.
-#'   Every scored fold checks its unweighted, unpenalized native fit, analysis
-#'   rows, complete strata and partial method before prediction. These checks
-#'   apply even when fits and selection records are not retained.
+#' Before any fitting, the function rejects a split that divides a choice
+#' set. Holding out whole choice sets measures transfer to new sets from the
+#' same animals. To measure transfer to new animals, build the folds from
+#' animal IDs instead. If step labels repeat across animals, first create a
+#' globally unique set ID, such as `interaction(animal, step, drop = TRUE)`,
+#' and use that column in `strata()`. For spatial blocks, pass the set IDs or
+#' the animal IDs as `group` to [spatial_cv_folds()], so that no set crosses
+#' a split boundary.
 #'
-#'   Use \code{\link{cv_tab}} to compare this choice target and
-#'   \code{\link{select_cv}} for training-only AIC/AICc/BIC selection. Penalties
-#'   retain native event counts and full coefficient/scale/shape K. Ordinary
-#'   Bernoulli probabilities and relative selection risks are different targets.
-#'   Dot formulas expand declared column names before fitting and learn no
-#'   assessment transformations. Exclude the set ID as an ordinary predictor,
-#'   for example \code{case_ ~ . - choice_id + strata(choice_id)}. Predictors
-#'   constant within every set have no identified conditional coefficient.
-#'   The supported training-only transformations described in
-#'   \code{\link{cross_validate}} also apply inside choice expressions and offsets.
-#'   Their saved constants do not introduce stratum effects or change event K.
-#'   Point scores do not integrate parameter/selection uncertainty, provide
-#'   observation intervals or establish calibration. This adapter does not
-#'   promote guarded spatial-scale or Bayesian methods.
+#' # What the model can contain
+#'
+#' Each set needs exactly one used alternative and at least one available
+#' alternative. Weights, missing values, robust clustering (`cluster()`),
+#' frailty and other special or penalized Cox terms, and general censored
+#' survival responses are outside this function, and no rows are dropped
+#' silently. Predictors that are constant within every set have no
+#' identifiable coefficient. Native alias and convergence problems are kept
+#' as failures rather than resolved by dropping terms or alternatives, and a
+#' warning from the native training fit makes the fold fail. Every scored
+#' fold checks that its native fit is unweighted and unpenalized, uses the
+#' analysis rows and complete sets, and used the declared `method`, whether
+#' or not fits or records are kept. Learned transformations follow the rules
+#' described in [cross_validate()]. Their training constants add no stratum
+#' effects and do not change the event count.
+#'
+#' # Estimate scales within the folds
+#'
+#' With `kernel_inputs`, each fold rebuilds the spatial covariates from the
+#' raw cells of its analysis rows, learns the standardization and the
+#' representative bin distances there, and estimates the scales. The
+#' assessment rows reuse those frozen references. Inputs from
+#' [kernel_prep_by_group()] are fixed covariate maps and add no random
+#' effects. Raw covariate units (`covariate_transform = "raw"` in
+#' `optim_args`) require `backend = "refit"`.
+#' `vignette("v04-landscape-metrics", package = "multiScaleR")` shows a
+#' search over a grid of radii on a full data set.
+#'
+#' # Read the scores
+#'
+#' The score of a held-out set is the negative natural log of the probability
+#' the fitted model gives its used alternative, where the probabilities of a
+#' set's alternatives sum to 1. The pooled score averages over sets. A model
+#' without covariates or offsets gives each of k alternatives a probability
+#' of 1/k, so its score is log(k), or 1.099 for three alternatives. A useful
+#' covariate lowers the score. Scores are computed on the log scale, so a
+#' probability that prints as zero still has a finite score. Predictions use
+#' the saved training terms and assign no effect to the labels of new sets.
+#' These within-set probabilities differ from Bernoulli probabilities of use
+#' and from unnormalized relative selection strengths.
+#'
+#' For a model with no estimated coefficients, survival's `logLik()` can
+#' return `NA`. The function then checks survival's stored null
+#' log-likelihood against the exact complete-set likelihood before using it,
+#' with K = 0, for training-criterion selection. Missing or inconsistent
+#' values remain failures. Other native fits are not altered.
+#'
+#' # Compare and select models
+#'
+#' Use [cv_tab()] with `metric = "neg_log_score"` to rank choice models fitted
+#' to the same sets, folds, and `method`. Use [select_cv()] to score a
+#' training AIC, AICc, or BIC rule. Its sample size is the number of choice
+#' sets (one event each), and K counts the coefficients and any estimated
+#' scales and shapes. Choice scores cannot be mixed with scores from
+#' Bernoulli GLMs. They treat fitted parameters as known, so they do not
+#' integrate parameter or selection uncertainty, give intervals, or establish
+#' calibration. `vignette("v08-cross-validation", package = "multiScaleR")`
+#' includes a step-selection example.
 #' @examples
 #' if (requireNamespace("survival", quietly = TRUE)) {
-#'   d <- data.frame(case_ = rep(c(1, 0, 0), 6),
-#'                   step = rep(1:6, each = 3), x = sin(1:18))
-#'   f <- grouped_cv_folds(d$step, k = 2)
-#'   cv <- cross_validate_clogit(case_ ~ x + strata(step), d, f,
-#'                               keep_selection = TRUE)
-#'   cv$summary # natural-log loss per held-out choice set
+#'   # 24 choice sets of three alternatives. The first of each set was used.
+#'   i <- 1:72
+#'   choices <- data.frame(step = (i - 1) %/% 3 + 1,
+#'                         used = as.numeric(i %% 3 == 1),
+#'                         habitat = sin(i * 1.7))
+#'   folds <- grouped_cv_folds(choices$step, k = 3)   # whole sets held out
+#'
+#'   models <- list(
+#'     null = cross_validate_clogit(used ~ strata(step), choices, folds,
+#'                                  keep_selection = TRUE),
+#'     habitat = cross_validate_clogit(used ~ habitat + strata(step), choices,
+#'                                     folds, keep_selection = TRUE))
+#'   print(models$habitat)   # natural-log loss per held-out choice set
+#'
+#'   # The null model scores log(3) = 1.099. Here habitat is unrelated to use,
+#'   # so it does not lower the score.
+#'   print(cv_tab(models, metric = "neg_log_score"))
+#'
+#'   # Model picked by training AICc in each fold
+#'   select_cv(models, criterion = "AICc")$selection$chosen
 #' }
-#' @seealso \code{\link{cross_validate}}, \code{\link{grouped_cv_folds}},
-#'   \code{\link{spatial_cv_folds}}, \code{\link{cv_tab}}, \code{\link{select_cv}}
+#' @seealso [cross_validate()], [grouped_cv_folds()], [spatial_cv_folds()],
+#'   [cv_tab()], [select_cv()], and [multiScaleR_cv-class].
 #' @export
 cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
     backend = c("conditional_logit", "refit"), method = c("exact", "efron", "breslow"),
@@ -373,8 +440,8 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
 }
 
 #' @rdname cross_validate_clogit
-#' @param x A conditional-choice CV result.
-#' @param ... Reserved for future print controls.
+#' @param x A `multiScaleR_choice_cv` result, for `print()`.
+#' @param ... Not used. Reserved for future print controls.
 #' @export
 print.multiScaleR_choice_cv <- function(x, ...) {
   cat("Conditional-choice CV:", sum(x$fold_results$status == "scored"), "of", nrow(x$fold_results), "folds scored.\n")

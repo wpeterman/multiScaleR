@@ -1,4 +1,5 @@
 test_that("conditional score audits agree with full AD derivatives", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (family in c("gaussian", "nbinom2")) {
     f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
@@ -15,6 +16,7 @@ test_that("conditional score audits agree with full AD derivatives", {
 })
 
 test_that("score auditing is explicit and preserves default and boundary behavior", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 6, n_year = 2)
   s <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp, f$inputs, f$data,
@@ -37,6 +39,7 @@ test_that("score auditing is explicit and preserves default and boundary behavio
 })
 
 test_that("a failed score audit remains a retained failed attempt", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 6, n_year = 2)
   s <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp, f$inputs, f$data,

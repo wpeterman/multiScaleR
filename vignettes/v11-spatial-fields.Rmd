@@ -442,3 +442,5 @@ map_zero <- predict(fit_field, layers, re.form = NA)
   by how well they predict held-out observations.
 - **`vignette("v03-map-predictions", package = "multiScaleR")`**,
   mapping beyond the conditions you sampled.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.

@@ -2,22 +2,31 @@
 % Please edit documentation in R/data_files.R
 \name{landscape}
 \alias{landscape}
-\title{Simulated raster}
+\title{Example landscape raster}
 \format{
-\code{landscape_rast}
-
-A SpatRaster object with three surfaces:
-\describe{
-\item{land1}{ --> A binary landscape surface with low autocorrelation}
-\item{land2}{ --> A continuous landscape surface with low autocorrelation}
-\item{land3}{ --> A continuous landscape surface with high autocorrelation}
+A \code{SpatRaster} with three layers of 200 by 200 cells of 20 map
+units (an extent of 0 to 4000 in each direction) and no coordinate
+reference system. Values range from 0 to 1:
+\itemize{
+\item \code{land1}: binary surface with low spatial autocorrelation.
+\item \code{land2}: continuous surface with low spatial autocorrelation.
+\item \code{land3}: continuous surface with high spatial autocorrelation.
 }
+}
+\source{
+Simulated for this package.
 }
 \description{
-Raster data for use with vignette example
+Three simulated landscape layers stored as \code{landscape.tif} in the
+package's \code{extdata} folder, used with \link{surv_pts} and \link{landscape_counts} in
+the vignettes.
 }
 \examples{
-land_rast <- terra::rast(system.file("extdata",
-                         "landscape.tif", package = 'multiScaleR'))
-
+land <- terra::rast(system.file("extdata", "landscape.tif",
+                                package = "multiScaleR"))
+land
+terra::plot(land)
+}
+\seealso{
+\link{surv_pts}, \link{landscape_counts}.
 }

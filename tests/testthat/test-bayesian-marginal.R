@@ -1,4 +1,5 @@
 test_that("marginal Laplace reproduces an exactly integrable random-effect model", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   y <- .7; se <- .3; prior_sd <- .5
   f <- function(p) {
@@ -49,6 +50,7 @@ test_that("marginal SD quadrature retains the half-normal prior when data are un
 })
 
 test_that("marginal public inference rejects unsupported quadrature dimensions", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture()
   expect_error(multiScale_bayes(count ~ habitat, f$inputs, f$data,
@@ -59,6 +61,7 @@ test_that("marginal public inference rejects unsupported quadrature dimensions",
 })
 
 test_that("marginal public fits retain continuous pooling uncertainty and fitted methods", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 10, n_year = 3)
   prepared <- multiScale_bayes(count ~ habitat + temp, f$inputs, f$data,

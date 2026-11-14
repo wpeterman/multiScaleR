@@ -59,6 +59,7 @@ test_that("analytic GLMs use weighted SQ values and profile derivatives", {
 })
 
 test_that("weighted SQ connects NB2 inference and mixed likelihood machinery", {
+  skip_on_cran()
   f <- weighted_glm_fixture(surface_only = TRUE)
   set.seed(320); f$data$y <- rnbinom(120, mu = exp(f$eta), size = 3)
   model <- glm(f$formula, f$data, family = MASS::negative.binomial(3))
@@ -131,6 +132,7 @@ test_that("weighted SQ fits connect to prediction, covariance and scale profiles
 })
 
 test_that("weighted SQ mixed tapes agree with native Laplace likelihoods and scores", {
+  skip_on_cran()
   skip_if_not_installed("RTMB"); skip_if_not_installed("glmmTMB")
   for (kernel in c("gaussian", "exp")) for (only in c(FALSE, TRUE)) {
     f <- weighted_glm_fixture(kernel, only)

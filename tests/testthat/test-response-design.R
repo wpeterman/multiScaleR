@@ -38,6 +38,7 @@ test_that("native formula products retain contrasts, nesting and literal names",
 })
 
 test_that("grouped response products retain complete AD gradients", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   dat <- data.frame(y = seq_len(12), h = sin(1:12), k = cos(1:12),
     f = factor(rep(letters[1:3], 4)))

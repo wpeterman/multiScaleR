@@ -9,6 +9,9 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Run the full test suite on CI, including tests marked skip_on_cran()
+  # because they are slow or need RTMB. CRAN itself skips them.
+  NOT_CRAN: true
 
 jobs:
   R-CMD-check-push:

@@ -24,6 +24,7 @@ test_that("expow mixtures retain radius transforms without estimating a hard sha
 })
 
 test_that("public expow refitting supports hard-radius surface mixtures end to end", {
+  skip_on_cran()
   f <- refit_spatial_fixture("expow", weighted = FALSE)
   object <- suppressMessages(multiScale_optim(f$object$opt_mod, f$inputs,
     par = f$object$optim_results$par, verbose = FALSE, n_cores = NULL))

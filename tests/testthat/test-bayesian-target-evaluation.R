@@ -1,4 +1,5 @@
 testthat::test_that("importance targets preserve every finite AD value across families and kernels", {
+  skip_on_cran()
   testthat::skip_if_not_installed("RTMB")
   for(family in c("gaussian","poisson","binomial","nbinom2"))for(kernel in c("gaussian","exp")) {
     f<-bayesian_scale_fixture(n_site=4,n_year=3,kernel=kernel)
@@ -16,6 +17,7 @@ testthat::test_that("importance targets preserve every finite AD value across fa
   }
 })
 testthat::test_that("overflowing Poisson means retain valid zero posterior mass", {
+  skip_on_cran()
   testthat::skip_if_not_installed("RTMB")
   f<-bayesian_scale_fixture(n_site=3,n_year=2)
   f$data$count<-rep(c(0,1),length.out=nrow(f$data))

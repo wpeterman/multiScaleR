@@ -23,162 +23,254 @@ cross_validate_field(
 )
 }
 \arguments{
-\item{formula}{Two-sided fixed-effects formula with a numeric response column.
-Products, interactions, factors, offsets and trained scale/poly/ns/bs terms
-retain their native meanings. Do not add random effects or penalized smooths;
-this adapter adds one shared response field to the fixed formula.}
+\item{formula}{Two-sided fixed-effects formula whose response is a numeric
+column of \code{data}. Products, interactions, factors, offsets, and the
+data-dependent terms \code{scale()}, \code{poly()}, \code{splines::ns()}, and
+\code{splines::bs()} keep their usual meanings, with their constants learned
+from the analysis rows. Do not add random effects or penalized smooths,
+because the function adds the one shared field itself.}
 
-\item{data}{Raw data frame with unique row names matching the fold IDs and
-coordinate order. Supply raw predictors, not full-data learned transforms.
-All observations have unit case weights.}
+\item{data}{Data frame of raw responses and predictors, with unique row
+names that match the fold IDs, in the same row order as \code{coords}. Supply
+raw predictors, not transformations learned from all rows. Every row has
+a case weight of one.}
 
-\item{coords}{Projected points or a numeric two-column table, one row per data
-row. Repeated locations identify shared field states.}
+\item{coords}{Locations of the observations, one per row of \code{data}, as
+projected \code{sf} points, a \code{terra::SpatVector} of points, or a numeric
+two-column table. Rows with identical coordinates share one field value,
+so repeated surveys of a location are linked.}
 
-\item{folds}{Explicit named analysis/assessment ID splits, usually from
-\code{\link[=spatial_cv_folds]{spatial_cv_folds()}}. A location cannot occur in both parts of one split.
-Buffer rows excluded from that split enter neither its fit nor its score.}
+\item{folds}{Named list of explicit splits, usually from
+\code{\link[=spatial_cv_folds]{spatial_cv_folds()}}. A location cannot appear in both the analysis and
+the assessment rows of one split, so keep repeated surveys of a location
+together. Rows excluded from a split, for example by a buffer, enter
+neither its fit nor its score.}
 
-\item{audit_dir}{Directory for compact write-once native fit/start records.
-Failures remain recorded. No models, tapes or dense covariance arrays are
-saved to these records.}
+\item{audit_dir}{Directory where compact, write-once records of each
+native fit and its starting values are saved, one subfolder per fold.
+Records of failed fits are kept too. No models, tapes, or dense
+covariance matrices are saved. Give each candidate model its own
+directory to keep the records apart.}
 
-\item{crs}{Projected coordinate reference system for coordinate tables. Default
-\code{NULL} uses the existing CRS of supplied spatial points. Units are retained.}
+\item{crs}{Projected coordinate reference system, in any form accepted by
+\code{sf::st_crs()}. It is required when \code{coords} is a coordinate table. The
+default \code{NULL} uses the CRS of spatial \code{coords}, which must be projected,
+and a supplied \code{crs} must match it. Coordinates are never transformed,
+so the correlation range is reported in the CRS units.}
 
-\item{covariance}{Response correlation, \code{"exponential"} (default) or
-\code{"gaussian"}. Correlation is exp(-d/range) or exp(-(d/range)^2), respectively.
-Range and field SD are estimated in every fold, as is the observation
-dispersion parameter for Gaussian, NB2 and Gamma models.}
+\item{covariance}{Correlation function of the field, either
+\code{"exponential"} (default), with correlation exp(-d / range) at distance
+d, or \code{"gaussian"}, with correlation exp(-(d / range)^2). The range and
+the field SD are estimated in every fold, as is the observation
+dispersion for Gaussian, NB2, and Gamma models.}
 
-\item{kernel_inputs}{Optional original \code{\link[=kernel_prep]{kernel_prep()}} inputs with raw cell
-data and matching IDs. Default \code{NULL} fits a spatial-field reference without
-estimating ecological scales. With inputs, use \code{\link[=msr_vars]{msr_vars()}} to identify the
-optimized predictors appearing in formula.}
+\item{kernel_inputs}{Optional \code{multiScaleR_data} object from
+\code{\link[=kernel_prep]{kernel_prep()}} with the cell-level data kept and row names matching
+\code{data}. The default \code{NULL} fits a field model without estimating scales.
+When it is supplied, each fold also estimates the scales of the
+optimized covariates that appear in \code{formula} (list them with
+\code{\link[=msr_vars]{msr_vars()}}) by refitting the field model.}
 
-\item{optim_args}{Named serial refit controls passed to \code{\link[=multiScale_optim]{multiScale_optim()}}.
-Default an empty list. Backend, data, callback and worker overrides are
-reserved; this adapter uses the refit backend and one worker.}
+\item{optim_args}{Named list of extra \code{\link[=multiScale_optim]{multiScale_optim()}} arguments for the
+scale fit, used only with \code{kernel_inputs}. The default is an empty list.
+This function fixes the backend (\code{"refit"}), the data, the refit
+function, and the single worker, so those cannot be replaced.}
 
-\item{control}{Named native nlminb controls. Defaults are \code{iter.max = 1000},
-\code{eval.max = 1500}, \code{rel.tol = 1e-10} and \code{x.tol = 1e-8}. Positive native controls
-are retained with the fit. Convergence and curvature gates remain mandatory.}
+\item{control}{Named list of native \code{nlminb()} optimizer settings for each
+field fit. Accepted names are \code{iter.max}, \code{eval.max}, \code{rel.tol}, \code{x.tol},
+and \code{abs.tol}, each a positive number. The defaults are
+\code{iter.max = 1000}, \code{eval.max = 1500}, \code{rel.tol = 1e-10}, and
+\code{x.tol = 1e-8}. The settings are stored with each fit, and the
+convergence and curvature checks apply whatever they are.}
 
-\item{metrics}{Recorded scores. Default \code{c("rmse", "mae", "neg_log_score")}.
-Negative log score uses one joint density or probability mass per
-assessment block. Pooled reporting sums the block losses and divides by
+\item{metrics}{Scores to record, any of \code{"rmse"}, \code{"mae"}, and
+\code{"neg_log_score"} (all three by default). The negative log score uses one
+joint density, or one joint probability for counts and 0/1 data, per
+assessment block. The pooled score sums the block losses and divides by
 the number of assessment observations.}
 
-\item{max_refits}{Positive integer kernel-refit budget per fold, default 200.
-Each point checks two native starts. Exceeding the budget fails the fold.}
+\item{max_refits}{Positive whole number, the most native refits allowed in
+one fold during the scale search (default 200). Each refit checks two
+starting values. A fold that exceeds the budget fails.}
 
-\item{max_memory_mb}{Positive finite conservative covariance-work budget in
-MiB, default 512. Node aggregation avoids a dense training-observation
-covariance for repeated surveys. This plan is not an operating-system cap.}
+\item{max_memory_mb}{Positive number, a conservative budget in MiB for the
+covariance calculations of one fold (default 512), checked before any
+fitting. Repeated surveys at one location share one field value, so they
+do not enlarge the training covariance matrix. This is a planning check,
+not an operating-system memory limit.}
 
-\item{keep_fits}{Logical, default \code{FALSE}. Retain complete training models
-when \code{TRUE}; compact training information-criterion records are always kept.}
+\item{keep_fits}{Logical. \code{TRUE} keeps the complete training model of each
+fold in \code{fits}. The default \code{FALSE} saves memory. The compact training
+records that \code{\link[=select_cv]{select_cv()}} reads are kept either way.}
 
-\item{family}{Response family and link. Use \code{"gaussian"} (identity, default)
-for continuous observations, \code{"poisson"} or \code{"nbinom2"} (log) for
-nonnegative integer counts, \code{"binomial"} (logit) for numeric zero/one
-observations, or \code{"Gamma"} (log) for positive continuous observations.}
+\item{family}{Response family and link. Use \code{"gaussian"} (identity, the
+default) for continuous observations, \code{"poisson"} or \code{"nbinom2"} (log)
+for counts, \code{"binomial"} (logit) for numeric 0/1 observations, or
+\code{"Gamma"} (log) for strictly positive continuous observations. All
+families other than \code{"gaussian"} are experimental.}
 }
 \value{
-A \code{multiScaleR_field_cv} result inheriting from \code{multiScaleR_cv}.
-\code{predictions} retains assessment IDs, means, observed values, squared and
-absolute losses, and separately labeled field and noise variances. The two
-field variance columns use the linear-predictor scale. Observation noise
-variance and observation predictive SD use the response scale. The noise
-column averages the conditional observation variance over the field.
-\code{joint_scores} retains each block's negative log density or mass. For
-Gaussian responses it includes the quadratic loss and log determinant.
-For the Laplace calculation it includes both marginal log likelihoods,
-their latent-mode diagnostics, and the analysis likelihood gap relative
-to the native fit. \code{training} retains the field SD, range in coordinate
-units, and the observation SD, NB2 size or Gamma shape when estimated.
-\code{selection_records}, \code{diagnostics}, \code{warnings} and \code{errors} retain training
-likelihoods, parameter counts, convergence information and failures.
-\code{summary} pools the recorded losses. \code{settings} and \code{prediction_contracts}
-specify the target and omitted uncertainty. Use \code{\link[=cv_tab]{cv_tab()}} for matching
-field-CV candidates and \code{\link[=select_cv]{select_cv()}} for training-only AIC/AICc/BIC choices.
+A list of class \code{multiScaleR_field_cv}, which inherits from
+\code{multiScaleR_cv}. \code{summary} holds the pooled scores, \code{predictions} the
+predicted mean, errors, and variance components of each held-out
+observation, \code{joint_scores} the joint loss of each held-out block, and
+\code{training} the field SD, correlation range (in coordinate units),
+dispersion, and coefficients of each fold. Compact \code{selection_records}
+are always kept. The spatial field section of \link[=multiScaleR_cv-class]{multiScaleR_cv}
+describes every element and its scale.
 }
 \description{
-Estimate a shared response field and its correlation range in each training
-split, then score the joint distribution of the held-out block. Gaussian
-responses use exact Gaussian conditioning at the fitted parameters. Count,
-binary and positive responses use Laplace integration. Optional ecological
-kernel scales are also refitted inside training.
+Cross-validate a model that adds a spatial random field to its fixed
+predictors. A \emph{spatial random field} is a smooth surface of spatially
+correlated variation that the predictors do not explain. In each fold the
+function estimates the field, its correlation range, the regression
+coefficients, and optionally the scales of effect from the analysis rows.
+It then scores the joint distribution of each held-out block, so that
+correlation among nearby held-out observations counts. Gaussian responses
+use exact Gaussian conditioning at the fitted parameters. Count, binary,
+and positive responses use Laplace integration.
 }
 \details{
 The count, binary, and positive response families are experimental. Their
 arguments and results may change in a later release without a deprecation
 period.
-
-The native fits use glmmTMB and TMB. Every fit checks two deterministic
-training-only covariance starts and records package versions, convergence,
-marginal score and fixed/joint/latent curvature. For Gaussian responses
-both starts must pass and agree. For the other families, use the highest
-likelihood among the starts that pass and retain the outcome of each start.
-
-For Gaussian responses, the score integrates the field and observation
-noise by exact Gaussian conditioning. For the other families it subtracts
-the Laplace log marginal likelihood for the joint analysis and assessment
-responses from the analysis-only log marginal likelihood. Both evaluations
-use parameters estimated solely in analysis, including field covariance,
-fixed effects, observation dispersion and ecological scales. This ratio
-retains dependence across held-out locations and repeated observations.
-For discrete responses, a ratio above one beyond numerical roundoff is
-recorded as a failed score.
-
-Bernoulli means and observation SDs integrate over a Gaussian approximation
-to the field given the analysis responses. Log-link families instead use
-Laplace ratios of exponentially tilted analysis likelihoods for the first
-two response moments. Each distinct assessment location uses two additional
-latent solves with the training covariance factor held fixed. This improves
-response-moment accuracy in low-dimensional numerical comparisons, particularly
-for sparse observations with strong fields. The joint block score uses its
-own integration.
-
-Observation SDs include conditional observation noise and response-mean
-variation. For a nonlinear link, obtain the total response variance by
-squaring the observation predictive SD. The two field variance columns
-describe the local Gaussian approximation on the linear-predictor scale.
-Both routes condition on estimated parameters.
-The field range is a response-correlation distance, separate from ecological
-kernel bandwidth. Use the returned SDs for predictive variation rather than
-interpreting them as native mean-prediction standard errors.
-
-A scored fold has an eligible native fit and a valid numerical score for the
-specified calculation. Assess predictive reliability separately on the
-held-out locations and retain failed folds in the availability denominator.
-In simulations with buffered held-out locations, squared prediction errors
-averaged 1.5 (Gaussian), 2.7 (Poisson), and 1.9 (NB2) times the predicted
-observation variance, against 1 for a calibrated prediction. Treat the
-returned predictive SDs as optimistic when parameters are estimated.
-
-Binning, normalization and supported learned design constants use training
-rows only. Custom cohort-dependent preprocessing must also be learned inside
-each training fold. Native formula evaluation cannot detect external data
-leaked through user-defined functions. No missing rows are silently dropped.
-
-The model contains one shared latent Gaussian field with exponential or
-Gaussian correlation, constant observation dispersion when applicable, and
-maximum-likelihood estimation.
-\code{vignette("v08-cross-validation", package = "multiScaleR")} explains
-fold design and how to read the scores.
 }
+\section{What each fold estimates}{
+The native fits use glmmTMB and TMB with maximum likelihood. The model has
+one shared latent Gaussian field with exponential or Gaussian correlation,
+and a constant observation dispersion where the family has one. From the
+analysis rows each fold estimates the regression coefficients, the field
+SD, the correlation range, the observation dispersion, and, with
+\code{kernel_inputs}, the scales of effect. Distance bins, standardization, and
+the constants of learned formula terms also come from the analysis rows
+only. Custom preprocessing that depends on the data must be learned inside
+each training fold too, because formula evaluation cannot detect outside
+information passed in through your own functions. No missing rows are
+dropped silently.
+
+The correlation range is the distance, in coordinate units, over which the
+unexplained variation stays correlated. It is separate from the kernel
+scale of effect, which describes how far the landscape around a point
+affects it.
+
+Every fit tries two deterministic starting values chosen from the training
+data and records the package versions, convergence, marginal score, and
+curvature checks of each. For Gaussian responses both starts must pass and
+agree, or the fold fails. For the other families the passing start with
+the highest likelihood is used, and the outcome of each start is kept.
+}
+
+\section{Build folds for a field model}{
+Hold out complete locations, so that no location has observations in both
+parts of a split. Spatial blocks with a buffer test prediction at new
+places. The field locations in \code{coords} can differ from the focal points
+used for the landscape covariates, but each location must be given by its
+actual, consistent coordinates, and \code{coords} is required even when
+\code{kernel_inputs} is supplied. A template that compares two correlation
+functions on the same folds:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{folds <- spatial_cv_folds(field_xy, block_size = 10000, k = 5,
+  buffer = 1000, crs = 32617, ids = rownames(raw_data))
+covariances <- c(exponential = "exponential", gaussian = "gaussian")
+candidates <- lapply(covariances, function(covariance) \{
+  cross_validate_field(y ~ habitat * cover + offset(log(exposure)),
+    raw_data, field_xy, folds, crs = 32617, covariance = covariance,
+    kernel_inputs = inputs,
+    audit_dir = file.path("field-cv-audits", covariance))
+\})
+cv_tab(candidates, metric = "neg_log_score")
+selected <- select_cv(candidates, criterion = "AICc")
+selected$selection$chosen   # chosen by the training criterion in each fold
+}\if{html}{\out{</div>}}
+}
+
+\section{How the joint score works}{
+The negative log score treats the held-out observations of each fold as
+one block. For Gaussian responses it is the negative log of one
+multivariate normal density. Its covariance holds the field variation that
+remains after conditioning on the analysis responses, plus the observation
+noise. For the other families the score is the Laplace log marginal
+likelihood of the analysis responses alone minus that of the analysis and
+assessment responses together. Both calculations use parameters estimated
+from the analysis rows only, including the field covariance, coefficients,
+dispersion, and scales, so the score keeps the dependence among held-out
+locations and repeated observations. For counts and 0/1 data, a block
+probability above one beyond numerical roundoff is recorded as a failed
+score.
+
+The pooled score is the total block loss divided by the number of
+assessment observations, and smaller is better. RMSE and MAE summarize the
+errors of the predicted response means. Multiplying separate marginal
+densities would ignore the field dependence and define a different score,
+so \code{\link[=cv_tab]{cv_tab()}} keeps these scores apart from the per-observation scores of
+ordinary GLMs.
+}
+
+\section{Predicted means and spreads}{
+For 0/1 responses, predicted means and observation SDs integrate over a
+Gaussian approximation to the field given the analysis responses. For
+log-link families, the first two response moments come from Laplace
+ratios of exponentially tilted analysis likelihoods, with two additional
+latent solves per distinct assessment location and the training
+covariance factor held fixed. This improves the accuracy of the moments in
+low-dimensional numerical comparisons, particularly for sparse
+observations with strong fields. The joint block score uses its own
+integration.
+
+\code{observation_predictive_SE} combines the conditional observation noise
+with the variation of the response mean. For a nonlinear link, square it
+to get the total response variance. The two field variance columns
+describe the field on the linear-predictor scale. All of these condition
+on the estimated parameters. Use them as predictive spreads for new
+observations, not as standard errors of the predicted mean.
+}
+
+\section{Check calibration separately}{
+A scored fold has an eligible native fit and a valid score. It does not
+show that the predictive spreads are reliable. Assess that on the held-out
+locations, and count failed folds in the denominator when you report how
+often the method succeeds. In simulations with buffered held-out
+locations, squared prediction errors averaged 1.5 (Gaussian), 2.7
+(Poisson), and 1.9 (NB2) times the predicted observation variance, against
+1 for a calibrated prediction. Treat the returned spreads as optimistic
+when parameters are estimated.
+}
+
+\section{Compare and select field models}{
+Use \code{\link[=cv_tab]{cv_tab()}} to rank field results fitted to the same responses, folds,
+and coordinates. Poisson and NB2 results share a count target. Use
+\code{\link[=select_cv]{select_cv()}} to score a training AIC, AICc, or BIC rule from the compact
+records. The coefficients, field SD, estimated range, and any observation
+dispersion count toward K, while the integrated field values add nothing.
+Field scores do not integrate parameter or scale uncertainty and do not
+establish calibration. \code{vignette("v08-cross-validation", package = "multiScaleR")} explains fold design and how to read the scores, and
+\code{vignette("v11-spatial-fields", package = "multiScaleR")} covers spatial
+field models.
+}
+
 \examples{
-# Start from raw data and explicit projected points, keeping all repeated
-# surveys at a location in the same fold. Supply a compact audit directory.
-# folds <- spatial_cv_folds(xy, block_size = 10000, k = 5, crs = 32617)
-# cv <- cross_validate_field(y ~ habitat * group + offset(log(exposure)),
-#   raw_data, xy, folds, audit_dir = "field-cv-audit", crs = 32617)
-# count_cv <- cross_validate_field(count ~ habitat + offset(log(exposure)),
-#   raw_data, xy, folds, audit_dir = "count-field-cv-audit", crs = 32617,
-#   family = "poisson")
-# cv_tab(list(count_field = count_cv), metric = "neg_log_score")
+\donttest{
+if (requireNamespace("glmmTMB", quietly = TRUE)) {
+  data("landscape_counts")
+  data("surv_pts")
+  xy <- crds(vect(surv_pts))   # simulated coordinates in meters
+  folds <- spatial_cv_folds(xy, block_size = 1000, k = 3, crs = 32617)
+
+  # Poisson counts with a site covariate and an exponential field. The
+  # Poisson family is experimental.
+  field_cv <- cross_validate_field(counts ~ site, landscape_counts, xy,
+    folds, audit_dir = file.path(tempdir(), "field-cv"), crs = 32617,
+    family = "poisson")
+  print(field_cv)   # the log score is a joint score per held-out survey
+
+  # Field SD (log-link scale) and correlation range (m) in each fold
+  print(sapply(field_cv$training, function(fold)
+    unlist(fold$parameters[c("field_SD", "range")])))
+}
+}
 }
 \seealso{
-\code{\link[=cross_validate]{cross_validate()}}, \code{\link[=cross_validate_glm]{cross_validate_glm()}}, \code{\link[=response_field_geometry]{response_field_geometry()}}
+\code{\link[=cross_validate]{cross_validate()}}, \code{\link[=cross_validate_glm]{cross_validate_glm()}},
+\code{\link[=response_field_geometry]{response_field_geometry()}}, \link[=multiScaleR_cv-class]{multiScaleR_cv}, \code{\link[=cv_tab]{cv_tab()}}, and
+\code{\link[=select_cv]{select_cv()}}.
 }

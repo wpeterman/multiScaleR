@@ -13,117 +13,141 @@ prepare_unmarked_data(
 )
 }
 \arguments{
-\item{object}{A fitted \code{multiScaleR} object containing an
-\code{unmarkedFit}, fitted scales, training standardization, and retained
-\code{kernel_inputs}.}
+\item{object}{A fitted \code{multiScaleR} object whose \code{opt_mod} is an
+\code{unmarkedFit}, with its fitted scales, training standardization, and
+retained \code{kernel_inputs}.}
 
-\item{newdata}{A nonempty data frame in the row layout required by native
-unmarked prediction for your chosen component. Include site key columns
-and all nonspatial variables, including factors and offset inputs.
-Existing optimized spatial columns are replaced. Supply fixed-radius
-predictors on their native fitted scale explicitly unless
-\code{include_fixed = TRUE}. Other columns and row order remain unchanged.}
+\item{newdata}{A nonempty data frame of prediction rows, in the layout
+that native \code{unmarked} prediction needs for your chosen component.
+Include the site key columns and every non-spatial
+variable, including factors and offset inputs. Existing optimized spatial
+columns are replaced. Supply fixed-radius predictors on their fitted scale
+unless \code{include_fixed = TRUE}. Other columns and the row order are left
+unchanged.}
 
-\item{kernel_inputs}{Spatial inputs created by \code{\link{kernel_prep}}
-for the prediction sites. Use the fitted kernel, source/metric definitions,
-buffer extent, and raster resolution. Cell-level inputs are required for
-landscape and surface metrics; lean binned inputs are supported for kernel
-means.}
+\item{kernel_inputs}{A \code{multiScaleR_data} object from \code{\link[=kernel_prep]{kernel_prep()}} for
+the new sites. Use the fitted kernel, source and metric definitions,
+buffer extent (\code{max_D}), raster resolution, and the same binned or exact
+evaluation as the fit. Landscape and surface metrics need cell-level
+inputs, while lean binned inputs are enough for kernel means.}
 
-\item{join_by}{A data frame with one unique key row per prepared prediction
-site, in \code{kernel_inputs} point order. Its column names must occur in
-\code{newdata}. Every prediction row must match a key. Repeated keys in
-\code{newdata} repeat that site's predictors, allowing explicit site/year
-or site/observation scenarios without changing their order.}
+\item{join_by}{A data frame with one unique key row per prepared site, in
+\code{kernel_inputs} point order. Its column names must occur in \code{newdata},
+and every \code{newdata} row must match a key. Repeated keys in \code{newdata}
+repeat that site's spatial values, which lets you write site-by-year or
+site-by-survey scenarios without changing their order. Required.}
 
 \item{include_fixed}{Logical. The default \code{FALSE} leaves fixed-radius
-predictors as explicit native inputs. Set \code{TRUE} to calculate modeled
-fixed-radius metrics too, after verifying that their retained preparation
-values and standardization match the fitted static site covariates. Missing
-or inconsistent training information raises an error.}
+predictors as native inputs that you supply. Set \code{TRUE} to calculate
+modeled fixed-radius metrics at the new sites too, after verifying that
+their retained preparation values and standardization match the fitted
+static site covariates. Missing or inconsistent training information
+raises an error.}
 }
 \value{
-A data frame with the same rows, row names, and nonspatial columns as
-\code{newdata}. Calculated spatial columns contain the fitted transforms in
-standard-deviation units relative to the training sample. These are native
-model inputs, not response predictions. Do not standardize them again.
+A data frame with the same rows, row names, and non-spatial columns
+as \code{newdata}. The calculated spatial columns hold the fitted kernel
+transforms in standard-deviation units of the training sample, the scale
+the native model was fitted on. They are model inputs, not predictions.
+Do not standardize them again.
 }
 \description{
-Calculate optimized spatial predictors at new sites and insert
-them into an explicitly keyed native prediction data frame. Training means
-and standard deviations are reused, so prediction sites are on the fitted
-model's covariate scale.
+Calculate the optimized spatial predictors at new sites and insert them
+into an explicitly keyed data frame for native \code{unmarked} prediction. The
+training means and standard deviations are reused, so the new sites are on
+the fitted model's covariate scale. Pass the result to
+\code{unmarked::predict()}, or give the same inputs to \code{\link[=prepare_prediction]{prepare_prediction()}}
+for a reusable snapshot.
 }
-\details{
-Only active GDR component formulas identify spatial predictors. Availability
-is inactive for one primary period, and the distance formula is inactive for
-a uniform key. Optimized static site names must not also occur in native
-yearly or observation covariate tables; use distinct names for distinct inputs.
-Dot formulas use the original component's available training-column names.
+\section{What the function does and does not do}{
+This function prepares data only. Native prediction determines the
+component's meaning, factor handling, offsets, missing-data behavior, and
+confidence limits, and neither this function nor \code{\link[=prepare_prediction]{prepare_prediction()}}
+adds uncertainty in the selected scales. \link{multiScaleR-prediction} lists
+what each \code{unmarked} component predicts.
 
-Native GDR models with active formula offsets or TMB zero inflation are
-rejected before fitting, model selection or prediction. In the audited
-unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
-TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
-require separate provider qualification; multiScaleR does not remove offsets,
-switch engines, alter parameter counts or substitute uncertainty estimates.
-Offset-free C ZIP models retain their native likelihood and parameter count.
-
-This function prepares data only. Pass its result to
-\code{unmarked::predict(object$opt_mod, type = ..., newdata = ...)}, or supply
-the same inputs and keys to \code{\link{prepare_prediction}} to retain a
-compact prediction snapshot. Native prediction determines component meaning,
-factor handling, offsets, missing-data behavior, and conditional intervals.
-Neither function adds uncertainty in selected spatial scales.
-
-Spatial predictors are static site covariates, as required by the unmarked
-fitting adapter. You must supply the native row layout for detection and
-annual components explicitly. The function does not infer observation times,
-expand sites into years, or modify an unmarked frame. It does not borrow
-nonspatial values from the fitting data.
-
-Distances inside prepared inputs are converted using their internal
-\code{unit_conv}; reported fitted scales remain in map units. Metric
-definitions must match the fit. Fixed-radius predictors are recalculated only
-with \code{include_fixed = TRUE}. Their normalization comes from the original
-preparation object, and their fitted site values must match that object after
-explicit training-site alignment. This rejects manually rescaled or stale
-fixed predictors rather than guessing their fitted scale.
-Binned versus exact
-kernel evaluation must also match. Repreparing bins at new sites can change
-their representative distances slightly, just as in other binned prediction
-paths. Source names are checked, but raster contents are not fingerprinted.
-Use the intended source rasters and coordinate system when preparing sites.
-When internal fitted parameters are retained, they are reused directly to
-avoid rounding from a conversion to reported units and back. Inconsistent
-stored parameters and reported scales or shapes raise an error.
-
-Missing spatial values remain missing for the native prediction method.
-Infinite values or invalid training standard deviations raise errors.
-Prediction values are not clamped or standardized within the new sample.
+Spatial predictors are static site covariates, as the \code{unmarked} fitting
+adapter requires. Supply the native row layout for detection and annual
+components yourself. The function does not infer observation times,
+expand sites into years, modify an \code{unmarkedFrame}, or borrow non-spatial
+values from the fitting data.
 }
+
+\section{Match the spatial inputs to the fit}{
+Distances inside \code{kernel_inputs} are converted with its own \code{unit_conv},
+and the reported scales remain in map units. Metric definitions and the
+choice of binned or exact kernel evaluation must match the fit. Preparing
+bins at new sites can shift their representative distances slightly, as in
+other binned prediction routes. Source names are checked, but raster
+contents are not fingerprinted, so prepare the sites from the intended
+source rasters and coordinate system. When the internal fitted parameters
+are retained, they are reused directly, which avoids rounding from a
+conversion to reported units and back. Stored parameters that disagree
+with the reported scales or shapes raise an error.
+
+The calculated columns use the training sample's mean and standard
+deviation. Prediction values are never clamped or standardized within the
+new sample. Missing spatial values stay missing for the native prediction
+method, while infinite values or invalid training standard deviations
+raise errors.
+}
+
+\section{Recompute fixed-radius predictors}{
+Fixed-radius predictors are recalculated only with \code{include_fixed = TRUE}.
+Their normalization comes from the original preparation object, and their
+fitted site values must match that object after explicit training-site
+alignment. This rejects manually rescaled or stale fixed predictors, changed
+radii, ambiguous training keys, and missing training buffers rather than
+guessing their fitted scale. Keep the original inputs if you need this
+verification.
+}
+
+\section{Distance-removal models}{
+For \code{unmarked::gdistremoval()} fits, only active component formulas
+identify spatial predictors. Availability is inactive with one primary
+period, and the distance formula is inactive for a uniform key. Optimized
+static site names must not also occur in the native yearly or observation
+covariate tables, so use distinct names for distinct inputs. Dot formulas use
+the original component's available training-column names. GDR models with
+active formula offsets or TMB zero inflation are rejected, as \code{\link[=aic_tab]{aic_tab()}}
+explains.
+}
+
 \examples{
-\dontrun{
-# Keys follow the order of points used in kernel_prep().
-keys <- data.frame(site = prediction_sites$site)
-inputs <- kernel_prep(prediction_sites, habitat,
-  max_D = fit$max_D, kernel = fit$kernel_inputs$kernel,
-  scale_vars = fit$kernel_inputs$scale_vars,
-  bin = !is.null(fit$kernel_inputs$binned))
-nd <- prepare_unmarked_data(fit, scenarios, inputs, join_by = keys)
-unmarked::predict(fit$opt_mod, type = "state", newdata = nd)
+## A stored N-mixture fit used in vignette("v02-user-guide"). Abundance
+## depends on the bin1 and cont2 layers of a simulated landscape.
+nmix <- readRDS(system.file("extdata", "cache-user-guide-nmix.rds",
+                            package = "multiScaleR"))
+layers <- subset(sim_rast(user_seed = 999, dim = 250), c("bin1", "cont2"))
 
-# Freeze the same native component and controls for repeated use.
-prepared <- prepare_prediction(fit, scenarios, inputs, component = "state",
-  join_by = keys)
+## Three new sites, prepared with the fitted kernel, max_D, covariate
+## definitions, and binning
+new_pts <- terra::vect(cbind(x = c(800, 1250, 1700),
+                             y = c(900, 1250, 1600)))
+new_inputs <- kernel_prep(new_pts, layers, max_D = nmix$max_D,
+                          kernel = nmix$kernel_inputs$kernel,
+                          scale_vars = nmix$kernel_inputs$scale_vars,
+                          bin = !is.null(nmix$kernel_inputs$binned),
+                          verbose = FALSE)
+
+## Keys follow the prepared point order. Site B appears twice, for
+## example in two survey years, and reuses the same spatial values.
+keys <- data.frame(site = c("A", "B", "C"))
+scenarios <- data.frame(site = c("A", "B", "B", "C"))
+nd <- prepare_unmarked_data(nmix, scenarios, new_inputs, join_by = keys)
+nd  # bin1 and cont2 in training standard-deviation units
+
+## Expected abundance at each row, with native 95\% confidence limits
+unmarked::predict(nmix$opt_mod, type = "state", newdata = nd)
+
+## The same rows and component as a reusable snapshot
+prepared <- prepare_prediction(nmix, scenarios, new_inputs,
+                               component = "state", join_by = keys)
 predict(prepared)
-
-# Opt in to checked reconstruction of modeled fixed-radius metrics.
-nd_fixed <- prepare_unmarked_data(fit, scenarios, inputs, join_by = keys,
-  include_fixed = TRUE)
-}
 }
 \seealso{
-\code{\link{kernel_prep}}, \code{\link{prepare_prediction}},
-\code{\link{kernel_scale.raster}}
+\code{\link[=prepare_prediction]{prepare_prediction()}}, \code{\link[=predict.multiScaleR]{predict.multiScaleR()}},
+\link{multiScaleR-prediction}, \code{\link[=kernel_prep]{kernel_prep()}}, \code{\link[=kernel_scale.raster]{kernel_scale.raster()}}, and
+\code{vignette("v02-user-guide", package = "multiScaleR")} for fitting and
+mapping \code{unmarked} models.
 }

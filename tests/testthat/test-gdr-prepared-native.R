@@ -1,4 +1,5 @@
 test_that("prepared GDR binds trained designs and rebuilds the same native objective", {
+  skip_on_cran()
   f <- gdr_trained_fixture()
   settings <- list(method = "BFGS", se = TRUE, threads = 1L,
     control = list(maxit = 2500L, reltol = 1e-10))

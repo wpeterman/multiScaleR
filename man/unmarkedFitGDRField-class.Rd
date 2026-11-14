@@ -9,7 +9,7 @@
 \alias{simulate,unmarkedFitGDRField-method}
 \alias{profile,unmarkedFitGDRField-method}
 \alias{ranef,unmarkedFitGDRField-method}
-\title{Native Fixed-Range GDR Response Field}
+\title{Fitted Distance-Removal Model with a Fixed-Range Abundance Field}
 \usage{
 \S4method{confint}{unmarkedFitGDRField}(object, parm, level = 0.95, type, method = c("normal", "profile"))
 
@@ -22,23 +22,120 @@
 \S4method{ranef}{unmarkedFitGDRField}(object, ...)
 }
 \arguments{
-\item{object, fitted}{A fitted native GDR response-field object.}
+\item{object, fitted}{A fitted \code{unmarkedFitGDRField} object.}
 
-\item{parm, type, level, method}{Native interval controls. Only normal intervals
-using the retained component covariance are qualified for this field.}
+\item{parm, type, level, method}{Arguments of \code{confint()}. \code{type} names the
+component (\code{"lambda"}, \code{"dist"} or \code{"rem"}), \code{parm} optionally selects
+coefficients within it, and \code{level} is the confidence level (default
+0.95). \code{method = "normal"} (the default) gives Wald intervals from the
+retained covariance. \code{method = "profile"} stops for this class.}
 
-\item{...}{Reserved controls for guarded inherited operations.}
+\item{...}{Not used. The stopped methods ignore extra arguments.}
 
-\item{nsim, seed}{Reserved simulation controls. Field simulation remains guarded.}
+\item{nsim, seed}{Not used. \code{simulate()} stops for this class.}
 }
 \description{
-An identified extension of unmarked's GDR fit for a fixed-range exponential
-abundance field. Use \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}} to construct this class.
+The class of object returned by \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}. It extends the
+\code{unmarkedFitGDR} class of \code{unmarked} with one slot, \code{response_field}, which
+holds the field geometry, the covariance retained from the fit and its
+diagnostics. Most \code{unmarked} methods work as usual. The methods listed
+below are replaced or stopped because the inherited versions do not handle
+the correlated field.
 }
 \section{Slots}{
 
 \describe{
-\item{\code{response_field}}{Numeric geometry, frozen component recipes, joint
-prediction covariance, provider/target identities and compact fit diagnostics.}
+\item{\code{response_field}}{A named list. The elements you are most likely to
+read are:
+\itemize{
+\item \code{definition}: the field definition, with \code{covariance}
+(\code{"exponential"}), the supplied \code{range}, \code{range_estimated} (always
+\code{FALSE}), the linear \code{units} of the CRS, \code{state_count} (the number of
+blocks) and \code{survey_count}.
+\item \code{coords}: the survey coordinates supplied to \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}},
+one row per survey. \code{block} gives each survey's block number, and \code{crs}
+holds the CRS as WKT text.
+\item \code{point}: the complete parameter vector at the optimum, named by TMB
+block. It holds the fixed coefficients (\verb{beta_*}, link scale), the log
+SDs (\verb{lsigma_*}) and the block deviations in their internal whitened
+form (\code{b_lambda}).
+\item \code{joint_covariance}: the covariance matrix of \code{point}, the inverse of the
+joint precision returned by \code{TMB::sdreport()}.
+\item \code{lower}: the lower Cholesky factor of the block correlation matrix.
+Multiplying the whitened deviations by \code{lower} gives the physical field
+values reported by \code{coef()}.
+\item \code{diagnostics}: the checks of the selected start, such as \code{pdHess},
+\code{maximum_absolute_gradient}, \code{conditional_latent_maximum_absolute_gradient}
+and \code{conditional_latent_Newton_decrement}.
+\item \code{settings}: the evaluated \code{tmb_settings}. \code{audit_file} is the path of the
+final audit record, and \code{max_memory_mb} is the planning budget used by
+\code{predict()}.
+}
+
+The remaining elements are frozen design recipes and SHA-256 fingerprints.
+Every method checks them before use and stops if any has changed, so do
+not edit this slot.}
 }}
 
+\section{Methods for this class}{
+\tabular{ll}{
+   Method \tab Behavior \cr
+   \code{coef()}, \code{logLik()}, \code{unmarked::sigma()}, \code{summary()} \tab Inherited from \code{unmarked}. Field values reported by \code{coef(fixedOnly = FALSE)} are physical deviations on the log density scale \cr
+   \code{predict()} \tab Replaced. See \link{predict,unmarkedFitGDRField-method} \cr
+   \code{vcov()} \tab Replaced. See \link{vcov,unmarkedFitGDRField-method} \cr
+   \code{confint()} \tab Normal (Wald) intervals from the retained covariance. \code{method = "profile"} stops \cr
+   \code{update()} \tab Stops. Refit through \code{\link[=make_gdr_refitter]{make_gdr_refitter()}}, which keeps the field \cr
+   \code{simulate()}, \code{profile()}, \code{ranef()} \tab Stop. They are not available for this class \cr
+}
+
+
+See \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}} for a table that locates each parameter and
+its scale, and \code{vignette("v12-distance-removal", package = "multiScaleR")}
+for a worked example.
+}
+
+\examples{
+\donttest{
+# The field needs unmarked 1.5.2 and TMB 1.9.25.
+if (requireNamespace("TMB", quietly = TRUE) &&
+    utils::packageVersion("unmarked") == "1.5.2" &&
+    utils::packageVersion("TMB") == "1.9.25") {
+  # Eight survey blocks 1 km apart, six point counts in each
+  block <- factor(rep(paste0("b", 1:8), each = 6))
+  hab <- rep(seq(-1, 1, length.out = 6), 8)
+  shift <- c(-0.4, -0.3, -0.1, 0, 0.1, 0.2, 0.35, 0.4)[block]
+  sim <- sim_dat_gdr(density = exp(log(400) + 0.5 * hab + shift),
+    distance_scale = 40, removal = 0.2, dist_breaks = c(0, 25, 50, 75),
+    interval_lengths = c(2, 3, 5), interval_units = "minutes",
+    site_covs = data.frame(hab = hab, block = block), seed = 1)
+  template <- unmarked::gdistremoval(lambdaformula = ~ hab + (1 | block),
+    removalformula = ~ 1, distanceformula = ~ 1, data = sim$observed,
+    keyfun = "halfnorm", mixture = "P", output = "density",
+    unitsOut = "kmsq", K = 60, engine = "TMB",
+    starts = c(log(400), 0, log(40), qlogis(0.2), log(0.3)))
+  block_xy <- cbind(x = 500000 + 1000 * (as.integer(block) - 1),
+                    y = 4400000)
+  rownames(block_xy) <- rownames(unmarked::siteCovs(sim$observed))
+  cold <- c("beta_lambda[1]" = log(300), "beta_lambda[2]" = 0,
+            "beta_dist[1]" = log(30), "beta_rem[1]" = qlogis(0.4),
+            "lsigma_lambda[1]" = log(0.5))
+  settings <- list(method = "BFGS", se = TRUE, threads = 1L,
+                   control = list(maxit = 2500L, reltol = 1e-10))
+  field_fit <- fit_gdr_response_field(template, block_xy, crs = 32617,
+    range = 2000, cold_starts = list(cold = cold),
+    audit_dir = tempfile("gdr-field-"), tmb_settings = settings)
+
+  # TRUE: the methods of unmarked still apply
+  print(methods::is(field_fit, "unmarkedFitGDR"))
+  # The supplied range, its units, and the number of blocks and surveys
+  str(field_fit@response_field$definition[c("range", "units",
+                                            "state_count", "survey_count")])
+  # Wald limits for the abundance coefficients, on the log scale
+  print(confint(field_fit, type = "lambda"))
+}
+}
+}
+\seealso{
+\code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}, \code{\link[=make_gdr_refitter]{make_gdr_refitter()}},
+\code{\link[=response_field_geometry]{response_field_geometry()}}
+}

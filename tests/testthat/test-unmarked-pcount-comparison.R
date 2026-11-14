@@ -76,6 +76,7 @@ pcount_metadata_fixture <- function(drop_site = FALSE, rows = seq_len(12L), tran
 }
 
 test_that("mixed pcount penalties retain variance and mixture parameters", {
+  skip_on_cran()
   f <- pcount_comparison_fixture()
   expect_identical(f$calls, 6L)
   for (name in names(f$fits)) {

@@ -2,7 +2,7 @@
 % Please edit documentation in R/gdr_response_field_fit.R
 \name{fit_gdr_response_field}
 \alias{fit_gdr_response_field}
-\title{Fit a Fixed-Range Spatial Abundance Field to GDR}
+\title{Fit a Fixed-Range Spatial Abundance Field to a Distance-Removal Model}
 \usage{
 fit_gdr_response_field(
   model,
@@ -16,90 +16,272 @@ fit_gdr_response_field(
 )
 }
 \arguments{
-\item{model}{An actual native TMB \code{unmarkedFitGDR} used as a template. The
-qualified domain is density per square kilometer, Poisson abundance,
-half-normal distance detection, one
-primary period, complete canonical 75-meter point-circle bins, one
-abundance random intercept and optionally one independent observer
-intercept in distance detection. Existing offset and other native guards
-apply. Each abundance state must have an observed location.}
+\item{model}{An \code{unmarkedFitGDR} fitted by \code{unmarked::gdistremoval()} with
+\code{engine = "TMB"}. It serves as the template. Its data, formulas, cutoff
+\code{K} and estimates are reused, and its independent abundance intercepts
+become the field. See "Check that your model qualifies" for the supported
+model forms.}
 
-\item{coords}{Numeric matrix or data frame with two projected coordinates
-per retained survey. Row names must equal the original site identities.
-Repeated surveys for one abundance state must share exactly one location.}
+\item{coords}{Numeric matrix or data frame with two projected coordinate
+columns (x, y) and one row per survey, in the row order of the model's
+frame. Row names must equal the frame's site row names, which are
+\code{rownames(unmarked::siteCovs(model@data))} when the frame has site
+covariates. All surveys in one block (one level of the abundance grouping
+factor) must carry exactly the same coordinates, usually the block center,
+and different blocks must have different coordinates.}
 
-\item{crs}{Known projected two-dimensional CRS, supplied as an EPSG code or
-another input accepted by \code{sf::st_crs()}. No coordinate conversion occurs.}
+\item{crs}{The projected coordinate reference system of \code{coords}, as an EPSG
+code (for example \code{32617}) or any other input accepted by \code{sf::st_crs()}.
+It must have two horizontal axes and declared linear units. Coordinates are
+never transformed, so \code{range} and \code{coords} must use these units.}
 
-\item{range}{Positive fixed exponential correlation distance in CRS units.
-It adds no estimated parameter. This is a response-correlation distance,
-not an ecological kernel scale.}
+\item{range}{Positive number. The fixed correlation range of the
+exponential field, in the linear units of \code{crs}. Two blocks \code{range} apart
+have correlation \code{exp(-1)}, about 0.37, and blocks three ranges apart have
+correlation about 0.05. This is a distance over which density deviations
+are shared. It is not a kernel scale of effect, and it is not counted as a
+parameter.}
 
-\item{cold_starts}{Nonempty named list of independent finite coefficient/SD
-starts in the constructor order returned by \code{\link[=gdr_start_values]{gdr_start_values()}}. Original
-fitted starts and zero latent states are also checked. Failed attempts and
-disagreements stop rather than returning a preferred passing fit.}
+\item{cold_starts}{Named list of one or more extra starting vectors (for
+example \code{list(cold = cold)}). Each vector holds one value for every fixed
+coefficient and log standard deviation, on the link scales listed by
+\code{\link[=gdr_start_values]{gdr_start_values()}}. Supply it either unnamed, in the order of
+\code{gdr_start_values(model)$starts}, or named by parameter block and
+position, such as \code{"beta_lambda[1]"} (log density intercept),
+\code{"beta_dist[1]"} (log distance scale), \code{"beta_rem[1]"} (logit removal
+probability) and \code{"lsigma_lambda[1]"} (log SD of the abundance
+intercepts). Each vector must differ from the template's estimates and
+from the other vectors. The names \code{"original"} and \code{"final"} are reserved.}
 
-\item{audit_dir}{Directory for compact atomic request/attempt/result records.
-Records retain failures, controls and identities, not models or tapes.
-Each native optimizer point is saved before covariance work as an explicitly
-inference-ineligible numeric packet. A later failure cannot turn that point
-into a fitted field or erase its completed optimization evidence.}
+\item{audit_dir}{Character string naming a directory for audit records. It
+is created if needed. Every fit writes small \code{.rds} records there: the
+request, the validated inputs, each attempt (including failures), the
+optimizer result saved before covariance work, and the final outcome.
+Records hold numbers, settings and identities, not fitted models. Keep the
+directory to inspect a failed fit.}
 
-\item{tmb_settings}{Explicit native settings as in \code{\link[=make_gdr_refitter]{make_gdr_refitter()}}.
-This initial field route requires BFGS, \code{se = TRUE}, one thread and positive
-\code{control$maxit}. Full fixed and joint curvature remain mandatory.
-Optional inner-mode policies and process-memory observations follow
-\code{\link[=make_gdr_refitter]{make_gdr_refitter()}} and must remain identical in field-preserving refits.}
+\item{tmb_settings}{Named list of optimizer settings with elements \code{method},
+\code{se}, \code{threads} and \code{control}. This function requires \code{method = "BFGS"},
+\code{se = TRUE}, \code{threads = 1} and a positive integer \code{control$maxit}, for
+example \code{list(method = "BFGS", se = TRUE, threads = 1L, control = list(maxit = 2500L, reltol = 1e-10))}. The optional elements
+\code{random.start}, \code{inner.control} and \code{record_memory} are described in
+\code{\link[=make_gdr_refitter]{make_gdr_refitter()}}. Pass the identical list to \code{\link[=make_gdr_refitter]{make_gdr_refitter()}}
+when you later estimate scales of effect with the field.}
 
-\item{max_memory_mb}{Positive finite conservative planning budget in MiB.
-Default 512. Dense field/covariance and finite-K tape planning must fit it.
-This estimate is not an operating-system memory cap.}
+\item{max_memory_mb}{Positive number, default 512. A conservative planning
+budget, in MiB, for the dense field covariance and the TMB tape. The fit
+stops before optimizing when its estimate exceeds the budget. The same
+budget limits later \code{predict()} calls on the fitted object. It is an
+estimate, not an operating-system memory cap.}
 }
 \value{
-An \code{unmarkedFitGDRField} with the native maximized Laplace likelihood,
-coefficient/SD estimates and identified field metadata in \code{response_field}.
-Abundance random coefficients and their component covariance are expressed
-as physical field values; native TMB uses equivalent correlation-whitened
-coordinates internally. Fixed range is not included in the AIC penalty.
-Use \code{predict(fit, type = "lambda", ...)} for conditional density predictions
-and \code{\link[=make_gdr_refitter]{make_gdr_refitter()}} for fixed-reference ecological-scale refits.
+An object of class \link[=unmarkedFitGDRField-class]{unmarkedFitGDRField}.
+It extends the \code{unmarkedFitGDR} class of \code{unmarked}, so \code{coef()}, \code{logLik()},
+\code{unmarked::sigma()} and \code{summary()} work as usual, while \code{predict()},
+\code{vcov()} and \code{confint()} use the retained field covariance. The table
+under "Read the fitted model" says where each parameter lives and on what
+scale. The log-likelihood is the native Laplace approximation of the
+marginal likelihood, with the field integrated out. The AIC counts the
+same parameters as the template model, because the range is fixed.
+The attribute \code{msr_gdr_refit_audit} summarizes the fit: \code{status}, the
+\code{attempts} from every start with their diagnostics, the index of the
+\code{selected} start, \code{maximum_start_value_difference} (the spread of the
+negative log-likelihoods among starts) and the audit \code{path}.
 }
 \description{
-Replace one native iid abundance intercept with an exponential Gaussian
-response field while retaining the original distance/removal observation
-likelihood. Correlation range is supplied, not estimated. Ecological kernel
-scales remain separate parameters in the usual fixed-reference machinery.
+Replace the independent random intercepts on abundance in a native TMB
+distance-removal (GDR) model with a spatially correlated Gaussian field.
+Nearby survey blocks then tend to have similar density deviations. The
+correlation between two blocks falls with the distance \code{d} between them as
+\code{exp(-d / range)}. You supply \code{range}; it is not estimated. Ecological
+scales of effect remain separate parameters, estimated later with
+\code{\link[=make_gdr_refitter]{make_gdr_refitter()}} and \code{\link[=multiScale_optim]{multiScale_optim()}}.
 }
 \details{
-The finite integration cutoff, sampled area, distance/removal constants and
-normalized Gaussian SD are unchanged. No year field or population prior is
-introduced. Both declared starts must return warning-free converged fits
-with usable full covariance, positive current latent precision and a small
-marginal score. This is an opt-in native fitting route; private RTMB fitting
-admission and all unrelated guards remain unchanged.
-
-Predictions retain full fitted coefficient/field cross-covariance. At new
-locations, conditional field residual variance is identified separately and
-included in the latent predictor SE. Back-transformed predictions are the
-inverse-link conditional predictor, not an average over a lognormal field.
-No observation noise or ecological-scale uncertainty is added. Setting
-\code{re.form = NA} supplies a zero-effect reference, not field integration.
-
-Ecological-scale fitting uses the refit backend with n_cores = 1 and
-PSOCK = FALSE. Native fit/tape objects are not sent to fit workers.
-
-Estimated ranges, other GDR mixtures/keys, annual availability, spatial CV,
-field simulation and profile intervals require separate qualification.
-Ordinary update is guarded; retain the audited refitter. See
-\code{vignette("v12-distance-removal", package = "multiScaleR")} for a
-worked example and the supported scope.
+A random intercept for each survey block lets density differ among blocks
+beyond what the covariates explain. In the template model those block
+deviations are independent. This function keeps the same distance and
+removal observation model, the same cutoff \code{K} and the same SD of the
+deviations, but makes the deviations of nearby blocks correlated. See the
+"Model spatial correlation among survey blocks" section of
+\code{vignette("v12-distance-removal", package = "multiScaleR")} for a worked
+example.
 }
+\section{Check that your model qualifies}{
+The template must have all of the following:
+\itemize{
+\item Poisson abundance (\code{mixture = "P"}) and a half-normal distance function
+(\code{keyfun = "halfnorm"}).
+\item Density output in birds per square kilometer (\code{output = "density"},
+\code{unitsOut = "kmsq"}).
+\item One visit per point (one primary period) and complete counts for every
+survey, with no sites dropped by \code{unmarked}.
+\item Distance bands in meters with boundaries \code{c(0, 25, 75)} or
+\code{c(0, 25, 50, 75)}, so the survey circle has a 75 m radius.
+\item Exactly one random intercept in the abundance formula, such as
+\code{~ land1 + (1 | block)}. Every level of the grouping factor must have at
+least one survey.
+\item Optionally, one independent random intercept in the distance formula,
+such as an observer effect. It stays independent. The removal formula
+takes no random effects.
+\item No \code{offset()} terms.
+\item \code{unmarked} 1.5.2 and \code{TMB} 1.9.25.
+}
+
+The field correlation matrix must also be numerically positive definite.
+Blocks at nearly identical locations relative to \code{range} can fail this
+check. No numerical jitter is added.
+}
+
+\section{How the fit is checked}{
+The field model is fitted from the template's own estimates (the start
+named \code{"original"}) and from every vector in \code{cold_starts}. Each fit starts
+its block deviations at zero. Every start must return a converged,
+warning-free fit with usable covariance and a largest absolute gradient
+below 0.001. All starts must also agree, with negative log-likelihoods
+within 1e-5 and coefficients and log SDs within 0.001 of one another. If
+any start fails or the starts disagree, the function stops with an error
+and leaves the records in \code{audit_dir}. When every check passes, it returns
+the fit with the highest likelihood. Agreement among a few starts does not
+prove that no better optimum exists. If the starts disagree, compare the
+attempts recorded in \code{audit_dir} before trying other starting values.
+}
+
+\section{Read the fitted model}{
+\tabular{llll}{
+   Quantity \tab Where to find it \tab Scale \tab How to read it \cr
+   Density intercept \tab \code{coef(fit)["lambda(Int)"]} \tab log \tab \code{exp()} gives density per square km when covariates and the field are zero \cr
+   Abundance covariate effect \tab \code{coef(fit)["lambda(x)"]} \tab log \tab \code{exp()} is the factor by which density changes per unit of \code{x} \cr
+   Distance scale \tab \code{coef(fit)["dist(Int)"]} \tab log \tab \code{exp()} gives the half-normal scale in meters \cr
+   Removal probability \tab \code{coef(fit)["rem(Int)"]} \tab logit \tab \code{plogis()} gives the probability, per unit of interval time, that a bird present is first detected \cr
+   Field SD \tab \code{unmarked::sigma(fit)} \tab log density \tab Typical size of a block deviation. A block one SD above zero has \code{exp(SD)} times the density of a block with no deviation \cr
+   Block deviations \tab \code{coef(fit, type = "lambda", fixedOnly = FALSE)} \tab log density \tab The entries labeled \code{lambda(b_lambda)}, one fitted field value per block, follow the fixed coefficients \cr
+   Correlation range \tab \code{fit@response_field$definition$range} \tab CRS units \tab Supplied by you, not estimated \cr
+}
+
+
+Internally, TMB works with uncorrelated (whitened) versions of the block
+deviations. Every value reported by \code{coef()}, \code{vcov()} and \code{predict()} is
+converted back to the physical field, the deviation at each block's
+location.
+}
+
+\section{How uncertainty is reported}{
+\link[=vcov,unmarkedFitGDRField-method]{vcov()} returns the covariance retained
+from the fit. It includes the covariance between components (abundance,
+distance, removal) and between the fixed coefficients and the field values.
+It is computed once during fitting, so \code{vcov()} does not rerun TMB.
+
+\link[=predict,unmarkedFitGDRField-method]{predict()} uses that covariance for
+its standard errors. At a block used in fitting, the SE comes from the
+fitted coefficients and field values alone. At a new location, the SE adds
+the field variance that remains after conditioning on the fitted blocks.
+That extra variance describes how uncertain the field is between blocks.
+It is not observation noise. Density predictions are \code{exp()} of the linear
+predictor at the fitted field values. They are not averages over possible
+field values, which would be larger. With \code{re.form = NA}, predictions set
+the field to zero, which describes a block with no deviation rather than an
+average over blocks.
+
+All of these intervals treat the ecological scales of effect and the
+correlation range as known. They add no uncertainty for either.
+}
+
+\section{Estimate scales of effect with the field in place}{
+Build a refit function from the field fit, using the same starts and the
+identical \code{tmb_settings}, and pass it to \code{\link[=multiScale_optim]{multiScale_optim()}}:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{refit <- make_gdr_refitter(field_fit, list(cold = cold),
+  audit_dir = tempfile("gdr-field-refits-"), tmb_settings = settings)
+opt <- multiScale_optim(field_fit, kernel_inputs, refit_fn = refit,
+  n_cores = 1)
+}\if{html}{\out{</div>}}
+
+Each candidate scale refits the field from every start, with the range held
+fixed. Expect minutes even for 100 surveys. The search must run on one core
+with the default \code{backend = "refit"} and \code{PSOCK = FALSE}. The ordinary
+\code{update()} method stops for this class. Use the refit function instead.
+}
+
+\section{Map density with the field}{
+A density map needs the field value at every raster cell. Bind the fitting
+coordinates to the scale-of-effect result with \code{\link[=response_field_geometry]{response_field_geometry()}},
+then pass the descriptor to \code{\link[=predict.multiScaleR]{predict.multiScaleR()}}:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{geometry <- response_field_geometry(opt, coords = block_xy, crs = 32617)
+layers <- kernel_scale.raster(land, multiScaleR = opt,
+  scale_center = TRUE, match_buffer = TRUE)
+dens <- predict(opt, layers, type = "lambda", se.fit = TRUE,
+  uncertainty = "conditional",
+  raster_args = list(field_geometry = geometry))
+}\if{html}{\out{</div>}}
+
+The raster CRS must match \code{crs}, and prediction runs on one core. Each cell
+gets the field value predicted at its center from the fitted block values.
+The grouping factor of the field (\code{block} above) is not needed as a
+raster. A factor that also enters a fixed part of the model still needs an
+explicit value through \code{site_values} in \code{\link[=kernel_scale.raster]{kernel_scale.raster()}} or a raster
+coded with the fitted levels. To map the zero-field reference instead, omit
+\code{field_geometry} and set \code{re.form = NA}.
+}
+
+\section{Not supported}{
+Estimating the range, other abundance mixtures or distance functions,
+repeat visits with availability, a removal field, \code{simulate()},
+\code{profile()}, \code{ranef()} and spatial cross-validation are not available for
+this model.
+}
+
 \examples{
-# coords must be in exactly the retained survey order, with a known CRS.
-# Fit the ordinary native GDR template first, then supply its original
-# independent starts and explicit native controls to this opt-in constructor.
+\donttest{
+# The field needs unmarked 1.5.2 and TMB 1.9.25.
+if (requireNamespace("TMB", quietly = TRUE) &&
+    utils::packageVersion("unmarked") == "1.5.2" &&
+    utils::packageVersion("TMB") == "1.9.25") {
+  # Eight survey blocks 1 km apart along a line, six point counts in each
+  block <- factor(rep(paste0("b", 1:8), each = 6))
+  hab <- rep(seq(-1, 1, length.out = 6), 8)
+  shift <- c(-0.4, -0.3, -0.1, 0, 0.1, 0.2, 0.35, 0.4)[block]
+  sim <- sim_dat_gdr(density = exp(log(400) + 0.5 * hab + shift),
+    distance_scale = 40, removal = 0.2, dist_breaks = c(0, 25, 50, 75),
+    interval_lengths = c(2, 3, 5), interval_units = "minutes",
+    site_covs = data.frame(hab = hab, block = block), seed = 1)
+  umf <- sim$observed
+
+  # Template: an independent random intercept for each block (TMB engine)
+  template <- unmarked::gdistremoval(lambdaformula = ~ hab + (1 | block),
+    removalformula = ~ 1, distanceformula = ~ 1, data = umf,
+    keyfun = "halfnorm", mixture = "P", output = "density",
+    unitsOut = "kmsq", K = 60, engine = "TMB",
+    starts = c(log(400), 0, log(40), qlogis(0.2), log(0.3)))
+
+  # Every survey carries the projected coordinates (m) of its block center
+  block_xy <- cbind(x = 500000 + 1000 * (as.integer(block) - 1),
+                    y = 4400000)
+  rownames(block_xy) <- rownames(unmarked::siteCovs(umf))
+
+  # A second set of starting values, named by parameter block and position
+  cold <- c("beta_lambda[1]" = log(300), "beta_lambda[2]" = 0,
+            "beta_dist[1]" = log(30), "beta_rem[1]" = qlogis(0.4),
+            "lsigma_lambda[1]" = log(0.5))
+  settings <- list(method = "BFGS", se = TRUE, threads = 1L,
+                   control = list(maxit = 2500L, reltol = 1e-10))
+
+  field_fit <- fit_gdr_response_field(template, coords = block_xy,
+    crs = 32617, range = 2000, cold_starts = list(cold = cold),
+    audit_dir = tempfile("gdr-field-"), tmb_settings = settings)
+
+  # Log density, log distance scale (m) and logit removal probability
+  print(unmarked::coef(field_fit))
+  # SD of the block deviations, on the log density scale
+  print(unmarked::sigma(field_fit))
+  # The range adds no parameter, so the AIC penalty matches the template
+  print(c(template = template@AIC, field = field_fit@AIC))
+}
+}
 }
 \seealso{
-\code{\link[=make_gdr_refitter]{make_gdr_refitter()}}, \code{\link[=gdr_start_values]{gdr_start_values()}}, \code{\link[=response_field_geometry]{response_field_geometry()}}
+\link[=unmarkedFitGDRField-class]{unmarkedFitGDRField}, \code{\link[=make_gdr_refitter]{make_gdr_refitter()}},
+\code{\link[=gdr_start_values]{gdr_start_values()}}, \code{\link[=response_field_geometry]{response_field_geometry()}},
+\code{vignette("v12-distance-removal", package = "multiScaleR")}
 }

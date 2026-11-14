@@ -1,4 +1,5 @@
 test_that("native GDR field fits retain normalized targets, counts and every start", {
+  skip_on_cran()
   f <- gdr_native_field_fixture(); model <- f$model; field <- model@response_field
   expect_s4_class(model, "unmarkedFitGDRField")
   expect_s4_class(model, "unmarkedFitGDR")
@@ -99,6 +100,7 @@ test_that("new-location density uncertainty includes distinct field residual var
 })
 
 test_that("native GDR fields integrate actual scale refits, snapshots, curves and maps", {
+  skip_on_cran()
   f <- gdr_native_field_projection_fixture(); object <- f$object
   expect_s4_class(object$opt_mod, "unmarkedFitGDRField")
   expect_equal(object$opt_mod@data@siteCovs$hab, f$field$model@data@siteCovs$hab, tolerance = 1e-10)
@@ -176,6 +178,7 @@ test_that("field target mutations and unqualified inherited routes remain guarde
 })
 
 test_that("retained physical covariance and numeric workers need no saved tape", {
+  skip_on_cran()
   f <- gdr_native_field_fixture(); model <- f$model; field <- model@response_field
   fixed <- which(startsWith(names(field$point), "beta_"))
   actual <- unmarked::vcov(model)
@@ -204,6 +207,7 @@ test_that("retained physical covariance and numeric workers need no saved tape",
 })
 
 test_that("native fields retain the no-observer target and its five-parameter penalty", {
+  skip_on_cran()
   f <- gdr_native_field_fixture(); args <- f$template$constructor_args
   map <- gdr_start_values(f$template$model)$map
   keep <- map$block != "lsigma_dist"
@@ -302,6 +306,7 @@ test_that("coordinate field batches preserve logical raster column contracts", {
 })
 
 test_that("S3 covariance dispatch survives namespace-only loading with S4 exports", {
+  skip_on_cran()
   cluster <- parallel::makePSOCKcluster(1L)
   on.exit(parallel::stopCluster(cluster), add = TRUE)
   installed <- find.package("multiScaleR")

@@ -1,56 +1,107 @@
 #' Simulate Posterior Predictive Responses
 #'
-#' Generate replicate responses for fitted or new observations, including
-#' joint parameter uncertainty, explicit new-group effects and observation
-#' sampling variation.
+#' Generate replicate responses for fitted or new observations. Each
+#' replicate includes joint parameter uncertainty, any requested new-group
+#' effects, and the scatter of individual observations around their means, so
+#' replicates show the values you might record.
 #'
-#' @param object A \code{\link{multiScale_bayes}} fit with posterior draws
+#' @param object A fitted [multiScale_bayes()] object with posterior draws,
 #'   from sampling or either approximation.
-#' @param nsim Positive number of replicate datasets; default 1.
-#' @param seed Optional positive integer simulation seed. When supplied, the
-#'   caller's random-number state is restored after simulation, including on failure.
+#' @param nsim Positive integer number of replicate data sets; default 1.
+#' @param seed Optional positive integer simulation seed. Your own
+#'   random-number state is restored after simulation, even when it fails.
 #' @inheritParams predict.multiScaleR_bayes
-#' @param trials Positive integer binomial trial totals, one scalar or one per
-#'   observation row. \code{NULL} keeps fitted totals for fitted-row simulation
-#'   and uses one trial for new observations from a binary fit. New observations
-#'   from a grouped-binomial fit require explicit totals. This argument applies
-#'   only to binomial models. New response values never supply the trial totals.
-#' @param ... Reserved for extensions; unsupported arguments cause an error.
-#' @return A data frame with fitted or new observation rows and one column per
-#'   replicate dataset. Binomial values are success counts out of the fitted
-#'   or supplied trial totals, not proportions. Each column uses one sampled
-#'   complete posterior vector and the requested included random effects.
-#'   For new data, \code{point_ids} and \code{new_groups} attributes identify
-#'   original row order and sampled/zeroed levels, as in \code{predict()}.
-#'   The \code{prediction_contract} attribute identifies posterior predictive
-#'   replicates, which include observation noise, and records the included
-#'   effect policies. It does not establish diagnostic eligibility or calibration.
-#' @details Compare summaries of these replicate datasets with the observed
-#'   response to assess model adequacy. Good sampling diagnostics do not
-#'   establish that the observation model fits the data.
-#'   To use bayesplot, convert the replicates to a matrix and transpose it
-#'   with \code{t(as.matrix(replicated))}. This gives one simulated dataset
-#'   per row. For a count model, use \code{ppc_stat()} with
-#'   \code{stat = function(y) mean(y == 0)} to check the fraction of zeros.
-#'   For new groups, effects are sampled afresh for each replicate dataset,
-#'   shared by its rows in that group and independent across replicate datasets
-#'   conditional on the sampled posterior vector. Observation noise is then
-#'   generated separately for each row. Use a single batch to retain dependence.
-#'   Summaries of individual predictive intervals cannot be summed to obtain
-#'   an interval for a total; sum each complete replicate instead.
-#' @seealso \code{\link{multiScale_bayes}}, \code{\link{simulate_bayes_prior}},
-#'   \code{\link{prediction_contract}},
-#'   \code{\link{predict.multiScaleR_bayes}};
-#'   \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
+#' @param trials Positive integer binomial trial totals, one value or one per
+#'   observation row. The default `NULL` keeps the fitted totals when you
+#'   simulate the fitted rows. For new observations it uses one trial for a
+#'   binary fit, and it is an error for a grouped binomial fit, which needs
+#'   explicit totals. Use only with binomial models. Response columns in
+#'   `newdata` never supply the totals.
+#' @param ... Not used. Supplying any further argument is an error.
+#'
+#' @return A data frame with one row per fitted or new observation and one
+#'   column per replicate data set, named `sim_1`, `sim_2`, and so on. Values
+#'   are counts for Poisson and NB2 models, success counts out of the fitted
+#'   or supplied trial totals for binomial models (not proportions), and
+#'   response units for Gaussian models. Each column uses
+#'   one complete posterior vector, drawn at random with replacement, together
+#'   with the requested random effects.
+#'
+#'   For new data, a `point_ids` attribute gives the prepared landscape ID of
+#'   each row, and a `new_groups` attribute lists the unseen levels that were
+#'   sampled or set to zero, as in `predict()`. A `prediction_contract`
+#'   attribute (see [prediction_contract]) marks the result as posterior
+#'   predictive replicates that include observation noise and records the
+#'   policies for included effects. It does not establish diagnostic
+#'   eligibility or calibration.
+#'
+#' @details
+#' # Check the model against the data
+#'
+#' Compare summaries of the replicate data sets with the same summaries of
+#' the observed response. An observed value far outside the replicated range
+#' means the model cannot reproduce that feature. Good sampling diagnostics do
+#' not show that the observation model fits the data, and agreement on one
+#' statistic does not establish adequacy.
+#' `vignette("v13-bayesian-scales", package = "multiScaleR")` works through
+#' such a check. To use bayesplot, convert the replicates to a matrix with one
+#' simulated data set per row, `t(as.matrix(replicated))`. For a count model,
+#' `ppc_stat()` with `stat = function(y) mean(y == 0)` checks the fraction of
+#' zeros.
+#'
+#' # Simulate new groups jointly
+#'
+#' Within one call, new-group effects are drawn afresh for each replicate
+#' data set and shared by all of its rows in that group. Different new groups
+#' are independent given the population parameters, whose joint posterior
+#' dependence is kept. Observation noise is then drawn separately for each
+#' row. Separate calls do not share a realization across components or
+#' batches, so put every row that enters a joint question into one call.
+#' Reusing a seed across [predict_scales()], `predict()`, and `simulate()`
+#' does not promise matching latent effects, because the three functions use
+#' their random numbers differently.
+#'
+#' To get an interval for a total, sum each replicate column first with
+#' `colSums()` and then take quantiles of the sums. Adding the limits of
+#' individual intervals overstates the range of the total.
+#'
+#' The three prediction functions return different orientations, which
+#' matters for joint contrasts and totals. `simulate()` returns observations
+#' by replicates. `predict(summary = FALSE)` returns posterior draws by
+#' observations, and `predict_scales(summary = FALSE)` returns a named list of
+#' draws-by-observations matrices, one per landscape predictor.
+#'
+#' # Supply trials for binomial data
+#'
+#' For a binary fit, new observations default to one trial. For a fit to
+#' `cbind(successes, failures)`, supply the actual future totals, for example
+#' `trials = rep(10L, nrow(newdata))`. `simulate()` then returns success
+#' counts out of those totals, while `predict()` returns success
+#' probabilities whatever the number of trials.
+#'
+#' @seealso [multiScale_bayes()], [simulate_bayes_prior()],
+#'   [predict.multiScaleR_bayes()], [predict_scales()],
+#'   [prediction_contract], [multiScaleR_bayes-class];
+#'   `vignette("v14-bayesian-prediction", package = "multiScaleR")`.
 #' @examples
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'   package = "multiScaleR"))
 #' replicated <- simulate(example$fits$pooled, nsim = 20, seed = 94)
 #' dim(replicated)  # one row per original observation, one column per replicate
+#'
+#' # Posterior predictive check of the fraction of zero counts
 #' range(vapply(replicated, function(y) mean(y == 0), numeric(1)))
 #' mean(example$data$count == 0)  # observed fraction of zero counts
-#' # These replicate counts include observation variation; fitted means do not.
-#' # Agreement on one statistic alone does not establish model adequacy.
+#' # These replicate counts include observation noise. Fitted means do not.
+#'
+#' # Counts at eight future surveys, and an interval for their total
+#' forecast <- readRDS(system.file("extdata", "bayesian-prediction-example.rds",
+#'   package = "multiScaleR"))
+#' future <- simulate(forecast$fit, nsim = 200, seed = 803,
+#'   newdata = forecast$newdata, kernel_inputs = forecast$kernel_inputs,
+#'   row_id = "site_year", new_scale_levels = "sample",
+#'   new_response_levels = "sample")
+#' quantile(colSums(future), c(0.025, 0.5, 0.975))  # total of the eight surveys
 #' @exportS3Method stats::simulate
 simulate.multiScaleR_bayes <- function(object, nsim = 1L, seed = NULL,
     newdata = NULL, kernel_inputs = NULL, row_id = NULL, re.form = NULL,

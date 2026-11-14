@@ -36,6 +36,7 @@ native_bam_facets_fixture <- local({
 })
 
 test_that("Gaussian BAM maps and raw-reference curves agree across four kernels", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old), add = TRUE)
   grDevices::pdf(NULL); on.exit(grDevices::dev.off(), add = TRUE)

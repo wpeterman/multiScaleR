@@ -1,4 +1,5 @@
 test_that("explicit raw exact-limit components retain normalized native whole-model densities", {
+  skip_on_cran()
   cases <- 0L; maximum <- 0
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
@@ -67,6 +68,7 @@ test_that("component structure preserves dependence, neutral target and full obs
 })
 
 test_that("exact components cannot admit raw fitting or reach tape constructors", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- path_component_fixture("gaussian", "gaussian", FALSE, "tied", "canonical")
   p <- private_sq_parameters(s); p$scale_z <- p$response_z <- numeric()

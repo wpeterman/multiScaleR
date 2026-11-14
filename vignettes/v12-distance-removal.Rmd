@@ -604,3 +604,5 @@ dens_map <- terra::predict(r_scaled, fit, type = "lambda")
   mapping beyond the conditions you sampled.
 - **`vignette("v06-year-specific-rasters", package = "multiScaleR")`**, surveys
   from several years, each with its own map.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.

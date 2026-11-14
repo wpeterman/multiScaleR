@@ -51,6 +51,7 @@ test_that("fixed spline matrices follow native crossings, columns and row layout
 })
 
 test_that("fixed spline AD tapes retain scores and curvature when crossing knots", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   original_config <- RTMB::TapeConfig()
   dat <- data.frame(y = 1:7, h = c(-.1,0,.2,.5,.8,1,1.2),
@@ -117,6 +118,7 @@ test_that("fixed spline profiles retain native family targets and kernel derivat
 })
 
 test_that("fixed spline prepared weighted-SQ targets preserve priors and prediction recipes", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (surface in c(FALSE,TRUE)) for (family in c("gaussian","poisson","binomial","nbinom2")) {
     f <- prepared_formula_fixture(surface=surface)
@@ -248,6 +250,7 @@ test_that("public fixed spline fits preserve coefficient SEs, K and frozen curve
 })
 
 test_that("fixed splines retain native mixed count and choice-set targets", {
+  skip_on_cran()
   skip_if_not_installed("RTMB");skip_if_not_installed("glmmTMB");skip_if_not_installed("survival")
   f <- readRDS(test_path("fixtures","joint-mixed-existing.rds"))
   dat <- f$data;dat$site <- factor(dat$site);dat$year <- factor(dat$year)
@@ -311,6 +314,7 @@ test_that("fixed spline private groups and endpoints preserve native Gaussian ta
 })
 
 test_that("fixed spline Gaussian coefficient proposals retain normalized prior factors", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- prepared_formula_fixture(two=FALSE)
   fit <- multiScale_bayes(count ~ splines::ns(habitat,knots=c(-.4,.6),Boundary.knots=c(-5,5))*year +

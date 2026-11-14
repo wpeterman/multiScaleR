@@ -70,6 +70,7 @@ native_bam_coding_fixture <- local({
 bam_native_value <- function(x) { attr(x, "prediction_contract") <- NULL; x }
 
 test_that("serial native BAM routes retain fitted coding and numerical outputs", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- native_bam_coding_fixture()
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
@@ -136,6 +137,7 @@ test_that("BAM snapshots keep external pools and joint uncertainty guarded", {
 })
 
 test_that("native BAM prediction workers retain coding and explicit exclusions", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- native_bam_coding_fixture()
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old), add = TRUE)

@@ -1,6 +1,7 @@
 # Native family outputs and basis geometry, using the established spatial data.
 # No recovery study or outer ecological-scale optimization is run here.
 test_that("multiple GAM predictors keep native fixed bases, labels and uncertainty", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- refit_spatial_fixture(); dat <- f$data
   dat$y <- dat$y + as.integer(dat$site)^2

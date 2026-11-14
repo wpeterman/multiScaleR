@@ -52,6 +52,7 @@ test_that("finite identity and the retained infinite scorer have distinct target
 })
 
 test_that("stable log-CDF program preserves four derivatives and vector cross terms", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   reference <- function(x, m) {
     mu <- exp(x); y <- ppois(m, mu, log.p = TRUE)

@@ -1,4 +1,5 @@
 test_that("optimizing subdivisions preserve factorized derivatives across families", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for(kernel in c("gaussian","exp"))for(family in c("gaussian","poisson","binomial","nbinom2")) {
     f<-bayesian_scale_fixture(n_site=4,n_year=3,kernel=kernel,seed=8321)
@@ -17,6 +18,7 @@ test_that("optimizing subdivisions preserve factorized derivatives across famili
 })
 
 test_that("factorized subdivision control is explicit and preserves defaults", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f<-bayesian_scale_fixture(n_site=8,n_year=3,annual=FALSE,seed=8321)
   s<-multiScaleR:::.msr_marginal_prepare(count~habitat+temp,f$inputs,f$data,

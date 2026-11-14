@@ -24,6 +24,7 @@ bayes_cv_fixture <- function() {
 }
 
 test_that("Bayesian CV refits training rows and scores joint new-group predictions", {
+  skip_on_cran()
   f <- bayes_cv_fixture()
   d <- f$data
   args <- list(formula = count ~ habitat + poly(temp, 2) + (1 | site) + offset(log(effort)),
@@ -184,6 +185,7 @@ test_that("Bayesian CV rebuilds fixed metrics and retains weighted surface buffe
 })
 
 test_that("Bayesian CV compares Poisson and NB2 mass on common count blocks", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 6L, n_year = 4L, annual = FALSE)
   d <- f$data

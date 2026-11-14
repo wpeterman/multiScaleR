@@ -1,4 +1,5 @@
 test_that("Bayesian effect curves retain links, offsets, and fixed reference units", {
+  skip_on_cran()
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
   for (kernel in c("gaussian", "exp")) {

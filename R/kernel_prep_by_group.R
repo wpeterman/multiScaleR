@@ -13,8 +13,11 @@
 #'   the corresponding name in \code{raster_stacks}. Every point uses only its
 #'   assigned map, including cells affected by changes outside the point's
 #'   immediate location.
-#' @param max_D Maximum extraction radius in the projected map units.
-#' @param kernel Kernel weighting function; see \code{\link{kernel_prep}}.
+#' @param max_D Positive numeric scalar. Maximum extraction radius, in the
+#'   projected map units, and the upper bound of the sigma search. See the
+#'   section on choosing `max_D` in [multiScaleR-kernels].
+#' @param kernel Kernel weighting function: `"gaussian"` (default), `"exp"`,
+#'   `"expow"`, or `"fixed"`. See [kernel_prep()] and [multiScaleR-kernels].
 #' @param scale_vars Optional \code{\link{msr_vars}} specification. By default,
 #'   each raster layer becomes a kernel-weighted mean covariate.
 #' @param sigma Optional starting scales in map units. Defaults to
@@ -30,7 +33,9 @@
 #' @param progress Logical. Display extraction progress. Default \code{FALSE}.
 #' @param verbose Logical. Print preparation messages. Default \code{TRUE}.
 #'
-#' @return A \code{multiScaleR_data} list containing:
+#' @return A \code{multiScaleR_data} list with the same structure as the
+#' output of [kernel_prep()] (see [multiScaleR_data-class]), plus
+#' \code{raster_group}. It contains:
 #' \describe{
 #'   \item{\code{kernel_dat}}{Initial covariate data frame, with one row per
 #'     point. Columns are centered and divided by their pooled standard
@@ -86,9 +91,15 @@
 #' prep <- kernel_prep_by_group(pts, list(y1 = r1, y2 = r2),
 #'                              group = rep(c("y1", "y2"), 3),
 #'                              max_D = 25, verbose = FALSE)
+#' # Standardized habitat covariate, pooled across both maps
 #' head(prep$kernel_dat)
+#' # The map assigned to each point
+#' prep$raster_group
 #'
-#' @seealso \code{\link{kernel_prep}}, \code{\link{multiScale_optim}}
+#' @seealso \code{\link{kernel_prep}}, \code{\link{multiScale_optim}},
+#'   [multiScaleR_data-class].
+#'   `vignette("v06-year-specific-rasters", package = "multiScaleR")` fits
+#'   one pooled model to observations from two annual maps.
 #' @export
 kernel_prep_by_group <- function(pts, raster_stacks, group, max_D,
                                  kernel = c("gaussian", "exp", "expow", "fixed"),

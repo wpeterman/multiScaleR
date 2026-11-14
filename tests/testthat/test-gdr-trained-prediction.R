@@ -1,4 +1,5 @@
 test_that("GDR component points retain original learned bases and native uncertainty", {
+  skip_on_cran()
   f <- gdr_trained_fixture()
   for (name in names(f$models)) {
     model <- f$models[[name]]
@@ -85,6 +86,7 @@ test_that("GDR points, snapshots and raster chunks share component recipes", {
 })
 
 test_that("GDR effect curves use active component rows and raw modeled values", {
+  skip_on_cran()
   f <- gdr_trained_fixture()
   old <- options("contrasts"); on.exit(options(old), add = TRUE)
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
@@ -181,6 +183,7 @@ test_that("trained GDR chunk contexts reuse checked immutable original covariate
 })
 
 test_that("trained GDR component contexts restore for a native prediction worker", {
+  skip_on_cran()
   model <- gdr_trained_fixture()$models$mixed
   rows <- unmarked:::get_covariates(model, "dist")[c(2, 9, 12), "temperature", drop = FALSE]
   thin <- list(object = list(opt_mod = model), type = "dist", se.fit = TRUE,

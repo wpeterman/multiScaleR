@@ -138,6 +138,7 @@ test_that("reordered learned arguments keep their original training constants", 
 })
 
 test_that("native nested predictions and conditional SEs agree across row and map routes", {
+  skip_on_cran()
   f <- native_nested_fixture(); dat <- f$data
   dat$y <- dat$y + as.integer(dat$site)^2
   make <- function(kind, nested) {

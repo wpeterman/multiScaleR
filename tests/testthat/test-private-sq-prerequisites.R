@@ -27,6 +27,7 @@ test_that("exact SQ limits include all nearest ties and keep constant support ex
 })
 
 test_that("pure SQ fixed-kernel reductions preserve neutral normalized density and reference maps", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- private_sq_fixture(kernel, family)
@@ -107,6 +108,7 @@ test_that("pure SQ fixed-kernel reductions preserve neutral normalized density a
 })
 
 test_that("kernel independence removes annual SD only and preserves Gaussian response covariance", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (annual in c(FALSE, TRUE)) {
     f <- private_sq_fixture(response = TRUE, annual = annual)
@@ -145,6 +147,7 @@ test_that("SQ group subsetting recomputes memory from the retained rows", {
 })
 
 test_that("every SQ differentiation entry rejects unresolved or insufficient RAM before tapes", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- private_sq_fixture()$spec
   launched <- 0L
@@ -173,6 +176,7 @@ test_that("every SQ differentiation entry rejects unresolved or insufficient RAM
 })
 
 test_that("a singular nearest-SQ design is not promoted to finite curvature", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- private_sq_fixture()$spec
   s$surface$buffers$rough <- lapply(s$surface$buffers$rough, function(b) { b$d <- seq_along(b$d); b })

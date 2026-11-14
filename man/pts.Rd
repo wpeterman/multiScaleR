@@ -2,16 +2,30 @@
 % Please edit documentation in R/data_files.R
 \name{pts}
 \alias{pts}
-\title{Spatial sample points}
+\title{Survey points for the hab example}
 \format{
-An sf class point object:
-\describe{
-\item{pts}{ --> spatial location of points}
+An \code{sf} point object with 75 features, no coordinate reference
+system, and coordinates in the map units of \code{hab.tif} (from 400 to 3600).
+Its one attribute column, \code{obs}, repeats the counts in \code{count_data$y}.
 }
+\source{
+Simulated for this package.
 }
 \usage{
 data(pts)
 }
 \description{
-Example point file for optimizing scales of effect
+Locations of the 75 survey points that go with \link{count_data} and the
+\code{hab.tif} raster.
+}
+\examples{
+data(pts)
+pts
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
+terra::plot(hab)
+terra::points(terra::vect(pts), pch = 19)
+}
+\seealso{
+\link{count_data}, \link{hab}, \code{\link[=kernel_prep]{kernel_prep()}}.
 }

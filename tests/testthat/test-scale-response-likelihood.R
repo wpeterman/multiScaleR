@@ -20,6 +20,7 @@ test_that("shared response densities retain normalization and parameter meaning"
 })
 
 test_that("shared AD densities have independent values, scores and curvature", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   density <- multiScaleR:::.msr_scale_response_loglik
   for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
@@ -47,6 +48,7 @@ test_that("shared AD densities have independent values, scores and curvature", {
 })
 
 test_that("posterior and likelihood adapters retain their different targets", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- bayesian_scale_fixture(n_site = 4, n_year = 3)

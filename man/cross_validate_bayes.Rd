@@ -25,133 +25,215 @@ cross_validate_bayes(
 )
 }
 \arguments{
-\item{formula}{Two-sided Bayesian response formula. Use a data column as the
-response, or \code{cbind(successes, failures)} for grouped binomial data.
-An \code{I()} wrapper is also accepted. Predictor and scale formulas use
-\code{\link{multiScale_bayes}} syntax.}
+\item{formula}{Two-sided response formula in \code{\link[=multiScale_bayes]{multiScale_bayes()}} syntax.
+Use a data column as the response, or \code{cbind(successes, failures)} for
+grouped binomial data. An \code{I()} wrapper is also accepted.}
 
-\item{data}{Data frame of raw observations and formula variables. Unique row
-names identify observations in \code{folds}, even if several observations
-use the same prepared point.}
+\item{data}{Data frame of raw observations and formula variables. Its
+unique row names identify observations in \code{folds}, even when several
+observations share one prepared point.}
 
-\item{kernel_inputs}{Spatial inputs from \code{\link{kernel_prep}} or
-\code{\link{kernel_prep_by_group}}. For training-only rebinning, prepare
-kernel means with \code{bin = TRUE, store_cell_data = TRUE}. Weighted SQ and
-fixed spatial metrics use raw cells.}
+\item{kernel_inputs}{Prepared landscape inputs from \code{\link[=kernel_prep]{kernel_prep()}} or
+\code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}. For the default training-only rebinning,
+prepare kernel means with \code{bin = TRUE} and \code{store_cell_data = TRUE} (both
+defaults of \code{\link[=kernel_prep]{kernel_prep()}}). Weighted SQ and fixed-radius metrics also
+use the raw cells.}
 
-\item{folds}{Uniquely named list of analysis and assessment splits. Each
-split contains nonempty, disjoint character vectors \code{analysis} and
-\code{assessment} of observation row names in \code{data}.}
+\item{folds}{Uniquely named list of splits. Each split holds nonempty,
+disjoint character vectors \code{analysis} and \code{assessment} of row names of
+\code{data}, as returned by \code{\link[=grouped_cv_folds]{grouped_cv_folds()}} or \code{\link[=spatial_cv_folds]{spatial_cv_folds()}}.
+Every analysis set needs at least two observations.}
 
-\item{scales}{Named scale formulas as in \code{\link{multiScale_bayes}}.
-Default \code{NULL} estimates one shared scale per spatial predictor.}
+\item{scales}{Named list of scale formulas, as in \code{\link[=multiScale_bayes]{multiScale_bayes()}}. The
+default \code{NULL} estimates one shared scale per landscape predictor.}
 
-\item{family}{Response family. Use \code{"nbinom2"} (default) or
-\code{"poisson"} for counts, \code{"binomial"} for successes and trials,
-or \code{"gaussian"} for continuous outcomes.}
+\item{family}{Response family, one of \code{"nbinom2"} (default) or \code{"poisson"}
+for counts, \code{"binomial"} for successes and trials, or \code{"gaussian"} for
+continuous outcomes.}
 
-\item{row_id}{Optional name of the column holding prepared point IDs. The
-default uses the observation row names as point IDs. Repeated point IDs
-are allowed and do not replace the unique observation row names.}
+\item{row_id}{Optional name of the column of \code{data} that holds prepared
+point IDs. The default \code{NULL} uses the row names of \code{data} as point IDs.
+Point IDs may repeat. They do not replace the unique row names that
+identify observations.}
 
-\item{priors}{Named prior settings passed to \code{\link{multiScale_bayes}}.
-Specify them before looking at assessment outcomes. Default \code{list()}
-uses the model's documented defaults.}
+\item{priors}{Named list of prior settings passed to \code{\link[=multiScale_bayes]{multiScale_bayes()}}.
+Set them before you look at any assessment outcome. The default \code{list()}
+uses the documented defaults.}
 
-\item{method}{Posterior method. The default \code{"slice"} runs without
-optional sampling packages. \code{"sample"} runs NUTS. \code{"laplace"}
-and \code{"marginal"} use the respective posterior approximations,
-including direct importance-weighted scoring when correction is requested.}
+\item{method}{Computation for every fold. The default \code{"slice"} needs no
+optional sampling packages. \code{"sample"} runs NUTS. \code{"laplace"} and
+\code{"marginal"} use the approximations, and an importance-corrected
+marginal fit is scored directly with its candidate weights.}
 
-\item{fit_args}{Named list of additional fitting arguments, chosen from
-\code{chains}, \code{iter}, \code{warmup}, \code{control},
-\code{laplace_draws} and \code{cores}. Defaults follow
-\code{\link{multiScale_bayes}}. Folds run sequentially.}
+\item{fit_args}{Named list of further fitting arguments for
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}, chosen from \code{chains}, \code{iter}, \code{warmup}, \code{control},
+\code{laplace_draws}, and \code{cores}. Settings you leave out take the defaults of
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}. Folds always run one after another.}
 
-\item{assessment_group}{Optional name of a data column defining joint
-scoring blocks within each assessment split. Default \code{NULL} scores
-the whole assessment split jointly. Choose the blocks to represent the
-prediction question before observing assessment outcomes.}
+\item{assessment_group}{Optional name of a column of \code{data} that defines
+joint scoring blocks within each assessment split. The default \code{NULL}
+scores each whole assessment split as one block. Choose the blocks to
+match your prediction question before you see any assessment outcome.}
 
-\item{new_scale_levels, new_response_levels}{Separate unseen-level policies
-for scale and response random effects. Default \code{"sample"} integrates
-new group variation by simulation. \code{"error"} refuses an unseen level
-and \code{"zero"} predicts at its zero deviation. Existing groups retain
-their fitted posterior effects.}
+\item{new_scale_levels, new_response_levels}{What to do with a group level
+that is absent from an analysis split, set separately for scale and
+response random effects. The default \code{"sample"} averages over new-group
+variation by simulation. \code{"error"} refuses an unseen level, and \code{"zero"}
+predicts at a zero deviation. Groups present in the analysis split keep
+their fitted effects.}
 
-\item{new_group_draws}{Positive integer number of new-effect simulations per
-posterior vector when sampling unseen levels. Default one. Increase it to
-reduce conditional Monte Carlo error from new-effect simulation. For rare
-joint responses or concentrated posterior weights, check score stability
-at larger budgets with the same seed and fitting settings.}
+\item{new_group_draws}{Positive integer number of new-effect simulations
+per posterior vector when unseen levels are sampled; default 1. Raise it
+to reduce the simulation error of the average over new groups. See
+"Compare models".}
 
-\item{bin_reference}{\code{"training"} (default) computes representative
-distances from unique analysis points and freezes them for assessment.
-Use \code{"fixed"} only when supplied bins and representative distances
+\item{bin_reference}{\code{"training"} (default) computes the representative
+bin distances from the unique analysis points of each fold and freezes
+them for its assessment points. Use \code{"fixed"} only when the supplied bins
 were fixed independently of all analysis and assessment data.}
 
-\item{seed}{Optional positive integer seed for distinct fold fitting and
-scoring streams. A supplied seed preserves the caller's R random state.}
+\item{seed}{Optional positive integer seed. It generates distinct fitting
+and scoring seeds for every fold, and your own random-number state is
+restored afterward.}
 
-\item{keep_fits}{Logical. Default \code{FALSE} stores compact fold records.
-Use \code{TRUE} to retain complete Bayesian fits for investigation.}
+\item{keep_fits}{Logical. The default \code{FALSE} stores compact fold records
+only. \code{TRUE} also keeps every fold's complete fit in \code{fits}, for
+investigation, at a cost in memory.}
 }
 \value{
-A \code{multiScaleR_bayes_cv} object inheriting
-\code{multiScaleR_cv}. \code{predictions} contains the posterior mean
-response and marginal negative log score per observation. For binomial
-models, \code{prediction} is a per-trial probability and log scores use
-the observed count and trial total. \code{joint_scores} contains each
-fold's block sizes and joint negative log scores. \code{summary} and
-\code{metrics} report pooled and per-fold joint negative log score divided
-by the number of assessment observations. \code{fold_results} records
-which folds scored, failed fitting or scoring, or failed diagnostics.
-\code{training} records analysis and point IDs, frozen normalization,
-bin references, priors and random seeds. \code{diagnostics},
-\code{prediction_contracts}, \code{warnings}, \code{errors},
-\code{targets}, \code{folds}, \code{settings}, \code{assessment_counts},
-\code{complete}, and optional \code{fits} support audit and comparison.
+An object of class \code{multiScaleR_bayes_cv}, which inherits from
+\code{multiScaleR_cv} (see \link[=multiScaleR_cv-class]{multiScaleR_cv}). It is a list with these
+elements.
+\itemize{
+\item \code{summary}: a one-row data frame with the pooled score. \code{estimate} is the
+sum of joint negative log scores divided by the number of assessment
+observations (\code{unit} is \code{"joint_block_density_per_observation"}), so
+lower is better. \code{n_assessment}, \code{n_scored}, \code{weight_sum}, and
+\code{complete} describe its basis. \code{estimate} is \code{NA} unless every fold
+scored.
+\item \code{metrics}: the same score for each \code{fold}.
+\item \code{predictions}: one row per assessed observation, with \code{fold},
+\code{row_id}, \code{point_id}, \code{observed}, \code{trials}, \code{assessment_group}, the
+posterior mean response \code{prediction} (a per-trial probability for
+binomial models), \code{marginal_neg_log_score} for that observation alone,
+\code{new_scale_level} and \code{new_response_level} flags, and \code{eligible}, which
+is \code{TRUE} only in a scored fold.
+\item \code{joint_scores}: one row per fold and assessment block, with its size
+\code{n} and joint \code{neg_log_score}.
+\item \code{fold_results}: one row per fold, with \code{n_analysis}, \code{n_assessment},
+and \code{status}, which is \code{"scored"}, \code{"diagnostic_failed"}, or
+\code{"failed"} (an error at any stage, recorded in \code{errors}).
+\item \code{diagnostics}: for each fold, the fit's stored checks (\code{raw}), the
+\code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}} report for sampled fits (\code{derived}), the
+overall \code{passed} flag, and the importance records of corrected fits.
+\item \code{errors}, \code{warnings}: for each fold, the failing \code{stage} and \code{message}
+(or \code{NULL}), and the warnings captured during the fold.
+\item \code{training}: for each fold, the analysis rows and point IDs, the fit and
+score seeds, the frozen normalization (\code{center}, \code{spread}, and those of
+fixed-radius metrics), the bin distances and their reference, and the
+priors.
+\item \code{prediction_contracts}: for each fold, the unseen groups, the number of
+posterior vectors, \code{new_group_draws}, and whether importance weights
+were used.
+\item \code{targets}, \code{folds}, \code{settings}, \code{assessment_counts}, \code{complete}, \code{call},
+\code{integrity_sha256}: the scored observations, the validated splits, the
+settings, how often each row was assessed, whether every fold scored,
+the call, and a checksum that \code{\link[=cv_tab]{cv_tab()}} uses to detect altered
+records.
+\item \code{fits}: the complete fold fits when \code{keep_fits = TRUE}, and \code{NULL}
+otherwise.
+}
 }
 \description{
-Refit a Bayesian scale model in each explicit analysis split. Score the
-posterior predictive density of the held-out observations, with coherent
-random effects shared by observations in the same predicted group.
+Refit a \code{\link[=multiScale_bayes]{multiScale_bayes()}} model in each analysis split, then score the
+held-out observations with the posterior predictive density. Observations
+that share a predicted group, such as a held-out site or year, also share
+its random effect when they are scored.
 }
 \details{
 This function is experimental. Its arguments and results may change in a
 later release without a deprecation period.
+}
+\section{What the score measures}{
+The joint score of a block is the negative log of the posterior average of
+the product of the observation densities in that block. Lower is better.
+New effects are drawn once per group in each joint parameter vector and
+shared by every assessment observation in that group. For grouped binomial
+data, each observation contributes one normalized probability of its count
+of successes. The sum of the marginal row scores is a different target.
+The pooled score weights each block by its number of observations. It is
+the only cross-validation score in the package that averages over
+uncertainty in the coefficients, the scales, and the group effects.
+}
 
-The joint score is the negative log of the posterior average of
-the conditional product of observation densities in each assessment
-block. For grouped binomial data, the block product uses one normalized
-count probability per observation. New effects are drawn once per
-group in each joint parameter vector and shared by all corresponding
-assessment observations. The sum of marginal row scores is a different
-target. Pooled scores weight each joint block by its observation count
-after expressing its score per observation.
+\section{Choose folds for your prediction question}{
+Each fit learns the normalization, formula bases, coefficients, and
+scales from its analysis rows only. Repeated visits can share one point
+buffer. To predict new sites or years, hold out whole sites or years, for
+example with \code{\link[=grouped_cv_folds]{grouped_cv_folds()}} on the site labels. Where groups cross,
+make each assessment block cover the observations whose joint response you
+want to predict.
+\code{vignette("v08-cross-validation", package = "multiScaleR")} discusses fold
+design.
+}
 
-Each fit learns normalization, formula bases, coefficients and ecological
-scales only from analysis rows. Repeated visits can share one point
-buffer. Use whole-site or whole-year folds if prediction concerns an
-unseen site or year. Where several groups cross, the assessment block
-should cover the observations whose joint response you want to predict.
+\section{Handle failed folds}{
+A fold that fails its native or derived diagnostics is marked
+\code{"diagnostic_failed"} and leaves the result incomplete, though its computed
+scores stay available for investigation. Slice sampling without the
+posterior package can score folds with diagnostics recorded as
+unavailable, so install posterior to check mixing and simulation
+precision. Laplace and marginal scores inherit the limits of their
+approximation and its checks. Importance-corrected fits are scored with
+their normalized candidate weights. Passing numerical checks does not
+establish predictive calibration. Every fold runs the full fitting
+method, so a run takes about as long as one fit per fold.
+}
 
-Failed native or derived diagnostics keep the fold incomplete, with any
-computed scores available for investigation. Slice sampling without the
-optional posterior package can score folds with diagnostics recorded as
-unavailable. Install posterior to check mixing and simulation precision.
-Laplace and marginal scores inherit their fitted approximation and
-diagnostic limits. Importance correction uses normalized candidate
-weights directly. Numerical diagnostic checks do not establish
-predictive calibration.
+\section{Compare models}{
+Use \code{\link[=cv_tab]{cv_tab()}} with \code{metric = "neg_log_score"} to rank complete Bayesian
+results computed on the same targets, folds, blocks, and new-level
+policies. Poisson and NB2 results can be compared, because both score
+probability mass on the same counts. Training AIC, AICc, and BIC selection
+does not apply to posterior fits, so use an outer split to evaluate a
+model-selection rule. The average over unseen group effects uses a finite
+number of simulated effects. When two candidates score very closely, rerun
+both with a larger \code{new_group_draws} and the same \code{seed} and fitting
+settings, and treat the comparison as unresolved if the ranking changes.
+}
 
-Use \code{\link{cv_tab}} with \code{metric = "neg_log_score"} for complete
-Bayesian results on the same targets, folds, blocks and new-level policies.
-Poisson and NB2 can compare predictive mass on the same count observations.
-Training AIC, AICc and BIC selection does not apply to this posterior
-workflow. Use an outer split to evaluate a model-selection rule.
+\examples{
+\donttest{
+data("landscape_counts")
+data("surv_pts")
+land <- terra::rast(system.file("extdata", "landscape.tif",
+                                package = "multiScaleR"))
+# Keep the raw cells (the default) so each fold rebins from its own
+# analysis points
+inputs <- kernel_prep(pts = terra::vect(surv_pts), raster_stack = land[["land1"]],
+                      max_D = 1700, kernel = "gaussian", verbose = FALSE)
+
+# Two folds of alternating rows
+folds <- grouped_cv_folds(rep(1:2, length.out = nrow(landscape_counts)),
+                          k = 2, ids = rownames(landscape_counts))
+
+# Very short slice chains keep this example quick. With the posterior
+# package installed, they usually fail the diagnostics, so the folds are
+# marked "diagnostic_failed" and the pooled score is NA. Use the default
+# chains and iter in an analysis.
+cv <- cross_validate_bayes(counts ~ land1, landscape_counts, inputs, folds,
+                           family = "poisson",
+                           priors = list(scale_median = 300),
+                           method = "slice",
+                           fit_args = list(chains = 2, iter = 200), seed = 1)
+cv$fold_results    # status of each fold
+cv$joint_scores    # joint negative log score of each assessment block
+cv$summary         # pooled score per observation, lower is better
+}
 }
 \seealso{
-\code{\link{multiScale_bayes}}, \code{\link{grouped_cv_folds}},
-\code{\link{diagnose_bayes_scales}}, \code{\link{cv_tab}}
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}, \code{\link[=grouped_cv_folds]{grouped_cv_folds()}},
+\code{\link[=spatial_cv_folds]{spatial_cv_folds()}}, \code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}}, \code{\link[=cv_tab]{cv_tab()}},
+\link[=multiScaleR_cv-class]{multiScaleR_cv};
+\code{vignette("v08-cross-validation", package = "multiScaleR")}.
 }

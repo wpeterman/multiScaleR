@@ -28,6 +28,7 @@ make_marginal_year_fixture <- local({
 })
 
 test_that("unmarked factor and unscaled effects use named site-year columns", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   open_null_device()
   on.exit(grDevices::dev.off(), add = TRUE)
@@ -145,6 +146,7 @@ test_that("generic numeric effects are independent of extra columns and response
 })
 
 test_that("constant nuisance factors retain explicit fitted contrasts", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   sc <- f$sc
   contrasts(sc$Year) <- stats::contr.sum(3L)
@@ -215,6 +217,7 @@ test_that("formula symbols distinguish fixed logic, removed terms and random gro
 })
 
 test_that("native unmarked curves retain admitted symbols and exclude removed predictors", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   sc <- f$sc
   name <- "land:cover"
@@ -286,6 +289,7 @@ test_that("upstream unmarked pipe rejection remains explicit before integration"
 
 
 test_that("unmarked learned fixed bases retain training geometry and native intervals", {
+  skip_on_cran()
   f <- make_marginal_year_fixture()
   set.seed(907)
   present <- rbinom(nrow(f$sc), 1, .65)

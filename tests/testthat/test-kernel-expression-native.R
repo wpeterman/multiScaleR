@@ -1,4 +1,5 @@
 test_that("native mixed expression likelihoods retain complete AD scores", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB"); skip_if_not_installed("RTMB")
   f <- readRDS(test_path("fixtures", "joint-mixed-existing.rds"))
   dat <- f$data; dat$site <- factor(dat$site); dat$year <- factor(dat$year)

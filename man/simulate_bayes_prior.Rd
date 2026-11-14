@@ -7,68 +7,76 @@
 simulate_bayes_prior(object, nsim = 100L, seed = NULL)
 }
 \arguments{
-\item{object}{A \code{\link{multiScale_bayes}} object. An object from
-\code{method = "prepare"} is sufficient. A fitted object's posterior
-draws are ignored; its specification supplies the same prior model.}
+\item{object}{A \code{\link[=multiScale_bayes]{multiScale_bayes()}} object. An object from
+\code{method = "prepare"} is enough. For a fitted object, the posterior draws
+are ignored and its specification supplies the same prior model.}
 
-\item{nsim}{Positive integer number of prior predictive datasets; default
-100. Larger values explore the priors more thoroughly and use more memory.}
+\item{nsim}{Positive integer number of prior predictive data sets; default
+100. More data sets explore the priors more thoroughly and use more
+memory.}
 
-\item{seed}{Optional positive integer simulation seed. When supplied, the
-caller's random-number state is restored, including when simulation fails.}
+\item{seed}{Optional positive integer simulation seed. Your own
+random-number state is restored afterward, even when simulation fails.}
 }
 \value{
-A list with:
-\describe{
-\item{responses}{A data frame with the original observation rows and
-one column per simulated dataset, named \code{sim_1}, \code{sim_2},
-and so on. Gaussian responses use response units. Poisson and NB2
-responses are counts. Binomial responses are success counts out of
-the prepared trial totals.}
-\item{means}{A data frame of matching expected responses. Binomial
-values are success probabilities, not expected success counts;
-multiply by the prepared trial totals for expected counts. Other
-families use the response scale. Each mean conditions on its replicate's
-prior parameter vector and excludes observation variation; it is not
-an expectation integrated over the entire prior.}
-\item{log_scales}{A named list, one matrix per landscape predictor.
-Rows follow its distinct scale-formula combinations, labeled as in
-\code{\link{posterior_scales}}; columns match the simulated datasets.
-Entries are natural log distances in projected map units. Exponentiate
-medians and interval limits for distance summaries.}
-\item{observation_ids}{The prepared observation identities, in the same
-order as the rows of \code{responses} and \code{means}.}
-\item{priors}{The complete prior settings used.}
+A list with these elements.
+\itemize{
+\item \code{responses}: a data frame with one row per prepared observation and
+one column per simulated data set, named \code{sim_1}, \code{sim_2}, and so on.
+Values are counts for Poisson and NB2 models, success counts out of the
+prepared trial totals for binomial models, and response units for
+Gaussian models.
+\item \code{means}: a data frame of the matching expected responses. Binomial
+values are success probabilities, so multiply by the trial totals for
+expected counts. Other families use the response scale. Each mean is
+conditional on its own prior draw and excludes observation noise. It is
+not an expectation over the whole prior.
+\item \code{log_scales}: a named list with one matrix per landscape predictor. Rows
+are its distinct combinations of scale covariates and groups, labeled as
+in \code{\link[=posterior_scales]{posterior_scales()}}, and columns match the simulated data sets.
+Entries are natural log distances in projected map units, so
+exponentiate medians and interval limits to read them as distances.
+\item \code{observation_ids}: the prepared landscape ID of each observation, in
+the row order of \code{responses} and \code{means}.
+\item \code{priors}: the complete prior settings used, with defaults filled in.
 }
 }
 \description{
-Check the implications of the complete model priors before fitting. Draw
-parameters from their specified priors and generate responses for the
-prepared observations, including observation sampling variation.
+Check what the complete set of priors implies before you fit. Each
+simulated data set draws every parameter from its prior and then generates
+responses for the prepared observations, including the scatter of
+individual observations around their means.
 }
-\details{
-Each dataset uses one complete, independent prior parameter vector.
-All observations in a group share that vector's group effect, retaining
-the dependence specified by the scale and response formulas. Scale effects
-and response effects are drawn separately, as specified by the model.
+\section{Read the simulations}{
+Compare the simulated magnitudes, fractions of zeros, and scale quantiles
+with ranges that are scientifically plausible for your design. Extreme
+simulations show that a prior is loose for your design and may call for a
+tighter setting, such as a smaller \code{beta_sd}. They are not evidence of a
+poor posterior fit, and they do not choose a prior for you.
+\code{vignette("v13-bayesian-scales", package = "multiScaleR")} works through
+this check.
+
+Broad distance priors can have infinite arithmetic moments, so summarize
+scales with log-scale summaries and distance quantiles. Broad response
+group-SD priors with a log link can also give infinite prior predictive
+count moments. A finite simulation does not show that a mean over prior
+replicates exists.
+}
+
+\section{How the simulation works}{
+Each data set uses one complete, independent prior parameter vector. All
+observations in a group share that vector's group effect, which keeps the
+dependence that the scale and response formulas specify. Scale effects and
+response effects are drawn separately, as the model specifies.
 
 Simulation conditions on the prepared maps, fixed covariates, offsets,
-group identities, binomial trial totals and frozen predictor
-standardization. It does not use observed response values, posterior
-draws or likelihood weights. It does not generate new sites or years.
-No optional Bayesian packages are required.
-
-Compare replicated magnitudes, zero fractions and scale quantiles with
-scientifically plausible ranges before fitting. Extreme predictions can
-reveal a prior that is implausible for your design. They do not demonstrate
-poor posterior fit or prescribe a prior automatically. Broad distance
-priors can have infinite arithmetic moments; prefer log-scale summaries
-and distance quantiles. Broad log-link response group-SD priors can also
-permit infinite prior predictive count moments. A finite simulation does
-not establish that an arithmetic mean over prior replicates exists.
-Nonfinite calculations cause an informative error
-identifying the replicate instead of clipping values or replacing a draw.
+group identities, binomial trial totals, and the frozen predictor
+standardization. It uses no observed responses and no posterior draws, and
+it creates no new sites or years. No optional Bayesian package is needed. A
+nonfinite value stops with an error that names the replicate. Values are
+never clipped and draws are never replaced.
 }
+
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
   package = "multiScaleR"))
@@ -76,13 +84,17 @@ prepared <- multiScale_bayes(count ~ habitat + factor(year) + (1 | site),
   example$inputs, example$data, scales = list(habitat = ~1 + (1 | year)),
   row_id = "site_year", priors = list(scale_median = 250), method = "prepare")
 prior <- simulate_bayes_prior(prepared, nsim = 20, seed = 63)
+
+# Fraction of zero counts in each prior data set, against the observed 0.04
 range(vapply(prior$responses, function(y) mean(y == 0), numeric(1)))
-# Prior responses can be much more variable than the observed counts.
+# The default priors are loose and allow far more zeros than were observed.
+
+# Prior range of sigma for each year, in meters
 exp(apply(prior$log_scales$habitat, 1, stats::quantile, c(.025, .5, .975)))
 # These are prior scale intervals, not posterior estimates or evidence of fit.
 }
 \seealso{
-\code{\link{multiScale_bayes}},
-\code{\link{simulate.multiScaleR_bayes}},
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}, \code{\link[=simulate.multiScaleR_bayes]{simulate.multiScaleR_bayes()}},
+\code{\link[=posterior_scales]{posterior_scales()}};
 \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }

@@ -379,3 +379,5 @@ cv_tab(list(movement = cv_move, forest = cv_forest), metric = "neg_log_score")
   and comparing models by held-out prediction.
 - **`vignette("v07-fitting-methods", package = "multiScaleR")`**, which
   covariate types each fitting route accepts.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.

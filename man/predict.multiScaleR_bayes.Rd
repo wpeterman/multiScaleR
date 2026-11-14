@@ -23,139 +23,205 @@
 )
 }
 \arguments{
-\item{object}{A \code{\link{multiScale_bayes}} fit with posterior draws
+\item{object}{A fitted \code{\link[=multiScale_bayes]{multiScale_bayes()}} object with posterior draws,
 from sampling or either approximation.}
 
-\item{newdata}{\code{NULL} (default) uses the fitted observations. Otherwise
-a nonempty data frame containing fixed covariates, offsets and included
-grouping variables. Response values are neither needed nor used.}
+\item{newdata}{\code{NULL} (default) uses the fitted observations.
+Otherwise a nonempty data frame of new observations that holds the fixed
+covariates, the offset variables, and the grouping variables of every
+component you include. Response values are neither needed nor used.}
 
-\item{type}{\code{"response"} (default) returns expected response values,
-or \code{"link"} returns the linear predictor. Binomial response values
-are success probabilities, including for grouped-binomial data.}
+\item{type}{\code{"response"} (default) returns expected responses, which are
+expected counts for Poisson and NB2 models, success probabilities for
+binomial models (also for grouped binomial data), and means for Gaussian
+models. \code{"link"} returns the linear predictor.}
 
-\item{re.form}{\code{NULL} (default) includes fitted response random effects.
-\code{NA} sets response random effects to zero while retaining fitted
-group-specific landscape scales. This does not integrate over random effects.}
+\item{re.form}{\code{NULL} (default) includes the response random effects. \code{NA}
+sets them all to zero while keeping group-specific scales. This is a
+reference prediction, not an average over the random effects.}
 
-\item{summary}{Logical. Return posterior summaries (default \code{TRUE})
-or a draws-by-observations matrix (\code{FALSE}).}
+\item{summary}{Logical. \code{TRUE} (default) returns posterior summaries.
+\code{FALSE} returns the matrix of draws by observations.}
 
-\item{level}{Central posterior interval probability; default 0.95.}
+\item{level}{Probability of the central interval; default 0.95.}
 
-\item{draws}{Optional number of evenly spaced posterior draws to use;
-\code{NULL} uses all draws.}
+\item{draws}{Optional positive integer number of evenly spaced posterior
+draws to use. The default \code{NULL} uses every draw. Fewer draws save time
+and memory at a cost in simulation precision.}
 
-\item{kernel_inputs}{Matching prepared inputs for \code{newdata}, from
-\code{\link{kernel_prep}} or \code{\link{kernel_prep_by_group}}.
-Required for new observations and otherwise \code{NULL}. Use the fitted
-kernel, predictor definitions and physical map units. Numerical
-\code{unit_conv} normalizers may differ and are converted internally;
-this does not convert coordinate systems or physical units.
-Kernel means require bins. Weighted SQ requires matching source/metric
-specifications and raw buffers, with the fitted reference normalization.}
+\item{kernel_inputs}{Prepared landscape inputs for \code{newdata}, from
+\code{\link[=kernel_prep]{kernel_prep()}} or \code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}. Required with new data and
+\code{NULL} otherwise. Use the fitted kernel, predictor definitions, and
+physical map units. See "Match new rows to their landscapes" in
+\code{\link[=predict.multiScaleR_bayes]{predict.multiScaleR_bayes()}}.}
 
-\item{row_id}{Name of a \code{newdata} column matching unique prepared
-\code{binned$point_ids}, or \code{kernel_dat} row names for surface-only
-inputs. Observation keys may repeat. \code{NULL} uses
-the fitted row-ID column when retained, or new-data row names otherwise.
-Supply it explicitly for older saved objects. Used only with new data.}
+\item{row_id}{Name of the column in \code{newdata} that matches each row to an
+entry of \code{kernel_inputs$binned$point_ids}, or to a row name of
+\code{kernel_inputs$kernel_dat} for surface-only inputs. IDs may repeat. The
+default \code{NULL} uses the fitted row-ID column when the fit kept it, and
+the row names of \code{newdata} otherwise. Supply it for fits saved by older
+versions of the package. Used only with new data.}
 
-\item{scale_re.form}{\code{NULL} (default) includes fitted or explicitly
-sampled scale random effects. \code{NA} fixes all scale deviations at zero.
-This is separate from \code{re.form}, which controls response effects.}
+\item{scale_re.form}{\code{NULL} (default) includes the fitted scale random
+effects and any sampled new ones. \code{NA} sets every scale deviation to
+zero. It is separate from \code{re.form}, which controls response effects.}
 
-\item{new_scale_levels, new_response_levels}{Separate policies for unseen
-included scale and response group levels: \code{"error"} (default),
-\code{"sample"}, or \code{"zero"}. Sampling draws one new standard-normal
-effect per group and complete posterior vector, multiplied by that vector's
-group SD. Rows in the same group share it. Zeroing new effects gives a
-conditional reference, not a population average. Known effects retain
-their fitted draws. These policies do not create new fixed-factor coefficients.}
+\item{new_scale_levels, new_response_levels}{What to do with a group level
+that was not in the fitted data, set separately for scale and response
+random effects. \code{"error"} (default) stops, \code{"sample"} draws a new effect,
+and \code{"zero"} sets the new effect to zero. A sampled effect is one
+standard-normal value per new group and posterior draw, multiplied by
+that draw's group SD, and shared by every row in the group. Zeroing gives
+a typical-group reference, not a population average. Known groups keep
+their fitted effects. Neither choice creates a coefficient for a new
+level of a fixed factor.}
 
-\item{seed}{Optional positive integer seed for new effects. When supplied,
-the caller's random-number state is restored, including on failure.}
+\item{seed}{Optional positive integer seed for sampled new effects. Your
+own random-number state is restored afterward, even when prediction
+fails.}
 
-\item{include_fixed}{Logical. With new data and matching spatial inputs,
-\code{TRUE} recomputes declared fixed-radius predictors using their original
-preparation means and sample SDs. The default \code{FALSE} requires these
-columns explicitly. Source, metric, radius, kernel, and resolution must
-match the fitted preparation, including its \code{max_D} buffer extent.
-This adds no scale parameters or uncertainty.}
+\item{include_fixed}{Logical. With new data, \code{TRUE} recomputes declared
+fixed-radius landscape predictors from \code{kernel_inputs}, using their
+original preparation means and SDs. The default \code{FALSE} requires those
+columns in \code{newdata}. Source, metric, radius, kernel, and resolution must
+match the fitted preparation, including its \code{max_D} buffer extent. This
+adds no scale parameters or uncertainty.}
 
-\item{...}{Reserved for future extensions; unused arguments cause an error.}
+\item{...}{Not used. Supplying any further argument is an error.}
 }
 \value{
-With \code{summary = TRUE}, a data frame in the supplied observation
-order containing \code{row}, \code{point_id}, \code{mean}, \code{median},
-\code{sd}, \code{lower}, and \code{upper}. Otherwise a numeric matrix.
-New-data summaries also include \code{new_scale_level} and
-\code{new_response_level}, indicating unseen groups in included components.
-New-data outputs have a \code{new_groups} attribute with \code{component},
-\code{covariate}, \code{group}, \code{level} and \code{action}, recording
-which new levels were sampled or fixed at zero.
-Intervals describe uncertainty in expected responses or linear predictors;
-they do not include a new observation's sampling variation. These are
-marginal intervals for individual observations, not a simultaneous band.
-When new effects are sampled, they also include variation among new groups.
-The mean and SD are empirical draw summaries. A finite Monte Carlo result
-does not establish that the corresponding posterior or new-group moment
-exists; medians and quantiles are preferable for heavy-tailed predictions.
-Summaries have a \code{prediction_contract} attribute describing the target,
-included effects, uncertainty, and stored original-parameter map. Its
-diagnostic status reports the fit's existing status; prediction does not
-make a failed fit eligible. Raw draw matrices keep their existing attributes.
+With \code{summary = TRUE}, a data frame with one row per observation,
+in the supplied order.
+\itemize{
+\item \code{row}: the position of the observation.
+\item \code{point_id}: its prepared landscape ID.
+\item \code{mean}, \code{median}, \code{sd}, \code{lower}, \code{upper}: summaries of the predicted
+quantity on the scale set by \code{type}. \code{lower} and \code{upper} bound the
+central \code{level} credible interval.
+\item \code{new_scale_level}, \code{new_response_level} (new data only): whether the
+row belongs to an unseen group of an included scale or response
+component.
+}
+
+With \code{summary = FALSE}, a numeric matrix with one row per posterior draw
+and one column per observation.
+
+Results for new data carry a \code{new_groups} attribute, a data frame with
+\code{component}, \code{covariate}, \code{group}, \code{level}, and \code{action} that lists each
+unseen level and whether it was sampled or set to zero. Summaries also
+carry a \code{prediction_contract} attribute that describes the target, the
+included effects, the uncertainty, and the stored parameter map (see
+\link{prediction_contract}). Its diagnostic status repeats the fit's own
+status. Prediction does not make a failed fit eligible.
 }
 \description{
-Predict fitted or new-observation means using joint scale, coefficient,
-and random-effect uncertainty. New groups require an explicit decision
-about sampling their effects or fixing their deviations at zero.
+Predict expected responses, or linear predictors, at fitted or new
+observations. Each prediction carries the joint posterior uncertainty in
+the scales, the coefficients, and the random effects. A site or year that
+was not in the fitted data needs an explicit choice, either drawing its
+effect from the estimated spread among groups or setting it to zero.
 }
-\details{
-Fitting standardization, fixed-effect bases and contrasts are reused.
-Fixed covariate learners \code{scale()}, \code{poly()}, \code{splines::ns()}
-and \code{splines::bs()} retain their training definitions inside ordinary
-expressions such as \code{I(scale(temp))} and transformed offsets. The same
-constants apply to single rows, batches and coefficient effect curves.
-For older fits, reconstructed calls must reproduce the retained training
-formula values using original stored data; otherwise prediction stops.
-Namespace-qualify custom functions with these learner names, or precompute
-their predictors. Existing dynamic-kernel expression restrictions apply.
-
-Prediction does not refit the model, learn a new scale reference or condition
-on response values in \code{newdata}. An unseen fixed year factor remains an
-error, even when random-effect sampling is enabled. A hierarchical response
-year term or a scientifically justified numeric trend is needed for future
-response years. Exchangeable annual effects alone impose no temporal trend
-or autocorrelation. \code{\link{predict_scales}} can predict annual scales
-separately when the response formula still contains fixed year effects.
-
-Use one batch for joint predictions across rows. Within that batch, all
-new observations in one grouping term and level share their new effect
-for each posterior vector. Distinct terms and groups follow the model's
-conditional independence, while joint posterior parameter dependence is
-retained. Separate calls generate separate new effects; do not combine
-independently generated batches to infer joint spatial or annual uncertainty.
-
-Setting effects to zero is not integration over group variation. With a
-nonlinear link or kernel, the two predictions generally differ. Grouping
-columns used only by omitted components may be absent. New fixed-factor
-levels are always rejected. Formula transforms must remain available in
-base/stats or through explicit package namespaces; precompute caller-defined
-transforms as covariate columns. Older fits without design metadata must
-reproduce their stored training matrix before new predictions are allowed.
-Prediction-aware bases such as \code{scale()} and \code{poly()} retain
-their training definitions. Arbitrary expressions such as
-\code{I(x - mean(x))} evaluate their mean on the new batch by R formula
-rules; precompute with training constants when that is not intended.
-
-New kernels use the neighborhoods actually prepared. Larger predicted
-scales cannot recover missing distant landscape cells. The method uses
-stored joint draws, including resamples from corrected fits, and does not
-validate failed fit diagnostics. Nonfinite new predictions cause an error
-without clipping or replacing draws. Large draws-by-observations matrices
-require memory; \code{draws} reduces size at a cost in simulation precision.
+\section{What the intervals include}{
+Intervals describe uncertainty in the expected response or the linear
+predictor. They include uncertainty in the scales, the coefficients, and
+the fitted group effects, and, when new effects are sampled, the variation
+among new groups. They leave out the scatter of a single new observation
+around its mean. Use \code{\link[=simulate.multiScaleR_bayes]{simulate.multiScaleR_bayes()}} for that. Each interval
+is marginal for one observation, not a simultaneous band. \code{mean} and \code{sd}
+summarize a finite set of draws and do not show that the corresponding
+moment exists, so prefer the median and the interval limits for
+long-tailed predictions.
 }
+
+\section{Match new rows to their landscapes}{
+\code{kernel_inputs} supplies the prepared bins for the prediction locations and
+maps. Each prepared location has one unique entry in \code{binned$point_ids},
+and \code{row_id} matches every row of \code{newdata} to one of them. Rows can come
+in any order and can repeat, as for repeated visits to one location. Build
+the inputs with \code{\link[=kernel_prep]{kernel_prep()}} or \code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}, as in
+\code{vignette("v06-year-specific-rasters", package = "multiScaleR")}. Keep the
+fitted kernel, predictor definitions, and projected map units. The
+numerical distance normalizer \code{unit_conv} may differ and is converted
+internally, but that does not convert coordinate systems or physical
+units. Kernel means need bins. Weighted SQ needs matching source and
+metric specifications and the raw cell buffers.
+
+Prediction reuses the fitted reference center and spread, the contrasts,
+and the formula bases. It never standardizes the new rows on their own,
+never learns a new scale reference, and never refits the model or uses
+responses in \code{newdata}. A new kernel uses only the neighborhood you
+prepared, so a predicted scale larger than \code{max_D} cannot draw on cells
+beyond it.
+}
+
+\section{Choose how to treat new groups}{
+\code{vignette("v14-bayesian-prediction", package = "multiScaleR")} compares
+the choices in a table. A few rules matter for every call. An unseen level
+of a fixed year factor, such as \code{factor(year)}, is always an error, under
+every policy. To predict response years you have not surveyed, use a
+random intercept for year or a scientifically justified numeric trend.
+Exchangeable annual effects impose no trend or autocorrelation.
+\code{\link[=predict_scales]{predict_scales()}} can still predict a new year's scale when the response
+formula has fixed year effects. Setting new effects to zero is not
+integration over group variation, and with a nonlinear link or kernel the
+two predictions generally differ. Grouping columns used only by a
+component you leave out with \code{re.form = NA} or \code{scale_re.form = NA} may be
+absent from \code{newdata}.
+}
+
+\section{Predict jointly across rows}{
+Put every row whose joint prediction matters into one call. Within a call,
+all new rows in the same grouping term and level share one new effect for
+each posterior draw. Distinct terms and groups follow the model's
+conditional independence, and the joint posterior dependence among
+parameters is kept. Separate calls draw separate new effects, so do not
+combine independently generated batches to infer joint spatial or annual
+uncertainty or a total. For a total of expected values, set
+\code{summary = FALSE} and sum each row of the matrix with \code{rowSums()}.
+
+The full matrix of draws by observations is built even when
+\code{summary = TRUE}, at 8 bytes per value. When you need only an interval for
+each location of a large map, predict smaller batches and keep their
+summaries, or lower \code{draws} at a cost in simulation precision.
+}
+
+\section{Use formula transformations safely}{
+\code{scale()}, \code{poly()}, \code{splines::ns()}, and \code{splines::bs()} keep their
+training definitions inside ordinary expressions such as \code{I(scale(temp))}
+and in transformed offsets, so single rows, batches, and effect curves use
+the same constants. An expression such as \code{I(x - mean(x))} instead takes
+its mean from the new batch, by ordinary R formula rules. Compute such a
+covariate with training constants before fitting when you need the
+original centering. Transforms must come from base R or stats, or carry an
+explicit package namespace. Custom functions defined only in the fitting
+workspace are not saved with the model, so compute them as covariate
+columns instead. New levels of a fixed factor are always rejected. For
+fits saved without design metadata, the rebuilt formula must reproduce the
+stored training matrix from the original data, or prediction stops. Give
+a namespace prefix to any custom function that reuses a learner name such
+as \code{scale}.
+}
+
+\section{Know what prediction cannot fix}{
+Prediction passes the fitted posterior forward. It does not repair failed
+sampling, an inaccurate approximation, or a misspecified observation
+model, and it does not check the fit's diagnostics, so inspect
+\code{summary(object)$diagnostics} first. Every method uses its stored joint
+draws. For an importance-corrected fit these are resampled candidates, so
+prediction has the finite precision of those resamples rather than a fresh
+weighted integration.
+
+Prediction stops on unmatched IDs, new fixed-factor levels, unavailable
+formula transforms, incompatible kernel inputs, and nonfinite results. It
+never clips scales to the input limits or replaces a problematic draw.
+
+To test predictions, hold out data at the level you intend to predict. A
+held-out visit at a known site and year is easier to predict than a whole
+new site or year, and repeated sites or years are not independent
+validation replicates. \code{\link[=cross_validate_bayes]{cross_validate_bayes()}} refits the model without
+the held-out rows and scores them.
+}
+
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
   package = "multiScaleR"))
@@ -163,17 +229,29 @@ fit <- example$fits$pooled
 fitted_means <- predict(fit, draws = 100)
 head(fitted_means[c("point_id", "median", "lower", "upper")])
 # Expected counts at the fitted rows, including fitted site effects.
-# The draw limit keeps this demonstration short; use all draws for final summaries.
-# simulate() additionally includes observation variation.
-new_surveys <- example$data[1:3, ]
-new_surveys$count <- NULL
+# The draw limit keeps this demonstration short. Use all draws for
+# final summaries.
+
+# New surveys at known site-years reuse their annual maps and group effects
+new_surveys <- example$data[1:3, c("site", "year", "site_year")]
 predict(fit, new_surveys, kernel_inputs = example$inputs,
   row_id = "site_year", draws = 100)
-# These rows reuse known annual maps and group effects for new surveys.
+# simulate() would add the scatter of individual counts.
+
+# A fit with random year intercepts can predict new sites and years
+forecast <- readRDS(system.file("extdata", "bayesian-prediction-example.rds",
+  package = "multiScaleR"))
+future <- predict(forecast$fit, forecast$newdata,
+  kernel_inputs = forecast$kernel_inputs, row_id = "site_year",
+  new_scale_levels = "sample", new_response_levels = "sample",
+  draws = 200, seed = 802)
+future[c("point_id", "median", "lower", "upper", "new_response_level")]
+attr(future, "new_groups")   # the unseen levels and what was done to them
 }
 \seealso{
-\code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
-\code{\link{prediction_contract}},
-\code{\link{predict_scales}}, \code{\link{simulate.multiScaleR_bayes}};
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}, \link[=multiScaleR_bayes-class]{multiScaleR_bayes},
+\code{\link[=posterior_scales]{posterior_scales()}}, \link{prediction_contract}, \code{\link[=predict_scales]{predict_scales()}},
+\code{\link[=simulate.multiScaleR_bayes]{simulate.multiScaleR_bayes()}}, \code{\link[=cross_validate_bayes]{cross_validate_bayes()}},
+\link{multiScaleR-prediction} for prediction across the package;
 \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
 }

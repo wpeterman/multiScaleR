@@ -1,4 +1,5 @@
 test_that("more native response families and spatial covariances retain prediction contracts", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   for (family in c("gaussian", "poisson", "binomial", "nbinom2", "Gamma"))
     for (covariance in c("exp", "gau", "mat")) {

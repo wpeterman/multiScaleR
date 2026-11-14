@@ -10,44 +10,57 @@ grouped_cv_folds(group, k = 5, ids = NULL)
 \method{print}{multiScaleR_folds}(x, ...)
 }
 \arguments{
-\item{group}{Vector of sampling-group labels, one per row. Animals, sites or
-matched choice sets can define groups. Missing or empty labels are rejected.}
+\item{group}{Vector of sampling-group labels, one per row, such as site,
+animal, year, or choice-set IDs. Missing or empty labels are rejected.}
 
 \item{k}{Number of folds, at least two and no greater than the number of
-indivisible groups. The default is five.}
+groups. The default is five.}
 
-\item{ids}{Unique character row IDs, in the order of \code{group}. Defaults
-to its names, or character row numbers when it is unnamed. Named groups
+\item{ids}{Unique character row IDs, in the order of \code{group}. Use the row
+names of the modeling data. The default uses the names of \code{group}, or the
+row numbers as character strings when \code{group} is unnamed. Named groups
 must align exactly with supplied IDs.}
 
-\item{x}{A \code{multiScaleR_folds} object.}
+\item{x}{A \code{multiScaleR_folds} object, for \code{print()}.}
 
-\item{...}{Reserved for future print controls.}
+\item{...}{Not used. Reserved for future print controls.}
 }
 \value{
-A named list of class \code{multiScaleR_folds}. Each element contains
-disjoint character vectors \code{analysis} and \code{assessment}, accepted
-by \code{\link{cross_validate}}. Every row is assessed once. Attribute
-\code{fold_info} records the method, row/unit assignments and exclusions.
+A named list of class \code{multiScaleR_folds} with one element per fold
+(\code{fold1}, \code{fold2}, and so on), ready for \code{\link[=cross_validate]{cross_validate()}} and the other
+cross-validation functions. Each element holds two character vectors of
+row IDs, \code{analysis} (rows used to fit) and \code{assessment} (rows held out).
+Every row is assessed exactly once. The attribute \code{fold_info} holds the
+\code{method} (\code{"grouped"}), \code{k}, an \code{assignment} data frame with the \code{row_id},
+\code{group}, \code{unit}, and assessment \code{fold} of every row, and \code{excluded}, the
+IDs left out of each fold's training rows (none for grouped folds).
+\code{print()} shows the number of analysis, assessment, and excluded rows in
+each fold, and returns \code{x} invisibly.
 }
 \description{
-Keep all rows from a sampling group in the same assessment fold. Whole
-groups are assigned to balance row counts, largest groups first.
+Keep all rows from a sampling group in the same assessment fold, so that a
+held-out row is never predicted with help from its own group. Whole groups
+are assigned to folds to balance the row counts, largest groups first.
 }
 \details{
 Assignment is deterministic and does not use the random-number
-generator. Equal-size groups are ordered by their labels. Balancing counts
-does not stratify responses. Choose sampling groups and the validation
-target before examining assessment outcomes. Fold construction does not
-qualify a model class for scoring; matched-set survival/amt scoring still
-requires a separate adapter.
+generator, so the same call always gives the same folds. Groups of equal
+size are ordered by their labels. Balancing row counts does not stratify
+the responses. Choose the sampling groups and the prediction question
+before you look at any scores. To keep groups together within spatial
+blocks, pass them as \code{group} to \code{\link[=spatial_cv_folds]{spatial_cv_folds()}}. Building folds does
+not decide which models can be scored. For matched choice sets, score
+the folds with \code{\link[=cross_validate_clogit]{cross_validate_clogit()}}.
+\code{vignette("v08-cross-validation", package = "multiScaleR")} compares
+grouped, spatial, and random fold designs.
 }
 \examples{
+# Twelve records from six sites, two visits each
 ids <- paste0("row", 1:12)
 folds <- grouped_cv_folds(rep(letters[1:6], each = 2), k = 3, ids = ids)
-folds
+folds                    # rows fitted and held out in each fold
+folds$fold1$assessment   # both visits to a site are held out together
 }
 \seealso{
-\code{\link{spatial_cv_folds}}, \code{\link{cross_validate}},
-\code{\link{cv_tab}}
+\code{\link[=spatial_cv_folds]{spatial_cv_folds()}}, \code{\link[=cross_validate]{cross_validate()}}, \code{\link[=cv_tab]{cv_tab()}}
 }

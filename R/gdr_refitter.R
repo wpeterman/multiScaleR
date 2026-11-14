@@ -126,190 +126,243 @@
   path
 }
 
-#' Create an audited native refitter for combined distance-removal models
+#' Create an Audited Refit Function for Distance-Removal Models
 #'
-#' @description Retain a small declared set of coefficient starts while
-#'   refitting a GDR model during ecological-scale optimization. The C engine
-#'   omits intermediate coefficient Hessians. The TMB engine retains native
-#'   joint covariance checks; both engines return an actual native fitted model.
-#' @param model An original \code{unmarkedFitGDR} fitted with the native C or
-#'   TMB engine in unmarked 1.5.2 (TMB 1.9.25 for TMB fits). Data, formulas,
-#'   coefficient identities, actual integration cutoff and evaluated optimizer
-#'   settings must remain available. Active offsets, TMB ZIP and stochastic
-#'   optimizer controls remain unsupported. No engine is switched silently.
-#' @param cold_starts A nonempty named list of finite numeric vectors on the
-#'   native link scales. For C models, every vector must have exactly the unique
-#'   names in \code{unmarked::coef(model)} and is matched by name. For TMB models,
-#'   supply unnamed constructor-order vectors from \code{gdr_start_values(model)$starts},
-#'   including every estimated log-SD and excluding latent modes. Alternatively,
-#'   name each TMB coordinate as \code{block[within_block]}, using that snapshot's
-#'   map (for example, \code{beta_lambda[1]} or \code{lsigma_lambda[1]}).
-#'   Named TMB vectors are matched by those unique names. Provide independent
-#'   starts distinct from the fitted coordinates. These are neither ecological
-#'   kernel scales nor the native integration cutoff K.
-#' @param audit_dir A new directory, or an existing empty directory, for compact
-#'   audit records. Each refit writes atomic request, validated-input, attempt
-#'   and summary RDS files with all attempted starts and diagnostics. An attempt
-#'   request is written before entering the native constructor; an interrupted
-#'   request is retained without inventing a completion. Raw input data, models and likelihood environments
-#'   are hashed in memory or omitted; they are not checkpointed. Keep this
-#'   directory to inspect failures, including scalar objective failures.
-#' @param provenance Optional named list of caller-supplied source, data or
-#'   archive identities. Use simple atomic values and lists. This information
-#'   supplements the automatically recorded input and provider fingerprints.
-#' @param tmb_settings For a TMB model, an explicit named list containing
-#'   \code{method}, \code{se}, \code{threads} and \code{control}. Use a supported
-#'   deterministic \code{optim()} method (\code{"BFGS"}, \code{"Nelder-Mead"},
-#'   \code{"CG"} or \code{"L-BFGS-B"}), a scalar logical final SE request, \code{threads = 1}
-#'   and a named list of finite numeric controls with positive integer
-#'   \code{maxit}. Declare the intended evaluated settings; they cannot be
-#'   recovered reliably from a saved TMB call. Optional \code{lower}/\code{upper}
-#'   bounds require L-BFGS-B and use scalar or native fitted-optimizer order,
-#'   which can differ from constructor-start order. Leave \code{NULL} for C models,
-#'   whose original evaluated settings are recovered automatically.
-#'   Optional \code{random.start} is \code{"cached_best"} (the unchanged native
-#'   default) or \code{"zero"}. Optional \code{inner.control} explicitly supplies
-#'   positive \code{maxit}, \code{tol}, \code{grad.tol} and \code{step.tol} for
-#'   native conditional-mode Newton iterations. These numerical policies are
-#'   bound to the audit contract; they do not change priors or prove a rescue.
-#'   Optional \code{record_memory = TRUE} requires \pkg{ps} and records process
-#'   memory at phase boundaries; its default is \code{FALSE}.
-#' @return A function accepting \code{model}, \code{data} and \code{context},
-#'   suitable for \code{refit_fn} in \code{\link{multiScale_optim}}. It returns
-#'   one native fitted model with a compact \code{msr_gdr_refit_audit} attribute.
-#'   Failed calls raise a condition carrying their audit record and its path.
-#'   The audit adds `contract_sha256`, identifying the original `contract.rds`,
-#'   and `input_context_sha256`, binding the actual input data/design hashes and
-#'   authorized spatial columns to that contract. Attempt records retain these
-#'   identities, their request/completion paths and the native optimizer's
-#'   `par`, `value`, `counts`, `convergence` and `message` when supplied. Values
-#'   stay on native link scales; failed/nonfinite diagnostics remain visible.
-#'   Each TMB attempt also identifies an `optimizer_point_file`, written before
-#'   covariance computation. Its `msr_gdr_optimizer_point` packet contains native
-#'   fixed optimizer positions, repeated display labels, data/layout hashes,
-#'   finite-cutoff value and storage type, declared policy and phase records.
-#'   It is always inference-ineligible and contains no fitted S4 object, latent
-#'   states or covariance. A completed point survives a later covariance error;
-#'   it does not provide coefficient SEs or permission to resume inference.
+#' Build a refit function for `multiScale_optim(refit_fn = ...)` that refits
+#' an `unmarked` distance-removal (GDR) model at each candidate scale of effect
+#' from its original estimates and from extra starting values you declare. It
+#' keeps the best clean fit and writes a record of every attempt to an audit
+#' directory. A distance-removal likelihood can have more than one local
+#' optimum, and several starts make it less likely that a poor optimum is
+#' accepted unnoticed.
+#'
+#' @param model The starting model. One of:
+#'   * an `unmarkedFitGDR` fitted by `unmarked::gdistremoval()` with
+#'     `engine = "C"`;
+#'   * an `unmarkedFitGDR` fitted with `engine = "TMB"`, including models with
+#'     random intercepts;
+#'   * an [unmarkedFitGDRField][unmarkedFitGDRField-class] from
+#'     [fit_gdr_response_field()].
+#'
+#'   The refit function is tied to this model. It reuses the model's data,
+#'   formulas, cutoff `K`, mixture, distance function, output units and
+#'   optimizer settings, and it never switches engine. The model needs
+#'   `unmarked` 1.5.2, plus `TMB` 1.9.25 for the TMB engine. Formulas with
+#'   `offset()` terms and zero-inflated TMB models (`mixture = "ZIP"` with
+#'   `engine = "TMB"`) are not supported.
+#' @param cold_starts Named list of one or more extra starting vectors on the
+#'   link scales of the model, for example `list(cold = cold)`. For a C-engine
+#'   model, name each vector exactly like `unmarked::coef(model)`, such as
+#'   `"lambda(Int)"` and `"dist(Int)"`. For a TMB-engine or field model, supply
+#'   one value for every fixed coefficient and log SD, either unnamed in the
+#'   order of `gdr_start_values(model)$starts`, or named by parameter block and
+#'   position, such as `"beta_lambda[1]"` or `"lsigma_lambda[1]"`. Random
+#'   effects are not included. Each vector must differ from the model's
+#'   estimates and from the other vectors, and the names `"original"` and
+#'   `"final"` are reserved. These values are model coefficients, not kernel
+#'   scales of effect and not the cutoff `K`.
+#' @param audit_dir Character string naming the directory for audit records.
+#'   It must be new or empty, and it is created if needed. (For a field model,
+#'   an existing directory with records is also accepted.) Keep it, because the
+#'   records are the only trace of failed attempts. See "Read the audit
+#'   directory".
+#' @param provenance Optional named list of your own identifiers, such as a
+#'   data source, a script version or an archive DOI. Use simple values: atomic
+#'   vectors of at most 64 elements, or nested lists of them, with at most
+#'   64 KiB in total. It is copied into every record as supplied and is not
+#'   checked.
+#' @param tmb_settings For a TMB-engine or field model, a named list of the
+#'   optimizer settings to use for every refit. Leave it `NULL` (the default)
+#'   for a C-engine model, whose settings are read from the fitted model.
+#'   Required elements:
+#'   * `method`: one of `"BFGS"`, `"Nelder-Mead"`, `"CG"` or `"L-BFGS-B"`.
+#'   * `se`: logical. Whether the final refit of each call computes standard
+#'     errors.
+#'   * `threads`: must be 1.
+#'   * `control`: named list of finite numeric `optim()` controls with a
+#'     positive integer `maxit`, such as
+#'     `list(maxit = 2000L, reltol = 1e-10)`.
+#'
+#'   Optional elements:
+#'   * `lower`, `upper`: parameter bounds for `method = "L-BFGS-B"`, either one
+#'     number or one value per coordinate in the fitted optimizer order
+#'     (`names(gdr_start_values(model)$fitted_values)`), which can differ from
+#'     the start order.
+#'   * `random.start`: how TMB starts each search for the random-effect values.
+#'     `"cached_best"` (the TMB default) starts from the best values found so
+#'     far. `"zero"` starts from zero.
+#'   * `inner.control`: a list with positive `maxit`, `tol`, `grad.tol` and
+#'     `step.tol` for that inner search.
+#'   * `record_memory`: `TRUE` records the memory used by the R process at each
+#'     phase of a fit. It requires the `ps` package. The default is `FALSE`.
+#'
+#'   For a field model, pass the identical list used in
+#'   [fit_gdr_response_field()].
+#' @return A function with arguments `model`, `data` and `context`, for the
+#'   `refit_fn` argument of [multiScale_optim()]. The optimizer calls it with
+#'   the starting model, a copy of its frame in which the kernel-weighted
+#'   covariates have new values, and a context whose `covs` element names
+#'   those columns. Each call returns one fitted model of the same class as
+#'   `model`, with an attribute `msr_gdr_refit_audit` that summarizes the call:
+#'   * `status`: `"returned"` for a successful call.
+#'   * `attempts`: one record per start (`"original"`, each cold start, and
+#'     `"final"`), each with the `start`, `converged`, the `logLik`,
+#'     `coefficients` on the link scale, `warnings`, any `error`, the
+#'     `covariance` status, whether it was `eligible`, and the optimizer
+#'     output (`par`, `value`, `counts`, `convergence`, `message`). TMB
+#'     attempts add `marginal_score` (largest absolute gradient, its 0.001
+#'     threshold and whether it passed) and `optimizer_point_file`.
+#'   * `selected`: the index of the start with the highest log-likelihood.
+#'   * `objective_only`: `TRUE` when the call skipped the final refit.
+#'   * `contract_sha256` and `input_context_sha256`: fingerprints that tie the
+#'     call to `contract.rds` and to the inputs it received. `path` is the
+#'     summary record.
+#'
+#'   A field model returns the record described in [fit_gdr_response_field()]
+#'   instead. A failed call stops with an error of class
+#'   `msr_gdr_refit_error`, whose `audit` and `audit_file` elements hold the
+#'   record and its path.
 #' @details
-#' The factory binds to the supplied original model. The callback permits only
-#' updates to static spatial columns named by \code{context$covs}. All other
-#' native frame fields and nonspatial columns remain fixed. Native engine,
-#' actual cutoff K, mixture, distance key, density units, formulas, method,
-#' threads and optimizer controls are bound to evaluated settings rather than
-#' re-evaluating the original call's potentially changed variables. C bounds
-#' retain their existing contract. TMB settings are supplied explicitly because
-#' the native saved objective does not retain the original evaluated controls.
-#' The unmarked 1.5.2 TMB constructor does not forward its optimizer extras;
-#' this adapter forwards the declared controls through a local fitting helper
-#' without changing the installed provider or its namespace. Native data,
-#' random-effect preparation, compiled likelihood and S4 construction are used.
-#' Every TMB attempt creates a fresh tape with zero incoming latent coordinates.
-#' Fixed parameters and log-SDs use the declared original/cold starts. Native
-#' \code{sdreport()} is evaluated explicitly at the returned optimizer coordinates
-#' so that estimates, covariance and optimizer metadata describe the same point.
+#' # How each refit works
 #'
-#' Returned native calls retain the declared controls without capturing the
-#' temporary constructor environment. Use this callback for audited refits;
-#' ordinary \code{unmarked::update()} retains the provider's TMB control handling.
+#' At every call the function fits the model from its original estimates
+#' (the start named `"original"`) and from each cold start, then keeps the
+#' start with the highest finite log-likelihood. That start must be eligible:
+#' converged (code 0) with no warnings and, for TMB models, usable covariance
+#' and a largest absolute gradient below 0.001. If it is not eligible, the
+#' call fails rather than returning a lower-likelihood fit in its place.
 #'
-#' Every call compares the original fitted coefficients with every declared
-#' cold start. It retains errors, warnings, native convergence, likelihood,
-#' available gradients, coefficient identities and uncertainty status. Only
-#' one winning model is retained. The highest finite likelihood must come from
-#' a warning-free converged fit. A better but unusable attempt causes an explicit
-#' failure rather than an inferior fit being labeled the winner.
+#' When [multiScale_optim()] needs the fitted model rather than only its
+#' likelihood, a final fit starts from the selected coefficients with the
+#' original standard-error request. It must also be eligible and may lose no
+#' more than 1e-5 log-likelihood units. C-engine intermediate fits skip
+#' coefficient Hessians, which saves time.
 #'
-#' When \code{context$return_model = FALSE}, C coefficient Hessians are omitted.
-#' TMB still computes native \code{sdreport()} for every attempt, including
-#' \code{se = FALSE}; this is not a faster likelihood-only TMB interface. TMB
-#' eligibility also requires finite scores, positive-definite fixed covariance
-#' and, when latent effects are present, positive-definite full joint precision.
-#' These checks retain cross-component covariance. Unusable covariance remains
-#' a failure even when the final SE request is false. Final calls polish the
-#' selected coordinates using the original C or explicitly declared TMB SE request.
-#' A final likelihood loss greater than \code{1e-5}, inconsistent parameter
-#' count, or unusable requested native covariance fails with its audit retained.
-#' Kernel-conditional coefficient SEs do not include uncertainty in estimated
-#' spatial scales. This helper does not add Bayesian priors, bootstrap intervals
-#' or a guarantee that unvisited likelihood modes have been found.
-#' An explicitly supplied optimizer iteration budget must be positive;
-#' a zero-iteration evaluation is not accepted as a converged refit.
+#' Only the columns named in `context$covs` may change between calls, and
+#' only static site covariates qualify. A covariate whose name also appears in
+#' the yearly or observation covariates is rejected, so give it a distinct
+#' name.
+#' Changes to the counts, the other covariates, the survey protocol or the
+#' row order stop the call.
 #'
-#' Audit input fingerprints use SHA256 in memory through digest. The records
-#' contain coefficient vectors and summaries, not candidate-model arrays.
-#' The contract retains original data and evaluated-design fingerprints,
-#' numeric constructor-coordinate metadata and the original optimizer summary.
-#' Its SHA256 covers the entire contract before its own fingerprint is added,
-#' including evaluated settings and native provider identity. This is stronger
-#' than the coordinate-only fingerprint from `gdr_start_values()`. Caller
-#' provenance is recorded as supplied; it is not independently verified.
-#' Input-design fingerprints identify the actual permitted spatial update.
-#' None of these records restores an executable objective or evaluates a new
-#' coefficient score. Existing fitting, curvature and uncertainty gates still
-#' apply, and no Hessians, raw data or design matrices are checkpointed.
-#' Restored callbacks verify their adapter and native function identities.
-#' Native R and DLL files are hashed once again in each new worker process;
-#' a changed provider fails before fitting and leaves an audit record.
-#' Identified native GDR response-field models retain their fixed exponential
-#' correlation, frozen component designs and full joint covariance through this
-#' callback. Supply the same explicit tmb_settings used by fit_gdr_response_field().
-#' Ordinary iid update, field simulation, profile and spatial-CV routes remain
-#' guarded; the private RTMB fitting admission is unchanged.
+#' Each TMB attempt builds a new TMB objective and starts its random effects
+#' at zero. It always runs `TMB::sdreport()`, even with `se = FALSE`, so TMB
+#' refits are not faster without standard errors. Usable covariance requires
+#' a positive-definite Hessian, fixed covariance and joint precision. The
+#' random effects must sit at a mode with positive-definite curvature and a
+#' largest gradient and Newton decrement below 0.001. The objective,
+#' recomputed at the optimizer's coordinates, must also agree with the
+#' reported value within 1e-7. These are local checks. They
+#' do not show that the mode is unique or that TMB's Laplace approximation is
+#' accurate.
 #'
-#' The native integration cutoff K is distinct from the K column in information
-#' criterion tables, which counts fitted parameters. Reusing one cutoff does
-#' not replace a separate cutoff-sensitivity analysis.
+#' # Declare TMB settings
 #'
-#' Native TMB refits also require a finite marginal score at every returned
-#' optimizer coordinate with maximum absolute value below 1e-3, matching the
-#' field fitting route. Each attempt records `marginal_score` with its maximum,
-#' threshold and eligibility. A convergence code or positive covariance cannot
-#' replace this score check. C-engine score handling remains unchanged.
+#' A C-engine fit keeps the optimizer settings it used, so they are read
+#' automatically. A TMB fit in `unmarked` 1.5.2 does not keep them, and its
+#' constructor does not pass optimizer controls through. Declare them in
+#' `tmb_settings` instead. The refit function passes them to `optim()`
+#' directly, without changing `unmarked`. A typical list is:
 #'
-#' TMB diagnostics evaluate the direct joint gradient and current latent
-#' precision at the retained complete mode. They record its maximum latent
-#' gradient and precision-scaled Newton decrement, each required below 1e-3,
-#' and align the covariance's random coordinates with that mode. The returned
-#' marginal value must also agree within 1e-7. These are local consistency checks,
-#' not evidence of a unique/global mode or accurate high-dimensional integration.
-#' A zero inner start or tighter tolerances may reach another numerical branch;
-#' retain every failure and qualify each policy independently. No automatic
-#' policy rescue, population-prior change or uncertainty adjustment is applied.
+#' ```
+#' list(method = "BFGS", se = TRUE, threads = 1L,
+#'      control = list(maxit = 2500L, reltol = 1e-10))
+#' ```
 #'
-#' Attempt records separate native constructor preparation from TMB tape
-#' construction, outer optimization, returned-value checking, covariance and
-#' diagnostic qualification. Elapsed times include the declared observer work.
-#' With `record_memory = TRUE`, `ps` supplies whole-process RSS and lifetime
-#' maximum RSS in bytes at phase boundaries. These include other objects loaded
-#' in that R process. They are not isolated tape costs, phase-specific maxima or
-#' operating-system memory caps. An unavailable observation retains its reason.
-#' Ordinary unmarked constructor replay does not forward these policies in the
-#' qualified provider; use this audited refitter to retain the declared controls.
-#' Returned native models still retain full native coefficient/latent uncertainty
-#' conditional on ecological scales. The numeric point does not replace them.
-#' @seealso \code{\link{multiScale_optim}}, \code{\link{validate_unmarked_data}},
-#'   \code{\link{aic_tab}}
+#' `random.start` and `inner.control` change how TMB searches for the random
+#' effects. A different setting can reach a different numerical solution, so
+#' treat a change as a new analysis and check its results. No setting is
+#' changed automatically after a failure. With `record_memory = TRUE`, each
+#' phase record stores the resident memory of the whole R process and its
+#' lifetime peak, in bytes. These numbers include everything else loaded in
+#' the session, so they are not the memory used by one phase.
+#'
+#' # Read the audit directory
+#'
+#' | File | Written | Contents |
+#' |:---|:---|:---|
+#' | `contract.rds` | When the refit function is created | Fingerprints of the original data and design, the settings, the starts, the original coefficients and optimizer summary, and the identity of `unmarked`, TMB and `multiScaleR`, with a SHA-256 of the whole contract |
+#' | `refit-*-request.rds` | At the start of each call | The call's opening record |
+#' | `refit-*-input.rds` | After the inputs pass their checks | Fingerprints of the new data and the changed columns |
+#' | `refit-*-attempt-*-request.rds` | Before each start enters `unmarked` | The start and its name |
+#' | `refit-*-attempt-*-point.rds` | TMB only, after optimization and before covariance | The optimizer result |
+#' | `refit-*-attempt-*.rds` | After each start | The completed attempt record |
+#' | `refit-*.rds` | At the end of each call | The summary, also attached to the returned model |
+#'
+#' A request without a matching completed record documents an attempt that
+#' never finished, for example after an interruption. Keep it. Records contain
+#' numbers, settings and SHA-256 fingerprints. They contain no raw data,
+#' design matrices, Hessians or fitted models, so they stay small.
+#'
+#' The optimizer point file (class `msr_gdr_optimizer_point`) is written
+#' before the covariance step, so a later covariance failure still leaves
+#' evidence that the optimization finished. It holds the optimizer's `par`,
+#' `value`, `counts`, `convergence` and `message`, the coordinate labels, data
+#' and layout fingerprints, the cutoff `K`, the declared settings and the
+#' elapsed time of each phase. It is always marked
+#' `inference_eligible = FALSE`. It is not a fitted model, it gives no
+#' standard errors, and a fit cannot be resumed from it.
+#'
+#' At each call the refit function also confirms that `unmarked`, TMB and
+#' this function's own code have not changed since it was created. A change,
+#' including a different installation in a new worker process, stops the call
+#' before fitting.
+#'
+#' # Refit a response field
+#'
+#' For a model from [fit_gdr_response_field()], each call refits the field
+#' with all of that function's checks, with the range held fixed. Use the
+#' same `cold_starts` and the identical `tmb_settings`, and run
+#' [multiScale_optim()] with `n_cores = 1`. The ordinary `update()` method
+#' stops for field models, so this refit function is the way to refit one.
+#'
+#' # What the checks do not establish
+#'
+#' Coefficient standard errors from the returned model treat the selected
+#' scales of effect as known. The function adds no priors, bootstrap
+#' intervals or kernel-scale uncertainty. Agreement among the declared starts
+#' does not guarantee that a better optimum does not exist elsewhere.
+#'
+#' The cutoff `K` (the largest abundance the likelihood considers at a point)
+#' is unrelated to the `K` column of [aic_tab()], which counts parameters.
+#' Reusing one cutoff does not replace a check that results are insensitive to
+#' it.
+#'
+#' See the "Refit from several starting values" section of
+#' `vignette("v12-distance-removal", package = "multiScaleR")` for a worked
+#' example.
+#' @seealso [multiScale_optim()], [gdr_start_values()],
+#'   [fit_gdr_response_field()], [validate_unmarked_data()], [aic_tab()]
 #' @examples
 #' if (as.character(utils::packageVersion("unmarked")) == "1.5.2") {
+#'   # Five point counts: birds by distance band and by time interval
 #'   yd <- rbind(c(0, 0), c(1, 0), c(0, 2), c(2, 1), c(0, 0))
 #'   yr <- rbind(c(0, 0, 0), c(0, 1, 0), c(1, 0, 1), c(1, 1, 1), c(0, 0, 0))
 #'   frame <- unmarked::unmarkedFrameGDR(yd, yr, dist.breaks = c(0, 25, 75),
 #'     unitsIn = "m", period.lengths = c(1, 2, 1),
 #'     siteCovs = data.frame(hab = seq(-1, 1, length.out = 5)))
-#'   # Fit the original model before declaring independent refit starts.
+#'   # Fit the starting model (C engine) before declaring extra starts
 #'   model <- unmarked::gdistremoval(lambdaformula = ~hab, data = frame,
 #'     output = "abund", K = 40, se = FALSE, engine = "C",
 #'     starts = c(log(8), 0, log(40), qlogis(0.3)), control = list(maxit = 2000))
+#'   # One extra start, named like the model coefficients (link scales)
 #'   cold <- unmarked::coef(model)
 #'   cold[] <- 0
 #'   cold["dist(Int)"] <- log(30)
-#'   callback <- make_gdr_refitter(model, list(cold = cold),
-#'     audit_dir = tempfile("msr-gdr-audit-"))
-#'   is.function(callback)
-#'   # Supply callback as refit_fn in multiScale_optim().
+#'   audit_dir <- tempfile("msr-gdr-audit-")
+#'   refit <- make_gdr_refitter(model, list(cold = cold), audit_dir = audit_dir)
+#'
+#'   # multiScale_optim() calls refit() at each candidate scale. Calling it
+#'   # once here, on the original data, shows what each call records.
+#'   fit <- refit(model, frame, context = list(covs = "hab"))
+#'   audit <- attr(fit, "msr_gdr_refit_audit")
+#'   # Log-likelihood and eligibility of each start, then the selected start
+#'   print(sapply(audit$attempts, function(a)
+#'     c(logLik = a$logLik, eligible = a$eligible)))
+#'   print(audit$attempts[[audit$selected]]$name)
+#'   # contract.rds, plus request, input, attempt and summary records
+#'   print(list.files(audit_dir))
 #' }
-#' @md
 #' @export
 make_gdr_refitter <- function(model, cold_starts, audit_dir, provenance = list(),
                               tmb_settings = NULL) {

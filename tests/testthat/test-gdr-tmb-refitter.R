@@ -1,4 +1,5 @@
 test_that("native TMB refitters retain actual fits, start order, counts and joint covariance", {
+  skip_on_cran()
   for (kind in c("P", "NB", "mixed")) {
     f <- gdr_tmb_refit_fixture(kind)
     expect_identical(as.integer(f$model@opt$convergence), 0L, info = kind)

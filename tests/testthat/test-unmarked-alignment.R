@@ -158,6 +158,7 @@ test_that("site covariates must contain the optimized unmarked predictor", {
 })
 
 test_that("multiScale_optim completes an open-population unmarked workflow", {
+  skip_on_cran()
   fix <- make_unmarked_fixture()
   set.seed(2)
   y <- matrix(stats::rpois(90, 3), nrow = 15)

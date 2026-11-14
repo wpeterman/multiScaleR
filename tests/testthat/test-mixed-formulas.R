@@ -28,6 +28,7 @@ mixed_formula_fixture <- function(family = "poisson", weighted = FALSE,
 }
 
 test_that("mixed products retain native likelihood values and AD gradients", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB"); skip_if_not_installed("RTMB")
   cases <- list(list(family = "poisson"), list(family = "nbinom2"),
     list(weighted = TRUE), list(weighted = TRUE, kernel = "exp"))
@@ -58,6 +59,7 @@ test_that("mixed products retain native likelihood values and AD gradients", {
 })
 
 test_that("mixed factor products retain all cold starts and native uncertainty boundaries", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB"); skip_if_not_installed("RTMB")
   f <- mixed_formula_fixture()
   starts <- matrix(c(.1, .23, .5), ncol = 1)
@@ -99,6 +101,7 @@ test_that("mixed factor products retain all cold starts and native uncertainty b
 })
 
 test_that("weighted mixed products retain native predictions and fixed-input snapshots", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB"); skip_if_not_installed("RTMB")
   f <- mixed_formula_fixture(weighted = TRUE)
   fit <- multiScale_optim(f$model, f$inputs, backend = "joint_mixed", n_cores = 1,
@@ -113,6 +116,7 @@ test_that("weighted mixed products retain native predictions and fixed-input sna
 })
 
 test_that("expanded mixed designs keep target and additional-memory guards", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB"); skip_if_not_installed("RTMB")
   f <- mixed_formula_fixture()
   args <- .msr_native_mixed_design(f$model, f$engine, "habitat", f$par, rownames(f$data))

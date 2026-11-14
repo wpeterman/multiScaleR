@@ -26,6 +26,7 @@ test_that("optimizer checkpoints retain native diagnostics without executable ob
 })
 
 test_that("native C refit checkpoints bind each attempt to its data and settings", {
+  skip_on_cran()
   for (mixture in c("P", "NB", "ZIP")) {
     fixture <- gdr_refit_fixture(mixture)
     before <- gdr_guard_state(fixture$model)

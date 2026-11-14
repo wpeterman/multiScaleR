@@ -15,6 +15,7 @@ running_profile_glm <- function() {
 }
 
 test_that("profile_sigma() defaults work on a profile_glm fit", {
+  skip_on_cran()
   fit <- running_profile_glm()
   prof <- profile_sigma(fit, verbose = FALSE)
   expect_s3_class(prof, "sigma_profile")
@@ -47,6 +48,7 @@ test_that("profile_sigma() defaults work on a profile_glm fit", {
 })
 
 test_that("the default refit grid also keeps exact endpoints", {
+  skip_on_cran()
   land <- terra::rast(system.file("extdata", "landscape.tif", package = "multiScaleR"))
   inputs <- kernel_prep(pts = surv_pts, raster_stack = land, max_D = 1700,
                         kernel = "gaussian", verbose = FALSE)
@@ -58,6 +60,7 @@ test_that("the default refit grid also keeps exact endpoints", {
 })
 
 test_that("profile_sigma() profiles a conditional_logit fit with native refits", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   fx <- ssf_fixture()
   coxph <- survival::coxph; Surv <- survival::Surv; strata <- survival::strata
@@ -96,6 +99,7 @@ test_that("profile_sigma() profiles a conditional_logit fit with native refits",
 })
 
 test_that("summary(profile = TRUE) on a conditional_logit fit stops with one clear message", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   fx <- ssf_fixture()
   coxph <- survival::coxph; Surv <- survival::Surv; strata <- survival::strata

@@ -1,4 +1,5 @@
 test_that("large-SD AD coordinates retain full native nuisance gradients and Hessians", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   maximum <- c(value = 0, gradient = 0, hessian = 0)
   for (kernel in c("gaussian", "exp"))

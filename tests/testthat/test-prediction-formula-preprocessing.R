@@ -133,6 +133,7 @@ prediction_formula_reference <- function(s, p, training, d, inputs) {
 }
 
 test_that("Bayesian and private likelihood predictions reuse all trained formula components", {
+  skip_on_cran()
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- prediction_formula_fixture(kernel = kernel)
     f$data$region <- factor(rep(c("a", "b"), 6))

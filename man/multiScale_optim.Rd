@@ -2,7 +2,7 @@
 % Please edit documentation in R/multiScale_optim.R
 \name{multiScale_optim}
 \alias{multiScale_optim}
-\title{Multiscale optimization}
+\title{Estimate scales of effect by maximum likelihood}
 \usage{
 multiScale_optim(
   fitted_mod,
@@ -26,678 +26,319 @@ multiScale_optim(
 }
 \arguments{
 \item{fitted_mod}{A fitted model object whose covariates include the
-kernel-weighted variables defined in \code{kernel_inputs}. Supported
-classes include \code{lm}, \code{glm}, \code{gls} (nlme), and
-\code{unmarkedFit} (unmarked). Many other model classes are also supported
-via \code{stats::update()} or a custom \code{refit_fn}. A predictor cannot
-be named \code{"x"}, which is reserved for internal coordinate data.}
+kernel-weighted variables defined in \code{kernel_inputs}. Supported classes
+include \code{lm}, \code{glm}, \code{gls} (nlme), and \code{unmarkedFit} (unmarked). Many
+other model classes also work through \code{stats::update()} or a custom
+\code{refit_fn}. A predictor cannot be named \code{"x"}, which is reserved for
+internal coordinate data.}
 
 \item{kernel_inputs}{A list of class \code{"multiScaleR_data"} created by
-\code{\link{kernel_prep}}. Must contain elements \code{raw_cov},
-\code{d_list}, \code{min_D}, \code{max_D}, \code{unit_conv}, and
-\code{kernel}.}
+\code{\link[=kernel_prep]{kernel_prep()}}. It must contain the elements \code{raw_cov}, \code{d_list}, \code{min_D},
+\code{max_D}, \code{unit_conv}, and \code{kernel}. See \link[=multiScaleR_data-class]{multiScaleR_data}.}
 
-\item{join_by}{Default: \code{NULL}. For \code{unmarked} models, a data
-frame with one unique key row per spatial site in \code{kernel_inputs},
-in the same order as those sites. Its named key columns must also occur in
-the fitted model's \code{siteCovs}. Use it when model rows repeat sites,
-such as one row per site and year. See Details.}
+\item{join_by}{Default: \code{NULL}. For \code{unmarked} models whose rows repeat
+sites (for example one row per site and year), a data frame with one
+unique key row per spatial site in \code{kernel_inputs}, in the same order as
+those sites. Its named key columns must also occur in the fitted model's
+\code{siteCovs}. See "Fit unmarked models with repeated sites" below.}
 
-\item{par}{Optional numeric vector of starting values for the optimizer.
-Values must be divided by \code{max_D} to match the internal scaled
-parameter space. Length must equal the number of optimized covariates
-(or twice that for \code{kernel = "expow"}, where shape parameters follow
-sigma parameters). Default: \code{NULL}; starting values are chosen
-automatically.
-The expow native-refit interface retains one shape position per optimized
-variable, including hard radii. A hard radius ignores that position;
-provide a finite positive placeholder when supplying \code{par}.}
+\item{par}{Optional numeric vector of starting values. Default: \code{NULL},
+which chooses starts automatically (see \code{start_strategy}). For the refit
+backend, divide each starting sigma by \code{max_D} to match the internal scaled
+parameter space. For the analytic backends, give scales in internal
+distance units (map distance divided by \code{unit_conv}), as for the rows of
+\code{profile_control$starts}. The length must equal the number of optimized
+covariates, or twice that for \code{kernel = "expow"}, where the shape values
+follow the sigma values. The \code{"expow"} layout keeps one shape position per
+optimized covariate, including hard radii, which ignore it; give a finite
+positive placeholder there.}
 
 \item{start_strategy}{Character. How to choose starting values when
-\code{par = NULL}: \code{"single"} uses one shared default start, while
-\code{"screen"} performs a low-cost prescreen of sigma values and short
-screening optimizations before launching one full optimization. The
-default, \code{NULL}, uses \code{"screen"} when \code{kernel_inputs} was
-prepared with \code{kernel = "fixed"} and the backend is \code{"refit"}
-without a \code{radius_grid}, and \code{"single"} otherwise. Under a
-fixed kernel every optimized scale is a hard radius, and the gradient
-search cannot leave a single start on that stepped likelihood.
-A refit search that returns its starting values gives a warning and
-records \code{start_stall} in \code{\link{diagnostics}}.}
+\code{par = NULL}. \code{"single"} uses one shared default start. \code{"screen"} runs a
+cheap prescreen of sigma values and a few short searches before the one
+full search (see "Choose starting values" below). The default, \code{NULL},
+uses \code{"screen"} when \code{kernel_inputs} was prepared with \code{kernel = "fixed"}
+and the backend is \code{"refit"} without a \code{radius_grid}, and \code{"single"}
+otherwise. Under a fixed kernel every optimized scale is a hard radius,
+and a gradient search cannot leave a single start on that stepped
+likelihood. A refit search that returns its starting values gives a
+warning and records \code{start_stall} in \code{\link[=diagnostics]{diagnostics()}}.}
 
 \item{screen_n_sigma}{Positive integer. Number of log-spaced sigma values
 evaluated per covariate during the prescreen when
 \code{start_strategy = "screen"}. Default: \code{5}.}
 
 \item{screen_n_jitter}{Non-negative integer. Number of jittered candidate
-starts evaluated with short screening optimizations after the marginal
-prescreen. Default: \code{6}. Set to \code{0} to skip the short jittered
-runs.}
+starts tried with short searches after the prescreen. Default: \code{6}. Set
+to \code{0} to skip the short jittered runs.}
 
-\item{screen_maxit}{Positive integer. Maximum iterations used for each short
-screening optimization. Default: \code{8}.}
+\item{screen_maxit}{Positive integer. Maximum iterations for each short
+screening search. Default: \code{8}.}
 
 \item{screen_jitter_sd}{Non-negative numeric scalar. Standard deviation of
-multiplicative sigma jitter on the log scale during screening. Default:
-\code{0.5}.}
+the multiplicative sigma jitter, on the log scale, used during screening.
+Default: \code{0.5}.}
 
-\item{n_cores}{Positive integer. Number of cores for parallel optimization
-via \code{optimParallel}. Default: \code{NULL} (single-threaded). When
-\code{start_strategy = "screen"}, the same \code{n_cores} setting is also
-used for short screening attempts before the full optimization.
-Parallel optimization is beneficial for models with many covariates or
-slow log-likelihood evaluations. When \code{n_cores > 1},
-\code{multiScale_optim()} checks \code{\link{estimate_multiscale_ram}} and
-stops before screened starts or worker creation if the requested workers
-exceed the conservative RAM-based limit for the current inputs. Use
-\code{n_cores = 1} for serial execution, or rebuild inputs with
-\code{kernel_prep(..., bin = TRUE, store_cell_data = FALSE)} for lean mode
-when every covariate is kernel-weighted. Landscape and surface metrics
-cannot use lean mode. An unavailable RAM estimate does not block the run;
-a passing estimate does not guarantee sufficient memory. No worker count
-is reduced automatically.}
+\item{n_cores}{Positive integer. Number of cores for a parallel search
+through \code{optimParallel}. Default: \code{NULL} (serial). With
+\code{start_strategy = "screen"}, the short screening searches also use these
+cores. Parallel searches help most with many covariates or slow model
+fits. When \code{n_cores > 1}, \code{multiScale_optim()} checks
+\code{\link[=estimate_multiscale_ram]{estimate_multiscale_ram()}} and stops before screening or creating
+workers if the requested workers exceed its conservative RAM-based limit.
+Use \code{n_cores = 1} for a serial search, or rebuild the inputs with
+\code{kernel_prep(..., bin = TRUE, store_cell_data = FALSE)} (lean mode) when
+every covariate is kernel-weighted. Landscape and surface metrics cannot
+use lean mode. An unavailable RAM estimate does not block the run, a
+passing estimate does not guarantee enough memory, and the worker count is
+never reduced automatically.}
 
 \item{PSOCK}{Logical. On Windows, a PSOCK cluster is always used. On Unix,
-a FORK cluster is used by default (faster). Set \code{TRUE} to force a
-PSOCK cluster on Unix. Default: \code{FALSE}.}
+a FORK cluster is used by default because it is faster. Set \code{TRUE} to
+force a PSOCK cluster on Unix. Default: \code{FALSE}.}
 
-\item{verbose}{Logical. Print optimization status and diagnostic blocks to the
-console. Default: \code{TRUE}.}
+\item{verbose}{Logical. Print the search status and diagnostic messages to
+the console. Default: \code{TRUE}.}
 
-\item{refit_fn}{Optional function for refitting \code{fitted_mod} during
-optimization. When \code{NULL} (default), \code{stats::update()} (or the
-unmarked equivalent) is used. Provide this only when the default refit
-path is insufficient. See Details.}
+\item{refit_fn}{Optional function for refitting \code{fitted_mod} during the
+search. When \code{NULL} (default), \code{stats::update()} (or the \code{unmarked}
+equivalent) is used. Supply one only when the default refit is not enough;
+see "Supply a custom refit function" below.}
 
-\item{backend}{\code{"refit"} (default) preserves the existing model-refit
-optimizer. \code{"profile_glm"} opts into the analytic-profile backend for
-independent Gaussian, Poisson, binomial, and NB2 observations. Fit a
-Gaussian model with \code{glm(family = gaussian())}, because this backend
-rejects \code{lm()} fits. See the
-formula, data, and uncertainty contracts in Details. \code{"joint_nb2"}
-jointly estimates kernel parameters, coefficients, and NB2 dispersion,
-including the exact Poisson boundary. It requires an NB2 log-link model.
-\code{"joint_mixed"} opts into joint Poisson/NB2 random-intercept fitting
-with optional zero inflation; see its restricted contracts in Details.
-\code{"conditional_logit"} jointly estimates smooth kernel scales and
-conditional-logistic coefficients for one used step per matched choice set.
-It accepts retained survival models or amt wrappers; see Details.}
+\item{backend}{Character. The fitting method. \code{"refit"} (default) refits
+\code{fitted_mod} at each candidate scale and works with any model class that
+can be refit. \code{"profile_glm"} (Gaussian, Poisson, binomial, and NB2 GLMs),
+\code{"joint_nb2"} (NB2 models, including the exact Poisson boundary),
+\code{"joint_mixed"} (Poisson and NB2 \code{glmmTMB} models with one random
+intercept), and \code{"conditional_logit"} (step-selection models) estimate
+the scales and the model parameters in one likelihood. Fit a Gaussian
+model with \code{glm(family = gaussian())} for the analytic backends, because
+\code{lm()} fits are rejected. \link{multiScaleR-fitting-methods} gives each
+backend's requirements and the uncertainty it reports.}
 
-\item{profile_control}{Named list used by the analytic backends:
-For \code{conditional_logit}, accepted entries are \code{n_starts} (6),
-\code{starts}, \code{iter.max} (500), \code{gradient_tolerance} (0.001),
-and \code{kernel_engine} (\code{"reference"} or \code{"stream"}).
-For \code{joint_mixed}, only \code{n_starts} (default 6) and
-\code{starts} are accepted. Each row of \code{starts} contains positive
-kernel scales in internal distance units (map distance divided by
-\code{unit_conv}), in model predictor order. All starts are retained.
-For the analytic GLM backends, available controls are
-\code{n_starts} (6), \code{starts} (optional positive numeric matrix),
-\code{theta_bounds} (\code{c(1e-4, 1e5)}), \code{theta_start} (optional),
-\code{gradient_tolerance} (0.001), \code{iter.max} (500), and
-\code{eval.max} (1000). Set \code{kernel_engine = "stream"} to opt into
-contiguous matrix traversal for shared kernel values and derivatives,
-reduced copying of prepared matrices, and cached response-only NB2 terms;
-\code{"reference"} is the default. This retains the same starts,
-likelihood, and uncertainty checks. The stream
-engine uses additional temporary vectors proportional to the number of
-observations and can reduce traversal cost for larger binned matrices.
-For smooth weighted SQ predictors in \code{conditional_logit}, it also
-computes values and scale derivatives in compiled code, reusing work
-buffers across sites. Temporary storage is proportional to the largest
-retained site buffer. The reference engine and default remain unchanged.
-For NB2 models in either analytic backend, set
-\code{coefficient_start = "warm"} to reuse
-conditional regression coefficients within each search. The default is
-\code{"cold"}. Warm continuation resets at every independent start and
-falls back to cold initialization if its score or rank checks fail. Final
-likelihood checks always use independently initialized coefficients.
-Counts and fallback reasons are stored in
-\code{profile_fit$coefficient_audit}. All independent starts are retained.
-For \code{joint_nb2} only, \code{worker_pool} accepts a reusable PSOCK
-cluster created with \code{parallel::makePSOCKcluster()}. Its default,
-\code{NULL}, keeps fitting serial. Keep \code{n_cores = 1}; the pool size
-determines the number of workers for independent starts. Workers must
-load the same installed package code as the controller. Each start keeps
-its cold terminal audit, and results retain their original start order.
-You own the pool: reuse it across calls and close it with
-\code{parallel::stopCluster()} when finished, including after errors.
-Pool connections are not stored in the fitted object. Worker coefficient
-audits are stored in \code{profile_fit$worker_coefficient_audits};
-\code{coefficient_audit} then covers controller-side final evaluation.
-Subsequent profile and bootstrap inference remains serial. Separate
-processes duplicate data and package memory; inspect
-\code{estimate_multiscale_ram()} before creating a pool. Pool startup
-also checks the binned payload against 75 percent of physical RAM, allowing
-four payload copies and 1 GiB per process for the controller and workers.
-This planning estimate is not a guarantee of peak memory or available RAM.
-Startup
-can outweigh fitting gains for short jobs. Set math-library thread limits
-before creating workers to avoid nested parallel computation.
-Each row of \code{starts} contains kernel scales
-divided by \code{unit_conv}, followed by shapes for \code{"expow"}, in
-model predictor order. Explicit starts replace the deterministic scale
-starts; \code{par}, if supplied, is prepended. NB2 dispersion starts cycle
-through the initial theta, 0.3, 2, and 20 within the specified bounds.
-Theta bounds must be positive, increasing, and at most 1e6.
-For \code{"joint_nb2"}, the default theta bounds are \code{c(1e-4, Inf)};
-the upper bound must remain infinite, and the lower bound must be at least
-\code{1e-8}. Each kernel start is tried at the exact Poisson boundary and
-at an interior dispersion, giving 12 fits with the default six kernel
-starts. \code{iter.max} limits each L-BFGS-B search; \code{eval.max} applies
-to subsequent profile/inference refits, which use conditional fitting.}
+\item{profile_control}{Named list of settings for the analytic backends,
+such as the number of starts (\code{n_starts}, default 6), a matrix of explicit
+\code{starts}, iteration limits, NB2 theta bounds, and a PSOCK \code{worker_pool}
+for \code{"joint_nb2"}. Default: \code{list()}, which uses every default. The refit
+backend accepts no entries. The "Control settings" section of
+\link{multiScaleR-fitting-methods} lists every entry, the backends that accept
+it, and its default.}
 
-\item{covariate_transform}{Transformation of optimized spatial predictors.
-\code{"candidate"} (default) centers and scales each candidate's kernel or
-metric values. \code{"raw"} is an opt-in native-refit contract that passes
-their unstandardized values and retains named zero centers/unit scales for
-prediction. Fit the initial model in those units, including any fixed
-spline knots. This changes neither upstream surface/reference normalization
-nor fixed-metric fallback transforms. Raw mode currently requires
-\code{backend = "refit"}; Bayesian targets are unchanged.}
+\item{covariate_transform}{Character. How optimized covariates enter the
+model. \code{"candidate"} (default) centers and scales the kernel or metric
+values at each candidate scale, so a coefficient describes a change of one
+standard deviation. \code{"raw"} keeps the values in their own units (for a
+binary layer, the kernel-weighted proportion) and records centers of zero
+and scales of one for prediction. Fit the starting model in those raw
+units, including any fixed spline knots. \code{"raw"} requires
+\code{backend = "refit"}. See \link{multiScaleR-fitting-methods}.}
 
 \item{radius_grid}{Experimental, so its behavior may change in a later
 release without a deprecation period. With \code{backend = "refit"}, an
-optional named list
-of candidate radius vectors, one for each optimized hard-radius predictor.
-For a single hard radius, supply the vector directly or name it in a list.
-Each vector needs at least two distinct radii in the original map units,
-between \code{kernel_inputs$min_D} and \code{kernel_inputs$max_D}.
-The fit evaluates all combinations and reoptimizes any smooth kernel
-bandwidths and shapes at each combination. The default \code{NULL}
-uses the selected backend's usual optimizer.}
+optional named list of candidate radius vectors, one for each optimized
+hard-radius predictor. For a single hard radius, supply the vector
+directly or name it in a list. Each vector needs at least two distinct
+radii in map units, between \code{kernel_inputs$min_D} and
+\code{kernel_inputs$max_D}. The fit evaluates every combination and
+reoptimizes any smooth kernel bandwidths and shapes at each one. The
+default \code{NULL} uses the backend's usual search. See "Profile hard radii
+over a grid" in \link{multiScaleR-fitting-methods}.}
 }
 \value{
-A list of class \code{"multiScaleR"} containing:
-\describe{
-\item{\code{scale_est}}{Data frame with one row per optimized covariate and
-two columns: \code{Mean} (optimized sigma on the original projection
-scale) and \code{SE} (Hessian-based standard error). \code{SE} is
-\code{NA} for hard-radius landscape and unweighted surface metrics
-and for every estimated radius under \code{kernel = "fixed"},
-whose likelihood changes in steps. Row names are covariate names.}
-\item{\code{shape_est}}{Data frame of the same structure as
-\code{scale_est} for the shape parameter, or \code{NULL} when
-\code{kernel != "expow"}. Hard-radius variables have NA shape and shape
-SE because shape is inapplicable; their ignored shape positions are
-excluded from likelihood parameter counts.}
-\item{\code{optim_results}}{The raw list returned by \code{stats::optim}
-or \code{optimParallel::optimParallel}, including \code{par},
-\code{value} (negative log-likelihood), \code{hessian}, and convergence
-codes. Also contains \code{par_unscale} (sigma values back on the
-projection scale) and \code{hessian_unscale}. For a declared radius
-grid, this list describes the selected combination. The Hessian covers
-only the smooth parameters at those fixed radii, with \code{NA} for
-hard-radius rows and columns and any inactive shape.
-See \code{diagnostics(fit)$radius_profile} for all candidates.}
-\item{\code{opt_mod}}{The refitted model at the optimized sigma values.
-This is the model object to use for inference, prediction, and
-\code{\link{plot_marginal_effects}}.}
-\item{\code{fitted_mod_original}}{The original \code{fitted_mod} passed
-by the user, stored for reference.}
-\item{\code{min_D}}{Numeric. Lower bound for sigma during optimization.}
-\item{\code{max_D}}{Numeric. Upper bound for sigma during optimization.}
-\item{\code{kernel_inputs}}{The \code{kernel_inputs} list (minus
-\code{min_D} and \code{max_D}, which are stored separately).}
-\item{\code{scl_params}}{Named list with \code{mean} and \code{sd} vectors
-for each covariate: the centering and scaling parameters from the
-optimized kernel data. Used by \code{\link{kernel_scale.raster}} when
-\code{scale_center = TRUE}. Raw optimized predictors retain centers of
-zero and scales of one; prediction batches never relearn these values.}
-\item{\code{join_by}}{The \code{join_by} data frame, or \code{NULL}.}
-\item{\code{opt_context}}{Internal optimization context object storing the
-model-class-specific refit logic. Retained for use by
-\code{\link{profile_sigma}}. Raw mode also retains
-\code{covariate_transform = "raw"} here.}
-\item{\code{profile_scale_est}}{Profile-likelihood CI data frame, or
-\code{NULL} until \code{\link{profile_sigma}} has been run.}
-\item{\code{diagnostics}}{List of diagnostic objects; see
-\code{\link{diagnostics}}.}
-\item{\code{next_run}}{List of recommended values for a follow-up fit.
-Includes \code{max_D} for the next \code{\link{kernel_prep}} call,
-optimized \code{start_sigma} values in map units, optional
-\code{start_shape} values for \code{kernel = "expow"}, and
-\code{start_par} on the internal scaled parameter space expected by
-\code{multiScale_optim}. \code{n_cores} is \code{NULL}; a conservative
-parallel worker-count suggestion is available on demand from
-\code{\link{estimate_multiscale_ram}} (it is no longer computed
-automatically, as that query can be slow and shells out to an external
-process).}
-\item{\code{warn_message}}{Integer vector of triggered warning codes:
-1 = max-distance, 2 = sigma precision, 3 = shape precision.}
-\item{\code{call}}{The matched call.}
-\item{\code{profile_fit}, \code{uncertainty}, \code{dispersion_est}}{Present
-for both analytic GLM backends. These retain transformed parameter estimates,
-starts and convergence scores, the profile and joint information
-matrices, identifiability diagnostics, and NB2 theta. The ordinary
-\code{opt_mod} and its coefficient summary condition on optimized kernel
-parameters. Use \code{\link{vcov.multiScaleR}} and
-\code{\link{predict.multiScaleR}} for joint uncertainty.}
-\item{\code{mixed_fit}}{For \code{joint_mixed}, retained kernel engine,
-log-scale estimates and bounds in internal distance units, independent
-starts, every start outcome and warning, selected-start index, and
-required prediction variables. \code{uncertainty$available} is
-\code{FALSE}; \code{next_run} and \code{opt_context} are \code{NULL}.}
+An object of class \code{"multiScaleR"}, a list. The elements you will
+use most are:
+\itemize{
+\item \code{scale_est}: the estimated sigma of each optimized covariate (\code{Mean})
+and its standard error (\code{SE}), in map units;
+\item \code{shape_est}: the same for the shape parameter under \code{kernel = "expow"},
+otherwise \code{NULL};
+\item \code{opt_mod}: your model refit at the estimated scales, to use for
+coefficients, prediction, and effect plots;
+\item \code{diagnostics}: search and uncertainty diagnostics, read with
+\code{\link[=diagnostics]{diagnostics()}};
+\item \code{next_run}: suggested \code{max_D} and starting values for a follow-up fit.
 }
+
+\link[=multiScaleR-class]{multiScaleR} describes every element, including those added by the
+analytic backends, and lists the methods that read the object.
 }
 \description{
-Identifies the kernel scale of effect (sigma) for each raster
-covariate by maximizing the log-likelihood of a fitted statistical model.
-Repeatedly replaces kernel-weighted covariate values at different scales and
-refits the model, using \code{optim} (or \code{optimParallel} for parallel
-execution) with the L-BFGS-B algorithm.
+Estimates the scale of effect (sigma) of each kernel-weighted
+covariate in a fitted model by maximizing the model's log-likelihood. The
+\emph{scale of effect} is the distance over which a landscape variable influences
+the response. By default, \code{multiScale_optim()} recomputes the kernel-weighted
+covariates at each candidate scale, refits your model, and searches with the
+L-BFGS-B algorithm through \code{\link[stats:optim]{stats::optim()}} (or
+\code{\link[optimParallel:optimParallel]{optimParallel::optimParallel()}} for parallel searches). Other backends
+estimate the scales and the model parameters in one likelihood; see
+\link{multiScaleR-fitting-methods}.
 }
-\details{
-For the default refit backend, a smooth kernel or shape parameter within
-\code{1e-5} on the log scale of an optimization bound invalidates the
-unconstrained joint outer Wald approximation. Its smooth kernel SEs and
-Wald limits are withheld. The raw Hessian, original curvature status and
-parameter-bound table remain in \code{diagnostics$refit_hessian}. A zero
-lower bound is flagged only when reached. This numerical flag does not
-establish identifiability or provide a calibrated interval. Explicit profile
-limits retain their existing interpretation. Native coefficient covariance
-still conditions on the selected kernels; likelihoods and parameter counts
-are unchanged. Hard-radius uncertainty follows its separate profile contract.
+\section{How the search works}{
+A \emph{kernel} is a distance-weighting function that converts a raster layer
+into one covariate value per survey point. Its scale, sigma, sets how fast
+the weights decline with distance (see \link{multiScaleR-kernels}). The default
+refit backend proposes sigma values (and shape values for \code{"expow"}),
+recomputes the kernel-weighted covariates, refits \code{fitted_mod}, and keeps
+the values that maximize the log-likelihood. Standard errors come from the
+Hessian of this outer search. Hard-radius covariates have no Hessian
+standard error because their likelihood changes in steps. Profile
+likelihood intervals are available with \code{summary(fit, profile = TRUE)} or
+\code{\link[=profile_sigma]{profile_sigma()}}. \link{multiScaleR-fitting-methods} gives the rules for each
+backend.
+}
 
-\strong{Opt-in analytic GLM contracts}
+\section{Read the warnings}{
+\code{multiScale_optim()} prints a warning, and records a code in
+\code{warn_message}, in three situations:
+\itemize{
+\item \strong{The scale approaches \code{max_D}.} The estimate is near or beyond the
+search extent, so the true scale may be larger. Rebuild the inputs with
+\code{\link[=kernel_prep]{kernel_prep()}} using at least the suggested \code{max_D}, which is also stored
+in \code{fit$next_run$max_D}, and refit.
+\item \strong{A sigma standard error is at least half its estimate.} The scale is
+poorly determined. Assess whether the covariate is meaningful in your
+analysis and interpret it with caution.
+\item \strong{A shape standard error is at least half its estimate.} Assess whether
+the exponential power kernel suits your data.
+}
 
-The opt-in \code{backend = "conditional_logit"} uses the exact finite-choice-set
-likelihood with one used and at least one available step per set. Use a
-retained \code{survival::clogit} model (\code{model = TRUE}) or an amt
-\code{fit_clogit} wrapper, Gaussian or exponential inputs, and one
-bare \code{strata(choice_id)} term. IDs must identify sets uniquely across
-animals and bursts. Row names must match prepared point IDs. Explicitly
-prepare complete sets before fitting; omitted missing rows, subsets, weights,
-robust clustering and special Cox terms are rejected. Numeric kernel predictors
-may enter native R interaction, crossing and nesting terms, including crosses
-with factors or other optimized predictors. Fixed transformations and offsets
-retain their native meaning and saved training values. Optimized
-kernel-weighted surface SQ predictors are also supported when the matching
-raw buffers are retained. These use the weighted root-mean-square deviation,
-not hard-radius sample SD. Their scales remain independent, and prediction
-requires the same source and metric specifications and training normalization.
-Fixed-radius metrics can be supplied as fixed predictors. Their original
-prepared numeric columns must be retained in the native model frame.
-New predictions require these columns explicitly unless
-\code{include_fixed = TRUE} verifies and reuses their original normalization.
-Within the analytic conditional-logistic backend, hard-radius landscape
-and surface metrics with estimated radii, adaptive dynamic bases, arbitrary or
-nondifferentiable functions, fixed context inside a dynamic expression, and
-kernel-dependent offsets remain unsupported. Kernel-only scalar arithmetic
-and supported smooth base functions use the shared response contract.
+A search that never leaves its starting values also warns and records
+\code{start_stall} in \code{\link[=diagnostics]{diagnostics()}}. Supply different starts with \code{par}, or use
+\code{start_strategy = "screen"}.
+}
 
-A quoted choice-set ID is still one bare variable; special-call text inside
-a quoted predictor name is not interpreted as a Cox special term.
+\section{Choose starting values}{
+With \code{start_strategy = "screen"} and \code{par = NULL}, \code{multiScale_optim()}
+first scouts the sigma range with one-dimensional, log-spaced scans of each
+covariate. It then tests a few jittered starts with short searches that skip
+the Hessian. The marginal scans are serial, but the short searches use
+\code{n_cores} when you request a parallel search. Screening only chooses one
+starting vector for the single full search. On Windows those parallel
+screening searches use PSOCK workers, so the serialization advice under
+"Speed up the search" applies to them too. Call \code{set.seed()} before
+\code{multiScale_optim()} for reproducible screened starts.
 
-Conditional-logistic fitting uses serial independent L-BFGS-B starts, with
-cold coefficient initialization and a cold native survival refit at every
-terminal point. Eligibility requires convergence, a small projected score,
-agreement in likelihood and coefficients, well-conditioned coefficient
-information and agreement with native covariance. Failed attempts and warnings
-remain explicit. After the original joint point passes the native agreement
-audits, cold native coefficients may refine its terminal score if the objective
-does not increase and the score improves. Both scores and the refinement flag
-are retained; the eligibility threshold is unchanged. Failed attempts
-remain in \code{profile_fit$start_results}; if all fail, the error condition
-contains \code{start_results}. \code{profile_fit$starts} stores log-scale
-starting values and \code{winner} identifies the selected record. Final
-\code{opt_mod} retains the native conditional fit and amt metadata when
-supplied. If the original fitting call no longer exposes its raw data,
-retained model-frame values support fixed transformations, factors and
-compound offsets without attempting to invert them. Cold native refits
-retain the original prediction transformations, including learned polynomial
-bases. New-data prediction still requires the formula's raw inputs.
-The original amt proposal distributions remain unchanged; apply amt's
-movement-distribution updates to \code{opt_mod} when appropriate for the
-movement terms included in the model. Its internal prediction contract omits duplicate fitting data to
-reduce serialized size; the original model remains in
-\code{fitted_mod_original}. Updating the conditional fit requires explicit data with already
-standardized kernel covariates; otherwise rerun the original multiscale fit.
-Scale SEs and joint prediction uncertainty are withheld. Native
-coefficient covariance conditions on the selected scales and does not correct
-temporal dependence. Movement terms must match the available-step proposal;
-the backend does not add them, validate a sampling interval, or calibrate
-population inference. Keep available steps fixed throughout optimization.
+To continue from an earlier fit, rebuild the inputs with \code{fit$next_run$max_D}
+and pass \code{fit$next_run$start_par} as \code{par}. Those starts are scaled to that
+\code{max_D}.
+}
 
-For a hard-radius likelihood profile, supply \code{radius_grid} to the
-native refit backend. Landscape metrics and unweighted surface metrics use
-hard radii. All optimized predictors use hard radii under \code{kernel = "fixed"}.
-At each radius combination, the model refits its coefficients and any
-native nuisance parameters using the same observations. When Gaussian,
-exponential, or exponential-power kernels supply smooth predictors, a
-bounded optimizer starts independently at each combination and refits all
-smooth bandwidths and applicable shapes. Set \code{par} to provide the
-first smooth start using the usual parameter layout.
+\section{Speed up the search}{
+When \code{\link[=kernel_prep]{kernel_prep()}} was run with \code{bin = TRUE} (the default),
+kernel-weighted covariates are computed from precomputed distance-binned
+summaries instead of every buffer cell at each evaluation. The cost of an
+evaluation then no longer depends on \code{max_D}, which usually speeds the
+search by an order of magnitude or more for large buffers, with a
+negligible binning approximation. Inputs created with
+\code{store_cell_data = FALSE} (lean mode) carry only the binned summaries; they
+still optimize, profile, and refit normally. Landscape-metric covariates
+always use the exact per-cell path and so need the cell-level data.
 
-The largest eligible native log-likelihood determines the selected
-combination. Exact ties favor the smallest radii in model predictor order.
-Inspect failed combinations and likelihood plateaus in the diagnostic table.
-Hard radii have no Hessian SE or confidence interval. Available smooth
-standard errors and Wald limits condition on the selected hard radii.
+For a parallel search, fit the starting model with fully
+namespace-qualified functions so that its call serializes cleanly to the
+workers. For example, fit a negative binomial model as
+\code{fitted_mod <- MASS::glm.nb(y ~ x, data = df)} rather than relying on an
+attached package.
+}
 
-The grid uses serial native refits of ordinary \code{lm()}, \code{glm()},
-\code{MASS::glm.nb()} or complete one-case conditional-logistic models with a
-retained model frame. Fixed predictors, including fixed metrics, can accompany
-the optimized predictors. Retain raw cells and matching model row IDs, and
-omit \code{join_by}, custom refitters, and start screening. For step
-selection, supply one case and at least one available alternative per
-stratum, with unweighted, unpenalized native likelihood.
+\section{Fit unmarked models with repeated sites}{
+When the rows of an \code{unmarked} model repeat spatial sites, for example a
+stacked layout with one row per site and year, the preparation object
+still has one row per unique site. Add a site ID to the model's \code{siteCovs}
+and pass one matching ID per prepared site through \code{join_by}. For spatial
+sites \code{c("A", "B")} and model rows \code{c("A", "B", "A", "B")} for two years,
+use \code{join_by = data.frame(site = c("A", "B"))} and include the four-row
+\code{site} column in \code{siteCovs}. Multiple key columns are allowed. Prepared keys
+must be unique, every model row must match one, and the IDs in the model
+may repeat in any order. The model's response and site-covariate row order
+is preserved.
 
-The opt-in \code{backend = "joint_mixed"} requires optional packages RTMB,
-TMB, and glmmTMB. It jointly estimates kernel scales and model parameters,
-integrating random intercepts by the Laplace approximation. It supports
-log-link Poisson and NB2 glmmTMB fits with one conditional random intercept,
-constant dispersion, and optional fixed-effects zero inflation. Use
-Gaussian or negative exponential kernels, native R crossings, nesting or
-factor interactions of numeric spatial predictors, retained model row names
-matching prepared point IDs, and
-\code{n_cores = 1}. Random slopes, multiple grouping terms, spatial terms in
-zero-inflation or dispersion formulas, non-unit weights, priors, parameter
-maps, and REML are unsupported. Raw formula variables must be recoverable
-from the fitted model; use formula \code{offset()} terms. Each start uses a
-fresh native fit, a joint Hessian check, and an independent native terminal
-refit with likelihood agreement within \code{1e-5}. Failed starts remain in
-\code{mixed_fit$start_results}; if all fail, the error condition contains
-\code{start_results}. No Hessian checks are bypassed.
+The layout looks like this, where \code{counts_by_year} is a list of count
+matrices, each with one row per site (in the order of
+\code{kernel_inputs$kernel_dat}) and one column per visit:
 
-For \code{joint_mixed}, \code{opt_mod} is the final native glmmTMB fit.
-\code{mixed_fit} records log scales, bounds, starts, all outcomes, and the
-selected start. Narrow raw prediction data retain fixed-transform inputs
-for effect curves after temporary native-refit data are no longer available.
-\code{diagnostics$joint_mixed} reports eligibility and scale
-boundary flags. Scale uncertainty has not been calibrated: scale SEs and
-legacy scale Hessians are \code{NA}, and joint intervals are unavailable.
-Native coefficient and prediction covariance condition on the selected
-scales. Use \code{predict(fit, se.fit = TRUE, uncertainty = "conditional")}
-or \code{predict(fit$opt_mod, ...)}. This backend does not extend the
-single-predictor NB2 GLM contract of \code{scale_inference()}.
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{site_id <- seq_len(nrow(kernel_inputs$kernel_dat))
+y_stacked <- do.call(rbind, counts_by_year)
+site_row <- rep(site_id, times = length(counts_by_year))
+site_covs <- kernel_inputs$kernel_dat[site_row, , drop = FALSE]
+site_covs$site_id <- site_id[site_row]
+site_covs$Year <- factor(rep(seq_along(counts_by_year),
+                             each = length(site_id)))
+umf <- unmarked::unmarkedFramePCount(y = y_stacked, siteCovs = site_covs)
+mod <- unmarked::pcount(~Year ~ Year + hab, data = umf, K = 100)
+fit <- multiScale_optim(mod, kernel_inputs,
+                        join_by = data.frame(site_id = site_id))
+}\if{html}{\out{</div>}}
 
-The analytic optimization backends support optimized kernel means and kernel-weighted
-surface SQ (root mean square deviation), including combinations of these
-predictors. Weighted SQ uses retained raw cell buffers with Gaussian or
-exponential kernels; estimation of other surface metrics' radii requires
-\code{backend = "refit"}. Declared fixed-radius metrics can enter the native
-numeric design without adding a scale parameter. Their original prepared
-values and normalization must remain recoverable from the native model frame.
-Kernel means require \code{bin = TRUE}; surface-only models need explicit
-preparation row IDs and raw buffers, without binned summaries.
-The two analytic GLM backends require a smooth kernel,
-and a \code{glm} or \code{MASS::glm.nb} object retaining its model frame.
-Fit Gaussian models with \code{glm(family = gaussian())}, because an
-\code{lm()} fit is rejected.
-For \code{"profile_glm"}, supported links are Gaussian identity, Poisson log, binomial logit, and
-NB2 log. NB2 has variance \eqn{\mu + \mu^2/\theta}; theta is estimated
-alongside kernel parameters, even when the initial GLM used a fixed theta.
-Independent native likelihoods verify the fitted objective in simulations
-of the supported GLM families. The finite theta limit differs from the exact
-Poisson face handled by \code{"joint_nb2"}. This backend is experimental,
-and its scale-interval calibration is not established. Simulations found
-Wald undercoverage even among fits passing curvature checks. For single-kernel NB2 models,
-\code{\link{scale_inference}} examines the full likelihood range and can
-assess individual scale values with a parametric bootstrap.
-For \code{"profile_glm"}, regression coefficients are solved by IRLS at each candidate. A full-rank
-NB2 fit whose iterations fail receives a coefficient-likelihood refinement
-using the analytic score and observed information. Gaussian residual
-standard deviation is profiled at its maximum likelihood estimate.
+Check that the rows of \code{y_stacked} and \code{site_covs} refer to the same
+site-year records before fitting. Without \code{join_by}, model rows must match
+the prepared sites one for one, in the same order. When both objects keep
+the same row IDs their order is checked; otherwise you are responsible for
+it. An open-population \code{unmarked::pcountOpen()} model instead stores one
+row per site with the years across count columns, so it uses the same
+static site covariates without \code{join_by}. Optimized covariates must be
+static \code{siteCovs}; \code{obsCovs} and \code{yearlySiteCovs} cannot be optimized
+through this site-level workflow. Sparse counts can leave scales weakly
+identified, so examine the scale profile and \code{\link[=diagnostics]{diagnostics()}}.
+}
 
-\code{"joint_nb2"} uses L-BFGS-B to estimate kernel parameters, coefficients,
-and \eqn{\rho = \log(1 + \alpha)} jointly, where \eqn{\alpha = 1/\theta}.
-At \code{rho = 0}, the likelihood is exactly Poisson. Each candidate must
-also agree with an independently optimized conditional coefficient fit
-within \code{1e-5} negative log-likelihood units. Start records retain
-failures, projected gradients, conditional likelihood gaps, and warnings.
-\code{dispersion_est} adds \code{alpha} and \code{exact_poisson}; a boundary
-estimate has \code{theta = Inf}. This is still an NB2 model, so the fitted
-model's likelihood parameter count includes dispersion at the boundary.
-Its conditional coefficient summary uses the Poisson GLM summary at that
-boundary; inspect \code{dispersion_est} for the NB2 boundary metadata.
-The \code{profile_fit} parameter vector uses log kernel parameters followed
-by \code{rho}; \code{joint_par} also includes regression coefficients.
-Its marginal covariance and Hessian are missing when joint uncertainty is
-unavailable. Interior joint covariance returned by \code{vcov()} retains
-log(theta) coordinates, as for \code{"profile_glm"}.
+\section{Supply a custom refit function}{
+By default, \code{multiScale_optim()} refits the model with \code{stats::update()}
+(standard models) or the \code{unmarked} equivalent. When that is not enough,
+supply \code{refit_fn}. The function must accept the arguments \code{model}, \code{data},
+and \code{context}, and return a fitted model whose log-likelihood
+\code{stats::logLik()} or \code{insight::get_loglikelihood()} can extract. A minimal
+refit function:
 
-Numeric kernel predictors may enter native R product, crossing and nesting
-terms, including factor interactions and products of optimized predictors.
-Native terms and fitted contrast coding define the coefficient layout;
-all kernel, coefficient and cross derivatives enter joint uncertainty.
-GAMs retain their smooth and penalty targets through the native-refit backend;
-they are not treated as ordinary unpenalized GLMs here. Kernel-only scalar
-arithmetic inside \code{I()}, and the base functions \code{exp}, \code{log},
-\code{sqrt}, \code{sin}, \code{cos}, and \code{tan}, retain their native
-coefficient basis and analytic derivatives. Their inputs must be optimized
-kernel values or literal constants. Nonfinite domains are errors.
-Cubic \code{splines::ns()} and \code{splines::bs()} response terms also
-support changing kernel values when you supply literal fixed \code{knots}
-and two increasing \code{Boundary.knots}. All basis columns share the
-ecological scale of their original source, including factor interactions.
-Knots are in the modeled predictor's units. Analytic GLM, conditional-logistic
-and joint mixed searches retain their candidate-specific standardization and
-its derivatives. Fixed standardized knots are not fixed raw-cover thresholds.
-Bayesian targets retain their frozen reference transformation. With a fixed
-reference, convert raw knots and boundaries using its center and SD before
-inserting literal values into the formula. Basis values and complete kernel
-derivatives update at each
-candidate scale. The knots, native coefficient basis and priors stay fixed.
-Only cubic bases with distinct strictly interior knots are supported here.
-Adaptive \code{df} recipes, repeated/boundary knots and other degrees require
-the native-refit backend. Natural-spline tails are linear on the linear
-predictor scale. These are unpenalized fixed-complexity bases, with neither
-smoothing-variance uncertainty nor a monotonicity constraint.
-
-Fixed inputs within a dynamic expression, adaptive dynamic bases,
-nondifferentiable or arbitrary functions, kernel-dependent offsets,
-hard-radius metrics, random effects,
-and zero inflation are unsupported. Put offsets in the formula with
-\code{offset()}, rather than in the separate model argument.
-
-The retained model-frame rows define the fitting sample. Their row names
-must match unique prepared point IDs; preserve these through subsetting.
-Kernel means and standard deviations use only these rows. No observations
-are dropped during optimization. Binomial logit responses may be numeric
-\code{0}/\code{1} or logical \code{FALSE}/\code{TRUE} Bernoulli observations,
-a two-level factor with success
-in its second level, or \code{cbind(successes, failures)} with positive trial
-totals. Logical count columns represent zero/one counts without changing
-trial totals. Response predictions are success probabilities. Positive integer
-frequency weights are supported for count and binomial models; Gaussian
-weights must all equal one. Proportion responses and precision weights are
-unsupported.
-
-These backends default to serial full multi-start fits; use \code{n_cores = 1},
-\code{start_strategy = "single"}, and \code{profile_control}. It does not
-accept \code{refit_fn} or \code{join_by}. Every winning start must pass both
-optimizer convergence and projected-gradient checks.
-The optional \code{profile_control$worker_pool} distributes independent
-\code{joint_nb2} starts across a caller-owned PSOCK pool. It does not reduce
-the number of starts or change uncertainty criteria. For repeated fitting,
-create a pool once, pass \code{profile_control = list(worker_pool = pool)}
-to each call, and close the pool afterward. Use \code{on.exit()} inside
-your calling function to ensure cleanup if a fit fails.
-
-Joint observed information includes kernel, coefficient, and dispersion
-cross derivatives. Default scale limits are normal approximations on the
-log scale. Wald uncertainty is withheld at bounds, with nonpositive
-information or scaled-information condition number at least 1e8, log-kernel
-standard errors exceeding one, or competing starts more than 0.5 log units
-apart within a 95 percent likelihood threshold. These are diagnostic
-screening rules, not a proof of identifiability. A separate near-Poisson
-diagnostic flags \code{max(mu/theta) < 0.01}. A finite upper theta bound
-does not establish a finite dispersion maximum.
-Joint Wald results are also withheld when a Poisson fit at the selected
-scales is within the same likelihood threshold of the NB2 fit. This
-conservative dispersion diagnostic does not constitute a formal model test;
-reoptimizing Poisson scales could reveal additional compatibility.
-An exact Poisson boundary fit never receives joint Wald uncertainty.
-Explicit \code{uncertainty = "conditional"} predictions at that boundary
-condition on both the fitted kernel parameters and the Poisson dispersion
-boundary. They do not quantify uncertainty about the boundary or scales.
-The conditional \code{opt_mod} retains standard GLM methods, but
-\code{update(opt_mod)} is disabled because its original call references
-pre-optimization kernel values. Refit through \code{multiScale_optim()}.
-
-\code{summary(x, profile = TRUE)} reoptimizes other kernel parameters and
-NB2 dispersion while profiling each sigma. It reports the connected
-likelihood region around the selected solution; limits that reach a search
-bound are labeled \code{"profile-bound-limited"}, not interpreted as fully
-resolved confidence limits. \code{profile_sigma()} instead holds other
-kernel parameters fixed, while reestimating coefficients and NB2 dispersion.
-Neither operation guarantees discovery of unvisited likelihood modes.
-
-\strong{Optimization approach}
-
-The default refit optimizer uses the L-BFGS-B algorithm (bounded quasi-Newton) to
-maximize the log-likelihood over sigma (and shape for \code{"expow"}) while
-holding all regression coefficients at their fitted values for each candidate
-scale. Standard errors are Hessian-based approximations from the outer
-optimization. Nonfinite, singular, or non-positive-definite active Hessians
-produce missing SEs and a retained diagnostic; the raw Hessian is preserved.
-Summary methods report profile-likelihood confidence intervals
-for sigma when \code{\link{profile_sigma}} has been run on the object;
-otherwise they fall back to Hessian-based intervals.
-Candidate scales that make a covariate undefined at a modeled observation
-are rejected, so the optimizer compares likelihoods for the same sample.
-The final \code{sample_size} diagnostic reports prepared and fitted row
-counts; for repeated-site \code{unmarked} data it also reports the number
-of distinct prepared spatial sites. Hard-radius landscape and unweighted
-surface metrics, and all estimated fixed-kernel radii, omit Hessian SEs
-and Wald limits. The raw optimizer Hessian remains available for
-compatibility and diagnostics; it is not inverted for those radii. Use
-\code{summary(x, profile = TRUE)} for profile-likelihood intervals.
-
-Use \code{\link{make_gdr_refitter}} as an opt-in native C or TMB callback
-when independent starts and retained audits are needed. It freezes evaluated
-settings and retains final native covariance. TMB requires explicit
-\code{tmb_settings}, constructor-order starts including log-SDs, and native
-joint covariance checks. Its intermediate fits still compute sdreport.
-
-Identified native GDR response fields require the refit backend and a
-serial scale search: \code{n_cores = 1}, \code{PSOCK = FALSE}. A null
-core count selects one for this field route. Native fit/tape transport
-to fit workers remains unqualified.
-
-Only active GDR component formulas identify spatial predictors. Availability
-is inactive for one primary period, and the distance formula is inactive for
-a uniform key. Optimized static site names must not also occur in native
-yearly or observation covariate tables; use distinct names for distinct inputs.
-Dot formulas use the original component's available training-column names.
-
-Native GDR models with active formula offsets or TMB zero inflation are
-rejected before fitting, model selection or prediction. In the audited
-unmarked 1.5.2 provider, offsets did not enter the fitted likelihood and the
-TMB ZIP likelihood ignored its zero-inflation parameter. These combinations
-require separate provider qualification; multiScaleR does not remove offsets,
-switch engines, alter parameter counts or substitute uncertainty estimates.
-Offset-free C ZIP models retain their native likelihood and parameter count.
-
-\strong{Binned acceleration}
-
-When \code{kernel_inputs} was created by \code{\link{kernel_prep}} with
-\code{bin = TRUE} (the default), kernel-weighted covariates are evaluated
-from precomputed distance-binned summaries rather than by iterating every
-buffer cell on each optimizer evaluation. This makes the per-evaluation cost
-independent of \code{max_D} and typically speeds up optimization by an order
-of magnitude or more for large buffers, with a negligible binning
-approximation. Inputs created with \code{store_cell_data = FALSE} ("lean"
-mode) carry only the binned summaries; these still optimize, profile, and
-refit normally. Landscape-metric covariates always use the exact per-cell
-path and therefore require cell-level data.
-
-\strong{Parallel optimization}
-
-To ensure that fitted model function calls are properly serialized for
-parallel workers, fit models using fully namespace-qualified functions. For
-example, fit a negative binomial model as
-\code{fitted_mod <- MASS::glm.nb(y ~ x, data = df)} rather than loading the
-namespace implicitly.
-
-\strong{Joining unmarked multi-year data}
-
-When \code{unmarked} model rows repeat spatial sites, provide a
-\code{join_by} data frame with one row per prepared site. For example, if
-the spatial sites have IDs \code{c("A", "B")} and model rows have site IDs
-\code{c("A", "B", "A", "B")} for two years, use
-\code{join_by = data.frame(site = c("A", "B"))} and include the four-row
-\code{site} column in the model's \code{siteCovs}. Multiple key columns
-are allowed. Prepared keys must be unique and every model row must match.
-The model's response and site-covariate row order is preserved. Without
-\code{join_by}, the number and order of model rows must equal the prepared
-spatial sites. When both objects retain the same row IDs, their order is
-checked. Otherwise, the order must be supplied correctly by the caller.
-Optimized covariates must be static \code{siteCovs};
-\code{obsCovs} and \code{yearlySiteCovs} cannot be optimized through this
-site-level workflow.
-
-\strong{Custom refit functions}
-
-By default, \code{multiScale_optim()} refits the model using
-\code{stats::update()} (standard models) or the \code{unmarked} equivalent.
-When the default path is insufficient, supply \code{refit_fn}. The function
-must accept arguments \code{model}, \code{data}, and \code{context}, and
-return a fitted model whose log-likelihood can be extracted by
-\code{stats::logLik()} or \code{insight::get_loglikelihood()}.
-
-A minimal custom refit function:
-\preformatted{
-refit_fn <- function(model, data, context) \{
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{refit_fn <- function(model, data, context) \{
   stats::update(model, data = data)
 \}
-}
+}\if{html}{\out{</div>}}
 
-For models requiring explicit call reconstruction:
-\preformatted{
-refit_fn <- function(model, data, context) \{
+For models that need their call rebuilt explicitly:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{refit_fn <- function(model, data, context) \{
   call <- model$call
   call$data <- quote(data)
   eval(call, envir = list(data = data), enclos = parent.frame())
 \}
-}
+}\if{html}{\out{</div>}}
 
 With PSOCK clusters, \code{refit_fn} must serialize cleanly. Prefer
-namespace-qualified calls (e.g., \code{stats::update()}) and avoid
-closures over large local objects.
+namespace-qualified calls such as \code{stats::update()} and avoid closures over
+large local objects.
 
-The callback receives \code{context$return_model = FALSE} for scalar
-objective evaluations and \code{TRUE} when a fitted model is requested,
-including the final selected-model refit. For supported unmarked models,
-you can omit intermediate Hessian calculations while retaining the original
-model's uncertainty settings whenever a fitted model is returned:
-\preformatted{
-refit_unmarked <- function(model, data, context) \{
+The function receives \code{context$return_model = FALSE} for scalar objective
+evaluations and \code{TRUE} when a fitted model is wanted, including the final
+refit at the selected scales. For supported \code{unmarked} models, you can skip
+the intermediate Hessian calculations while keeping the original model's
+uncertainty settings whenever a fitted model is returned:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{refit_unmarked <- function(model, data, context) \{
   if (identical(context$return_model, FALSE))
     unmarked::update(model, data = data, se = FALSE)
   else
     unmarked::update(model, data = data)
 \}
+}\if{html}{\out{</div>}}
+
+This changes neither the coefficient starts nor the model's likelihood. It
+does not add uncertainty for the kernel scales or override an original
+\code{se = FALSE} setting. Verify this behavior for your model class before you
+rely on a custom refit function.
 }
-Supply this function as \code{refit_fn} to opt in. This changes neither
-coefficient starts nor the model's likelihood. It does not add uncertainty
-for kernel scales or override an original \code{se = FALSE} setting.
-Verify this contract for your model class before using a custom refitter.
 
-\strong{Wrapper model objects}
-
-Some packages return wrapper objects around another fitted model (e.g.,
-\code{amt::fit_clogit()} wraps a \code{survival::clogit()} fit in its
-\code{model} component). When possible, \code{multiScale_optim()} unwraps
-these automatically. For \code{amt::fit_clogit()}, pass \code{model = TRUE}
-when fitting so the nested \code{clogit} model retains its model frame.
-For complete choice sets with learned predictors such as
-\code{base::scale()}, use \code{na.action = stats::na.fail} to retain the
-fitted transformation attributes. Some survival versions drop those
-attributes when applying omission, even with complete data.
-
-When \code{start_strategy = "screen"} and \code{par} is left as \code{NULL},
-\code{multiScale_optim()} first scouts the sigma space with one-dimensional
-log-spaced scans, then optionally tests a few jittered starts using short,
-Hessian-free optimizations. The marginal sigma scans are serial, but the
-short screening attempts use \code{n_cores} when parallel optimization is
-requested. These screening steps are used only to choose one starting vector
-for the single full optimization. On Windows, those parallel screening
-attempts use PSOCK workers, so the same PSOCK serialization guidance applies
-as in the full optimization. For reproducible screened starts, call
-\code{set.seed()} before \code{multiScale_optim()}.
+\section{Fit wrapper model objects}{
+Some packages return a wrapper around another fitted model. For example,
+\code{amt::fit_clogit()} wraps a \code{survival::clogit()} fit in its \code{model}
+component. \code{multiScale_optim()} unwraps these automatically when it can.
+For \code{amt::fit_clogit()}, pass \code{model = TRUE} when fitting so the nested
+\code{clogit} model keeps its model frame. For complete choice sets with learned
+predictors such as \code{base::scale()}, use \code{na.action = stats::na.fail} to keep
+the fitted transformation attributes, because some \code{survival} versions drop
+them when applying omission, even with complete data.
 }
+
 \examples{
 \donttest{
 set.seed(555)
@@ -808,5 +449,12 @@ if (requireNamespace("MASS", quietly = TRUE)) {
 }
 }
 \seealso{
-\code{\link[multiScaleR]{kernel_dist}}
+\link{multiScaleR-fitting-methods} for the backends,
+\link[=multiScaleR-class]{multiScaleR} for the returned object, \code{\link[=kernel_prep]{kernel_prep()}} to prepare
+the inputs, \code{\link[=profile_sigma]{profile_sigma()}} for profile-likelihood intervals,
+\code{\link[=kernel_scale.raster]{kernel_scale.raster()}} to map the fitted covariates, \code{\link[=kernel_dist]{kernel_dist()}} for
+effective distances, and
+\code{vignette("v01-quickstart", package = "multiScaleR")} and
+\code{vignette("v02-user-guide", package = "multiScaleR")} for worked
+examples.
 }

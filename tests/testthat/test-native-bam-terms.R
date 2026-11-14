@@ -100,6 +100,7 @@ bam_terms_partition_warnings <- function(model, newdata, type, se, control) {
 }
 
 test_that("native BAM ordinary term rows and numerical snapshots retain their targets", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- native_bam_terms_fixture()
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
@@ -138,6 +139,7 @@ test_that("native BAM ordinary term rows and numerical snapshots retain their ta
 })
 
 test_that("native BAM workers preserve term geometry, controls and covariance warnings", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- native_bam_terms_fixture()
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old), add = TRUE)

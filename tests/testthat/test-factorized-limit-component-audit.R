@@ -1,4 +1,5 @@
 test_that("optimized raw exact-limit witnesses agree with normalized native Gaussian ML", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- path_component_fixture("gaussian", "gaussian", FALSE, "tied", "canonical")
   p <- private_sq_parameters(s); p$beta[3L] <- .12
@@ -40,6 +41,7 @@ test_that("optimized raw exact-limit witnesses agree with normalized native Gaus
 })
 
 test_that("component orchestration retains starts, zero faces, Poisson coordinates and failures", {
+  skip_on_cran()
   # These are software orchestration mocks, not accepted optimizer references.
   # Real ordinary point values and exact path leaves remain active. Deliberate
   # nonconvergence and singular curvature must survive as feasible witnesses.
@@ -149,6 +151,7 @@ test_that("component orchestration retains starts, zero faces, Poisson coordinat
 })
 
 test_that("explicit component auditing preserves strict admission and neutral source restrictions", {
+  skip_on_cran()
   s <- path_component_fixture("gaussian", "gaussian", TRUE, "tied", "canonical")
   p <- private_sq_parameters(s); p$scale_z <- p$response_z <- numeric()
   expect_error(.msr_factorized_limit_audit(s, p, 100), "Weighted SQ")

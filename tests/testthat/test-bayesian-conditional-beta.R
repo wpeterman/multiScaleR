@@ -1,4 +1,5 @@
 test_that("conditional response coefficient curvature matches the full posterior", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   fixture <- bayesian_scale_fixture(n_site = 5, n_year = 3)
   for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
@@ -27,6 +28,7 @@ test_that("conditional response coefficient curvature matches the full posterior
 })
 
 test_that("Gaussian coefficient proposals have the exact conditional density", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
   prepared <- prepare_bayesian_fixture(f, family = "gaussian")
@@ -93,6 +95,7 @@ test_that("latent-prior defense has a normalized density including SD Jacobians"
 })
 
 test_that("conditional coefficient controls reject contradictory settings", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture()
   call_fit <- function(control) multiScale_bayes(count ~ habitat, f$inputs, f$data,

@@ -69,6 +69,7 @@ test_that("spatial target adapters reject mislabeled population priors", {
 })
 
 test_that("spatial targets preserve population priors and derivatives for both kernels and families", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for(kernel in c("gaussian","exp")) for(family in c("gaussian","poisson","binomial","nbinom2")) {
     b <- spatial_scale_fixture(kernel,family,"posterior")$object

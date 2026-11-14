@@ -20,6 +20,7 @@ test_that("Laplace covariance and draws retain joint Gaussian dependence", {
 })
 
 test_that("Laplace inference uses the sampler posterior and existing fitted methods", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 12, n_year = 3)
   # A strong continuous response gives a stable small integration example.

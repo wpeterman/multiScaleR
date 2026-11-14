@@ -10,6 +10,7 @@ fixed_inference_fixture <- function(kernel = "gaussian", bin = FALSE) {
 }
 
 test_that("legacy binned inputs without scale_vars retain their original contract", {
+  skip_on_cran()
   f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
   empty <- list(covariates = character(), center = numeric(), spread = numeric())
   expect_identical(.msr_fixed_reference_contract(f$inputs, f$data,
@@ -56,6 +57,7 @@ test_that("fixed features leave analytic objectives and scores unchanged", {
 })
 
 test_that("fixed Bayesian columns preserve priors, target, derivatives, and repeated-row predictions", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- fixed_inference_fixture(kernel)
@@ -145,6 +147,7 @@ test_that("fixed automatic prediction binds finite buffer support and preserves 
 })
 
 test_that("all finite varying fixed surface and landscape metrics enter numeric designs", {
+  skip_on_cran()
   f <- fixed_inference_fixture()
   cover <- f$rasters[[1]]
   xy <- terra::xyFromCell(cover, seq_len(terra::ncell(cover)))
@@ -244,6 +247,7 @@ test_that("public analytic fixed features share point, snapshot, raster, and K c
 })
 
 test_that("fixed mixed predictors retain all starts, cold targets, and native prediction", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB"); skip_if_not_installed("RTMB")
   f <- fixed_inference_fixture()
   dat <- f$data

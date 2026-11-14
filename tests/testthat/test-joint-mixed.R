@@ -1,4 +1,5 @@
 test_that("joint mixed models retain native predictions and independent starts", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   skip_if_not_installed("TMB")
   skip_if_not_installed("glmmTMB")

@@ -64,6 +64,21 @@ articles:
 # Function reference, grouped by step in the analysis workflow.
 # Every non-internal help topic must be listed here, or check_pkgdown() fails.
 reference:
+  - title: Concepts and objects
+    desc: >
+      Start here. Background on kernels, fitting methods, and predictions, a
+      glossary of terms, and descriptions of the objects the main functions
+      return.
+    contents:
+      - multiScaleR-package
+      - "`multiScaleR-glossary`"
+      - "`multiScaleR-kernels`"
+      - "`multiScaleR-fitting-methods`"
+      - "`multiScaleR-prediction`"
+      - "`multiScaleR-class`"
+      - "`multiScaleR_data-class`"
+      - "`multiScaleR_bayes-class`"
+      - "`multiScaleR_cv-class`"
   - title: Prepare inputs
     desc: >
       Build the kernel inputs and declare how each raster covariate is
@@ -162,6 +177,3 @@ reference:
       - landscape
       - pts
       - surv_pts
-  - title: Package
-    contents:
-      - multiScaleR-package

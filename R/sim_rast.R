@@ -1,71 +1,94 @@
 # Raster simulation -------------------------------------------------------
-#' Simulate spatially autocorrelated raster surfaces
+#' Simulate Spatially Autocorrelated Raster Surfaces
 #'
 #' @description
-#' Creates a \code{SpatRaster} stack of four simulated landscape surfaces for
-#' use with \code{\link{sim_dat}} and \code{\link{sim_dat_unmarked}}. The stack
-#' contains two binary (0/1) and two continuous (0 to 1) surfaces with differing
-#' spatial autocorrelation ranges, allowing simulation of multiscale ecological
-#' processes.
+#' Creates a `SpatRaster` with four simulated landscape layers, two binary
+#' (0 or 1) and two continuous (0 to 1), for testing and teaching. Each pair
+#' has one layer with a fine and one with a broad autocorrelation range. Use the layers with
+#' [sim_dat()] or [sim_dat_unmarked()] to simulate responses at known scales
+#' of effect, then check that [multiScale_optim()] recovers them.
 #'
-#' @param dim Positive integer. Number of cells on each side of the square
-#'   raster. The output will be a \code{dim x dim} grid. Default: \code{100}.
+#' @param dim Positive integer. Number of cells along each side of the square
+#'   raster, so the output is a `dim` x `dim` grid. With the default ranges,
+#'   use at least 40, because smaller values round the fine-scale range down
+#'   to zero cells and `cont1` (and below 20, `bin1`) returns `NaN`. See
+#'   Details. Default: `100`.
 #' @param resolution Positive numeric. Cell size (edge length) in map units.
-#'   The raster extent will be \code{dim * resolution} in each direction.
-#'   Default: \code{10}.
-#' @param autocorr_range1 Optional positive numeric. Spatial autocorrelation
-#'   range (in map cells) for surfaces 1 and 3 (\code{bin1}, \code{cont1}).
-#'   Controls the decay rate of the exponential covariance: larger values
-#'   produce smoother, more broadly correlated patterns. If \code{NULL}
-#'   (default), set to 5\% of \code{dim} (fine-scale autocorrelation).
-#' @param autocorr_range2 Optional positive numeric. Autocorrelation range for
-#'   surfaces 2 and 4 (\code{bin2}, \code{cont2}). If \code{NULL} (default),
-#'   set to 25\% of \code{dim} (broad-scale autocorrelation).
-#' @param sill Positive numeric. Partial sill (variance) of the Gaussian
-#'   random field used for all four surfaces. Default: \code{10}.
-#' @param plot Logical. If \code{TRUE}, the raster stack is plotted using
-#'   \code{terra::plot} after simulation. Default: \code{FALSE}.
-#' @param user_seed Optional integer seed for reproducibility. Different
-#'   transformations of \code{user_seed} are applied to each of the four
-#'   surfaces so they are independent but fully reproducible. Default:
-#'   \code{NULL}.
-#' @param ... Additional arguments. Not currently used.
+#'   The raster spans 0 to `dim * resolution` in each direction. Default:
+#'   `10`.
+#' @param autocorr_range1 Optional positive numeric. Autocorrelation range, in
+#'   cells, of the fields behind `bin1` and `cont1`. Larger values give
+#'   smoother, more broadly correlated patterns. Default `NULL` uses
+#'   `floor(0.05 * dim)` (fine-scale autocorrelation).
+#' @param autocorr_range2 Optional positive numeric. Autocorrelation range, in
+#'   cells, of the fields behind `bin2` and `cont2`. Default `NULL` uses
+#'   `floor(0.25 * dim)` (broad-scale autocorrelation).
+#' @param sill Positive numeric. Variance (partial sill) of the exponential
+#'   covariance used for all four fields. Each field is rescaled to 0 to 1
+#'   afterward, so the sill does not change the returned values. Default:
+#'   `10`.
+#' @param plot Logical. If `TRUE`, plot the four layers with `terra::plot()`.
+#'   Default: `FALSE`.
+#' @param user_seed Optional integer seed for reproducibility. Each layer uses
+#'   a different multiple of the seed (1, 9, 99, and 55 times `user_seed`), so
+#'   the layers differ but are fully reproducible. The seed also sets the
+#'   global random number stream. Default: `NULL` (not reproducible).
+#' @param ... Not used.
 #'
-#' @return A \code{SpatRaster} with four named layers:
-#' \describe{
-#'   \item{\code{bin1}}{Binary (0/1) surface with fine-scale autocorrelation
-#'     (\code{autocorr_range1}). Values of 1 where the underlying continuous
-#'     field exceeds its 55th percentile.}
-#'   \item{\code{bin2}}{Binary (0/1) surface with broad-scale autocorrelation
-#'     (\code{autocorr_range2}). Values of 1 where the underlying continuous
-#'     field falls below its 40th percentile.}
-#'   \item{\code{cont1}}{Continuous surface rescaled to [0, 1] with fine-scale
-#'     autocorrelation (75\% of \code{autocorr_range1}).}
-#'   \item{\code{cont2}}{Continuous surface rescaled to [0, 1] with broad-scale
-#'     autocorrelation (125\% of \code{autocorr_range2}).}
-#' }
-#' All layers span the same spatial extent:
-#' \code{[0, dim * resolution] x [0, dim * resolution]}.
+#' @return A `SpatRaster` with `dim` rows and columns, cell size `resolution`,
+#' extent 0 to `dim * resolution` in x and y, no coordinate reference system,
+#' and four layers:
+#' * `bin1`: binary, fine-scale (`autocorr_range1`). 1 where the field,
+#'   rescaled to 0 to 1, is at least 0.55, and 0 elsewhere.
+#' * `bin2`: binary, broad-scale (`autocorr_range2`). 1 where the rescaled
+#'   field is below 0.4, and 0 elsewhere.
+#' * `cont1`: continuous, rescaled to 0 to 1, with a range of
+#'   `floor(0.75 * autocorr_range1)` cells.
+#' * `cont2`: continuous, rescaled to 0 to 1, with a range of
+#'   `floor(1.25 * autocorr_range2)` cells.
+#'
+#' The thresholds are on the rescaled values, not percentiles, so the share
+#' of cells equal to 1 in `bin1` and `bin2` varies from one simulation to the
+#' next.
 #'
 #' @details
-#' Each surface is generated as a Gaussian random field using a fast Fourier
-#' transform (FFT) circulant embedding approach with an exponential covariance
-#' function. The underlying continuous fields are normalized to [0, 1] before
-#' thresholding (binary surfaces) or returning directly (continuous surfaces).
+#' Each layer comes from a Gaussian random field generated with a fast
+#' Fourier transform (FFT) method from the exponential covariance function
+#' `sill * exp(-d / range)`, with `d` in cells. Each field is rescaled to run
+#' from 0 to 1 before it is thresholded (binary layers) or returned
+#' (continuous layers). A range rounded down to zero cells leaves the
+#' covariance undefined and fills the layer with `NaN`. This happens for
+#' `cont1` whenever `autocorr_range1` is below 2, and for `bin1` whenever
+#' `autocorr_range1` is 0. With the default ranges, that means `dim` below 40
+#' and below 20, respectively.
 #'
-#' The two autocorrelation ranges allow simulation of covariates that operate
-#' at different spatial scales, a common scenario in landscape ecology where
-#' some resources are patchily distributed at fine scales and others vary
-#' broadly across the study area.
+#' Two ranges let you simulate covariates that act at different spatial
+#' scales, as when one resource is patchy at fine scales and another varies
+#' broadly across the study area. `vignette("v02-user-guide", package =
+#' "multiScaleR")` uses these layers to simulate zero-inflated, N-mixture,
+#' and occupancy data.
 #'
-#' When \code{user_seed} is provided, independent but reproducible seeds are
-#' derived for each surface as multiples of \code{user_seed}.
+#' @seealso [sim_dat()], [sim_dat_unmarked()], [kernel_prep()]
+#'
+#' @examples
+#' ## Four 50 x 50 layers with 20 m cells (1,000 m on a side)
+#' r_sim <- sim_rast(dim = 50, resolution = 20, user_seed = 555)
+#' r_sim
+#' # Binary layers in the top row, continuous below. Layers ending in 1 are
+#' # fine-scale and layers ending in 2 broad-scale
+#' terra::plot(r_sim)
+#' # Share of cells equal to 1 in each binary layer
+#' terra::global(r_sim[[c("bin1", "bin2")]], "mean")
+#'
+#' ## Broader patterns: raise the fine-scale range from 2 to 10 cells
+#' r_smooth <- sim_rast(dim = 50, resolution = 20, autocorr_range1 = 10,
+#'                      user_seed = 555)
+#' terra::plot(r_smooth[[c("bin1", "cont1")]])
 #'
 #' @export
 #' @rdname sim_rast
 #' @importFrom terra as.int rast plot minmax ext<- values<- crs<-
 #' @importFrom stats rpois rnbinom plogis rbinom dist predict
-#' @noMd
 
 sim_rast <- function(dim = 100,
                      resolution = 10,

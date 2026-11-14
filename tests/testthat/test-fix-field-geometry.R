@@ -36,6 +36,7 @@ small_field_fit <- function() {
 }
 
 test_that("response_field_geometry() accepts a real default-backend field fit", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   f <- small_field_fit()
   expect_null(f$fit$backend)

@@ -13,81 +13,127 @@ posterior_scales(
 )
 }
 \arguments{
-\item{object}{A \code{\link{multiScale_bayes}} fit with posterior draws
-from sampling or either approximation. Prepared objects have no draws.}
+\item{object}{A fitted \code{\link[=multiScale_bayes]{multiScale_bayes()}} object with posterior draws,
+from sampling or either approximation. A prepared object has no draws and
+gives an error.}
 
-\item{level}{Central posterior interval probability; default 0.95.}
+\item{level}{Probability of the central posterior interval; default 0.95.}
 
-\item{draws}{Optional positive integer limiting the number of stored
-posterior draws used. Draws are selected at evenly spaced positions.
-The default \code{NULL} uses all stored posterior draws.}
+\item{draws}{Optional positive integer number of stored draws to use, taken
+at evenly spaced positions. The default \code{NULL} uses every stored draw.
+Fewer draws run faster and add simulation noise.}
 
-\item{scale}{Summary scale: \code{"distance"} (default) gives projected
-map units; \code{"log"} gives natural log distances in those map units.
-Log summaries avoid exponentiating very large distances and provide
-finite-moment summaries under the documented group-SD priors.}
+\item{scale}{\code{"distance"} (default) reports scales in projected map units.
+\code{"log"} reports natural log distances in those units. Log summaries avoid
+exponentiating very large distances, and their means and SDs stay finite
+under the default group-SD prior (see "Read means of long-tailed
+distances").}
 
-\item{estimator}{\code{"draws"} (default) summarizes the stored posterior
-draws. For importance-corrected fits, \code{"weighted"} instead summarizes
-all retained production candidates using their normalized importance
-weights. This avoids additional resampling error. It requires
-\code{draws = NULL} and a fit with importance correction.}
+\item{estimator}{\code{"draws"} (default) summarizes the stored draws, for every
+method. \code{"weighted"} summarizes all retained production candidates of an
+importance-corrected fit with their normalized importance weights, which
+avoids the extra noise of resampling. It requires \code{draws = NULL} and a
+fit made with \code{control = list(correction = "importance")}.}
 }
 \value{
-A data frame with one row per predictor and distinct scale-formula
-covariate combination. \code{covariate} identifies the landscape predictor;
-\code{group} labels the scale predictors; \code{row} is a representative
-observation row. \code{mean}, \code{median}, \code{sd}, \code{lower}, and
-\code{upper} summarize the stored draws in map units, or log map units
-when \code{scale = "log"}. The \code{mean} and \code{sd} are empirical
-draw summaries; a finite sample does not establish that the corresponding
-posterior moment exists. Exponentiate log-scale medians and interval
-limits to express them as distances. Exponentiating a log mean gives a
-geometric summary, not an arithmetic posterior mean.
-Weighted summaries use empirical inverse-CDF quantiles and the population
-SD of the finite weighted candidate distribution. They do not increase
-importance effective sample size, correct an unseen mode, or establish
-that an arithmetic posterior moment exists.
-\code{p_below_min_D} and \code{p_above_max_D} give posterior mass outside
-the input reference range. These are truncation and resolution diagnostics,
-not automatic evidence of a biological boundary.
+A data frame with one row per landscape predictor and distinct
+combination of scale-formula covariates and groups.
+\itemize{
+\item \code{covariate}: the landscape predictor.
+\item \code{group}: a label for the combination, such as \code{"year=2021"}, or
+\code{"shared"} for a predictor with a single scale.
+\item \code{row}: a representative observation row with that combination.
+\item \code{mean}, \code{median}, \code{sd}, \code{lower}, \code{upper}: the posterior mean, median,
+and SD, and the limits of the central \code{level} credible interval. Values
+are in map units, or in log map units when \code{scale = "log"}. For log
+summaries, \code{exp()} of the median and the limits gives distances, but
+\code{exp()} of the mean gives a geometric mean, not the arithmetic mean
+distance.
+\item \code{p_below_min_D}, \code{p_above_max_D}: the posterior probability that the
+scale lies below \code{min_D} or above \code{max_D} of the prepared inputs. These
+flag truncation and resolution limits. They are not evidence of a
+biological boundary.
+}
+
+\code{mean} and \code{sd} summarize a finite set of draws. A finite value does not
+show that the corresponding posterior moment exists. With
+\code{estimator = "weighted"}, quantiles are empirical inverse-CDF quantiles of
+the weighted candidates and \code{sd} is the SD of that finite weighted
+population.
 }
 \description{
-Report shared or group-specific landscape scales in projected map units,
-including their posterior uncertainty and mass outside the reference range.
+Report the scale of each landscape predictor in projected map units, for
+every distinct combination of scale-formula covariates and groups, with its
+posterior uncertainty and the posterior mass outside the range of the
+prepared inputs.
 }
-\details{
-For \code{~1 + (1 | year)}, each row describes one fitted year's
-scale after partial pooling. A median is not a separately optimized annual
-estimate. The shared log-scale intercept describes a population median;
-it differs from the arithmetic mean of annual scales. Intervals describe
-uncertainty conditional on the likelihood, priors, maps, and binning.
+\section{Read annual scales after partial pooling}{
+For a scale formula such as \code{~1 + (1 | year)}, each row describes one
+fitted year's scale after partial pooling. Its median is not a separately
+estimated annual value. The shared log-scale intercept describes a
+population median, which differs from the arithmetic mean of the annual
+scales. Intervals are conditional on the likelihood, the priors, the maps,
+and the binning. With \code{scale = "log"}, \code{sd} measures uncertainty in one
+year's log distance. It differs from the between-year SD reported in
+\code{summary(object)$group_sd}.
+}
 
-A random scale effect is \eqn{\tau z}, with standard-normal \eqn{z}
-and half-normal \eqn{\tau} whose prior scale is \eqn{s}. Its prior
-exponential moment of order \eqn{r} exists only when \eqn{rs < 1}.
-Consequently, \code{scale_group_sd = 0.5} places annual distance variance
-at the infinite-moment boundary; \code{scale_group_sd >= 1} also permits
-an infinite arithmetic distance mean. A binned likelihood can retain
-these tails because very large distances approach uniform weighting
-within the extracted neighborhood. Prefer medians and interval quantiles
-for distance inference, and \code{scale = "log"} for means and SDs.
-Log-scale SD here measures uncertainty in a fitted year's log distance;
-it differs from the between-year population SD in \code{summary(object)}.
+\section{Read means of long-tailed distances}{
+A random scale effect is \eqn{\tau z}{tau z}, with standard-normal z and a
+half-normal tau whose prior scale is s (\code{scale_group_sd}). Its prior
+exponential moment of order r exists only when \eqn{r s < 1}{r s < 1}. The
+default \code{scale_group_sd = 0.5} therefore places the variance of annual
+distances at the boundary where it becomes infinite, and
+\code{scale_group_sd >= 1} also allows an infinite arithmetic mean distance. The
+binned likelihood can keep these tails, because very large distances
+approach uniform weighting within the extracted neighborhood. Report medians
+and interval limits for distances, and use \code{scale = "log"} when you need
+means and SDs.
 }
+
+\section{Summarize importance-corrected fits directly}{
+For a fit made with \code{correction = "importance"}, \code{estimator = "weighted"}
+summarizes the retained candidate population with its normalized weights
+instead of the resampled draws. Both target the same posterior. The weighted
+version avoids multinomial resampling noise, but it neither raises the
+importance effective sample size nor recovers a posterior region the
+candidates missed. Candidates with zero weight are dropped. The cautions
+about infinite distance moments still apply.
+
+\code{\link[=plot.multiScaleR_bayes]{plot.multiScaleR_bayes()}} uses the weighted estimator by default for
+corrected fits, while this function and \code{summary()} default to the draws.
+Request \code{estimator = "weighted"} in both to keep a table and a plot
+consistent.
+
+Weighted summaries are only as precise as the candidate population.
+\code{importance_max} in the \code{control} list of \code{\link[=multiScale_bayes]{multiScale_bayes()}} is a cap, and
+a population that passes its checks at a smaller size stops there. To
+require more candidates for precise quantiles, raise \code{importance_min} as
+well, as in \code{control = list(correction = "importance", importance_min = 65536, importance_max = 131072)}. Larger populations cost
+more and do not guarantee a chosen quantile error. Check the retained count
+in \code{fit$diagnostics$candidates}, and compare independently seeded fits.
+}
+
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
   package = "multiScaleR"))
-fit <- example$fits$pooled  # compact draws from an actual annual-scale fit
+fit <- example$fits$pooled  # compact draws from an annual-scale NUTS fit
 annual <- posterior_scales(fit)
-annual[c("group", "median", "lower", "upper")]
-# Distances and central 95\% credible intervals are in meters in this example.
+annual[c("group", "median", "lower", "upper", "p_below_min_D")]
+# Sigma for each year in meters, with central 95\% credible intervals.
+# Part of each posterior lies below min_D (100 m, one raster cell).
+
 posterior_scales(fit, scale = "log")[c("group", "mean", "sd")]
-# Log-distance SD measures uncertainty in one year's scale, not variation among years.
+# The log-distance SD measures uncertainty in one year's scale, not the
+# variation among years.
+
+# Convert the median sigma to the radius holding 90\% of the kernel weight
+kernel_dist(sigma = annual$median[1], kernel = "gaussian")
 }
 \seealso{
-\code{\link{multiScale_bayes}}, \code{\link{plot.multiScaleR_bayes}},
-\code{\link{diagnose_bayes_scales}};
+\code{\link[=multiScale_bayes]{multiScale_bayes()}}, \link[=multiScaleR_bayes-class]{multiScaleR_bayes},
+\code{\link[=plot.multiScaleR_bayes]{plot.multiScaleR_bayes()}}, \code{\link[=predict_scales]{predict_scales()}},
+\code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}}, \code{\link[=kernel_dist]{kernel_dist()}};
 \code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
 \code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
 }

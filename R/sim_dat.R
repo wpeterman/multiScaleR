@@ -1,100 +1,133 @@
 # Data sim function -------------------------------------------------------
-#' @title Simulate data for optimizing scales of effect
+#' @title Simulate Responses at Known Scales of Effect
 #'
-#' @description Generates simulated response data with known kernel-weighted
-#' landscape covariates at a controlled scale of effect. Useful for testing and
-#' demonstrating \code{\link{multiScale_optim}} with data where the true
-#' parameters are known.
+#' @description Simulates survey points and a response that depends on
+#' kernel-weighted landscape covariates at scales of effect you choose. Fit
+#' the simulated data with [kernel_prep()] and [multiScale_optim()] to check
+#' whether the true scales and coefficients are recovered, or to explore how
+#' sample size and kernel choice affect estimation.
 #'
-#' @param alpha Numeric scalar. Intercept term for the linear predictor.
-#'   Default: \code{1}.
-#' @param beta Numeric vector of slope coefficients, one per raster layer in
-#'   \code{raster_stack}. Length must equal \code{nlyr(raster_stack)}.
-#' @param kernel Character. Kernel function used to weight raster values by
-#'   distance when generating the true covariate values. One of
-#'   \code{"gaussian"} (default), \code{"exp"} (negative exponential),
-#'   \code{"expow"} (exponential power), or \code{"fixed"} (fixed-radius
-#'   buffer).
-#' @param type Character. Distribution of the simulated response variable. One
-#'   of:
-#'   \describe{
-#'     \item{\code{"count"}}{(Default) Poisson-distributed counts.}
-#'     \item{\code{"count_nb"}}{Negative binomial counts with dispersion
-#'       \code{StDev}.}
-#'     \item{\code{"occ"}}{Bernoulli (0/1) occupancy data via a logistic
-#'       link.}
-#'     \item{\code{"gaussian"}}{Normally distributed continuous response with
-#'       standard deviation \code{StDev}.}
-#'   }
-#' @param StDev Positive numeric. Dispersion parameter for \code{"count_nb"}
-#'   (the \code{size} argument of \code{rnbinom}) or the standard deviation for
-#'   \code{"gaussian"} responses. Default: \code{0.5}.
-#' @param n_points Positive integer or a \code{SpatVector}/\code{sf} point
-#'   object. When an integer, that many points are placed on a hexagonal grid
-#'   covering the raster extent (trimmed to 85% of the x/y range) and then
-#'   randomly subsampled. When a spatial object is supplied, those points are
-#'   used directly. Default: \code{50}.
-#' @param min_D Positive numeric. Minimum inter-point spacing on the hexagonal
-#'   grid. If \code{NULL} (default), set automatically to
-#'   \code{1.55 * max(sigma)}.
-#' @param raster_stack A \code{SpatRaster} object. Layer names become covariate
-#'   names in the returned data frame.
-#' @param sigma Positive numeric vector. True kernel scale parameters, one per
-#'   raster layer. These are the values that \code{\link{multiScale_optim}}
-#'   should recover. Must be in the same units as the raster projection.
-#' @param shape Positive numeric vector. Shape parameters for the exponential
-#'   power kernel (\code{kernel = "expow"}), one per raster layer. Values
-#'   between 1 and 50 are typical. Required when \code{kernel = "expow"}.
-#' @param max_D Positive numeric. Maximum buffer radius for
-#'   \code{\link{kernel_prep}} during simulation. If \code{NULL} (default), set
-#'   automatically to 110% of the one-dimensional distance enclosing 99%
-#'   of kernel weight along a line at \code{max(sigma)}. This historical default
-#'   is smaller than the radius enclosing 99% of weight on a plane; supply a
-#'   larger \code{max_D} if that planar cutoff is needed.
-#' @param user_seed Optional integer seed for reproducibility. Default:
-#'   \code{NULL}.
-#' @param ... Additional arguments. Not currently used.
+#' @param alpha Numeric scalar. Intercept of the linear predictor, on the link
+#'   scale of `type` (log for counts, logit for occurrence, identity for
+#'   `"gaussian"`). Default: `1`.
+#' @param beta Numeric vector of slopes, one per layer of `raster_stack` and
+#'   in the same order, on the link scale. Each slope is the effect of a
+#'   one standard deviation change in that standardized covariate. Required.
+#' @param kernel Character. Kernel used to weight raster values by distance
+#'   when computing the true covariates: `"gaussian"` (default), `"exp"`
+#'   (negative exponential), `"expow"` (exponential power), or `"fixed"`
+#'   (fixed-radius buffer). See [multiScaleR-kernels].
+#' @param type Character. Distribution of the simulated response:
+#'   * `"count"` (default): Poisson counts with mean `exp(eta)`.
+#'   * `"count_nb"`: negative binomial counts with mean `exp(eta)` and size
+#'     (dispersion) `StDev`.
+#'   * `"occ"`: binary (0 or 1) occurrence with probability `plogis(eta)`.
+#'   * `"gaussian"`: normal values with mean `eta` and standard deviation
+#'     `StDev`.
+#' @param StDev Positive numeric scalar. The `size` (dispersion) of the
+#'   negative binomial for `"count_nb"`, where smaller values give more
+#'   overdispersion, or the residual standard deviation for `"gaussian"`.
+#'   Unused for `"count"` and `"occ"`. Default: `0.5`.
+#' @param n_points Either a positive integer number of points to simulate, or
+#'   a `SpatVector` of points to use directly. An integer places points on a
+#'   regular square grid over the interior of the raster and samples
+#'   `n_points` of them at random (see Details). Default: `50`.
+#' @param min_D Positive numeric scalar. Starting spacing, in map units, of
+#'   the point grid when `n_points` is an integer. Default `NULL` uses
+#'   `1.55 * max(sigma)`. The spacing shrinks until the grid holds at least
+#'   `n_points` points.
+#' @param raster_stack A `SpatRaster` whose layers are the landscape
+#'   variables, such as the output of [sim_rast()]. Layer names become the
+#'   covariate names. Required.
+#' @param sigma Positive numeric vector of true scale parameters, in map
+#'   units, one per layer of `raster_stack`. These are the values that
+#'   [multiScale_optim()] should recover. Required.
+#' @param shape Positive numeric vector of true shape parameters, one per
+#'   layer. Required when `kernel = "expow"` and ignored otherwise.
+#' @param max_D Positive numeric scalar. Radius, in map units, of the buffer
+#'   used to compute the true covariates with [kernel_prep()]. Default `NULL`
+#'   uses 1.1 times the line-based (1D) distance holding 99% of the kernel
+#'   weight at `max(sigma)`. That is shorter than the planar radius holding
+#'   99%, so supply a larger value if you need less truncation. Supply it
+#'   when `kernel = "expow"`, because the default cannot be computed for
+#'   that kernel.
+#' @param user_seed Optional integer seed. When supplied, `set.seed()` is
+#'   called with it, which makes the simulation reproducible and also resets
+#'   the global random number stream. Default: `NULL`.
+#' @param ... Not used.
 #'
 #' @return A named list with three elements:
-#' \describe{
-#'   \item{\code{obs}}{Numeric vector of length \code{n_points} containing the
-#'     simulated response values.}
-#'   \item{\code{df}}{Data frame with \code{n_points} rows and one column per
-#'     raster layer plus a \code{y} column. The raster columns contain the
-#'     true kernel-weighted mean values, scaled to zero mean and unit variance.
-#'     This data frame can be used to fit a model for
-#'     \code{\link{multiScale_optim}}.}
-#'   \item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
-#'     An \code{obs} column is appended containing the simulated response
-#'     values. Pass this to \code{\link{kernel_prep}} as the \code{pts}
-#'     argument.}
-#' }
+#' * `obs`: numeric vector with the simulated response, one value per point.
+#' * `df`: data frame with the response in column `y` and one column per
+#'   raster layer. The layer columns hold the true kernel-weighted means,
+#'   standardized to mean 0 and standard deviation 1. A model fitted to this
+#'   data frame estimates the coefficients at the true scales.
+#' * `pts`: the survey points with an `obs` column holding the response.
+#'   With an integer `n_points`, an `sf` POINT object with no coordinate
+#'   reference system. Otherwise the supplied points. Pass it to
+#'   [kernel_prep()] as `pts`.
 #'
 #' @details
-#' Points are distributed on a hexagonal grid across the interior of the raster
-#' extent (85% of the range in each direction to avoid edge effects), then
-#' randomly subsampled to \code{n_points}. The \code{min_D} spacing controls
-#' the grid resolution; if the grid produces fewer points than \code{n_points},
-#' \code{min_D} is reduced iteratively by 3% until enough points are generated.
+#' **Model.** For each point, `sim_dat()` computes the kernel-weighted mean of
+#' each layer at its true `sigma` (and `shape`) with [kernel_prep()], and
+#' standardizes it across points. The linear predictor is
+#' `eta = alpha + sum(beta * x)`, where `x` holds those standardized
+#' covariates, and the response is drawn from the distribution set by `type`.
 #'
-#' Kernel-weighted covariate values are computed using
-#' \code{\link{kernel_prep}} at the specified \code{sigma} (and \code{shape})
-#' values. These represent the "true" covariate values that the optimization
-#' should recover.
+#' **Point placement.** With an integer `n_points`, points start as the cell
+#' centers of a regular square grid over a window inset from the raster
+#' edges, which reduces edge effects. The inset is 15% of the raster's
+#' maximum x coordinate on each side, and the same limits are used for x and
+#' y. This assumes a square raster whose extent starts at 0, as produced by
+#' [sim_rast()]. Rasters with other extents can fail or place points poorly,
+#' so supply your own points through `n_points` for them. The grid spacing
+#' starts at 97% of `min_D` and shrinks by 3% at a time until the grid holds
+#' at least `n_points` points, and then `n_points` of them are sampled at
+#' random.
+#'
+#' **Recovering the scales.** Prepare `pts` and the same `raster_stack` with
+#' [kernel_prep()], using a `max_D` comfortably above the largest true
+#' scale. Fit a starting model to the standardized covariates, run
+#' [multiScale_optim()], and compare the estimated sigma values with `sigma`.
+#' The example below shows these steps.
+#'
+#' @seealso [sim_rast()], [sim_dat_unmarked()], [kernel_prep()],
+#'   [multiScale_optim()]. `vignette("v02-user-guide", package =
+#'   "multiScaleR")` simulates zero-inflated counts with known scales.
 #'
 #' @examples
-#' rs <- sim_rast()
-#' rs <- terra::subset(rs, c(1,3))
-#' s_dat <- sim_dat(alpha = 0.5,
-#'                  beta = c(0.75,-0.75),
-#'                  kernel = 'gaussian',
-#'                  sigma = c(75, 150),
-#'                  type = 'count',
-#'                  raster_stack = rs,
-#'                  max_D = 400)
+#' ## Four simulated layers. Keep one binary and one continuous layer
+#' rs <- sim_rast(user_seed = 555)
+#' rs <- terra::subset(rs, c("bin1", "cont1"))
 #'
-#' plot(s_dat$df$y ~ s_dat$df$bin1)
-#' plot(s_dat$df$y ~ s_dat$df$cont1)
+#' ## Counts with true scales of 75 m (bin1) and 150 m (cont1)
+#' s_dat <- sim_dat(alpha = 0.5,
+#'                  beta = c(0.75, -0.75),   # log-scale effect per SD
+#'                  kernel = "gaussian",
+#'                  sigma = c(75, 150),
+#'                  type = "count",
+#'                  n_points = 75,
+#'                  raster_stack = rs,
+#'                  max_D = 400,
+#'                  user_seed = 999)
+#' # Response and the true standardized covariates
+#' head(s_dat$df)
+#' # Counts rise with bin1 and fall with cont1
+#' plot(y ~ bin1, data = s_dat$df)
+#' plot(y ~ cont1, data = s_dat$df)
+#'
+#' \donttest{
+#' ## Check whether multiScale_optim() recovers the true scales
+#' # max_D well above the largest true scale
+#' kernel_inputs <- kernel_prep(pts = s_dat$pts, raster_stack = rs,
+#'                              max_D = 750, verbose = FALSE)
+#' mod <- glm(y ~ bin1 + cont1, family = poisson,
+#'            data = data.frame(y = s_dat$obs, kernel_inputs$kernel_dat))
+#' fit <- multiScale_optim(fitted_mod = mod, kernel_inputs = kernel_inputs,
+#'                         verbose = FALSE)
+#' # Compare the sigma estimates with the true 75 and 150 m
+#' summary(fit)
+#' }
 #'
 #' @export
 #' @importFrom terra as.polygons ext nlyr rast

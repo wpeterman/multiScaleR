@@ -29,500 +29,602 @@ multiScale_bayes(
 )
 }
 \arguments{
-\item{object}{A \code{multiScaleR_bayes} object.}
+\item{object}{A \code{multiScaleR_bayes} object from \code{multiScale_bayes()},
+prepared or fitted.}
 
-\item{...}{Reserved for method extensions; unsupported arguments cause an error.}
+\item{...}{Not used. Supplying any further argument is an error.}
 
-\item{x}{A \code{multiScaleR_bayes} object to print.}
+\item{x}{A \code{multiScaleR_bayes} object to print, prepared or fitted.}
 
-\item{formula}{Two-sided response formula. Numeric spatial predictors can
-enter native R crossings, nesting, and factor interactions, such as
-\code{habitat * year} or \code{habitat:forest}. Fixed transformations,
-formula offsets, and additive random intercepts such as \code{(1 | site)}
-are supported. Kernel-only scalar arithmetic and supported smooth base
-functions retain the native coefficient basis. Fixed inputs within a
-dynamic expression, adaptive dynamic bases, arbitrary or nondifferentiable
-functions, and kernel-valued offsets remain guarded.}
+\item{formula}{Two-sided response formula, such as
+\code{count ~ habitat + factor(year) + (1 | site)}. Name each landscape
+predictor as it is named in \code{inputs}. Its kernel-weighted value is
+computed at every candidate scale, so you never supply that column. The
+formula accepts fixed covariates, interactions with landscape predictors,
+offsets, and additive random intercepts. See "Write the response formula".}
 
-\item{inputs}{Prepared inputs from \code{\link{kernel_prep}} or
-\code{\link{kernel_prep_by_group}}. Gaussian and exponential kernel means
-and optimized weighted surface SQ are supported, alone or together.
-Declared fixed-radius surface and landscape metrics are ordinary numeric
-covariates, using their original preparation normalization. Their original
-prepared columns must be retained in \code{data}; no bandwidth is estimated
-for them. Undefined or constant prepared metrics remain errors.
-Kernel means require bins; SQ requires retained raw cell buffers and
-source specifications. Distances use the projected map units of these inputs.}
+\item{inputs}{Prepared landscape inputs from \code{\link[=kernel_prep]{kernel_prep()}} or
+\code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}, built with a Gaussian or exponential kernel.
+Kernel means need the binned summaries (\code{bin = TRUE}, the default).
+Optimized weighted surface SQ needs the retained raw cell buffers and
+source specifications. Means and SQ can be combined. Distances, priors,
+and reported scales all use the projected map units of these inputs.
+Declared fixed-radius surface and landscape metrics enter as ordinary
+numeric covariates with their original preparation normalization, so keep
+their prepared columns in \code{data}. No scale is estimated for them, and a
+constant or undefined metric is an error.}
 
-\item{data}{Data frame with one row per observation, including the response,
-fixed covariates, and grouping variables. Spatial columns are reconstructed
-from prepared spatial inputs when their scales are estimated. These optimized
-columns need not be supplied in \code{data}. Missing
-response or model covariate values cause an error rather than row deletion.}
+\item{data}{Data frame with one row per observation, holding the response,
+fixed covariates, and grouping variables. Landscape predictors whose
+scales are estimated are rebuilt from \code{inputs} and need not appear here.
+A missing response or covariate value is an error. Rows are never
+dropped.}
 
-\item{scales}{Named list of one-sided formulas, one per modeled spatial
-predictor. \code{list(habitat = ~1 + (1 | year))} estimates partially pooled
-year-specific scales. \code{~year} gives fixed year effects on log scale.
-\code{~0 + year} gives independent annual log-scale coefficients with
-the same distance prior for every factor level, without estimated pooling.
-Other formulas need an intercept. The default \code{NULL} uses one shared
-scale per predictor, equivalent to \code{~1} for every predictor.
-A dot expands observation-data columns; remove response variables, row
-keys, and unrelated columns explicitly. Optimized response predictors
-cannot also predict spatial scales. Removed terms add no scale parameters.}
+\item{scales}{Named list with one one-sided formula for each landscape
+predictor in \code{formula}, such as \code{list(habitat = ~1 + (1 | year))}. Each
+formula models the natural log of that predictor's scale. The default
+\code{NULL} gives every predictor one shared scale, the same as \code{~1}. See
+"Write the scale formulas".}
 
-\item{family}{Response family: \code{"nbinom2"} (default, log link),
-\code{"poisson"} (log), \code{"binomial"} (logit), or \code{"gaussian"}
-(identity). Use numeric \code{0}/\code{1} or logical
-\code{FALSE}/\code{TRUE} values for Bernoulli responses,
-a two-level factor with success in its second level, or
-\code{cbind(successes, failures)} for grouped binomial responses. Logical
-count columns represent zero/one counts and retain the same trial totals.
-The logit response prediction is a success probability. NB2 variance is
-\eqn{\mu + \mu^2/\theta}.}
+\item{family}{Response family, one of \code{"nbinom2"} (default, negative
+binomial with a log link), \code{"poisson"} (log link), \code{"binomial"} (logit
+link), or \code{"gaussian"} (identity link). See "Choose a response family".}
 
-\item{row_id}{Optional name of a column in \code{data} containing prepared
-\code{binned$point_ids}, or \code{kernel_dat} row names for surface-only
-inputs. The default matches observation row names.
-Repeated IDs can reuse a static landscape for repeated observations.
-For annual rasters, use distinct prepared site-year IDs to match each
-observation to its assigned annual map.}
+\item{row_id}{Optional name of a column in \code{data} that matches each row to
+its prepared landscape, an entry of \code{inputs$binned$point_ids} (or a row
+name of \code{inputs$kernel_dat} for surface-only inputs). The default \code{NULL}
+matches the row names of \code{data}. IDs may repeat, so repeated visits can
+share one static landscape. With one map per year, use site-year IDs so
+each row reads the map for its own year. The name is kept with the fit
+and reused by \code{predict()} and \code{simulate()}.}
 
-\item{priors}{Named list overriding prior settings. \code{scale_median}
-is a positive distance, or a named vector for all kernel predictors;
-its default is \code{sqrt(inputs$min_D * inputs$max_D)}.
-\code{scale_intercept_sd = 1} and \code{scale_coef_sd = 0.5} are normal
-prior SDs on log-scale intercepts (or each coefficient in
-\code{~0 + year}) and other scale coefficients.
-\code{scale_group_sd = 0.5} is the half-normal prior scale for
-between-group log-scale SDs. \code{beta_sd = 2.5} is the normal
-prior SD for response coefficients. \code{response_group_sd = 1} is
-the half-normal prior scale for response random-intercept SDs.
-\code{dispersion_log_mean = 0} and \code{dispersion_log_sd = 1} define
-a normal prior on log NB2 theta or log Gaussian residual SD.}
+\item{priors}{Named list of prior settings to change. Settings you leave
+out take their defaults, and the default \code{list()} uses them all. See
+"Set the priors" for every setting and its default.}
 
-\item{method}{\code{"sample"} runs full Bayesian NUTS sampling through
-RTMB and tmbstan, with Laplace approximation disabled. NUTS is a
-gradient-based Markov chain Monte Carlo method. \code{"slice"} samples the
-same joint posterior in R and uses no optional fitting packages. Install
-posterior (version 1.6.0 or later) to check chain mixing and precision.
-\code{"prepare"} validates
-formulas, rows, priors, and bins without loading either optional package.
-\code{"laplace"} fits a joint Gaussian approximation to the posterior
-in the same unconstrained, noncentered coordinates used by the sampler.
-It requires only RTMB and does not run MCMC. Joint Laplace and
-uncorrected marginal Laplace are exploratory. Matched simulations
-found discrepancies in annual-scale probabilities even when
-numerical diagnostics passed. Confirm quantities of interest with
-full posterior sampling.
-\code{"marginal"} integrates one scale-group SD numerically, using
-conditional Laplace approximations for all remaining parameters. This
-retains a non-Gaussian SD distribution and also requires only RTMB.}
+\item{method}{Computation, one of \code{"sample"} (default, NUTS sampling),
+\code{"prepare"}, \code{"slice"}, \code{"laplace"}, or \code{"marginal"}. The method changes
+how the posterior is computed, not the model, likelihood, or priors.
+\code{"prepare"} checks the data, formulas, priors, and bins without fitting.
+See "Choose a computation method".}
 
-\item{chains}{Number of sampling chains; default 4.}
+\item{chains}{Number of independent chains for \code{"sample"} and \code{"slice"};
+default 4. Chain diagnostics need at least two.}
 
-\item{iter}{Total iterations per chain, including warmup; default 2000.}
+\item{iter}{Iterations per chain, including warmup; default 2000. Raise it
+when effective sample sizes fall short.}
 
-\item{warmup}{Adaptation iterations discarded per chain; default
-\code{floor(iter / 2)}.}
+\item{warmup}{Iterations at the start of each chain that are discarded
+while the sampler tunes itself; default \code{floor(iter / 2)}.}
 
-\item{seed}{Optional positive integer sampling seed; default \code{NULL}.}
+\item{seed}{Optional positive integer seed for sampling or approximation
+draws; default \code{NULL}. Slice, Laplace, and marginal fits restore your own
+random-number state after using a supplied seed. Slice sampling draws its
+chain seeds before any work is sent to workers, so a seed gives the same
+chains at every \code{cores} setting.}
 
-\item{control}{Named list with optional NUTS settings
-\code{adapt_delta} (default 0.9) and \code{max_treedepth} (default 12).
-Use an empty list for slice sampling.
-For \code{method = "laplace"}, instead supports \code{starts} (default 6,
-deterministic dispersed initial values) and \code{iter.max} (default 1000,
-optimizer iterations per start). All starts contribute to computational cost.
-For \code{"marginal"}, supports \code{starts} (default 3 per conditional
-node), \code{iter.max} (1000), \code{max_grid} (129; one of 33, 65, 129,
-or 257), \code{cdf_tol} (0.005), \code{quantile_tol} (0.02 prior SDs),
-and \code{logz_tol} (0.01). These bound changes in the marginal SD CDF,
-its 2.5\%, 50\%, and 97.5\% quantiles, and the log normalizing constant
-between successive integration grids. More grid points cost more time.
-\code{correction = "none"} retains this original approximation.
-\code{correction = "importance"} additionally corrects a heavy-tailed
-proposal against the full posterior; this requires optional package
-posterior (version 1.6.0 or later). \code{importance_max = 65536} caps
-candidates in the final production stage
-(one of 16384, 32768, 65536, or 131072), after a separate 16384-candidate
-training pilot. \code{importance_min = 16384} sets the minimum retained
-production count, using the same allowed values and not exceeding
-\code{importance_max}. Increasing only the maximum does not force a larger
-population when a smaller one passes diagnostics. Use a larger minimum
-when precise annual quantiles need more candidates. This does not guarantee
-a chosen Monte Carlo error or correct a missed posterior region.
-\code{importance_df = 7} sets the conditional Student t proposal's degrees
-of freedom. The alternative \code{5} provides heavier proposal tails and
-can improve reliability when posterior importance ratios are unstable.
-This changes sampling efficiency, not priors or diagnostic thresholds;
-heavier tails can also require more candidates.
-\code{conditional_beta = FALSE} retains the joint response-coefficient
-proposal. Experimental \code{TRUE} proposes those coefficients conditional on each
-candidate's scales and response random effects. Gaussian conditionals are
-exact. The other families use a normalized Student t proposal with
-7 degrees of freedom. A fixed 20 percent latent-prior defensive component
-helps cover regions missed by local geometry. Both corrected proposals have
-simulation evidence for Gaussian, Poisson, grouped binomial and NB2
-responses with one annual scale-group SD. See
-\code{vignette("v15-bayesian-computation", package = "multiScaleR")}
-for the tested models, diagnostic results and limits.
-These are proposal changes, not changes to model priors or diagnostics.
-Conditional optimization costs more per candidate and does not guarantee
-precise interval endpoints. This option requires importance correction
-and selects \code{nested_response = FALSE} unless explicitly supplied;
-an explicit \code{nested_response = TRUE} is incompatible.
-\code{importance_refinements = 1} permits one further
-adaptation if the first 16384-candidate production stage fails; those
-training candidates are discarded and a fresh final stage is drawn.
-Values 0, 1, or 2 are allowed. Larger limits can improve Monte Carlo
-precision and cost more time. \code{nested_response} defaults to \code{TRUE}
-with importance correction unless conditional coefficients are requested,
-and to \code{FALSE} otherwise. It integrates response random effects when
-locating conditional modes. Explicit \code{TRUE} currently
-requires importance correction. Setting it to \code{FALSE} retains the
-original joint conditional proposal, which can miss response-SD uncertainty.}
+\item{control}{Named list of method-specific settings; default \code{list()}
+uses each method's defaults. NUTS accepts \code{adapt_delta} and
+\code{max_treedepth}. Slice sampling accepts no settings, so leave the list
+empty. See "Set computation controls" for every setting, including those
+for \code{"laplace"} and \code{"marginal"}.}
 
-\item{laplace_draws}{Number of approximation draws
-for \code{method = "laplace"} or \code{"marginal"}; default 2000,
-minimum 2. Without importance correction these are independent Gaussian
-or mixture draws. Corrected draws are resampled from a finite weighted
-candidate population. Increasing this count reduces resampling error,
-but does not increase importance effective sample size or improve the
-underlying Laplace approximation.}
+\item{laplace_draws}{Number of draws taken from a \code{"laplace"} or
+\code{"marginal"} approximation for summaries; default 2000, minimum 2.
+Without importance correction these are independent Gaussian or mixture
+draws. With it they are resampled from the weighted candidates. More draws
+reduce resampling noise in summaries. They do not improve the
+approximation or raise the importance effective sample size.}
 
-\item{cores}{Positive integer worker limit; default 1. NUTS and slice
-sampling distribute chains. Joint and marginal Laplace distribute
-optimizer starts. With importance correction, workers also evaluate
-batches of candidate posterior densities. Preparation uses one process.
-Parallel fits use the optional package processx to launch local R
-processes. Each worker holds its own model data and, where needed, its
-own differentiation tape. Temporary worker files are removed after fitting.
-The effective limit is recorded in \code{sampling$cores},
-\code{laplace$cores}, or \code{marginal$cores}, depending on the method.
-For a given seed, slice sampling uses the same chain seeds at every core
-count. The worker limit for sampling is the number of chains. For
-uncorrected Laplace and marginal fits, it is the number of optimizer
-starts. Marginal integration keeps grid nodes in order so each node can
-use the previous fits as starts. Importance proposal generation and
-diagnostics run in the main process. Worker startup and data transfer
-can make small fits slower.}
+\item{cores}{Positive integer limit on parallel R worker processes. The
+default of 1 runs everything in the current session. Parallel fits need
+the optional package processx. See "Use parallel workers".}
 }
 \value{
-A \code{multiScaleR_bayes} list with \code{specification} (frozen
-model rows, bin summaries, formulas, priors, reference standardization,
-and parameter layout), \code{parameters} (initial parameters),
-\code{call}, \code{inference}, and \code{inference_metadata}.
-The metadata records \code{schema_version}, \code{target}, \code{method},
-\code{objective}, \code{population_priors}, \code{response_normalizers},
-\code{integration}, \code{solver}, and \code{uncertainty}. Integration
-labels \code{scale_effects}, \code{response_effects} and
-\code{population_parameters} describe how each present block is treated.
-Uncertainty records \code{intervals}, \code{population_parameters},
-\code{annual_scales} and \code{calibration}. Prepared objects report no computed integration
-or intervals. Posterior methods propagate population uncertainty and label
-their intervals as marginal credible intervals. The private hierarchical
-likelihood prototypes instead optimize population parameters and do not
-provide calibrated confidence intervals. Their conditional annual summaries
-omit population-parameter uncertainty. These methods therefore have
-different inferential targets even when both use Laplace integration.
-\code{diagnostics_field} identifies the unchanged \code{diagnostics}
-component. \code{metadata_establishes_eligibility = FALSE} and
-\code{uncertainty$calibration = "not_established"} distinguish the method
-description from numerical acceptance or demonstrated interval coverage.
-Older saved fits can lack this additive metadata and remain usable.
-Newly prepared fits retain compact training levels/contrasts and the
-original row-ID column name, when supplied, for new-observation prediction.
-Sampled fits additionally contain \code{draws} (posterior matrices by
-parameter block), \code{diagnostics}, and \code{sampling} settings.
-NUTS fits retain \code{sampler} (a \code{stanfit}). Slice fits retain
-\code{chains}, a numeric array ordered by post-warmup iteration, chain, and
-parameter. Without posterior installed, a slice fit records
-\code{diagnostics$passed = NA} and the reason in \code{diagnostics$reason}.
-Install posterior to compute derived diagnostics from the saved chains.
-Laplace fits contain \code{draws}, numerical \code{diagnostics}, and
-\code{laplace}: the unconstrained \code{mode}, joint \code{covariance},
-\code{hessian}, optimizer \code{starts}, \code{draws}, \code{seed}, and
-\code{coordinates}. These matrices follow the concatenated parameter layout.
-They retain correlations with coefficients and group SDs. No sampler is stored.
-Marginal fits instead store \code{marginal}: prior-CDF coordinates
-\code{x}, normalized node \code{weights}, interpolated \code{density}
-and \code{cumulative} probability, \code{log_normalizer}, conditional
-\code{nodes} (modes, Hessians, covariances, and optimizer attempts),
-\code{prior_sd}, \code{refinement}, \code{converged}, parameter
-\code{hyper_index}, \code{draws}, \code{seed}, \code{control}, and
-\code{coordinates}. \code{parameter_indices} maps node parameters to the
-full concatenated layout; with one integrated response grouping term,
-corrected node geometry excludes its latent site effects. Its log normalizer describes the approximate
-posterior integration, not a model-selection criterion.
-Importance-corrected fits also contain \code{importance}: unconstrained
-\code{candidates}, normalized \code{weights}, full-posterior/proposal
-\code{log_weights}, \code{resample_ids} into candidates, stage
-\code{history}, \code{seed}, a \code{proposal} description,
-\code{adapted_proposal} (\code{components} containing nodes/densities
-and their mixture \code{weights}), \code{pilot_candidates},
-retained-parameter \code{proposal_indices}, a \code{conditional_response}
-flag, total \code{production_candidates} including discarded stages,
-\code{response_proposal} fallback counts and maximum remaining Newton step,
-and the original \code{proposal_diagnostics}. The \code{target_evaluation}
-counts cover all target evaluations, invalid automatic-differentiation (AD)
-values, ordinary full-posterior rechecks recovering finite or zero density,
-and unresolved values. Only invalid AD targets are re-evaluated, at the
-same parameters. Counts include pilots and discarded production stages.
-Every candidate is retained, and unresolved target or proposal densities
-still fail the original importance checks. Adapted components record
-\code{skipped_nodes} whose original proposal geometry was retained.
-With conditional coefficients, \code{conditional_beta = TRUE} and
-\code{beta_proposal} additionally record the starting coefficients,
-fallback count, maximum remaining Newton step and latent-prior mixture
-fraction. The defensive component stores its normalized prior/proposal
-specification rather than conditional nodes. Coefficient fallbacks use
-their original normal prior as a proposal and retain every candidate.
-Corrected diagnostic
-\code{ess} measures weight concentration. \code{min_tail_ess} measures
-precision of tail indicators, \code{pareto_k} diagnoses extreme ratios,
-\code{max_weight} identifies dominance by one candidate, and
-\code{split_cdf_error} compares two independent production halves.
-\code{min_candidates} records the requested production minimum;
-history also records whether each stage met that budget.
-Prepared objects have no posterior draws. Use \code{summary()} for
-response coefficients and group scales, \code{\link{posterior_scales}}
-for scale summaries in map units, and \code{predict()} for fitted means
-with joint posterior uncertainty.
-The sampled summary contains \code{coefficients} for response effects,
-\code{scale_coefficients} by landscape predictor, \code{scales},
-\code{group_sd}, \code{dispersion}, and \code{diagnostics}. Scale-formula
-intercepts and \code{~0 + year} coefficients in that summary use log map
-units; other scale coefficients
-are log-distance contrasts. Exponentiation converts them to distances
-or multiplicative distance ratios, respectively.
-Response \code{coefficients} use the family link scale: count models use
-log expected counts, binomial models use log odds, and Gaussian models use
-response units. \code{dispersion} is NB2 size theta or Gaussian residual
-SD, and is \code{NULL} for Poisson and binomial models. Scale-group SDs
-measure population variation in log distance; response-group SDs use the
-response link scale. They are not annual-scale standard errors.
-Summary intervals are marginal central 95\% intervals for individual
-quantities. The stored sampler flag checks raw parameters and sampler
-behavior. It does not replace \code{\link{diagnose_bayes_scales}} or a
-posterior predictive assessment. For importance fits, the scale table in
-\code{summary()} uses resampled draws; request
-\code{posterior_scales(fit, estimator = "weighted")} for direct candidate
-summaries, as used by the plot's automatic estimator.
+An object of class \code{multiScaleR_bayes}, a list that holds the
+frozen model \code{specification}, the parameter layout in \code{parameters}, the
+\code{call}, an \code{inference} label, and \code{inference_metadata}. Fitted objects
+add posterior \code{draws}, \code{diagnostics}, and a record of the computation.
+The class page \link[=multiScaleR_bayes-class]{multiScaleR_bayes} describes every element, shows
+where each parameter lives and on which scale, and explains how to
+back-transform it. A prepared object (\code{method = "prepare"}) has no draws.
+
+\code{summary()} returns a list described in "Read the summary output".
+\code{print()} shows the computation, family, number of observations, scale
+formulas, and stored diagnostic status, and returns \code{x} invisibly.
 }
 \description{
-Estimate landscape scales and response effects jointly. Give each landscape
-predictor one shared scale, model scale as a function of measured covariates,
-or let scales vary among groups such as regions or years.
+Estimate landscape scales of effect and response coefficients together, as
+one posterior distribution that combines what the data say with the priors
+you state. Give each landscape predictor one shared scale, let the scale
+change with measured covariates, or let it vary among groups such as
+regions or years. This interface is experimental. A printed fit reports
+"Experimental Bayesian landscape-scale model".
 }
-\details{
-Each scale formula models log spatial scale. Random intercepts use
-independent standard-normal latent variables multiplied by a group SD.
-For \code{~1 + (1 | year)}, annual log scales share a population mean and
-an estimated between-year SD. Years are exchangeable; this first
-implementation does not impose temporal autocorrelation.
-
-Model support depends on the computation. Preparation, NUTS, slice sampling
-and joint Laplace allow multiple kernel predictors and additive or crossed random
-intercept groups. Marginal Laplace, including importance correction, requires
-exactly one scale-group SD across all kernel predictors. A second random
-scale term adds another SD even if it uses the same grouping variable.
-Use NUTS, slice sampling, or joint Laplace for those models. The function checks this
-structural restriction before starting the numerical fit; it does not
-switch methods automatically. Supported syntax does not establish numerical
-convergence, useful scale identification or interval calibration.
-
-Scale and response formulas describe different parts of the model. A
-response year effect changes baseline abundance or occurrence; a scale
-year effect changes how the surrounding landscape is weighted. Repeated
-observations can use \code{(1 | site)} in the response formula. Random
-slopes, spatial fields, observation weights,
-and imperfect-detection likelihoods are not supported in this development
-implementation. \code{\link{predict_scales}} predicts scales at new
-covariates and groups. \code{predict()} and \code{simulate()} also accept new
-observations with matching prepared landscape inputs and explicit policies
-for unseen random-effect levels. A fixed year factor cannot supply an unseen
-year's coefficient; the response formula must support that prediction.
-See \code{vignette("v14-bayesian-prediction", package = "multiScaleR")}.
-
-Kernel means retain the finite-cell numerator and denominator of the
-prepared inputs. Missing raster cells are excluded and remaining weights
-renormalized. Centering and SD are calculated once across fitting rows,
-using the prior median scales, and then held fixed. This differs from
-the scale-dependent standardization in the existing optimization backends:
-response coefficient priors therefore have a fixed reference meaning.
-Weighted surface SQ uses the square root of the kernel-weighted centered
-variance, dividing by the sum of weights. Each source uses its finite cells.
-The pooled reference transformation is fixed at preparation, including when
-a site has repeated observations or scales vary across years and draws.
-It is never estimated again from prediction rows.
-
-SQ preparation records \code{specification$surface$memory}: the number of
-observation-cell evaluations, retained buffer bytes, and a planning estimate
-of differentiation memory. Repeated observations count separately. Before
-recording an SQ differentiation tape, a conservative RAM check must succeed.
-This estimate is not a memory quota or guarantee; retain operational headroom.
-SQ proposals evaluate bounded candidate batches without a three-dimensional
-candidate-by-observation-by-cell array. Other optimized surface metrics and
-exponential-power SQ are unsupported. Private marginal-likelihood limiting
-routines remain separate and do not accept SQ.
-
-Priors act on log scales, with no hard bounds at \code{min_D} or
-\code{max_D}. Summaries report posterior mass outside this reference range.
-All spatial predictors still use the neighborhoods actually extracted. Scales
-beyond \code{max_D} describe increasingly uniform weighting within those
-neighborhoods, not information from unobserved distant cells.
-
-A small number of years may provide little information about between-year
-variation. Compare plausible scale and group-SD priors, inspect posterior
-predictive behavior, and check sampling diagnostics. A near-zero response
-effect leaves its landscape scale weakly identified even when chains mix.
-A continuous half-normal group-SD prior has no point mass at zero. A positive
-central credible interval is therefore not a test of the exact zero-variance
-model. Compare shared scales and scientifically meaningful variation instead.
-This interface is experimental. Numerical accuracy depends on the response,
-scale design, and computation method. Interval calibration for general
-ecological datasets remains unestablished.
-
-Slice sampling alternates among blocks of parameters in the full posterior.
-For Gaussian responses, it draws regression coefficients from their exact
-conditional distribution. It reuses kernel values when updating response
-parameters and recomputes only the changed kernel during scale updates.
-Sampling efficiency depends on the dataset and on dependence among scales
-and response effects. Compare Rhat and effective sample size per second
-before choosing a method for larger fits. Explicit slice seeds preserve the
-caller's random-number state. Chain seeds are generated before dispatch.
-
-Laplace inference uses the inverse positive-definite Hessian of the full
-negative log posterior at a numerically stationary mode, including log-SD
-Jacobians. It approximates all parameters jointly; it does not fix estimated
-pooling SDs or integrate random effects with a nested Laplace approximation.
-Non-positive curvature or failure to find a stationary mode causes an error.
-Numerical failure conditions retain attempted solutions in \code{starts},
-accessible with \code{tryCatch()} for detailed diagnosis.
-Numerically distinct modes within two log-posterior units trigger a warning.
-A passed numerical diagnostic does not establish approximation accuracy.
-Skewness, weak scale identification, and dependence between group SDs and
-latent year effects can produce inaccurate pooling and intervals even then.
-Compare important results with \code{method = "sample"}, especially with
-few years or weak landscape effects. Seeded Laplace draws preserve the
-caller's random-number state. Sampling arguments are unused for Laplace fits.
-
-Marginal inference currently requires exactly one scale-group SD, such as
-the between-year SD in \code{list(habitat = ~1 + (1 | year))}. It integrates
-all other parameters by a conditional joint Gaussian Laplace approximation,
-including any response-site SD. It does not implement full INLA. The
-conditional posterior volume corrects the SD marginal, which is integrated
-in its half-normal prior CDF coordinates without changing the prior.
-Linear interpolation and triangular mixture sampling give continuous SD
-draws and propagate conditional dependence into the other parameters.
-Grid refinement assesses numerical integration error, not Laplace error.
-Boundary evaluations use SDs of \code{1e-8} and 8 times the prior SD;
-these approximate the prior-CDF endpoints and do not bound sampled SDs.
-Numerical diagnostics additionally flag more than 0.001 posterior mass
-above prior CDF 0.9999, or more than 0.01 approximate posterior node weight
-with discovered competing conditional modes. Failed nodes cause an error
-rather than being dropped. Conditional skewness, residual multimodality,
-and response-SD uncertainty still require comparison with full sampling.
-
-Importance correction targets the same full posterior as NUTS, rather than
-adjusting intervals by an empirical coverage factor. It draws a training
-pilot from a mixture of multivariate and coordinatewise Student t
-distributions (7 degrees of freedom by default, or 5 with
-\code{importance_df = 5}; scale factor 1.2), fits local conditional proposal means and covariances,
-then discards the pilot from final estimation. Production candidates come
-from 80 percent adapted and 20 percent original proposals. Local training
-weights are tempered and proposal covariances are shrunk toward the original
-covariance to stabilize learning; these operations do not change the target.
-Production weights are neither smoothed nor truncated. All proposal mixture
-densities and the prior-CDF Jacobian are included in their evaluation.
-A one-percent uniform component in prior-CDF coordinates preserves positive
-proposal support in numerically small tails. An additional one-percent
-normal proposal for log SD, with mean \code{log(2 * prior SD)} and SD 0.6,
-covers SDs beyond finite-precision inverse-CDF endpoints. It uses the nearest
-endpoint conditional proposal when needed. Its density is included in the
-importance ratio; it does not change the prior. When a production stage fails,
-the optional refinement fits a new component and assigns it 60 percent
-proposal weight, retaining 40 percent of the previous defensive mixture.
-Training stages are discarded from final estimation; \code{history} and
-\code{production_candidates} retain their diagnostic and cost information.
-
-With nested response integration, outer curvature is calculated by central
-differences of RTMB's analytic gradient. With exactly one response random
-intercept term, its conditional proposal is updated at each candidate:
-independent scalar Student t site effects with 20 degrees of freedom follow
-their conditional modes and curvatures. This captures dependence on the
-sampled response SD beyond a fixed linear approximation. More response terms
-use an expanded joint proposal; reliability has not been established there.
-With one response grouping term, only the smaller outer covariance is stored
-at each SD node. This avoids constructing dense site-by-site covariance
-matrices that the conditional proposal does not need.
-A finite conditional proposal need not have an exactly stationary mean.
-Nonfinite site geometry falls back to the normalized prior proposal for
-that candidate and is recorded; candidates are not dropped. Unusable learned
-covariances retain their original proposal nodes. Full-posterior importance
-ratios still correct these proposals, and the same eligibility checks apply.
-
-Corrected numerical checks require Pareto k at most 0.7, raw weight ESS at
-least 1000, tail-indicator ESS at least 400, maximum weight at most 0.01,
-and split-half CDF differences at most 0.05. Indicators are checked at the
-2.5\%, 50\%, and 97.5\% quantiles of unconstrained parameters, annual log
-scales, and group SDs. These are importance diagnostics, not MCMC Rhat or
-ESS. Original proposal flags remain available separately: an imperfect,
-normalized proposal can be corrected, but only the corrected diagnostics
-determine corrected eligibility. Finite candidate sets may still miss modes
-or tails. A warning or failed diagnostic calls for NUTS, and passing these
-checks does not establish general interval calibration.
-
-Kernel-only scalar arithmetic such as \code{I(habitat^2)}, and supported
-smooth base functions, use the same fixed reference transformation and
-native coefficient basis as other response terms. Priors retain their
-original normalized factors in that basis. These expressions act on the
-standardized kernel predictor, not on raster cells before smoothing.
-Cubic \code{splines::ns()} and \code{splines::bs()} response terms also
-support changing kernel values when you supply literal fixed \code{knots}
-and two increasing \code{Boundary.knots}. All basis columns share the
-ecological scale of their original source, including factor interactions.
-Knots are in the standardized predictor's units after its frozen reference
-transformation. To specify raw-cover knots, subtract the retained reference
-center and divide by its SD for both knots and boundaries, then insert those
-literal values in the formula. Never learn them from prediction batches.
-Basis values and complete kernel derivatives update at each
-candidate scale. The knots, native coefficient basis and priors stay fixed.
-Only cubic bases with distinct strictly interior knots are supported here.
-Adaptive \code{df} recipes, repeated/boundary knots and other degrees require
-the native-refit backend. Natural-spline tails are linear on the linear
-predictor scale. These are unpenalized fixed-complexity bases, with neither
-smoothing-variance uncertainty nor a monotonicity constraint.
-
-Adaptive dynamic bases, fixed-data inputs inside a dynamic expression,
-arbitrary or nondifferentiable functions, and kernel offsets remain
-unsupported. Nonfinite expression domains are errors; values are not clipped.
+\section{Choose a computation method}{
+\tabular{lll}{
+   \code{method} \tab What it computes \tab Optional packages \cr
+   \code{"prepare"} \tab Matches rows to landscapes and checks formulas, priors, and bins. Fits nothing \tab None \cr
+   \code{"sample"} (default) \tab The full posterior by NUTS, a gradient-based Markov chain Monte Carlo (MCMC) sampler, run through RTMB and tmbstan with the Laplace option off \tab RTMB, tmbstan, rstan, posterior \cr
+   \code{"slice"} \tab The same full posterior by a slice sampler written in R \tab None to fit. posterior (>= 1.6.0) for diagnostics \cr
+   \code{"laplace"} \tab A joint Gaussian approximation around the posterior mode, in the same unconstrained, noncentered coordinates the samplers use \tab RTMB \cr
+   \code{"marginal"} \tab Numerical integration over one scale-group SD, with conditional Laplace approximations for every other parameter \tab RTMB, plus posterior with importance correction \cr
 }
+
+
+\code{\link[=check_bayes_setup]{check_bayes_setup()}} reports whether these packages are installed.
+Joint Laplace and uncorrected marginal Laplace are exploratory. In matched
+simulations they disagreed with full sampling about annual-scale
+probabilities even when their own numerical checks passed. Confirm every
+quantity you report with \code{"sample"} or \code{"slice"}.
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")} compares
+the methods on one model and shows what to do when a fit struggles.
+
+Preparation, NUTS, slice sampling, and joint Laplace accept several
+landscape predictors and additive or crossed random intercepts. Marginal
+Laplace, with or without importance correction, needs exactly one
+scale-group SD across all landscape predictors. A second random scale term
+adds another SD even when it uses the same grouping variable. The function
+checks this before the numerical fit begins and never switches methods for
+you. A model that the syntax accepts can still fail to converge, leave a
+scale weakly identified, or give intervals of unknown calibration.
+}
+
+\section{Choose a response family}{
+\itemize{
+\item \code{"nbinom2"}: counts with a log link. The variance is
+\eqn{\mu + \mu^2/\theta}{mu + mu^2 / theta}, where theta is the size
+(dispersion) parameter reported by \code{summary()}.
+\item \code{"poisson"}: counts with a log link.
+\item \code{"binomial"}: a logit link. Supply 0 and 1 values, \code{FALSE} and \code{TRUE}, a
+two-level factor whose second level is a success, or
+\code{cbind(successes, failures)} for grouped trials. Response-scale
+predictions are success probabilities.
+\item \code{"gaussian"}: a continuous response with an identity link and an
+estimated residual SD.
+}
+}
+
+\section{Write the response formula}{
+The response formula accepts the following terms.
+\itemize{
+\item Fixed covariates, factors, and offsets.
+\item Additive random intercepts such as \code{(1 | site)}. Each grouping variable
+can appear once in a formula and needs at least two levels. Use one for
+repeated observations at a site.
+\item Products, crossings, nesting, and factor interactions with a landscape
+predictor, such as \code{habitat * year} or \code{habitat:forest}. \code{habitat * year}
+estimates a separate habitat association in each year. It changes the
+response coefficients only and adds no year effect to the scale formula.
+An interaction between two landscape predictors still has one scale
+model per predictor. Every expanded coefficient keeps the normal prior on
+R's native factor and contrast coding.
+\item Transformations of fixed covariates. \code{scale()}, \code{poly()},
+\code{splines::ns()}, and \code{splines::bs()} keep their training definitions,
+including inside nested expressions such as \code{I(scale(temp))} and in
+transformed offsets. Prediction reuses those constants for single rows,
+batches, and effect curves. Give a namespace prefix to any custom
+function that reuses one of these names, or compute its predictor before
+fitting.
+\item Arithmetic on landscape predictors and literal numbers, such as
+\code{I(habitat^2)}. The operators \code{+}, \code{-}, \code{*}, \code{/}, and \code{^} and the
+functions \code{exp()}, \code{log()}, \code{sqrt()}, \code{sin()}, \code{cos()}, and \code{tan()} are
+allowed. These expressions act on the standardized kernel value after
+smoothing, not on raster cells, and keep the fixed reference
+standardization and coefficient priors.
+\item Cubic splines of a landscape predictor, from \code{splines::ns()} or
+\code{splines::bs()} with literal fixed knots. See "Use splines of a landscape
+predictor".
+}
+
+The following stop with an error: a fixed covariate inside an expression
+with a landscape predictor (write the interaction \code{habitat:forest} rather
+than \code{I(habitat * forest)}), any other function, including
+nondifferentiable ones, a landscape predictor in an offset, and adaptive
+spline recipes. An expression that is not finite is also an error. Values
+are never clipped. Random slopes, spatial random fields, observation
+weights, zero inflation, and imperfect detection are not supported.
+\code{method = "prepare"} checks all of this before any optional package is
+needed. \code{vignette("v07-fitting-methods", package = "multiScaleR")} lists
+the covariate types each fitting route accepts.
+\subsection{Use splines of a landscape predictor}{
+
+Supply literal \code{knots} and two increasing \code{Boundary.knots}, with every knot
+distinct and strictly inside the boundaries, for example
+\code{splines::ns(habitat, knots = 0, Boundary.knots = c(-3, 3))}. Knots are in
+the units of the standardized predictor, after the fixed reference
+transformation. To place knots at raw kernel-weighted values, prepare the
+model once with the plain predictor, then subtract
+\code{prepared$specification$center} and divide by
+\code{prepared$specification$spread} for both the knots and the boundaries.
+Write the resulting numbers into the formula. Never learn knots from
+prediction data.
+
+Basis values and their derivatives update at every candidate scale, while
+the knots, the coefficient basis, and the priors stay fixed. All basis
+columns share the scale of their source predictor, including in factor
+interactions. Natural-spline tails are linear on the link scale. These are
+unpenalized bases of fixed complexity, with no smoothing-variance
+uncertainty and no monotonicity constraint. Adaptive \code{df} recipes,
+repeated or boundary knots, and degrees other than 3 are not supported
+here. The error message points to the refit backend of
+\code{\link[=multiScale_optim]{multiScale_optim()}} for those.
+}
+}
+
+\section{Write the scale formulas}{
+Each formula in \code{scales} models the natural log of one predictor's scale.
+Scale formulas use columns of \code{data}. They cannot use landscape
+predictors, offsets, or a rank-deficient design.
+\itemize{
+\item \code{~1} (the default): one shared scale for all observations.
+\item \code{~ elevation}: the log scale changes linearly with a numeric covariate.
+\code{exp()} of its coefficient is the multiplicative change in scale per
+unit of the covariate.
+\item \code{~ year}: fixed effects of a factor on the log scale, coded as contrasts
+with the first level.
+\item \code{~0 + year}: a separate log scale for each level, each with the same
+distance prior, and no pooling. An intercept-free formula must define
+disjoint factor levels like this. Every other formula needs an
+intercept.
+\item \code{~1 + (1 | year)}: partial pooling. Years share a typical scale and an
+estimated between-year SD.
+}
+
+Random intercepts are noncentered, so each group's deviation is a
+standard-normal latent value times the group SD. For \code{~1 + (1 | year)} the
+scale of year \eqn{y} is
+\eqn{\log D_y = \alpha + \tau z_y}{log D_y = alpha + tau z_y}, with
+\eqn{z_y \sim N(0, 1)}{z_y ~ N(0, 1)}. Here alpha is the log of the
+typical scale and tau is the SD of log scale among years. \code{exp(tau)} is a
+multiplier. A year one SD above typical has a scale \code{exp(tau)} times the
+typical one. Years are exchangeable, and the model imposes no trend or
+temporal autocorrelation.
+
+The two formulas describe different parts of the model. A year effect in
+the response formula changes baseline abundance or occurrence. A year
+effect in the scale formula changes how far the landscape effect reaches.
+\subsection{Expand a dot in a scale formula}{
+
+A dot expands every column of \code{data}, including the response and the
+row-ID column. Remove the response, row keys, and unrelated columns
+explicitly, as in \code{~ . - count - site_year}. Only the active terms create
+scale coefficients and priors. A removed column adds no coefficient and no
+latent group coordinate. Prediction reuses the fitted active terms and
+does not need the removed columns. A landscape predictor of the response
+formula cannot also enter a scale formula.
+}
+}
+
+\section{Set the priors}{
+\tabular{lll}{
+   Setting \tab Default \tab What it controls \cr
+   \code{scale_median} \tab \code{sqrt(inputs$min_D * inputs$max_D)} \tab Prior median of each scale, in map units. One positive number, or a named vector with one value per landscape predictor. It is the center of the normal prior on each log-scale intercept, or on each coefficient of a \code{~0 + year} formula \cr
+   \code{scale_intercept_sd} \tab 1 \tab SD of that normal prior, on the natural log scale \cr
+   \code{scale_coef_sd} \tab 0.5 \tab SD of the zero-centered normal prior on other scale coefficients (slopes and log-distance contrasts) \cr
+   \code{scale_group_sd} \tab 0.5 \tab Scale of the half-normal prior on each between-group SD of log scale \cr
+   \code{beta_sd} \tab 2.5 \tab SD of the zero-centered normal prior on each response coefficient, on the link scale \cr
+   \code{response_group_sd} \tab 1 \tab Scale of the half-normal prior on each response random-intercept SD, on the link scale \cr
+   \code{dispersion_log_mean}, \code{dispersion_log_sd} \tab 0, 1 \tab Mean and SD of the normal prior on the log of NB2 theta or of the Gaussian residual SD \cr
+}
+
+
+The scale priors act on log distances and set no hard limit at \code{min_D} or
+\code{max_D}. A scale beyond \code{max_D} weights the extracted neighborhood ever
+more evenly. It cannot draw on cells outside the prepared buffers.
+\code{\link[=posterior_scales]{posterior_scales()}} reports the posterior mass below \code{min_D} and above
+\code{max_D}. Check what the priors imply with \code{\link[=simulate_bayes_prior]{simulate_bayes_prior()}} before
+you fit. \code{vignette("v13-bayesian-scales", package = "multiScaleR")}
+converts these settings into distances and multipliers.
+}
+
+\section{Understand the fixed standardization}{
+Kernel means use the finite-cell numerator and denominator stored in the
+bins. Missing raster cells are excluded and the remaining weights
+renormalized. Each landscape predictor is then centered and scaled once,
+across the fitting rows, at its prior median scale (\code{scale_median}). That
+reference transformation is held fixed for every candidate scale, group,
+and draw, including when a site has repeated observations or scales differ
+among years. It is never estimated again from prediction rows. The
+retained values are \code{specification$center} and \code{specification$spread}.
+
+\code{\link[=multiScale_optim]{multiScale_optim()}} restandardizes at each fitted scale, so the two
+functions give coefficients with different meanings. Here a response
+coefficient is the change in the linear predictor for one reference SD of
+the kernel-weighted predictor at \code{scale_median}, not at the fitted scale.
+Its prior therefore has a fixed meaning, but its value changes when you
+change \code{scale_median}. Report \code{scale_median} with any coefficient, and do
+not compare these coefficients directly with those of \code{\link[=multiScale_optim]{multiScale_optim()}}.
+
+Weighted surface SQ is the square root of the kernel-weighted centered
+variance, divided by the sum of the weights, computed over each source's
+finite cells. It uses the same pooled reference transformation.
+\subsection{Plan memory for weighted SQ}{
+
+Preparation records \code{specification$surface$memory}, which gives the number
+of observation-cell evaluations (\code{observation_cells}), the retained buffer
+bytes (\code{retained_bytes}), and a planning estimate of differentiation memory
+(\code{estimated_AD_bytes}). Repeated observations count separately. Before a
+differentiation tape is recorded for SQ, a conservative check against
+installed RAM must pass, and the fit stops otherwise. The estimate is a
+planning figure, not a quota or a guarantee, so leave headroom. Candidate
+batches are evaluated in bounded pieces. Other optimized surface metrics
+are not supported.
+}
+}
+
+\section{Read the summary output}{
+\code{summary()} of a prepared object returns \code{inference}, \code{family},
+\code{observations}, and \code{scale_formulas}. For a fit with draws it returns a
+list with these elements.
+\itemize{
+\item \code{inference}, \code{family}, \code{observations}: the computation label, the
+response family, and the number of observations.
+\item \code{coefficients}: a data frame with one row per response \code{coefficient}
+and columns \code{mean}, \code{median}, \code{sd}, \code{lower}, and \code{upper} (a central 95\%
+credible interval). Values are on the link scale, the log expected count
+for Poisson and NB2, the log odds for binomial, and response units for
+Gaussian models. For a count model, \code{exp()} of a landscape coefficient is
+the multiplicative change in the expected count per reference SD of the
+predictor.
+\item \code{scales}: the \code{\link[=posterior_scales]{posterior_scales()}} table, with each scale in map units.
+\item \code{scale_coefficients}: a list with one data frame per landscape predictor.
+Intercepts and \code{~0 + year} coefficients are in log map units, so \code{exp()}
+gives a distance. Other coefficients are log-distance contrasts, so
+\code{exp()} gives a ratio of distances.
+\item \code{group_sd}: a list with \code{log_scale_group_sd}, the between-group SD of
+log scale (tau) for each scale random term labeled \code{predictor:group} in
+\code{term}, and \code{response_group_sd}, the random-intercept SDs on the link
+scale. Each is \code{NULL} when the model has no such term. These SDs measure
+variation among groups. They are not the standard error of any one
+group's scale.
+\item \code{dispersion}: NB2 theta or the Gaussian residual SD on its natural
+scale, or \code{NULL} for Poisson and binomial models.
+\item \code{diagnostics}: the fit's stored checks, described on the class page
+\link[=multiScaleR_bayes-class]{multiScaleR_bayes}.
+}
+
+Summary intervals are marginal central 95\% intervals for individual
+quantities, not a joint band. \code{mean} and \code{sd} are summaries of the draws.
+For long-tailed distances, prefer \code{median}, \code{lower}, and \code{upper}. For an
+importance-corrected fit, the \code{scales} table uses the resampled draws.
+\code{posterior_scales(fit, estimator = "weighted")} summarizes the weighted
+candidates directly, as \code{plot()} does by default.
+
+The stored check covers the raw parameters and, for NUTS, sampler
+behavior. It does not replace \code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}} for the scales you
+report, or a posterior predictive check with
+\code{\link[=simulate.multiScaleR_bayes]{simulate.multiScaleR_bayes()}}.
+}
+
+\section{Interpret weakly informed scales}{
+A few years or regions say little about variation among them, so the
+group-SD prior can drive the answer. Compare plausible scale and group-SD
+priors, inspect posterior predictive behavior, and check the sampling
+diagnostics. A response coefficient near zero leaves its landscape scale
+weakly identified even when the chains mix well. The half-normal prior on a
+group SD has no point mass at zero, so a positive lower interval limit is
+not a test of equal scales. Compare a shared-scale model instead. Numerical
+accuracy depends on the response, the scale design, and the method.
+Interval calibration for general ecological data sets has not been
+established.
+}
+
+\section{Use parallel workers}{
+\code{cores} sets how many local R processes run at once. NUTS and slice
+sampling spread chains across workers, so the useful limit is \code{chains}.
+Joint and uncorrected marginal Laplace spread optimizer starts, so the
+limit is the number of starts. Marginal integration still visits grid
+nodes in order, so each node can start from the previous fits. With
+importance correction, workers also evaluate batches of candidate
+posterior densities, while proposal generation and diagnostics stay in
+the main process. Preparation uses one process.
+
+Each worker holds its own copy of the model data and, where needed, its
+own differentiation tape, so memory use rises with \code{cores}. Temporary
+worker files are removed after fitting. Worker start-up and data transfer
+can make small fits slower. The effective limit is recorded in
+\code{sampling$cores}, \code{laplace$cores}, or \code{marginal$cores}.
+}
+
+\section{Set computation controls}{
+\tabular{llll}{
+   Setting \tab Method \tab Default \tab What it does \cr
+   \code{adapt_delta} \tab \code{"sample"} \tab 0.9 \tab Target acceptance rate during NUTS adaptation, strictly between 0 and 1. Raise it when transitions diverge \cr
+   \code{max_treedepth} \tab \code{"sample"} \tab 12 \tab Maximum NUTS tree depth. Raise it when the sampler hits the limit \cr
+   \code{starts} \tab \code{"laplace"}, \code{"marginal"} \tab 6 for Laplace, 3 per grid node for marginal \tab Deterministic, dispersed optimizer starts. Every start adds run time \cr
+   \code{iter.max} \tab \code{"laplace"}, \code{"marginal"} \tab 1000 \tab Optimizer iterations per start \cr
+   \code{max_grid} \tab \code{"marginal"} \tab 129 \tab Largest integration grid, 33, 65, 129, or 257 nodes. More nodes cost more time \cr
+   \code{cdf_tol}, \code{quantile_tol}, \code{logz_tol} \tab \code{"marginal"} \tab 0.005, 0.02, 0.01 \tab Largest change allowed between successive grids in the SD CDF, its 2.5\%, 50\%, and 97.5\% quantiles (in prior SDs), and the log normalizing constant \cr
+   \code{correction} \tab \code{"marginal"} \tab \code{"none"} \tab \code{"importance"} reweights the approximation against the full posterior \cr
+   \code{importance_min} \tab importance \tab 16384 \tab Minimum number of production candidates retained \cr
+   \code{importance_max} \tab importance \tab 65536 \tab Cap on production candidates, 16384, 32768, 65536, or 131072 \cr
+   \code{importance_df} \tab importance \tab 7 \tab Degrees of freedom of the Student t proposal, 7 or 5 \cr
+   \code{importance_refinements} \tab importance \tab 1 \tab Further proposal adaptations allowed after a failed stage, 0, 1, or 2 \cr
+   \code{nested_response} \tab importance \tab \code{TRUE}, or \code{FALSE} with \code{conditional_beta = TRUE} \tab Integrate response random effects when locating conditional modes \cr
+   \code{conditional_beta} \tab importance \tab \code{FALSE} \tab Experimental. Propose response coefficients conditional on each candidate's scales and response random effects \cr
+}
+
+
+Grid refinement stops when all three changes fall within their
+tolerances. It measures numerical integration error, not Laplace error.
+
+\code{importance_max} is a cap, not a target. A population that passes its
+checks at a smaller size stops there. To require more candidates, as you
+may for precise annual quantiles, also raise \code{importance_min}, which takes
+the same values and cannot exceed \code{importance_max}. A separate training
+pilot of 16384 candidates always runs first and is discarded. Larger
+populations cost more, and they guarantee neither a chosen Monte Carlo
+error nor recovery of a missed posterior region. \code{importance_df = 5} gives
+heavier proposal tails, which can help when importance ratios are
+unstable, though it can need more candidates. With
+\code{importance_refinements = 1}, a failed first production stage of 16384
+candidates trains one further proposal. Its candidates are discarded and a
+fresh final stage is drawn. These settings change sampling efficiency,
+not the priors or the diagnostic thresholds.
+
+\code{nested_response = FALSE} keeps the original joint conditional proposal,
+which can miss response-SD uncertainty. An explicit
+\code{nested_response = TRUE} requires importance correction.
+\code{conditional_beta = TRUE} also requires importance correction and selects
+\code{nested_response = FALSE} unless you supply it, so an explicit
+\code{nested_response = TRUE} is then an error. Gaussian coefficient
+conditionals are exact. Other families use a normalized Student t proposal
+with 7 degrees of freedom, and a fixed 20\% latent-prior component guards
+regions the local geometry misses. Conditional optimization costs more per
+candidate and does not guarantee precise interval endpoints.
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")} reports the
+simulation evidence for the corrected proposals and its limits.
+}
+
+\section{How each computation works}{
+\subsection{Slice sampling}{
+
+Slice sampling updates blocks of parameters in turn from the full
+posterior. For Gaussian responses it draws the regression coefficients from
+their exact conditional distribution. It reuses kernel values when it
+updates response parameters and recomputes only the changed kernel during
+scale updates. Efficiency depends on the data set and on dependence among
+scales and response effects, so compare Rhat and effective sample size per
+second before choosing a sampler for a larger fit.
+}
+
+\subsection{Joint Laplace approximation}{
+
+The Laplace method inverts the positive-definite Hessian of the full
+negative log posterior at a numerically stationary mode, including the
+Jacobians of the log-SD coordinates. It approximates all parameters
+jointly. It neither fixes the estimated pooling SDs nor integrates random
+effects with a nested approximation. Non-positive curvature, or failure to
+find a stationary mode, stops the fit with an error whose \code{starts} element
+keeps every attempted solution. Catch it with \code{tryCatch()} to inspect them.
+Distinct modes within two log-posterior units trigger a warning. Skewness,
+weak scale identification, and dependence between group SDs and year
+effects can make the pooling and the intervals inaccurate even when the
+checks pass. Compare important results with \code{method = "sample"},
+especially with few years or weak landscape effects. \code{chains}, \code{iter}, and
+\code{warmup} are unused.
+}
+
+\subsection{Marginal Laplace approximation}{
+
+The marginal method needs exactly one scale-group SD, such as the
+between-year SD in \code{list(habitat = ~1 + (1 | year))}. It integrates that
+SD numerically on a grid in the coordinates of its half-normal prior CDF,
+which leaves the prior unchanged and allows a skewed SD distribution. Every
+other parameter, including any response random-intercept SD, gets a
+conditional joint Gaussian approximation at each grid node, and the
+conditional posterior volume corrects the SD marginal. This is not full
+INLA. Linear interpolation between nodes and triangular mixture sampling
+give continuous SD draws and carry conditional dependence into the other
+parameters. The grid endpoints use SDs of \code{1e-8} and 8 times the prior
+scale. These approximate the prior CDF endpoints and do not bound the
+sampled SDs. The checks also fail when more than 0.001 of the posterior
+mass lies above prior CDF 0.9999, or more than 0.01 of the node weight
+carries competing conditional modes. A failed node stops the fit rather
+than being dropped. Conditional skewness, remaining multimodality, and
+response-SD uncertainty still call for comparison with full sampling.
+}
+
+\subsection{Importance correction}{
+
+\code{control = list(correction = "importance")} targets the same full
+posterior as NUTS by reweighting candidates from a proposal built on the
+marginal approximation. It does not rescale intervals by an empirical
+coverage factor. A training pilot draws from an equal mixture of
+multivariate and coordinatewise Student t distributions (7 degrees of
+freedom, or 5 with \code{importance_df = 5}, inflated by a factor of 1.2) and
+fits local proposal means and covariances. The pilot is then discarded.
+Production candidates come 80\% from the learned proposal and 20\% from the
+original one. Training weights are tempered and learned covariances are
+shrunk toward the original, which stabilizes learning without changing the
+target. Production weights are neither smoothed nor truncated, and every
+mixture density, including the prior-CDF Jacobian, enters the importance
+ratio. A 1\% uniform component in prior-CDF coordinates keeps the proposal
+positive in very small tails. A further 1\% normal component for the log
+SD, with mean \verb{log(2 * prior SD)} and SD 0.6, covers SDs beyond the
+numerical CDF endpoints. A refinement after a failed stage fits a new
+component with 60\% of the proposal weight and keeps 40\% for the previous
+mixture. Training stages never enter the final estimate, though \code{history}
+and \code{production_candidates} keep their diagnostics and cost.
+
+With nested response integration, outer curvature comes from central
+differences of RTMB's analytic gradient. With exactly one response
+random-intercept term, each candidate draws its site effects from
+independent Student t proposals with 20 degrees of freedom, centered on
+their conditional modes and scaled by their curvatures. This follows the
+dependence of site effects on the sampled response SD. Only the smaller
+outer covariance is stored at each SD node, which avoids dense
+site-by-site matrices. More response terms use an expanded joint proposal,
+and its reliability has not been established. Nonfinite site geometry
+falls back to the normalized prior proposal for that candidate and is
+counted. Candidates are never dropped. Unusable learned covariances keep
+their original nodes. The full-posterior ratios still correct these
+proposals, and the same checks apply.
+
+The corrected checks require Pareto k at most 0.7, raw weight effective
+sample size (ESS) at least 1000, tail-indicator ESS at least 400, maximum
+weight at most 0.01, and split-half CDF differences at most 0.05.
+Indicators are evaluated at the 2.5\%, 50\%, and 97.5\% quantiles of the
+unconstrained parameters, annual log scales, and group SDs. These are
+importance diagnostics, not MCMC Rhat or ESS. The original proposal flag
+stays in \code{diagnostics$proposal_passed}, but only the corrected checks
+decide eligibility. A finite candidate set can still miss modes or tails.
+A warning or a failed check calls for NUTS, and passing does not establish
+interval calibration.
+}
+}
+
 \examples{
+# Annual survey example: 100 counts at 25 sites over five years, with one
+# habitat map per year prepared by kernel_prep_by_group()
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
   package = "multiScaleR"))
-# Share the habitat scale while allowing baseline counts to vary.
-shared <- multiScale_bayes(count ~ habitat + factor(year) + (1 | site),
-  example$inputs, example$data, row_id = "site_year", method = "prepare")
-summary(shared)$scale_formulas
-response_formula <- count ~ habitat + factor(year) + (1 | site)
-scale_formulas <- list(habitat = ~1 + (1 | year))
-prepared <- multiScale_bayes(response_formula, example$inputs, example$data,
-  scales = scale_formulas, row_id = "site_year", family = "nbinom2",
+
+# Check the model before fitting. Preparation matches each row to its
+# landscape through row_id and needs no optional packages.
+prepared <- multiScale_bayes(count ~ habitat + factor(year) + (1 | site),
+  example$inputs, example$data, scales = list(habitat = ~1 + (1 | year)),
+  row_id = "site_year", family = "nbinom2",
   priors = list(scale_median = 250), method = "prepare")
-prepared  # validates rows, maps, formulas and priors; no sampler is needed
-prepared$inference_metadata[c("target", "method", "uncertainty")]
-stored_fit <- example$fits$pooled  # actual fitted example, not the prepared object
-posterior_scales(stored_fit)[c("group", "median", "lower", "upper")]
-# See vignette("v13-bayesian-scales", package = "multiScaleR") for fitting and interpretation.
+prepared                        # family, observations, and scale formula
+prepared$inference_metadata$uncertainty$intervals  # "not_provided" yet
+
+# The same model fitted with NUTS, stored as 2,000 thinned draws
+fit <- example$fits$pooled
+fit_summary <- summary(fit)
+fit_summary$diagnostics$passed    # TRUE: the sampler checks passed
+# Response coefficients on the log expected-count scale
+fit_summary$coefficients[c("coefficient", "median", "lower", "upper")]
+# Sigma for each year, in meters, after partial pooling
+fit_summary$scales[c("group", "median", "lower", "upper")]
+# Tau, the SD of log sigma among years, and the multiplier exp(tau)
+fit_summary$group_sd$log_scale_group_sd[c("term", "median", "lower", "upper")]
+exp(fit_summary$group_sd$log_scale_group_sd$median)
+
+# A slice-sampled fit with one shared sigma per layer. Its call shows the
+# sampling arguments, and its scale intercepts are in log meters.
+shared <- readRDS(system.file("extdata", "cache-bayesian-scales.rds",
+  package = "multiScaleR"))$fit
+shared$call
+shared_coef <- summary(shared)$scale_coefficients
+exp(sapply(shared_coef, function(x) x$median))   # median sigma in meters
+# See vignette("v13-bayesian-scales", package = "multiScaleR") for fitting
+# and interpretation.
 
 }
 \seealso{
-\code{\link{check_bayes_setup}}, \code{\link{plot.multiScaleR_bayes}},
-\code{\link{diagnose_bayes_scales}}, \code{\link{simulate_bayes_prior}},
-\code{\link{kernel_prep_by_group}}, \code{\link{posterior_scales}},
-\code{\link{multiScale_optim}};
-\code{vignette("v13-bayesian-scales", package = "multiScaleR")} and
-\code{vignette("v15-bayesian-computation", package = "multiScaleR")}.
+The class page \link[=multiScaleR_bayes-class]{multiScaleR_bayes} for the returned object;
+\code{\link[=check_bayes_setup]{check_bayes_setup()}}, \code{\link[=simulate_bayes_prior]{simulate_bayes_prior()}}, \code{\link[=posterior_scales]{posterior_scales()}},
+\code{\link[=plot.multiScaleR_bayes]{plot.multiScaleR_bayes()}}, \code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}},
+\code{\link[=predict.multiScaleR_bayes]{predict.multiScaleR_bayes()}}, \code{\link[=predict_scales]{predict_scales()}},
+\code{\link[=simulate.multiScaleR_bayes]{simulate.multiScaleR_bayes()}}, \code{\link[=cross_validate_bayes]{cross_validate_bayes()}},
+\code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}, \code{\link[=multiScale_optim]{multiScale_optim()}}, and
+\link{multiScaleR-glossary} for terms;
+\code{vignette("v13-bayesian-scales", package = "multiScaleR")} for fitting
+and reading a model,
+\code{vignette("v14-bayesian-prediction", package = "multiScaleR")} for
+prediction, and
+\code{vignette("v15-bayesian-computation", package = "multiScaleR")} for
+choosing and checking a computation method.
 }

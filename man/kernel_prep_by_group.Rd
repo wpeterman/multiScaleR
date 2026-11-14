@@ -33,9 +33,12 @@ the corresponding name in \code{raster_stacks}. Every point uses only its
 assigned map, including cells affected by changes outside the point's
 immediate location.}
 
-\item{max_D}{Maximum extraction radius in the projected map units.}
+\item{max_D}{Positive numeric scalar. Maximum extraction radius, in the
+projected map units, and the upper bound of the sigma search. See the
+section on choosing \code{max_D} in \link{multiScaleR-kernels}.}
 
-\item{kernel}{Kernel weighting function; see \code{\link{kernel_prep}}.}
+\item{kernel}{Kernel weighting function: \code{"gaussian"} (default), \code{"exp"},
+\code{"expow"}, or \code{"fixed"}. See \code{\link[=kernel_prep]{kernel_prep()}} and \link{multiScaleR-kernels}.}
 
 \item{scale_vars}{Optional \code{\link{msr_vars}} specification. By default,
 each raster layer becomes a kernel-weighted mean covariate.}
@@ -60,7 +63,9 @@ requiring cell detail retain it regardless.}
 \item{verbose}{Logical. Print preparation messages. Default \code{TRUE}.}
 }
 \value{
-A \code{multiScaleR_data} list containing:
+A \code{multiScaleR_data} list with the same structure as the
+output of \code{\link[=kernel_prep]{kernel_prep()}} (see \link[=multiScaleR_data-class]{multiScaleR_data}), plus
+\code{raster_group}. It contains:
 \describe{
 \item{\code{kernel_dat}}{Initial covariate data frame, with one row per
 point. Columns are centered and divided by their pooled standard
@@ -122,9 +127,15 @@ pts <- vect(cbind(c(50, 70, 90, 110, 130, 150),
 prep <- kernel_prep_by_group(pts, list(y1 = r1, y2 = r2),
                              group = rep(c("y1", "y2"), 3),
                              max_D = 25, verbose = FALSE)
+# Standardized habitat covariate, pooled across both maps
 head(prep$kernel_dat)
+# The map assigned to each point
+prep$raster_group
 
 }
 \seealso{
-\code{\link{kernel_prep}}, \code{\link{multiScale_optim}}
+\code{\link{kernel_prep}}, \code{\link{multiScale_optim}},
+\link[=multiScaleR_data-class]{multiScaleR_data}.
+\code{vignette("v06-year-specific-rasters", package = "multiScaleR")} fits
+one pooled model to observations from two annual maps.
 }

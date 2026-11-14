@@ -1,162 +1,153 @@
-#' @title Kernel Scale Preparation
+#' @title Prepare Kernel Inputs for Scale Optimization
 #'
-#' @description Prepares the data inputs required for multiscale kernel
-#' optimization. Extracts raster values within a buffer around each point,
-#' computes pairwise distances, and calculates initial kernel-weighted covariate
-#' values. The result is passed directly to \code{\link{multiScale_optim}}.
+#' @description Extracts the raster cells around each survey point, records
+#' the distance from the point to each cell, and computes a first set of
+#' kernel-weighted covariates. Fit your starting model to those covariates,
+#' then pass the model and the returned object to [multiScale_optim()]. This
+#' is the first step of every `multiScaleR` workflow, shown in
+#' `vignette("v01-quickstart", package = "multiScaleR")`.
 #'
-#' @param pts Spatial point locations as a \code{SpatVector} (terra) or \code{sf}
-#'   object. Points must be in a projected coordinate system that shares units
-#'   with \code{max_D}.
-#' @param raster_stack One or more raster layers of class \code{SpatRaster}
-#'   (terra). Layer names must match the variable names in the model formula
-#'   used with \code{\link{multiScale_optim}}, unless \code{scale_vars} is
-#'   provided to define derived covariates. Layer names cannot be \code{"x"},
-#'   which is reserved for internal coordinate data.
-#' @param max_D Positive numeric. The maximum radius (in the same units as the
-#'   projection of \code{pts} and \code{raster_stack}) around each point to
-#'   sample from the raster. Should be at least 2 to 3 times the largest expected
-#'   sigma value. Raster layers must extend far enough beyond the points to
-#'   fully cover buffers of this radius.
-#' @param kernel Kernel function to be used for weighting raster values by
-#'   distance. One of:
-#'   \describe{
-#'     \item{\code{"gaussian"}}{(Default) Gaussian (normal) decay: weights fall
-#'       off as a normal distribution with standard deviation \code{sigma}.}
-#'     \item{\code{"exp"}}{Negative exponential decay: weights fall off as
-#'       \code{exp(-d / sigma)}.}
-#'     \item{\code{"fixed"}}{Fixed-radius (step) buffer: all cells within
-#'       \code{sigma} receive equal weight; cells beyond receive zero.}
-#'     \item{\code{"expow"}}{Exponential power kernel parameterized by both
-#'       \code{sigma} (scale) and \code{shape} (shape). Requires \code{shape}
-#'       to be specified.}
-#'   }
-#' @param scale_vars Optional variable specifications created with
-#'   \code{\link{msr_vars}}. When omitted, each raster layer becomes one
-#'   kernel-weighted covariate with the same name, preserving historical
-#'   behavior. Provide \code{scale_vars} to define derived model covariates,
-#'   for example, combining a kernel-weighted mean with landscape composition
-#'   or edge metrics from the same source layer. See \code{\link{kernel_var}}
-#'   and \code{\link{landscape_var}}.
-#' @param sigma Optional numeric vector of initial sigma values for
-#'   optimization. Length must equal the number of covariates with
-#'   \code{optimize = TRUE} in \code{scale_vars} (or the number of raster
-#'   layers when \code{scale_vars} is not provided). Values must be in the same
-#'   units as the projection. Default: \code{NULL}; initial values are
-#'   generated automatically as \code{max_D / 2}, which is recommended.
-#' @param shape Optional numeric vector of initial shape values when
-#'   \code{kernel = "expow"}. Length requirements same as \code{sigma}. Default:
-#'   \code{NULL}; starting values of 2 are generated automatically.
-#' @param projected Logical. Whether \code{pts} and \code{raster_stack} are in a
-#'   projected (planar) coordinate system. Currently only projected coordinates
-#'   are supported. Default: \code{TRUE}.
-#' @param progress Logical. Print progress bars to the console during extraction
-#'   and distance calculations. Default: \code{FALSE}.
-#' @param verbose Logical. Print status messages during preparation. Default:
-#'   \code{TRUE}.
-#' @param bin Logical. If \code{TRUE} (default), precompute distance-binned
-#'   summaries of the kernel-type covariates so that \code{\link{multiScale_optim}}
-#'   can evaluate kernel-weighted means in \code{O(nbins)} per point instead of
-#'   iterating every buffer cell on each optimizer evaluation. This makes
-#'   optimization substantially faster (and independent of \code{max_D}) at the
-#'   cost of a negligible binning approximation. Landscape-metric covariates are
-#'   never binned and always use the exact per-cell path.
-#' @param nbins Positive integer. Number of equal-width distance bins used when
-#'   \code{bin = TRUE}. More bins increase accuracy and memory; the default
-#'   (\code{256}) reproduces exact optimization results to several significant
-#'   figures. Ignored when \code{bin = FALSE}.
-#' @param store_cell_data Logical. If \code{TRUE} (default), the full per-cell
-#'   \code{d_list}/\code{raw_cov} data are retained. If \code{FALSE} and every
-#'   covariate is kernel-type (no landscape metrics) and \code{bin = TRUE}, the
-#'   cell-level data are dropped after binning, dramatically reducing the
-#'   object's memory footprint (often by 1 to 2 orders of magnitude). The binned
-#'   summaries are sufficient to drive optimization, \code{\link{profile_sigma}},
-#'   and the final refit. Ignored (with a message) when landscape metrics are
-#'   present or \code{bin = FALSE}.
+#' @param pts Survey point locations as a `SpatVector` (terra) or `sf` object,
+#'   in a projected coordinate system whose units match `max_D`. Row names
+#'   are kept as point IDs.
+#' @param raster_stack A `SpatRaster` (terra) with one or more layers, on the
+#'   same projection as `pts`. Without `scale_vars`, each layer becomes a
+#'   covariate with the layer's name, so the names must match the model
+#'   formula. Layer names cannot be `"x"`, which is reserved for internal
+#'   coordinate data. The raster must cover a buffer of `max_D` around every
+#'   point.
+#' @param max_D Positive numeric scalar. Radius, in map units, of the circle
+#'   around each point within which raster cells are extracted. It is also
+#'   the upper bound of the sigma search, and kernels are cut off at this
+#'   distance. Set it above the largest plausible scale of effect, at least
+#'   about 3.3 times the largest plausible sigma for a Gaussian kernel. If an
+#'   estimate comes back near `max_D`, increase it and run `kernel_prep()`
+#'   again. See the section on choosing `max_D` in [multiScaleR-kernels].
+#' @param kernel Character. Distance-weighting function used for every
+#'   covariate: `"gaussian"` (default), `"exp"` (negative exponential),
+#'   `"expow"` (exponential power, which also estimates a shape), or
+#'   `"fixed"` (equal weight within a radius). The weight functions are given
+#'   in [multiScaleR-kernels]. To compare kernels, run `kernel_prep()` once
+#'   per kernel.
+#' @param scale_vars Optional covariate specifications created with
+#'   [msr_vars()]. Omit it to make each raster layer one kernel-weighted mean.
+#'   Supply it to define derived covariates, such as a kernel mean and a
+#'   landscape or surface metric from the same layer.
+#' @param sigma Optional numeric vector of starting sigma values, in map
+#'   units, one per covariate whose scale is estimated (one per raster layer
+#'   when `scale_vars` is omitted). Default: `NULL`, which starts every sigma
+#'   at `max_D / 2`. The default is recommended. These values set the
+#'   covariates in `kernel_dat` and are not the starting values of
+#'   [multiScale_optim()], which chooses its own.
+#' @param shape Optional numeric vector of starting shape values for
+#'   `kernel = "expow"`, with the same length as `sigma`. Default: `NULL`,
+#'   which starts every shape at 2 (the Gaussian form). Ignored for other
+#'   kernels.
+#' @param projected Logical. Whether `pts` and `raster_stack` use projected
+#'   (planar) coordinates. Only projected coordinates are supported, so
+#'   `FALSE` is an error. Default: `TRUE`.
+#' @param progress Logical. Show progress bars during extraction and weighting.
+#'   Default: `FALSE`.
+#' @param verbose Logical. Print status messages. Default: `TRUE`.
+#' @param bin Logical. If `TRUE` (default), summarize each kernel mean's cell
+#'   values into distance bins. [multiScale_optim()] then evaluates kernel
+#'   means from the bins instead of every cell, which is much faster and no
+#'   longer depends on `max_D`, at the cost of a negligible approximation.
+#'   The analytic backends and [multiScale_bayes()] require it for kernel
+#'   means. Landscape and surface metrics are never binned. `FALSE` forces exact cell-by-cell
+#'   evaluation.
+#' @param nbins Integer, at least 2. Number of equal-width distance bins when
+#'   `bin = TRUE`. More bins increase accuracy and memory. The default
+#'   (`256`) reproduces exact optimization results to several significant
+#'   figures. Ignored when `bin = FALSE`.
+#' @param store_cell_data Logical. If `TRUE` (default), the per-cell distances
+#'   (`d_list`) and values (`raw_cov`) are kept. If `FALSE`, they are dropped
+#'   after binning, often shrinking the object by one to two orders of
+#'   magnitude. This lean mode needs `bin = TRUE` and only kernel means. With
+#'   landscape or surface metrics, or `bin = FALSE`, the cell data are kept
+#'   and a message says so. The bins suffice for optimization,
+#'   [profile_sigma()], and the final refit.
 #'
-#' @return A list of class \code{"multiScaleR_data"} containing:
-#' \describe{
-#'   \item{\code{kernel_dat}}{Data frame of scaled (mean-centered, unit-variance)
-#'     initial kernel-weighted covariate values, one row per point and one column
-#'     per covariate. Row names match \code{pts} row names or sequential integers.
-#'     Use this directly to fit the initial model passed to
-#'     \code{\link{multiScale_optim}}.}
-#'   \item{\code{d_list}}{Named list (one element per point) of numeric distance
-#'     vectors from the point to every raster cell within the buffer.}
-#'   \item{\code{raw_cov}}{Named list (one element per point) of matrices
-#'     containing raw raster cell values within the buffer, aligned with
-#'     \code{d_list}. Each point is stored as a dense or sparse matrix,
-#'     whichever is smaller. \code{NULL} in lean mode.}
-#'   \item{\code{cell_size}}{Fixed x/y raster cell dimensions in map units.
-#'     CV uses these to retain intersecting cells whose centers extend beyond
-#'     \code{max_D}, without learning a bin domain from assessment rows.}
-#'   \item{\code{kernel}}{Character string identifying the kernel used.}
-#'   \item{\code{sigma}}{Numeric vector of initial sigma values on the internal
-#'     (scaled) parameter space.}
-#'   \item{\code{shape}}{Numeric vector of initial shape values, or \code{NULL}.}
-#'   \item{\code{min_D}}{Numeric. Approximate minimum inter-cell distance,
-#'     used as the lower bound for sigma during optimization.}
-#'   \item{\code{max_D}}{Numeric. The \code{max_D} value supplied by the user.}
-#'   \item{\code{n_covs}}{Integer. Number of covariates with scale being
-#'     optimized.}
-#'   \item{\code{unit_conv}}{Numeric. Internal distance scaling factor (equals
-#'     \code{max_D}).}
-#'   \item{\code{scale_vars}}{Data frame of class \code{"multiScaleR_vars"}
-#'     describing all covariate specifications.}
-#'   \item{\code{resolution}}{Numeric. Raster cell resolution.}
-#'   \item{\code{n_cols}}{Integer. Number of raster columns (used for adjacency
-#'     landscape metrics).}
-#'   \item{\code{scl_params}}{Named list with elements \code{mean} and \code{sd}
-#'     the centering and scaling parameters applied to \code{kernel_dat}.
-#'     Stored for use by \code{\link{kernel_scale.raster}} when
-#'     \code{scale_center = TRUE}.}
-#'   \item{\code{binned}}{When \code{bin = TRUE}, a list of precomputed
-#'     distance-binned summaries (representative bin distances and per-covariate
-#'     value/count matrices) used to accelerate optimization. \code{NULL} when
-#'     \code{bin = FALSE}.}
-#'   \item{\code{cell_data_stored}}{Logical flag indicating whether the
-#'     per-cell \code{d_list}/\code{raw_cov} data were retained. \code{FALSE}
-#'     only in lean mode (\code{store_cell_data = FALSE}).}
-#' }
+#' @return An object of class `multiScaleR_data`, a list. Its full structure
+#' is described in [multiScaleR_data-class]. The parts you use directly:
+#' * `kernel_dat`: data frame with one row per point and one column per
+#'   covariate. Values are centered and scaled (mean 0, standard deviation 1)
+#'   at the starting sigma. Combine it with your response data to fit the
+#'   starting model.
+#' * `scl_params`: list with the `mean` and `sd` used for that scaling, in
+#'   the covariates' own units.
+#' * `kernel`, `max_D`, `min_D`, and `scale_vars`: the settings passed on to
+#'   [multiScale_optim()] and [kernel_scale.raster()].
+#'
+#' Printing the object reports the number of points and covariates, the
+#' kernel, the number of cells extracted around the first point ("Number of
+#' elements"), whether binning is on, the minimum distance (`min_D`, about one
+#' cell width and the lower bound of the sigma search), the maximum distance
+#' (`max_D`), and the unit conversion (distances are stored divided by
+#' `max_D`).
 #'
 #' @details
-#' Point locations and raster layers must share a defined CRS and both must be
-#' projected. All units (including \code{max_D} and any user-supplied
-#' \code{sigma}) must be in the same linear unit as the projection (typically
-#' meters or feet).
+#' # Prepare the points and rasters
 #'
-#' The \code{max_D} buffer should be large enough to encompass the plausible
-#' range of the true scale of effect. A common rule of thumb is to set
-#' \code{max_D} to at least 2 to 3 times the largest expected sigma. After running
-#' \code{\link{multiScale_optim}}, the \code{max_distance} diagnostic will warn
-#' if the estimated scale approaches \code{max_D}.
+#' Points and rasters must share a defined, projected CRS. Every distance,
+#' including `max_D` and any `sigma` you supply, is in the linear unit of
+#' that projection, usually meters. Landscape and surface metrics also need
+#' square cells. Row names of `pts` are kept throughout, so model data can be
+#' joined back to the points.
 #'
-#' Initial \code{sigma} values do not need to be precise. The optimizer will
-#' refine them. Provide explicit starting values only if the default
-#' (\code{max_D / 2}) leads to convergence problems.
+#' Each point's buffer is the circle of radius `max_D`, and every cell it
+#' intersects is extracted, including partly covered boundary cells, which
+#' keep their full kernel weight. Missing cells drop out of each weighted
+#' mean, and the remaining weights renormalize. Extraction runs in batches of
+#' 25 points to limit the peak memory of temporary tables. Point order,
+#' returned values, and distances are not affected.
 #'
-#' Row names from \code{pts} are preserved throughout the returned object so
-#' that downstream model data frames can be joined back to the original point
-#' order. Raster extraction is processed in batches of 25 points to limit the
-#' peak memory used by temporary extraction tables. Point order, returned
-#' values, and distance calculations are unchanged.
+#' # Manage memory
+#'
+#' A larger `max_D` extracts more cells per point. Check the size of the
+#' object and the memory needed for parallel optimization with
+#' [estimate_multiscale_ram()]. When every covariate is a kernel mean,
+#' `store_cell_data = FALSE` keeps only the bins.
+#'
+#' # Related preparation functions
+#'
 #' To assign each observation to a different annual raster while estimating
-#' one pooled landscape relationship, use \code{\link{kernel_prep_by_group}}.
-#' @examples
-#' library(terra)
-#' pts <- vect(cbind(c(3,5,7),
-#'                   c(7,5,3)))
+#' one pooled landscape relationship, use [kernel_prep_by_group()]. To
+#' prepare inputs for `unmarked` models, see [prepare_unmarked_data()].
 #'
-#' mat_list <- list(r1 = rast(matrix(rnorm(100),
-#'                                   nrow = 10)),
-#'                  r2 = rast(matrix(rnorm(100),
-#'                                   nrow = 10)))
-#' rast_stack <- rast(mat_list)
+#' @seealso [multiScale_optim()], [msr_vars()], [multiScaleR-kernels],
+#'   [multiScaleR_data-class], [estimate_multiscale_ram()].
+#'   `vignette("v02-user-guide", package = "multiScaleR")` explains each
+#'   argument on a worked example.
+#'
+#' @examples
+#' ## Survey points and a binary habitat raster bundled with the package
+#' data("pts")
+#' data("count_data")
+#' hab <- terra::rast(system.file("extdata", "hab.tif",
+#'                                package = "multiScaleR"))
+#'
 #' kernel_inputs <- kernel_prep(pts = pts,
-#'                              raster_stack = rast_stack,
-#'                              max_D = 2,
-#'                              kernel = 'gaussian',
-#'                              sigma = NULL)
+#'                              raster_stack = hab,
+#'                              max_D = 250,          # map units (meters)
+#'                              kernel = "gaussian",
+#'                              verbose = FALSE)
+#' # 75 points, one covariate, cells within 250 m of each point
+#' kernel_inputs
+#'
+#' # Standardized kernel-weighted habitat at the starting sigma (125 m)
+#' head(kernel_inputs$kernel_dat)
+#'
+#' # Fit the starting model that multiScale_optim() will optimize
+#' df <- data.frame(count_data["y"], kernel_inputs$kernel_dat)
+#' mod <- glm(y ~ hab, family = poisson, data = df)
+#'
+#' ## Lean mode keeps only the distance bins
+#' lean_inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+#'                            store_cell_data = FALSE, verbose = FALSE)
+#' # Object sizes in megabytes
+#' c(full = as.numeric(object.size(kernel_inputs)),
+#'   lean = as.numeric(object.size(lean_inputs))) / 1e6
 #' @rdname kernel_prep
 #' @export
 #' @importFrom exactextractr exact_extract

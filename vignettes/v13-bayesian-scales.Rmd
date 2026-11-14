@@ -669,3 +669,5 @@ replicated <- simulate(bfit, nsim = 200, seed = 94)   # predictive check
   interval includes and leaves out.
 - **`vignette("v07-fitting-methods", package = "multiScaleR")`**, which
   covariate types each fitting method accepts.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.

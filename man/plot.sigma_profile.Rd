@@ -2,23 +2,47 @@
 % Please edit documentation in R/profile_sigma.R
 \name{plot.sigma_profile}
 \alias{plot.sigma_profile}
-\title{Plot Sigma Profile}
+\title{Plot a Sigma Profile}
 \usage{
 \method{plot}{sigma_profile}(x, ...)
 }
 \arguments{
-\item{x}{An object of class \code{sigma_profile} from \code{\link{profile_sigma}}.}
+\item{x}{A \code{sigma_profile} object from \code{\link[=profile_sigma]{profile_sigma()}}.}
 
-\item{...}{Additional arguments (not currently used).}
+\item{...}{Not used.}
 }
 \value{
-A list of \code{ggplot} objects (one per covariate), returned
-invisibly. Plots are printed as a side effect.
+A named list of \code{ggplot} objects, one per covariate, returned
+invisibly. Each plot is printed as a side effect. Modify a stored plot
+and print it again to customize it.
 }
 \description{
-Plots the profiled log-likelihood or AICc across sigma values for each
-spatial covariate. The optimized sigma is marked with a vertical red line.
+Draws one panel per covariate from a \code{\link[=profile_sigma]{profile_sigma()}} result. Each panel
+plots AICc or the log-likelihood (whichever \code{metric} was chosen in
+\code{\link[=profile_sigma]{profile_sigma()}}) against sigma, with points at the evaluated values and a
+dashed red vertical line at the estimated sigma.
+}
+\details{
+\strong{How to read the plot.} The x-axis is sigma in map units, and the
+y-axis is AICc (lower is better) or the log-likelihood (higher is better).
+A clear trough in AICc, or peak in log-likelihood, at the dashed line means
+the data identify the scale of effect well. A flat curve means many
+scales fit about equally well. Points are joined with straight lines, so
+a hard-radius covariate's stepped likelihood is not shown between grid
+values. See \code{\link[=profile_sigma]{profile_sigma()}} for how the values are computed.
+}
+\examples{
+## A stored profile from the Quick Start fit (two covariates, 15 values each)
+prof <- readRDS(system.file("extdata", "cache-quickstart.rds",
+                            package = "multiScaleR"))$prof
+# One AICc panel each for land1 and land2. AICc is lowest near the
+# estimated sigma (dashed line)
+p <- plot(prof)
+
+# The stored ggplot objects can be modified and drawn again
+p$land1 + ggplot2::labs(x = "sigma (m)")
+
 }
 \seealso{
-\code{\link{profile_sigma}}
+\code{\link[=profile_sigma]{profile_sigma()}}
 }

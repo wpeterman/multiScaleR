@@ -15,6 +15,7 @@ zero_sq_native <- function(g, p) {
 }
 
 test_that("finite-bandwidth SQ zero-variance faces retain normalized targets and population counts", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   population_count <- function(p) sum(lengths(p[!names(p) %in% c("scale_z", "response_z")]))
   maximum <- c(value = 0, gradient = 0, hessian = 0, near_value = 0,

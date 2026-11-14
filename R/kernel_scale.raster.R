@@ -1,218 +1,292 @@
-#' @title Apply kernel smoothing to raster layers
+#' @title Apply Kernels to Raster Layers for Mapping
 #'
-#' @description Applies a kernel smoothing function to one or more raster
-#' layers, producing a spatially weighted mean, surface metric, or landscape metric at the
-#' scale identified by \code{\link{multiScale_optim}}. Primarily used to
-#' generate prediction rasters for spatial model projection.
+#' @description Computes the model covariates (kernel-weighted means, or
+#' declared landscape or surface metrics) for every cell of one or more raster
+#' layers, at the scales estimated by [multiScale_optim()] or at scales you
+#' supply. The result is a stack of covariate layers that a fitted model can
+#' predict from, so this is the usual first step in mapping a fitted model.
+#' `vignette("v03-map-predictions", package = "multiScaleR")` works through
+#' projection, extrapolation checks, and clamping.
 #'
-#' @param raster_stack A \code{SpatRaster} object containing the source raster
-#'   layer(s) to be smoothed. Layer names must match the covariate names used
-#'   during model fitting (or the \code{source} names in \code{scale_vars}).
-#' @param sigma Numeric vector of kernel scale parameter(s) in the same units
-#'   as the raster projection (e.g., meters). One value per optimized covariate
-#'   in declaration order, including separate derived variables from one source.
-#'   Ignored when \code{multiScaleR} is provided; sigma values are extracted
-#'   from the fitted object automatically.
-#' @param multiScaleR A fitted object of class \code{"multiScaleR"} (from
-#'   \code{\link{multiScale_optim}}) or class \code{"multiScaleR_data"} (from
-#'   \code{\link{kernel_prep}}). When provided, sigma, shape, kernel, and
-#'   scale_vars are all extracted automatically. Default: \code{NULL}.
+#' @param raster_stack A `SpatRaster` with the source layer(s). Layer names
+#'   must match the covariate names used in fitting, or the `source` names in
+#'   `scale_vars`. Use the same map units and cell size as in fitting.
+#' @param sigma Numeric vector of kernel scale parameters (or hard radii), in
+#'   map units. Supply one value per optimized covariate in declaration order
+#'   when `scale_vars` is used, or one per raster layer otherwise. Without
+#'   `scale_vars`, a length that does not match the number of layers gives a
+#'   warning and the first value is used for every layer. Ignored when
+#'   `multiScaleR` is supplied.
+#' @param multiScaleR A fitted `multiScaleR` object from [multiScale_optim()],
+#'   or a prepared `multiScaleR_data` object from [kernel_prep()]. When
+#'   supplied, `sigma`, `shape`, `kernel`, and `scale_vars` are taken from it.
+#'   A fitted object supplies the estimated scales. A prepared object supplies
+#'   the starting scales of [kernel_prep()]. Default: `NULL`.
 #' @param shape Numeric vector of shape parameters for the exponential power
-#'   kernel (\code{kernel = "expow"}), one per optimized covariate. A
-#'   hard-radius variable ignores its shape position. Ignored when
-#'   \code{multiScaleR} is provided. Default: \code{NULL}.
-#' @param kernel Character. Kernel function used for smoothing. One of
-#'   \code{"gaussian"} (default), \code{"exp"}, \code{"fixed"}, or
-#'   \code{"expow"}. Ignored when \code{multiScaleR} is provided.
-#' @param scale_vars Optional variable specifications created with
-#'   \code{\link{msr_vars}}. Use when projecting landscape metrics or
-#'   explicitly defined covariates without passing a fitted \code{multiScaleR}
-#'   object. When \code{multiScaleR} is provided, \code{scale_vars} is
-#'   extracted automatically.
-#' @param pct_wt Numeric between 0 and 1 (exclusive). Cumulative kernel weight
-#'   along a line through the focal cell used to determine the smoothing window
-#'   radius. A larger value (e.g., \code{0.99}) includes more of the kernel tail
-#'   but increases computation time. This is the historical one-dimensional
-#'   cutoff, not the proportion of total weight within the planar window.
-#'   Default: \code{0.975}.
-#' @param fft Logical. If \code{TRUE} (default), smoothing is performed via
-#'   Fast Fourier Transform (FFT) convolution, which is substantially faster
-#'   for large rasters and wide kernels. Set to \code{FALSE} to use direct
-#'   focal calculations. Both engines support kernel means and the declared
-#'   surface and landscape metrics, with the same available-support and
-#'   missing-value rules. Direct focal calculations can be slower.
-#' @param scale_center Logical. If \code{TRUE}, the smoothed raster values are
-#'   centered and scaled using the mean and standard deviation from the model
-#'   fitting data (extracted from \code{multiScaleR$scl_params}). Required
-#'   when using the output with \code{terra::predict} and a fitted model that
-#'   was trained on scaled covariates. Requires \code{multiScaleR} to be
-#'   provided. Default: \code{FALSE}.
-#' @param clamp Logical. If \code{TRUE}, scaled raster values are clamped to
-#'   the observed covariate range from the model fitting data, preventing
-#'   extrapolation beyond the training range. Only active when
-#'   \code{scale_center = TRUE}. Default: \code{FALSE}.
+#'   kernel (`kernel = "expow"`), one per optimized covariate. A hard-radius
+#'   covariate ignores its shape position. Ignored when `multiScaleR` is
+#'   supplied. Default: `NULL`.
+#' @param kernel Character. Kernel used for smoothing: `"gaussian"` (default),
+#'   `"exp"`, `"expow"`, or `"fixed"`. See [multiScaleR-kernels]. Ignored when
+#'   `multiScaleR` is supplied.
+#' @param scale_vars Optional covariate specifications from [msr_vars()]. Use
+#'   it to project landscape or surface metrics, or derived covariates,
+#'   without a fitted object. When `multiScaleR` is supplied, its
+#'   specifications are used, and for a fitted model only the covariates in
+#'   the model formula are projected.
+#' @param pct_wt Numeric between 0 and 1 (exclusive). Sets the size of the
+#'   default smoothing window for kernel means and kernel-weighted surface
+#'   metrics. The window extends to the line-based (1D) distance that holds
+#'   `pct_wt` of the kernel weight, rounded up to whole cells. Larger values
+#'   (for example `0.99`) include more of the kernel tail and take longer. It
+#'   is not the share of planar weight within the window. Ignored when
+#'   `match_buffer = TRUE` and by hard-radius metrics. Default: `0.975`.
+#' @param fft Logical. If `TRUE` (default), smoothing uses fast Fourier
+#'   transform (FFT) convolution, which is much faster for large rasters and
+#'   wide kernels. Set `FALSE` for direct moving-window (focal) calculations.
+#'   Both engines support kernel means and the declared surface and landscape
+#'   metrics, with the same support and missing-value rules.
+#' @param scale_center Logical. If `TRUE`, each smoothed layer is centered and
+#'   scaled with the mean and standard deviation stored in
+#'   `multiScaleR$scl_params`, so its values match the standardized
+#'   covariates used in fitting. Required for prediction from a model fitted
+#'   on standardized covariates, which is the default. Needs `multiScaleR`.
+#'   Default: `FALSE`.
+#' @param clamp Logical. If `TRUE`, standardized values are limited to the
+#'   range observed at the survey points (moved by `pct_mx`), which prevents
+#'   extrapolation beyond the fitted range. Active only when
+#'   `scale_center = TRUE`. Default: `FALSE`.
 #' @param pct_mx Numeric greater than -0.5 and no larger than 0.99. When
-#'   \code{clamp = TRUE}, each clamping limit moves outward by \code{pct_mx}
-#'   times the range of that covariate observed at the survey points:
-#'   \code{lower = min - pct_mx * (max - min)} and
-#'   \code{upper = max + pct_mx * (max - min)}, on the standardized scale used
-#'   for clamping. For example, a covariate observed from -1 to 3 is clamped to
-#'   -1.4 and 3.4 with \code{pct_mx = 0.1}, and to -0.6 and 2.6 with
-#'   \code{pct_mx = -0.1}. Negative values move the limits inward. Default:
-#'   \code{0} (exact training range).
-#' @param na.rm Logical. If \code{TRUE} (default), \code{NA} cells are excluded
-#'   from the kernel-weighted mean calculation. If \code{FALSE}, any window
-#'   containing a \code{NA} cell will produce a \code{NA} output.
-#' @param verbose Logical. Print layer-level progress messages. Default:
-#'   \code{TRUE}.
-#' @param offset_values Named numeric vector of values for variables
-#'   inside model offsets, such as \code{c(n_weeks = 4)} for
-#'   \code{offset(log(n_weeks))}. These are raw input values, not transformed
-#'   offsets. When omitted, a log offset uses 1 (zero on the log scale) and
-#'   a direct offset uses 0. Set this argument for a meaningful projection
-#'   scenario.
-#' @param include_fixed Logical. For a fitted native model with verifiable
-#'   retained numeric predictors and training row IDs,
-#'   set \code{TRUE}
-#'   with \code{scale_center = TRUE} to standardize modeled fixed-radius metrics
-#'   using their verified original training preparation. The default
-#'   \code{FALSE} uses only the supplied object's scaling parameters. The opt-in
-#'   requires retained training buffers, matching fixed metric definitions and
-#'   raster resolution, and unchanged native training predictor values.
-#'   Retain the native model frame (for GLM and coxph, \code{model = TRUE}) or
-#'   an equivalent recoverable training frame. Fixed inputs must be retained
-#'   under their original names, with row IDs matching prepared sites. See
-#'   \code{\link{prepare_unmarked_data}} for the verification contract.
-#' @param match_buffer Logical. The default \code{FALSE} retains the historical
-#'   \code{pct_wt} projection window. Set \code{TRUE} to use the retained
-#'   preparation's \code{max_D} polygon-intersection support and finite-cell
-#'   normalization, including partially intersecting boundary cells.
-#'   Requires a fitted or prepared \code{multiScaleR} object, matching projected
-#'   square-cell resolution and \code{na.rm = TRUE}. Both smoothing engines
-#'   support this option.
-#'   Metric radii larger than the prepared buffer raise an error. Central source
-#'   NA cells remain masked. Binning, rasterization, and cell-center differences
-#'   remain separate approximations.
-#' @param site_values Optional named list of scalar nonspatial projection
-#'   values in the native predictor units, for example
-#'   \code{list(season = "spring", effort = 2, surveyed = TRUE)}. Requires a
+#'   `clamp = TRUE`, each clamping limit moves outward by `pct_mx` times the
+#'   range of that covariate observed at the survey points:
+#'   `lower = min - pct_mx * (max - min)` and
+#'   `upper = max + pct_mx * (max - min)`, on the standardized scale. For
+#'   example, a covariate observed from -1 to 3 is clamped to -1.4 and 3.4
+#'   with `pct_mx = 0.1`, and to -0.6 and 2.6 with `pct_mx = -0.1`. Negative
+#'   values move the limits inward. Default: `0` (the exact training range).
+#' @param na.rm Logical. If `TRUE` (default), missing cells are left out and
+#'   the weights of the remaining cells renormalize. If `FALSE`, any window
+#'   with a missing cell, including cells beyond the raster edge, returns
+#'   `NA`.
+#' @param verbose Logical. Print a progress message for each layer. Default:
+#'   `TRUE`.
+#' @param offset_values Named numeric vector of raw input values for variables
+#'   inside model offsets, such as `c(n_weeks = 4)` for
+#'   `offset(log(n_weeks))`. When omitted, a log offset uses 1 (zero on the
+#'   log scale) and a direct offset uses 0. Set it for a meaningful projection
+#'   scenario. See Details.
+#' @param include_fixed Logical. Set `TRUE`, with `scale_center = TRUE` and a
+#'   fitted native model, to standardize modeled fixed-radius metrics with
+#'   their verified original training preparation. The default `FALSE` uses
+#'   only the scaling parameters stored on the supplied object. See Details.
+#' @param match_buffer Logical. With the default `FALSE`, kernel means use the
+#'   `pct_wt` window. Set `TRUE` to use the same circular footprint as
+#'   [kernel_prep()]: every cell intersecting a circle of radius `max_D`.
+#'   Requires a fitted or prepared `multiScaleR` object, a projected CRS with
+#'   square cells at the prepared resolution, and `na.rm = TRUE`. Works with
+#'   either value of `fft`. See Details.
+#' @param site_values Optional named list of scalar values for nonspatial
+#'   predictors, in their native units, for example
+#'   `list(season = "spring", effort = 2, surveyed = TRUE)`. Requires a
 #'   fitted object. Factor and character values must be fitted levels.
-#'   Numeric predictors retain their historical zero default when omitted;
-#'   categorical predictors need an explicit value. Unknown names and attempts
-#'   to overwrite computed spatial layers raise an error. Use
-#'   \code{offset_values} for variables occurring only inside offsets.
-#' @param ... Reserved for deprecated arguments. Currently only \code{scale_opt}
-#'   (deprecated alias for \code{multiScaleR}) is handled.
+#'   Omitted numeric predictors default to zero, and categorical predictors
+#'   need an explicit value. Unknown names and attempts to overwrite a
+#'   spatial layer are errors. Use `offset_values` for variables that occur
+#'   only inside offsets.
+#' @param ... Reserved for deprecated arguments. Only `scale_opt`, a
+#'   deprecated alias for `multiScaleR`, is handled (with a warning).
 #'
-#' @return A \code{SpatRaster} with one layer per covariate defined in
-#' \code{scale_vars} (or per raster layer when \code{scale_vars} is not used).
-#' Layer names match the covariate names from the model. When a fitted
-#' \code{multiScaleR} object is provided and the model contains site-level
-#' predictors (i.e., predictors not derived from raster layers), constant
-#' ("dummy") raster layers filled with zeros are appended to make the output
-#' compatible with \code{terra::predict}.
-#' Offset variables are appended under their input names so transformed offset
-#' expressions can be evaluated by prediction. With a fitted object, the
-#' returned R object also retains a preparation descriptor for checked
-#' \code{\link{predict.multiScaleR}} raster prediction. Ordinary raster file
-#' formats need not retain this descriptor.
+#' @return A `SpatRaster` on the grid of `raster_stack`, with one layer per
+#' covariate (as declared in `scale_vars` or stored in `multiScaleR`), or one
+#' per raster layer when you supply `sigma` without `scale_vars`. Layers are
+#' named as in the model. Read the values as follows:
+#' * **Covariate layers.** With `scale_center = FALSE`, values are in the
+#'   covariate's own units. A kernel-weighted mean is in the units of the
+#'   source layer, and a metric in the units given in [msr_vars()]. With
+#'   `scale_center = TRUE`, values are in standard deviations of the fitting
+#'   data, so 0 is the average survey point.
+#' * **Site-level layers.** With a fitted object, predictors not derived from
+#'   rasters (for example survey effort) are added as constant layers, at 0
+#'   unless set by `site_values`, so that the stack works with
+#'   `terra::predict()`. These do not represent spatial variation.
+#' * **Offset layers.** Variables inside offsets are added under their input
+#'   names, at the values described for `offset_values`.
+#'
+#' With a fitted object, the returned R object also carries a
+#' `"multiScaleR_projection"` attribute that records how the layers were
+#' made. [predict.multiScaleR()] checks it before raster prediction. Raster
+#' files written to disk do not store this attribute.
 #'
 #' @details
-#' \strong{Typical usage} after running \code{\link{multiScale_optim}}:
-#' \preformatted{
-#' opt_hab <- kernel_scale.raster(raster_stack = hab, multiScaleR = opt)
-#' plot(c(hab, opt_hab))
+#' # Choose where the scales come from
 #'
-#' ## Scale and center for prediction
-#' opt_hab_sc <- kernel_scale.raster(raster_stack = hab,
-#'                                   multiScaleR = opt,
-#'                                   scale_center = TRUE,
-#'                                   match_buffer = TRUE)
-#' preds <- predict(opt, opt_hab_sc, type = "response")
-#' }
+#' * **A fitted model** (`multiScaleR = fit`) is the usual choice for mapping.
+#'   Each covariate is smoothed at its estimated sigma or radius with the
+#'   fitted kernel.
+#' * **A prepared object** (`multiScaleR = kernel_inputs`) uses the starting
+#'   scales of [kernel_prep()]. Use it to check how a preparation maps before
+#'   fitting.
+#' * **Your own values** (`sigma`, `kernel`, and `shape`, with optional
+#'   `scale_vars`) let you explore smoothing at any scale without a model.
 #'
-#' \strong{FFT vs. focal smoothing}
+#' # Set the smoothing window
 #'
-#' FFT and direct focal calculations evaluate the same declared neighborhood
-#' and finite-cell normalization. Weighted means renormalize over available
-#' mapped support, including raster edges. Central source NA cells remain
-#' masked. With \code{na.rm = FALSE}, incomplete footprints, including missing
-#' cells beyond the map extent, return NA. Small floating-point differences
-#' between engines can occur. Constant weighted SQ support returns zero;
-#' standardized higher moments remain undefined when spread is zero.
+#' By default (`match_buffer = FALSE`), each kernel mean and kernel-weighted
+#' surface metric uses a square window that extends to the line-based
+#' distance holding `pct_wt` of the kernel weight. For a Gaussian kernel and
+#' the default `pct_wt = 0.975`, that is about 2.24 sigma. Hard-radius metrics
+#' use the cells whose centers lie within their radius. This window need not
+#' include the same cells that [kernel_prep()] used at the survey points,
+#' which were every cell intersecting a circle of radius `max_D`, including
+#' partly covered boundary cells.
 #'
-#' \strong{Dummy rasters for site-level covariates}
+#' With `match_buffer = TRUE`, kernel means and kernel-weighted surface
+#' metrics use that preparation footprint instead. The same projected
+#' `sf::st_buffer()` circle and polygon-intersection cell selection are
+#' applied around each raster cell center. Partly covered boundary cells get
+#' their usual full-cell kernel weights, as in fitting, rather than
+#' coverage-fraction weights. Weighted SQ remains a weighted population spread
+#' (zero for constant values), and a hard-radius SQ remains a sample standard
+#' deviation. Requirements and limits:
 #'
-#' When a fitted \code{multiScaleR} object is supplied, the function inspects
-#' the model frame to find any predictors that are not represented by raster
-#' layers (e.g., survey effort, habitat type measured in the field). These
-#' cannot be projected spatially and are therefore assigned constant zero
-#' rasters, which correspond to the reference value for centered and scaled
-#' covariates. These dummy layers are required for \code{terra::predict} to
-#' work but do not represent real spatial variation. Set \code{site_values}
-#' for other scenarios. Categorical predictors are skipped with a warning
-#' unless a fitted level is explicitly supplied. Their raster category labels
-#' preserve the fitted levels. Checked prediction also restores logical types.
-#' Native unmarked models require explicit nonspatial prediction scenarios.
-#' When every native predictor is represented by a spatial layer, no dummy
-#' layers are needed. Supply remaining variables through native prediction data
-#' or \code{terra::predict(..., const = scenario)}.
+#' * Supply a fitted or prepared object, a raster with a projected (not
+#'   longitude and latitude) CRS, square cells at the prepared resolution, and
+#'   `na.rm = TRUE`. Use the intended source layers in matching map units.
+#' * Both smoothing engines support matching. Direct focal calculation
+#'   (`fft = FALSE`) can be much slower with a large `max_D`, so check the
+#'   cost on a small area first.
+#' * A metric radius larger than the prepared `max_D` raises an error,
+#'   because its truncated footprint cannot be reproduced by capping the
+#'   radius. Prepare again with an adequate `max_D` before fitting such a
+#'   model.
+#' * Matching aligns the footprint at raster cell centers. It does not undo
+#'   distance binning, reconstruct missing CRS metadata, replace missing
+#'   source coverage, or remove the difference between a sampled point and a
+#'   cell center.
+#'
+#' # Choose a smoothing engine
+#'
+#' FFT and direct focal calculations evaluate the same neighborhood with the
+#' same finite-cell normalization, so they agree up to small floating-point
+#' differences. Weighted means renormalize over the available mapped cells,
+#' including at raster edges. Cells that are missing in the source layer stay
+#' missing in the output, so smoothing never fills unmapped locations. With
+#' `na.rm = FALSE`, incomplete windows, including those that extend beyond the
+#' map, return `NA`. Weighted SQ over constant values returns zero, while the
+#' standardized higher moments stay undefined when the spread is zero. Use
+#' `fft = FALSE` mainly to confirm a result, because it can be much slower.
+#'
+#' # Standardize and clamp for prediction
+#'
+#' By default, [multiScale_optim()] fits the model to centered and scaled
+#' covariates, so set `scale_center = TRUE` before predicting from the fitted
+#' model. The scaling uses the means and standard deviations stored in the
+#' supplied object (for a fitted model, those at the estimated scales). Map
+#' cells can take covariate values outside the range seen at the survey
+#' points. `clamp = TRUE` holds such values at the surveyed limits, and
+#' `pct_mx` moves those limits in or out.
+#' `vignette("v03-map-predictions", package = "multiScaleR")` shows how to
+#' find extrapolated cells and choose a setting.
+#'
+#' # Fill site-level predictors and offsets
+#'
+#' With a fitted object, the function finds predictors that no raster layer
+#' supplies, such as survey effort or a habitat type recorded in the field.
+#' They cannot be mapped, so they are added as constant layers. A numeric
+#' predictor defaults to zero, which is its mean when it was centered and
+#' scaled. Set `site_values` for any other scenario. Categorical predictors
+#' are skipped with a warning unless you supply a fitted level, and their
+#' raster category labels keep the fitted levels. Checked prediction also
+#' restores logical types. Native `unmarked` models require explicit
+#' nonspatial prediction scenarios. When every predictor comes from a raster,
+#' no constant layers are added. You can also supply remaining variables
+#' through native prediction data or `terra::predict(..., const = scenario)`.
+#'
 #' Offset terms use their underlying input variables as layer names. For
-#' \code{offset(log(n_weeks))}, the default layer is \code{n_weeks = 1},
-#' representing one week of effort. Set \code{offset_values = c(n_weeks = 4)}
-#' to predict for four weeks. Direct offsets default to zero.
-#' Compound offsets, such as \code{offset(log(effort * duration))}, require
-#' explicit raw values for each underlying input. Literal constant offsets
-#' need no layer. Ambiguous or conflicting default scenarios raise an error.
+#' `offset(log(n_weeks))`, the default layer is `n_weeks = 1`, one week of
+#' effort. Set `offset_values = c(n_weeks = 4)` to predict for four weeks.
+#' Direct offsets default to zero. Compound offsets, such as
+#' `offset(log(effort * duration))`, need explicit raw values for each input.
+#' Literal constant offsets need no layer. Ambiguous or conflicting default
+#' scenarios raise an error.
 #'
-#' \strong{Verified fixed-radius metrics in native projection}
+#' # Include verified fixed-radius metrics
 #'
-#' Set \code{include_fixed = TRUE} with \code{scale_center = TRUE} when the
-#' fitted model contains declared fixed-radius metrics whose scaling parameters
-#' are retained only in its original preparation. The original fixed transforms
-#' and training normalization must reproduce the native model covariates
-#' exactly. Changed definitions or training inputs raise an error. This opt-in
-#' does not alter the caller's fitted object, metric definitions, or native
-#' uncertainty interpretation. Point-buffer preparation and raster smoothing
-#' retain their respective truncation and approximation rules.
-#' Native projection requires a recoverable training frame and matching
-#' original prepared row IDs for this verification. Transformations that do not
-#' retain the fixed predictor under its original name are not reconstructed.
-#' For conditional-logistic step selection, native \code{type = "risk"} with
-#' \code{reference = "zero"} gives a relative selection score. Supply required
-#' stratum variables explicitly through \code{const}. These scores are not
-#' choice probabilities or occurrence probabilities; choice probabilities require
-#' normalization within explicit sets of alternatives.
+#' A fitted model can contain fixed-radius metrics whose scaling parameters
+#' are kept only in its original preparation. Set `include_fixed = TRUE` with
+#' `scale_center = TRUE` to standardize them with that preparation. The
+#' function first checks that the original fixed transforms and training
+#' normalization reproduce the native model covariates exactly. Changed
+#' definitions or training inputs raise an error. The check needs:
 #'
-#' \strong{Matching the prepared neighborhood}
+#' * The retained training buffers, matching fixed metric definitions, and a
+#'   raster at the fitted resolution.
+#' * A recoverable training frame (for `glm()` and `coxph()`, fit with
+#'   `model = TRUE`), with the fixed predictors retained under their original
+#'   names and row IDs matching the prepared sites.
+#' * A fixed radius no larger than the fitted `max_D`.
 #'
-#' \code{match_buffer = TRUE} uses the same projected \code{sf::st_buffer()}
-#' and polygon-intersection cell selection as point preparation. Partial boundary
-#' cells receive their usual full-cell kernel weights, matching the fitting
-#' convention rather than adding coverage-fraction weights. Finite cells within
-#' mapped support are renormalized at raster edges; central source NA cells remain
-#' masked. Constant weighted SQ support has zero population spread in this mode.
-#' The historical \code{pct_wt} window remains the default when
-#' \code{match_buffer = FALSE}; both window choices use the finite-support,
-#' source-mask, and missing-value corrections described above.
+#' Transformations that do not retain a fixed predictor under its original
+#' name are not reconstructed. This option does not alter your fitted
+#' object, the metric definitions, or the interpretation of native
+#' uncertainty. [prepare_unmarked_data()] describes the same verification for
+#' `unmarked` models.
 #'
-#' This option aligns the extraction footprint at raster cell centers. It does
-#' not undo distance binning, reconstruct raster contents or original CRS metadata,
-#' replace missing source coverage, or remove differences between an arbitrary
-#' sampled point and a raster cell center. Use the same intended sources and map
-#' units. A larger prepared buffer can increase projection memory and runtime.
-#' Hard-neighborhood metric radii above \code{max_D} are refused because their
-#' truncated cell-intersection footprint is not equivalent to a smaller radius.
+#' # Predict from the result
+#'
+#' Pass the returned stack to [predict.multiScaleR()], which checks the
+#' projection settings, or to `terra::predict()` with the fitted model
+#' (`fit$opt_mod`). For a conditional-logistic step-selection model, native
+#' `type = "risk"` with `reference = "zero"` gives a relative selection
+#' score, not a choice or occurrence probability. Supply required stratum
+#' variables through `const`. See [multiScaleR-prediction].
+#'
+#' @seealso [multiScaleR-kernels], [msr_vars()], [predict.multiScaleR()],
+#'   [multiScaleR-prediction].
+#'   `vignette("v03-map-predictions", package = "multiScaleR")` maps a fitted
+#'   model, and `vignette("v04-landscape-metrics", package = "multiScaleR")`
+#'   and `vignette("v05-surface-metrics", package = "multiScaleR")` map
+#'   metrics.
 #'
 #' @examples
-#' ## Not Run
-#' r1 <- rast(matrix(rnorm(25^2),
-#'                   nrow = 25))
+#' ## Smooth a raster at a chosen sigma, without a fitted model
+#' hab <- terra::rast(system.file("extdata", "hab.tif",
+#'                                package = "multiScaleR"))
+#' hab_100 <- kernel_scale.raster(hab, sigma = 100, kernel = "gaussian",
+#'                                verbose = FALSE)
+#' # Each cell now holds the kernel-weighted proportion of habitat around it
+#' plot(c(hab, hab_100))
 #'
-#' r1_s <- kernel_scale.raster(r1,
-#'                             sigma = 4,
-#'                             kernel = 'gaussian')
-#' plot(c(r1, r1_s))
+#' ## Map a fitted model
+#' # A fit stored with the package (the Quick Start model of counts on
+#' # land1 and land2, with a site-level covariate)
+#' fit <- readRDS(system.file("extdata", "cache-quickstart.rds",
+#'                            package = "multiScaleR"))$opt
+#' land <- terra::rast(system.file("extdata", "landscape.tif",
+#'                                 package = "multiScaleR"))
+#' # Smooth each layer at its estimated sigma, standardize it as in fitting,
+#' # and clamp it to the range seen at the survey points
+#' r_scaled <- kernel_scale.raster(land, multiScaleR = fit,
+#'                                 scale_center = TRUE, clamp = TRUE,
+#'                                 verbose = FALSE)
+#' # land1 and land2 in standard deviation units, plus a constant layer
+#' # (0, the mean) for the site-level covariate
+#' names(r_scaled)
+#' # Expected count in every cell
+#' pred <- terra::predict(r_scaled, fit$opt_mod, type = "response")
+#' plot(pred)
+#'
+#' ## Use the preparation footprint of kernel_prep()
+#' # match_buffer needs a projected CRS in meters. The bundled raster has
+#' # none, so assign one for this example.
+#' terra::crs(land) <- "EPSG:32617"
+#' r_matched <- kernel_scale.raster(land, multiScaleR = fit,
+#'                                  scale_center = TRUE, clamp = TRUE,
+#'                                  match_buffer = TRUE, verbose = FALSE)
+#' # Change in standardized land1 (standard deviation units) from using the
+#' # wider preparation footprint instead of the pct_wt window
+#' summary(abs(terra::values(r_matched$land1) -
+#'               terra::values(r_scaled$land1))[, 1])
 #'
 #' @rdname kernel_scale.raster
 #' @export

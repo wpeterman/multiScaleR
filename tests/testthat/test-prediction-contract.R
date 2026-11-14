@@ -165,6 +165,7 @@ test_that("native snapshots retain exact native output and survive metadata-free
 })
 
 test_that("factorized quantiles remain conditional on the supplied population vector", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
   spec <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp,

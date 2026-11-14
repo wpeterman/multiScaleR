@@ -1,4 +1,5 @@
 test_that("one-group joint-score tape retains native response and normal density constants", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp"))
     for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
@@ -24,6 +25,7 @@ test_that("one-group joint-score tape retains native response and normal density
 })
 
 test_that("conditional signed-score moments match integrated SQ nuisance derivatives", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   # Twenty fixed-parameter identities, not a model-fitting or sampler panel.
   cases <- expand.grid(kernel = c("gaussian", "exp"),
@@ -88,6 +90,7 @@ test_that("conditional signed-score moments match integrated SQ nuisance derivat
 })
 
 test_that("joint-score group tapes enforce layout and scientific RAM before native tape entry", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   s <- private_sq_fixture(response = TRUE)$spec; g <- .msr_factorized_group(s, 1L)
   p <- private_sq_parameters(g); p$scale_z <- p$response_z <- numeric()

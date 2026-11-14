@@ -100,6 +100,7 @@ test_that("a discrete field block cannot report mass above one", {
 })
 
 test_that("native non-Gaussian CV uses frozen training parameters for joint assessment", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   skip_if_not_installed("TMB")
   set.seed(412)
@@ -182,6 +183,7 @@ test_that("native non-Gaussian CV uses frozen training parameters for joint asse
 
 
 test_that("Poisson field CV accepts Gaussian correlation and refits ecological bandwidths", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   skip_if_not_installed("TMB")
   f <- native_response_field_fixture("poisson")

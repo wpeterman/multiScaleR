@@ -18,6 +18,7 @@ bayesian_sq_fixture <- function(kernel = "gaussian", only = FALSE, n_site = 4) {
 }
 
 test_that("Bayesian SQ preserves fixed reference normalization and proper targets", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (only in c(FALSE, TRUE))
     for (family in c("gaussian", "poisson", "nbinom2", "binomial")) {
@@ -68,6 +69,7 @@ test_that("Bayesian SQ preserves fixed reference normalization and proper target
 })
 
 test_that("SQ public Laplace and marginal fits retain their posterior diagnostics", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_sq_fixture(only = TRUE, n_site = 8)
   form <- count ~ rough + temp
@@ -103,6 +105,7 @@ test_that("slice sampling handles raw weighted SQ without binned predictors", {
 })
 
 test_that("SQ Gaussian response integration agrees with a normalized covariance density", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_sq_fixture(only = TRUE)
   fit <- multiScale_bayes(f$formula, f$inputs, f$data, f$scales,
@@ -177,6 +180,7 @@ test_that("SQ differentiation fails before tape construction when RAM is unresol
 })
 
 test_that("SQ reference preparation retains finite nearest ties at tiny prior medians", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_sq_fixture(only=TRUE)
   for(i in 2:4) {
@@ -194,6 +198,7 @@ test_that("SQ reference preparation retains finite nearest ties at tiny prior me
 })
 
 test_that("SQ raw evaluation retains broad, nearest and constant-buffer limits", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   buffers <- list(list(d = c(1, 1, 2), v = c(2, 4, 10)),
     list(d = c(1, 2, 3), v = c(2, 4, 8)), list(d = 1:3, v = c(5,5,5)))

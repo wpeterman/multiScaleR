@@ -16,64 +16,92 @@ spatial_cv_folds(
 )
 }
 \arguments{
-\item{coords}{Projected \code{sf} POINTs, a \code{terra::SpatVector} of points,
-or a numeric two-column coordinate matrix/data frame. Row order must match
+\item{coords}{Projected \code{sf} POINTs, a \code{terra::SpatVector} of points, or a
+numeric two-column coordinate matrix or data frame. Row order must match
 the data. Meaningful row names must match \code{ids}.}
 
-\item{block_size}{Positive grid-cell width, in coordinate CRS units.}
+\item{block_size}{Positive width of each grid cell, in the units of the
+coordinate CRS (usually meters). Larger blocks put more distance between
+held-out points and their nearest training points, which moves the task
+closer to predicting a new area.}
 
-\item{k}{Number of folds, at least two. The default is five. At least
-\code{k} indivisible spatial units must remain after joining groups.}
+\item{k}{Number of folds, at least two. The default is five. At least \code{k}
+indivisible spatial units must remain after joining groups.}
 
-\item{ids}{Unique character row IDs. Defaults to coordinate row names, or
-character row numbers. Use the same IDs as the modeling data.}
+\item{ids}{Unique character row IDs. Defaults to the row names of \code{coords},
+or to the row numbers as character strings. Use the same IDs as the
+modeling data.}
 
-\item{group}{Optional sampling-group labels aligned with \code{ids}.
-Blocks joined by any shared group are kept together, including transitive
-connections. This can reduce the number of available units.}
+\item{group}{Optional sampling-group labels aligned with \code{ids}, such as site
+or animal IDs. Blocks joined by any shared group are kept together,
+including through chains of shared groups. This can reduce the number of
+available units.}
 
-\item{buffer}{Nonnegative training-to-assessment separation in coordinate
-CRS units. Default zero adds no exclusions. With a positive buffer, an
-entire training unit is excluded if any of its points is within or exactly
-at this distance from an assessment point. Empty training sets are errors.}
+\item{buffer}{Nonnegative training-to-assessment separation, in coordinate
+CRS units. The default 0 adds no exclusions. With a positive buffer, an
+entire training unit is excluded from a fold if any of its points lies
+within, or exactly at, this distance from an assessment point of that
+fold. Assessment rows are never dropped. A buffer that leaves a fold with
+no training rows is an error.}
 
 \item{origin}{Numeric grid origin of length two, in coordinate CRS units.
-Defaults to \code{c(0, 0)}. Cells use half-open intervals of width
-\code{block_size}, indexed by \code{floor((coordinate - origin)/block_size)}.}
+Defaults to \code{c(0, 0)}. Cells are half-open intervals of width
+\code{block_size}, indexed by \code{floor((coordinate - origin) / block_size)}.}
 
-\item{crs}{Projected CRS declaration for coordinate tables, accepted by
-\code{sf::st_crs()}. For spatial objects, an optional declaration must match
-their existing CRS. Coordinates are never transformed or relabeled here.}
+\item{crs}{Projected CRS declaration for coordinate tables, in any form
+accepted by \code{sf::st_crs()}. For spatial objects, an optional declaration
+must match their existing CRS. Coordinates are never transformed or
+relabeled here, and longitude and latitude are rejected.}
 }
 \value{
-A \code{multiScaleR_folds} list with analysis/assessment IDs and
-\code{fold_info} metadata: CRS, units, grid/buffer controls, compact row,
-block, group and fold assignments, and excluded training IDs per fold.
+A named list of class \code{multiScaleR_folds}, structured as described
+in \code{\link[=grouped_cv_folds]{grouped_cv_folds()}}. Each fold holds \code{analysis} and \code{assessment} row
+IDs. Every row is assessed exactly once, although a buffer can leave a
+row out of some training sets. The attribute \code{fold_info} holds the
+\code{method} (\code{"spatial"}), \code{k}, \code{block_size}, \code{buffer}, \code{origin}, the \code{crs}
+(as WKT) and its distance \code{units}, an \code{assignment} data frame with each
+row's \code{row_id}, coordinates \code{x} and \code{y}, grid \code{block}, joined \code{unit},
+assessment \code{fold}, and \code{group} when supplied, and \code{excluded}, the
+training IDs removed by the buffer in each fold.
 }
 \description{
-Assign whole projected grid blocks to assessment folds. Optional sampling
-groups join intersecting blocks into indivisible units. A distance buffer
-can exclude nearby training units without dropping assessment rows.
+Lay a square grid over projected points and assign whole grid blocks to
+assessment folds, so that the model must predict parts of the landscape it
+was not fitted to. Optional sampling groups join the blocks they touch into
+indivisible units. A distance buffer can exclude nearby training units
+without dropping assessment rows.
 }
 \details{
-Units are assigned largest first to balance row counts, with stable
-ties and no random draws. Several disjoint blocks can share a fold; this
-does not produce contiguous geographic regions. Buffers measure separation
-between sampled points, not distances to entire cell boundaries. Whole-unit
-exclusions can create a larger gap than requested. Distance calculations
-use nearest-point indices and elementwise distances rather than a dense
-training-by-assessment distance matrix.
+Units are assigned largest first to balance row counts, with
+stable tie-breaking and no random draws, so the same call always gives
+the same folds. Several disjoint blocks can share a fold, so a fold need
+not be one contiguous region. Buffers measure the separation between
+sampled points, not the distance to block edges. Because whole units are
+excluded, the gap can be larger than requested, and a large buffer can
+leave few training points. Distance calculations use nearest-point
+searches rather than a dense training-by-assessment distance matrix.
 
-Choose block size, groups, buffer and the prediction target from the sampling
-design and ecological question. A projected CRS and a distance buffer alone
-do not establish independence or validate calibration. All rows are assessed
-once; some can be absent from a training set because of the buffer.
+Choose the block size, groups, buffer, and prediction target from the
+sampling design and the ecological question. A projected CRS and a
+distance buffer alone do not establish independence or validate
+calibration. \code{vignette("v08-cross-validation", package = "multiScaleR")}
+maps a set of spatial folds and shows how a buffer changes the training
+sets.
 }
 \examples{
+# Six points in three 50 m blocks (crs = 32617 declares meter units)
 xy <- cbind(x = rep(c(0, 100, 200), each = 2), y = rep(c(0, 10), 3))
 spatial_cv_folds(xy, block_size = 50, k = 3, crs = 32617)
+
+# The bundled survey points, in 1,000 m blocks. A 320 m buffer removes
+# training blocks that have a point near any held-out point.
+data("surv_pts")
+pts <- crds(vect(surv_pts))
+buffered <- spatial_cv_folds(pts, block_size = 1000, k = 3, buffer = 320,
+                             crs = 32617)
+buffered   # 'excluded' counts rows used for neither fitting nor scoring
+head(attr(buffered, "fold_info")$assignment)   # block and fold of each row
 }
 \seealso{
-\code{\link{grouped_cv_folds}}, \code{\link{cross_validate}},
-\code{\link{cv_tab}}
+\code{\link[=grouped_cv_folds]{grouped_cv_folds()}}, \code{\link[=cross_validate]{cross_validate()}}, \code{\link[=cv_tab]{cv_tab()}}
 }

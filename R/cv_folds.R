@@ -49,32 +49,45 @@
 
 #' Create Grouped Cross-Validation Folds
 #'
-#' Keep all rows from a sampling group in the same assessment fold. Whole
-#' groups are assigned to balance row counts, largest groups first.
+#' Keep all rows from a sampling group in the same assessment fold, so that a
+#' held-out row is never predicted with help from its own group. Whole groups
+#' are assigned to folds to balance the row counts, largest groups first.
 #'
-#' @param group Vector of sampling-group labels, one per row. Animals, sites or
-#'   matched choice sets can define groups. Missing or empty labels are rejected.
+#' @param group Vector of sampling-group labels, one per row, such as site,
+#'   animal, year, or choice-set IDs. Missing or empty labels are rejected.
 #' @param k Number of folds, at least two and no greater than the number of
-#'   indivisible groups. The default is five.
-#' @param ids Unique character row IDs, in the order of \code{group}. Defaults
-#'   to its names, or character row numbers when it is unnamed. Named groups
+#'   groups. The default is five.
+#' @param ids Unique character row IDs, in the order of `group`. Use the row
+#'   names of the modeling data. The default uses the names of `group`, or the
+#'   row numbers as character strings when `group` is unnamed. Named groups
 #'   must align exactly with supplied IDs.
-#' @return A named list of class \code{multiScaleR_folds}. Each element contains
-#'   disjoint character vectors \code{analysis} and \code{assessment}, accepted
-#'   by \code{\link{cross_validate}}. Every row is assessed once. Attribute
-#'   \code{fold_info} records the method, row/unit assignments and exclusions.
+#' @return A named list of class `multiScaleR_folds` with one element per fold
+#'   (`fold1`, `fold2`, and so on), ready for [cross_validate()] and the other
+#'   cross-validation functions. Each element holds two character vectors of
+#'   row IDs, `analysis` (rows used to fit) and `assessment` (rows held out).
+#'   Every row is assessed exactly once. The attribute `fold_info` holds the
+#'   `method` (`"grouped"`), `k`, an `assignment` data frame with the `row_id`,
+#'   `group`, `unit`, and assessment `fold` of every row, and `excluded`, the
+#'   IDs left out of each fold's training rows (none for grouped folds).
+#'   `print()` shows the number of analysis, assessment, and excluded rows in
+#'   each fold, and returns `x` invisibly.
 #' @details Assignment is deterministic and does not use the random-number
-#'   generator. Equal-size groups are ordered by their labels. Balancing counts
-#'   does not stratify responses. Choose sampling groups and the validation
-#'   target before examining assessment outcomes. Fold construction does not
-#'   qualify a model class for scoring; matched-set survival/amt scoring still
-#'   requires a separate adapter.
+#'   generator, so the same call always gives the same folds. Groups of equal
+#'   size are ordered by their labels. Balancing row counts does not stratify
+#'   the responses. Choose the sampling groups and the prediction question
+#'   before you look at any scores. To keep groups together within spatial
+#'   blocks, pass them as `group` to [spatial_cv_folds()]. Building folds does
+#'   not decide which models can be scored. For matched choice sets, score
+#'   the folds with [cross_validate_clogit()].
+#'   `vignette("v08-cross-validation", package = "multiScaleR")` compares
+#'   grouped, spatial, and random fold designs.
 #' @examples
+#' # Twelve records from six sites, two visits each
 #' ids <- paste0("row", 1:12)
 #' folds <- grouped_cv_folds(rep(letters[1:6], each = 2), k = 3, ids = ids)
-#' folds
-#' @seealso \code{\link{spatial_cv_folds}}, \code{\link{cross_validate}},
-#'   \code{\link{cv_tab}}
+#' folds                    # rows fitted and held out in each fold
+#' folds$fold1$assessment   # both visits to a site are held out together
+#' @seealso [spatial_cv_folds()], [cross_validate()], [cv_tab()]
 #' @export
 grouped_cv_folds <- function(group, k = 5, ids = NULL) {
   if (is.null(ids)) ids <- names(group)
@@ -143,51 +156,79 @@ grouped_cv_folds <- function(group, k = 5, ids = NULL) {
 
 #' Create Spatially Blocked Cross-Validation Folds
 #'
-#' Assign whole projected grid blocks to assessment folds. Optional sampling
-#' groups join intersecting blocks into indivisible units. A distance buffer
-#' can exclude nearby training units without dropping assessment rows.
+#' Lay a square grid over projected points and assign whole grid blocks to
+#' assessment folds, so that the model must predict parts of the landscape it
+#' was not fitted to. Optional sampling groups join the blocks they touch into
+#' indivisible units. A distance buffer can exclude nearby training units
+#' without dropping assessment rows.
 #'
-#' @param coords Projected \code{sf} POINTs, a \code{terra::SpatVector} of points,
-#'   or a numeric two-column coordinate matrix/data frame. Row order must match
-#'   the data. Meaningful row names must match \code{ids}.
-#' @param block_size Positive grid-cell width, in coordinate CRS units.
-#' @param k Number of folds, at least two. The default is five. At least
-#'   \code{k} indivisible spatial units must remain after joining groups.
-#' @param ids Unique character row IDs. Defaults to coordinate row names, or
-#'   character row numbers. Use the same IDs as the modeling data.
-#' @param group Optional sampling-group labels aligned with \code{ids}.
-#'   Blocks joined by any shared group are kept together, including transitive
-#'   connections. This can reduce the number of available units.
-#' @param buffer Nonnegative training-to-assessment separation in coordinate
-#'   CRS units. Default zero adds no exclusions. With a positive buffer, an
-#'   entire training unit is excluded if any of its points is within or exactly
-#'   at this distance from an assessment point. Empty training sets are errors.
+#' @param coords Projected `sf` POINTs, a `terra::SpatVector` of points, or a
+#'   numeric two-column coordinate matrix or data frame. Row order must match
+#'   the data. Meaningful row names must match `ids`.
+#' @param block_size Positive width of each grid cell, in the units of the
+#'   coordinate CRS (usually meters). Larger blocks put more distance between
+#'   held-out points and their nearest training points, which moves the task
+#'   closer to predicting a new area.
+#' @param k Number of folds, at least two. The default is five. At least `k`
+#'   indivisible spatial units must remain after joining groups.
+#' @param ids Unique character row IDs. Defaults to the row names of `coords`,
+#'   or to the row numbers as character strings. Use the same IDs as the
+#'   modeling data.
+#' @param group Optional sampling-group labels aligned with `ids`, such as site
+#'   or animal IDs. Blocks joined by any shared group are kept together,
+#'   including through chains of shared groups. This can reduce the number of
+#'   available units.
+#' @param buffer Nonnegative training-to-assessment separation, in coordinate
+#'   CRS units. The default 0 adds no exclusions. With a positive buffer, an
+#'   entire training unit is excluded from a fold if any of its points lies
+#'   within, or exactly at, this distance from an assessment point of that
+#'   fold. Assessment rows are never dropped. A buffer that leaves a fold with
+#'   no training rows is an error.
 #' @param origin Numeric grid origin of length two, in coordinate CRS units.
-#'   Defaults to \code{c(0, 0)}. Cells use half-open intervals of width
-#'   \code{block_size}, indexed by \code{floor((coordinate - origin)/block_size)}.
-#' @param crs Projected CRS declaration for coordinate tables, accepted by
-#'   \code{sf::st_crs()}. For spatial objects, an optional declaration must match
-#'   their existing CRS. Coordinates are never transformed or relabeled here.
-#' @return A \code{multiScaleR_folds} list with analysis/assessment IDs and
-#'   \code{fold_info} metadata: CRS, units, grid/buffer controls, compact row,
-#'   block, group and fold assignments, and excluded training IDs per fold.
-#' @details Units are assigned largest first to balance row counts, with stable
-#'   ties and no random draws. Several disjoint blocks can share a fold; this
-#'   does not produce contiguous geographic regions. Buffers measure separation
-#'   between sampled points, not distances to entire cell boundaries. Whole-unit
-#'   exclusions can create a larger gap than requested. Distance calculations
-#'   use nearest-point indices and elementwise distances rather than a dense
-#'   training-by-assessment distance matrix.
+#'   Defaults to `c(0, 0)`. Cells are half-open intervals of width
+#'   `block_size`, indexed by `floor((coordinate - origin) / block_size)`.
+#' @param crs Projected CRS declaration for coordinate tables, in any form
+#'   accepted by `sf::st_crs()`. For spatial objects, an optional declaration
+#'   must match their existing CRS. Coordinates are never transformed or
+#'   relabeled here, and longitude and latitude are rejected.
+#' @return A named list of class `multiScaleR_folds`, structured as described
+#'   in [grouped_cv_folds()]. Each fold holds `analysis` and `assessment` row
+#'   IDs. Every row is assessed exactly once, although a buffer can leave a
+#'   row out of some training sets. The attribute `fold_info` holds the
+#'   `method` (`"spatial"`), `k`, `block_size`, `buffer`, `origin`, the `crs`
+#'   (as WKT) and its distance `units`, an `assignment` data frame with each
+#'   row's `row_id`, coordinates `x` and `y`, grid `block`, joined `unit`,
+#'   assessment `fold`, and `group` when supplied, and `excluded`, the
+#'   training IDs removed by the buffer in each fold.
+#' @details Units are assigned largest first to balance row counts, with
+#'   stable tie-breaking and no random draws, so the same call always gives
+#'   the same folds. Several disjoint blocks can share a fold, so a fold need
+#'   not be one contiguous region. Buffers measure the separation between
+#'   sampled points, not the distance to block edges. Because whole units are
+#'   excluded, the gap can be larger than requested, and a large buffer can
+#'   leave few training points. Distance calculations use nearest-point
+#'   searches rather than a dense training-by-assessment distance matrix.
 #'
-#' Choose block size, groups, buffer and the prediction target from the sampling
-#'   design and ecological question. A projected CRS and a distance buffer alone
-#'   do not establish independence or validate calibration. All rows are assessed
-#'   once; some can be absent from a training set because of the buffer.
+#'   Choose the block size, groups, buffer, and prediction target from the
+#'   sampling design and the ecological question. A projected CRS and a
+#'   distance buffer alone do not establish independence or validate
+#'   calibration. `vignette("v08-cross-validation", package = "multiScaleR")`
+#'   maps a set of spatial folds and shows how a buffer changes the training
+#'   sets.
 #' @examples
+#' # Six points in three 50 m blocks (crs = 32617 declares meter units)
 #' xy <- cbind(x = rep(c(0, 100, 200), each = 2), y = rep(c(0, 10), 3))
 #' spatial_cv_folds(xy, block_size = 50, k = 3, crs = 32617)
-#' @seealso \code{\link{grouped_cv_folds}}, \code{\link{cross_validate}},
-#'   \code{\link{cv_tab}}
+#'
+#' # The bundled survey points, in 1,000 m blocks. A 320 m buffer removes
+#' # training blocks that have a point near any held-out point.
+#' data("surv_pts")
+#' pts <- crds(vect(surv_pts))
+#' buffered <- spatial_cv_folds(pts, block_size = 1000, k = 3, buffer = 320,
+#'                              crs = 32617)
+#' buffered   # 'excluded' counts rows used for neither fitting nor scoring
+#' head(attr(buffered, "fold_info")$assignment)   # block and fold of each row
+#' @seealso [grouped_cv_folds()], [cross_validate()], [cv_tab()]
 #' @export
 spatial_cv_folds <- function(coords, block_size, k = 5, ids = NULL,
     group = NULL, buffer = 0, origin = c(0, 0), crs = NULL) {
@@ -229,8 +270,8 @@ spatial_cv_folds <- function(coords, block_size, k = 5, ids = NULL,
 }
 
 #' @rdname grouped_cv_folds
-#' @param x A \code{multiScaleR_folds} object.
-#' @param ... Reserved for future print controls.
+#' @param x A `multiScaleR_folds` object, for `print()`.
+#' @param ... Not used. Reserved for future print controls.
 #' @export
 print.multiScaleR_folds <- function(x, ...) {
   info <- attr(x, "fold_info", exact = TRUE)

@@ -14,6 +14,7 @@ running_example <- function(kernel) {
 }
 
 test_that("a fixed-kernel single start that cannot move warns and is recorded", {
+  skip_on_cran()
   ex <- running_example("fixed")
   # Since 0.7.42 a fixed kernel screens by default, so request the single
   # start explicitly to exercise the unscreened stall.
@@ -36,6 +37,7 @@ test_that("a fixed-kernel single start that cannot move warns and is recorded", 
 })
 
 test_that("a screened fixed-kernel start that cannot move is described as screened", {
+  skip_on_cran()
   ex <- running_example("fixed")
   set.seed(1)
   fit <- withCallingHandlers(
@@ -53,6 +55,7 @@ test_that("a screened fixed-kernel start that cannot move is described as screen
 })
 
 test_that("a fixed kernel screens starting values by default", {
+  skip_on_cran()
   ex <- running_example("fixed")
   set.seed(1)
   screened <- suppressWarnings(
@@ -72,6 +75,7 @@ test_that("a fixed kernel screens starting values by default", {
 })
 
 test_that("smooth kernels keep the single default start", {
+  skip_on_cran()
   ex <- running_example("gaussian")
   fit <- multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE)
   single <- multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE,
@@ -101,6 +105,7 @@ test_that("a start where every refit fails warns with the refit remedy", {
 })
 
 test_that("fits that move from their start are unchanged and not flagged", {
+  skip_on_cran()
   ex <- running_example("gaussian")
   expect_no_warning(
     fit <- multiScale_optim(ex$mod, ex$inputs, n_cores = 1, verbose = FALSE)

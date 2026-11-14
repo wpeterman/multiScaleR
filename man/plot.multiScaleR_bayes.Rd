@@ -15,74 +15,98 @@
 )
 }
 \arguments{
-\item{x}{A fitted \code{\link{multiScale_bayes}} object with posterior draws.}
+\item{x}{A fitted \code{\link[=multiScale_bayes]{multiScale_bayes()}} object with posterior draws.}
 
-\item{type}{\code{"scales"} (default) plots one estimate per distinct
-scale-formula group. \code{"group_sd"} plots between-group SDs, with
-scale and response effects in separate panels.}
+\item{type}{\code{"scales"} (default) plots one interval for each distinct
+combination of scale covariates and groups, such as each year.
+\code{"group_sd"} plots the between-group SDs, with scale and response
+effects in separate panels.}
 
-\item{covariate}{Optional character vector selecting kernel predictors for
-\code{type = "scales"}. \code{NULL} (default) includes all predictors.}
+\item{covariate}{Optional character vector of landscape predictors to plot
+with \code{type = "scales"}. The default \code{NULL} plots every predictor.}
 
-\item{level}{Central posterior interval probability; default 0.95.}
+\item{level}{Probability of the central credible interval; default 0.95.}
 
-\item{scale}{\code{"distance"} (default) plots scales in projected map
-units; \code{"log"} uses natural log map units. Used only for
-\code{type = "scales"}. These are kernel parameters, not effective radii.}
+\item{scale}{\code{"distance"} (default) plots scales in projected map units.
+\code{"log"} uses natural log map units, which helps when the upper limits are
+very large. Used only with \code{type = "scales"}. These are kernel scale
+parameters, not effective radii.}
 
 \item{estimator}{\code{"auto"} (default) uses the weighted production
-candidates for importance-corrected fits and stored draws otherwise.
-\code{"draws"} always uses stored draws; \code{"weighted"} requires
-retained importance candidates. Weighted plotting avoids resampling noise
-but does not improve effective sample size or correct a missed mode.}
+candidates of an importance-corrected fit and the stored draws
+otherwise. \code{"draws"} always uses the stored draws, and \code{"weighted"}
+requires retained importance candidates. Weighted plotting avoids
+resampling noise but does not raise the effective sample size or recover
+a missed mode.}
 
-\item{...}{Reserved for extensions; unsupported arguments cause an error.}
+\item{...}{Not used. Supplying any further argument is an error.}
 }
 \value{
-A ggplot object. Its \code{data} contains the plotted summaries,
-including \code{median}, \code{lower}, and \code{upper}. Scale panels also
-contain \code{covariate} and \code{group}; SD panels contain
-\code{component} and \code{term}. Print the object inside a function or
-loop to display it. A failed or unavailable stored diagnostic flag is
-shown in the subtitle. This does not compute new chain diagnostics.
+A ggplot object. Its \code{data} holds the plotted summaries, including
+\code{median}, \code{lower}, and \code{upper}. Scale panels also hold \code{covariate} and
+\code{group}, and SD panels hold \code{component} and \code{term}. Print the object to
+display it inside a function or loop. When the stored diagnostic flag of
+the fit failed or is unavailable, the subtitle says so. Plotting computes
+no new chain diagnostics.
 }
 \description{
-Display posterior medians and central credible intervals for fitted scales
-or the standard deviations that describe variation among groups. Plotting
-does not refit the model or change its posterior draws.
+Draw posterior medians and central credible intervals for the fitted
+scales, or for the standard deviations that describe variation among
+groups. Plotting does not refit the model or change its draws.
 }
-\details{
-Annual intervals describe uncertainty in each fitted year's scale.
-The between-year SD describes population variation on the log-distance
-axis; it is not an annual scale's standard error. Response SDs use the
-response link scale. Shared-scale models without group effects have no
-group SD to plot. No plot establishes calibration or model adequacy.
-Continuous half-normal SD priors have no point mass at zero. A positive
-lower SD interval limit does not establish between-group heterogeneity;
-assess meaningful variation and compare a shared-scale model instead.
-For NUTS and slice fits, the stored flag describes checks on the original
-parameters. NUTS also checks sampler behavior. Use
-\code{\link{diagnose_bayes_scales}} to check mixing and simulation
-precision of derived log distances and group SDs.
+\section{Read the plots}{
+With \code{type = "scales"}, each point is the posterior median of one group's
+scale and each bar its central credible interval. Annual intervals describe
+uncertainty in each fitted year's scale. They are separate intervals, not a
+joint band. With \code{type = "group_sd"}, the scale panel shows the SD of log
+scale among groups (tau), and \code{exp(tau)} is the multiplier on the scale
+for a group one SD above typical. It is not the standard error of any
+year's scale. The response panel shows random-intercept SDs on the link
+scale. A shared-scale model without group effects has no group SD to plot.
 
-For chain plots, pass \code{fit$chains} for a slice fit or
-\code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
-for a NUTS fit to bayesplot. Use \code{mcmc_trace()} for trajectories,
+The half-normal prior on an SD has no point mass at zero, so a positive
+lower limit does not establish that groups differ. Judge whether the
+variation is meaningful, and compare a shared-scale model. No plot
+establishes calibration or model adequacy.
+
+For NUTS and slice fits, the stored flag describes checks on the original
+parameters, and for NUTS also on sampler behavior. Use
+\code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}} to check the mixing and simulation precision of
+the derived log scales and group SDs.
+}
+
+\section{Draw chain plots}{
+For chain plots, pass \code{fit$chains} for a slice fit, or
+\code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)} for a
+NUTS fit, to bayesplot. Use \code{mcmc_trace()} for trajectories,
 \code{mcmc_rank_overlay()} for rank distributions by chain, and
 \code{mcmc_dens_overlay()} for posterior densities by chain. Select
-\code{regex_pars = "^scale_beta"} to view the scale formula coefficients
-on the internal log scale. Approximate fits and compact examples support
-interval plots and posterior predictive checks. Chain plots require
-the original post-warmup draws in iteration and chain order.
+\code{regex_pars = "^scale_beta"} to see the scale-formula coefficients on the
+internal log scale. Chain plots need the original post-warmup draws in
+iteration and chain order. Approximate fits and compact examples support
+only interval plots and posterior predictive checks.
 }
+
 \examples{
 example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
   package = "multiScaleR"))
-plot(example$fits$pooled)                    # fitted annual distances
-plot(example$fits$pooled, type = "group_sd") # between-group variation
+plot(example$fits$pooled)                    # sigma for each year, meters
+plot(example$fits$pooled, type = "group_sd") # tau and the site SD
+
+# The plotted summaries are kept in the ggplot object
+p <- plot(example$fits$pooled, scale = "log")
+p$data[c("group", "median", "lower", "upper")]   # log meters
+
+# Trace plots from a stored slice fit that keeps its chains
+shared <- readRDS(system.file("extdata", "cache-bayesian-scales.rds",
+  package = "multiScaleR"))$fit
+if (requireNamespace("bayesplot", quietly = TRUE)) {
+  print(bayesplot::mcmc_trace(shared$chains, regex_pars = "^scale_beta"))
+}
 }
 \seealso{
-\code{\link{posterior_scales}}, \code{\link{multiScale_bayes}},
-\code{\link{diagnose_bayes_scales}}, \code{\link{simulate.multiScaleR_bayes}},
-and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
+\code{\link[=posterior_scales]{posterior_scales()}}, \code{\link[=multiScale_bayes]{multiScale_bayes()}},
+\code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}}, \code{\link[=simulate.multiScaleR_bayes]{simulate.multiScaleR_bayes()}},
+\link[=multiScaleR_bayes-class]{multiScaleR_bayes};
+\code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
 }

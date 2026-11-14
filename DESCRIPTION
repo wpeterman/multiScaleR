@@ -1,8 +1,18 @@
 Package: multiScaleR
 Type: Package
-Title: Methods for Optimizing Scales of Effect
-Version: 0.7.46
-Description: A tool for optimizing scales of effect when modeling ecological processes in space. Specifically, the scale parameter of a distance-weighted kernel distribution is identified for all environmental layers included in the model. Includes functions to assist in model selection, model evaluation, efficient transformation of raster surfaces using fast Fourier transformation, and projecting models. For more details see Peterman (2026) <doi:10.1007/s10980-025-02267-x>.
+Title: Estimate Scales of Effect for Spatial Ecological Models
+Version: 0.7.47
+Description: Estimates the scale of effect, the distance over which a landscape
+    variable influences an ecological response. Raster values around each
+    sample location are weighted with a distance kernel, and the kernel scale
+    that maximizes the likelihood of a fitted regression model is found. Works
+    with linear, generalized linear, additive, and mixed models, with 'unmarked'
+    occupancy, abundance, and distance-removal models, and with step-selection
+    models, and fits Bayesian models in which scales vary among years or with
+    covariates. Also provides kernel-weighted landscape and surface metrics,
+    cross-validation, model selection tables, fast kernel smoothing of rasters
+    for mapping predictions, and simulation of data with known scales of
+    effect. For more details see Peterman (2026) <doi:10.1007/s10980-025-02267-x>.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true

@@ -53,6 +53,7 @@ cv_distribution_fixture <- function() {
 }
 
 test_that("NB/Gamma CV matches native means, coefficient uncertainty, proper densities and nuisance K", {
+  skip_on_cran()
   skip_if_not_installed("MASS")
   z <- cv_distribution_fixture()
   expect_identical(z$planned_native_fits, 96L)
@@ -113,6 +114,7 @@ test_that("NB/Gamma CV matches native means, coefficient uncertainty, proper den
 })
 
 test_that("NB/Gamma compact and full native model selection agree for every nuisance convention", {
+  skip_on_cran()
   z <- cv_distribution_fixture()
   for (case in z$values) {
     full <- case$cv; compact <- full; compact$fits <- NULL

@@ -5,7 +5,8 @@
 \alias{kernel_var}
 \alias{landscape_var}
 \alias{surface_var}
-\title{Define multiScaleR covariate transformations}
+\alias{print.multiScaleR_vars}
+\title{Define Model Covariates from Raster Layers}
 \usage{
 msr_vars(...)
 
@@ -21,363 +22,373 @@ landscape_var(
 )
 
 surface_var(source, metric, radius = NULL, weighted = FALSE)
+
+\method{print}{multiScaleR_vars}(x, ...)
 }
 \arguments{
-\item{...}{Named \code{kernel_var()}, \code{landscape_var()}, or
-\code{surface_var()} specifications. Each argument must be named; the name
-becomes the covariate column name in the model data frame. All names must
-be unique and cannot be \code{"x"}, which is reserved for internal
-coordinate data. At least one specification is required.}
+\item{...}{For \code{msr_vars()}, one or more named specifications created with
+\code{kernel_var()}, \code{landscape_var()}, or \code{surface_var()}. Each name becomes
+the covariate's column name in the model data. Names must be unique, and
+\code{"x"} is reserved for internal coordinate data. At least one
+specification is required. For \code{print()}, further arguments passed to
+\code{\link[base:print.data.frame]{base::print.data.frame()}}.}
 
-\item{source}{Character scalar. Name of the source raster layer in
-\code{raster_stack} from which the covariate is derived. Must exactly match
-a layer name in the raster stack provided to \code{\link{kernel_prep}}.}
+\item{source}{Character scalar. Name of the source layer in the
+\code{raster_stack} given to \code{\link[=kernel_prep]{kernel_prep()}}. It must match a layer name
+exactly. Several covariates can share one source.}
 
-\item{metric}{Character scalar. The metric to compute within the circular
-buffer. For \code{landscape_var()} this is a landscape ecology metric
-computed on a categorical raster; for \code{surface_var()} this is a
-continuous surface texture metric (including \code{"sa"}, \code{"sq"},
-\code{"ssk"}, \code{"sku"}, \code{"sdq"}, and \code{"sdr"}) computed on
-a continuous raster. Must be one of the supported metrics (see Details).
-Matched case-insensitively.}
+\item{metric}{Character scalar. Code of the metric to compute within the
+buffer, matched case-insensitively. \code{landscape_var()} accepts the 25
+landscape metrics and \code{surface_var()} the six surface metrics defined in
+Details.}
 
-\item{radius}{Optional positive numeric. Fixed buffer radius in the same
-units as the projection. When \code{NULL} (default), the radius is treated
-as a free parameter and optimized alongside the model. When supplied, the
-metric is computed at this fixed radius and no scale optimization is
-performed for this covariate.}
+\item{radius}{Optional positive numeric scalar. Buffer radius in map units.
+With the default \code{NULL}, the radius is estimated with the model. It is a
+hard radius, so it has no Hessian standard error (see
+\link{multiScaleR-kernels}). When supplied, the metric is computed once at
+this radius and enters the model as an ordinary covariate, with no scale
+to estimate. Keep it within the \code{max_D} of \code{\link[=kernel_prep]{kernel_prep()}}, because cells
+beyond \code{max_D} are never extracted.}
 
-\item{base}{Positive numeric (not equal to 1). Logarithm base used by the
-Shannon metrics (\code{"shdi"}, \code{"shei"}) and the information-theory
-metrics (\code{"ent"}, \code{"condent"}, \code{"joinent"}, \code{"mutinf"}).
-Default: \code{exp(1)} (natural log, so entropies are in nats). Use
-\code{2} for bits or \code{10} for Hartley units. To reproduce the
-information-theory values reported by FRAGSTATS and the \code{landscapemetrics}
-package, set \code{base = 2}. The base cancels in the ratio metrics
-(\code{"shei"}, \code{"relmutinf"}, \code{"iji"}), so they are unaffected
-by it. The modified Simpson metrics (\code{"msidi"}, \code{"msiei"}) always
-use the natural log, as FRAGSTATS and \code{landscapemetrics} define them,
-so \code{landscape_var()} warns when a non-default \code{base} is supplied
-with either metric and ignores it.}
+\item{base}{Positive numeric scalar, not equal to 1. Base of the logarithm
+used by Shannon diversity (\code{"shdi"}) and the information-theory metrics
+(\code{"ent"}, \code{"condent"}, \code{"joinent"}, \code{"mutinf"}). Default: \code{exp(1)}, so
+entropies are in nats. Use \code{2} for bits, which reproduces FRAGSTATS and
+the \code{landscapemetrics} package for the information-theory metrics, or
+\code{10} for Hartleys. The base cancels in the ratio metrics (\code{"shei"},
+\code{"contag"}, \code{"iji"}, \code{"relmutinf"}). The modified Simpson metrics
+(\code{"msidi"}, \code{"msiei"}) always use the natural log, as FRAGSTATS and
+\code{landscapemetrics} define them. For these and for metrics that take no
+logarithm, \code{landscape_var()} warns and ignores a non-default \code{base}.}
 
-\item{classes_max}{Positive numeric. Maximum number of possible patch types
-in the landscape. Required for relative patch richness (\code{"rpr"}),
+\item{classes_max}{Positive numeric scalar. Number of classes that could
+occur in the landscape. Required for relative patch richness (\code{"rpr"}),
 where it is the denominator, and unused by every other metric. The
-observed class count is not substituted when it is missing, so
-\code{landscape_var()} stops if \code{"rpr"} is requested without it.}
+observed class count is never substituted, so \code{landscape_var()} stops if
+\code{"rpr"} is requested without it.}
 
-\item{class}{Optional integer-like scalar. The focal class for the class-level
-metrics (\code{"clumpy"}, \code{"pland"}, \code{"ca"}), which describe one
-category rather than the whole landscape. It must match one of the integer
-class codes in the source raster. It is required for those three metrics and
-is not accepted for any other metric (which describe the whole buffer). Where
-the focal class is absent from a buffer, \code{"pland"} and \code{"ca"}
-return 0 (zero cover) and \code{"clumpy"} returns \code{NA}.}
+\item{class}{Optional integer-like scalar. The focal class code for the
+class-level metrics (\code{"clumpy"}, \code{"pland"}, \code{"ca"}), which describe one
+class rather than the whole buffer. It must match one of the class codes
+in the source raster. It is required for those three metrics and an
+error for every other metric.}
 
-\item{weighted}{Logical, for \code{surface_var()} only. When \code{FALSE}
-(default), the surface metric is computed over a hard-edged circular
-neighborhood and the optimized scale parameter is that neighborhood radius.
-When \code{TRUE}, each cell is weighted by the model's distance kernel
-(the \code{kernel} passed to \code{\link{kernel_prep}}) and the optimized
-parameter is the kernel scale (sigma), exactly as for a kernel-weighted
-mean. Gaussian, exponential, and exponential-power weights vary
-continuously with sigma. With \code{kernel = "fixed"}, the fitted
-parameter is a hard cutoff radius and weights change as cells enter or
-leave the buffer. Its radius SE and Wald limits are missing; weighted
-metric definitions and training normalization are retained. SQ is smooth away from
-zero variance; absolute deviations and standardized higher moments have
-additional nonsmooth or undefined cases. Weighting is available only for the
-distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}),
-not the slope metric (\code{"sdq"}), and the scale is always optimized, so
-\code{radius} must be \code{NULL}.
-Within a buffer evaluation, weighted metrics reuse weights and centered
-moments only when the source, scale, shape and valid-cell mask match exactly.}
+\item{weighted}{Logical, for \code{surface_var()} only. With \code{FALSE} (default),
+the metric summarizes every cell within a hard-edged circle, and the
+estimated scale is that radius. With \code{TRUE}, each cell is weighted by the
+model's distance kernel (the \code{kernel} given to \code{\link[=kernel_prep]{kernel_prep()}}) and the
+estimated scale is the kernel's sigma, as for a kernel-weighted mean.
+Gaussian, negative exponential, and exponential power weights change
+smoothly with sigma, so sigma gets a standard error. With
+\code{kernel = "fixed"} the weights are 1 or 0, so the covariate is again a
+hard radius without a standard error. Weighting applies only to the
+distribution metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"}, \code{"sku"}), not to \code{"sdq"}
+or \code{"sdr"}, and requires \code{radius = NULL}.}
+
+\item{x}{A \code{multiScaleR_vars} object returned by \code{msr_vars()}.}
 }
 \value{
-\describe{
-  \item{\code{msr_vars()}}{A data frame of class \code{"multiScaleR_vars"}
-    with one row per covariate. Columns are \code{covariate} (the name
-    assigned in \code{...}), \code{source} (source raster layer name),
-    \code{type} (\code{"kernel"}, \code{"landscape"}, or \code{"surface"}),
-    \code{metric} (landscape or surface metric, or \code{NA}), \code{radius}
-    (fixed radius or \code{NA} when optimized), \code{optimize} (logical
-    indicating whether the scale is estimated), \code{weighted} (logical, the
-    kernel-weighted form of a surface metric), \code{base} (logarithm base for
-    entropy metrics), \code{classes_max} (richness denominator for
-    \code{"rpr"}, or \code{NA}), and \code{class} (focal class for the
-    class-level metrics, or \code{NA}).}
-  \item{\code{kernel_var()}}{An internal list of class
-    \code{"multiScaleR_var"} representing a kernel-weighted mean covariate.
-    Pass one or more of these inside \code{msr_vars()}.}
-  \item{\code{landscape_var()}}{An internal list of class
-    \code{"multiScaleR_var"} representing a landscape metric covariate.
-    Pass one or more of these inside \code{msr_vars()}.}
-  \item{\code{surface_var()}}{An internal list of class
-    \code{"multiScaleR_var"} representing a continuous surface texture metric
-    covariate. Pass one or more of these inside \code{msr_vars()}.}
+\code{msr_vars()} returns a data frame of class
+\code{c("multiScaleR_vars", "data.frame")} with one row per covariate and these
+columns:
+\itemize{
+\item \code{covariate}: the name given in \code{...}.
+\item \code{source}: the source raster layer.
+\item \code{type}: \code{"kernel"}, \code{"landscape"}, or \code{"surface"}.
+\item \code{metric}: the metric code, or \code{NA} for a kernel mean.
+\item \code{radius}: the fixed radius in map units, or \code{NA} when the scale is
+estimated.
+\item \code{optimize}: \code{TRUE} when the scale is estimated with the model.
+\item \code{weighted}: \code{TRUE} for a kernel-weighted surface metric.
+\item \code{base}: the logarithm base actually used.
+\item \code{classes_max}: the denominator of \code{"rpr"}, or \code{NA}.
+\item \code{class}: the focal class of a class-level metric, or \code{NA}.
 }
+
+\code{kernel_var()}, \code{landscape_var()}, and \code{surface_var()} each return a list of
+class \code{"multiScaleR_var"} holding one specification. Pass it to
+\code{msr_vars()}. It has no use on its own.
+
+\code{print()} displays the specification table and returns \code{x} invisibly.
 }
 \description{
-These helpers define named model covariates as transformations of one or
-more source raster layers. They are optional; if omitted,
-\code{\link{kernel_prep}} preserves the default behavior where each raster
-layer becomes one optimized kernel-weighted covariate with the same name.
+These helpers declare how each model covariate is computed from a source
+raster layer, and whether its scale is estimated or fixed. Use
+\code{kernel_var()} for a kernel-weighted mean, \code{landscape_var()} for a landscape
+metric of a categorical raster, and \code{surface_var()} for a texture metric of
+a continuous raster. Collect the specifications with \code{msr_vars()} and pass
+the result to the \code{scale_vars} argument of \code{\link[=kernel_prep]{kernel_prep()}} and
+\code{\link[=kernel_scale.raster]{kernel_scale.raster()}}.
 
-Use \code{msr_vars()} to collect one or more \code{kernel_var()},
-\code{landscape_var()}, or \code{surface_var()} specifications into a single
-object that is passed to the \code{scale_vars} argument of
-\code{\link{kernel_prep}} and \code{\link{kernel_scale.raster}}.
+The helpers are optional. Without \code{scale_vars}, \code{\link[=kernel_prep]{kernel_prep()}} turns each
+raster layer into one kernel-weighted mean covariate with the layer's name.
 }
-\details{
-The native-refit backend can combine exponential-power kernel predictors with
-optimized hard-radius surface or landscape metrics. A hard radius does not
-use kernel shape. Its reported shape and shape SE are NA, and its inactive
-shape position is excluded from model-selection parameter counts. Fixed-radius
-metrics likewise have no estimated scale or shape parameter.
-
-Analytic profile GLM, joint NB2, conditional-logistic, joint mixed-model, and
-Bayesian adapters accept weighted SQ with Gaussian or exponential kernels,
-subject to their model-specific contracts. Other surface and landscape
-metrics remain native-refit predictors. See
-\code{vignette("v07-fitting-methods", package = "multiScaleR")} for the
-feature and inference-method matrix.
-  This does not tie their fitted scales or reuse results across evaluations.
-
-\strong{Kernel vs. landscape covariates}
-
-\code{kernel_var(source)} defines a kernel-weighted mean of the continuous
-raster values within a circular neighborhood. The neighborhood radius (sigma)
-is optimized by \code{\link{multiScale_optim}}.
-
-\code{landscape_var(source, metric)} derives a landscape ecology metric from
-a categorical (or thresholded) raster layer within a circular buffer. Raster
-classes must be encoded as finite integer-like values. The buffer radius can
-be fixed or optimized.
-
-\code{surface_var(source, metric)} derives a continuous surface texture
-metric from a continuous raster layer (elevation, NDVI, canopy height,
-temperature, moisture, and similar surfaces) within a circular buffer. These
-metrics summarize within-neighborhood heterogeneity rather than an average
-value, so they complement \code{kernel_var()} (which summarizes the mean).
-The buffer radius can be fixed or optimized. Note that these covariates
-measure variability, not central tendency: changing the radius changes both
-the ecological scale and the statistical quantity being summarized.
-
-By default a surface metric uses a hard-edged neighborhood. Setting
-\code{weighted = TRUE} instead weights each cell by the model's distance
-kernel and optimizes the kernel scale (sigma), which estimates the scale of
-effect of heterogeneity using continuous kernel weights (see the \code{weighted}
-argument). This applies to the distribution metrics (\code{"sa"},
-\code{"sq"}, \code{"ssk"}, \code{"sku"}).
-
-\strong{Supported landscape metrics}
-
-Composition metrics (require a categorical raster):
-\describe{
-  \item{\code{"shdi"}}{Shannon diversity index.}
-  \item{\code{"shei"}}{Shannon evenness index.}
-  \item{\code{"sidi"}}{Simpson diversity index.}
-  \item{\code{"siei"}}{Simpson evenness index. Can be uninformative for
-    optimized scales when local evenness is uniform across sample points.}
-  \item{\code{"msidi"}}{Modified Simpson diversity index, always computed
-    with the natural log.}
-  \item{\code{"msiei"}}{Modified Simpson evenness index. Can be uninformative
-    for optimized scales when local evenness is uniform across sample points.}
-  \item{\code{"pr"}}{Patch richness (number of distinct classes).}
-  \item{\code{"prd"}}{Patch richness density (pr per 100 ha).}
-  \item{\code{"rpr"}}{Relative patch richness (pr / classes_max * 100).
-    Requires \code{classes_max}.}
-  \item{\code{"ta"}}{Total area of the buffer (ha).}
+\section{Choose a covariate type}{
+\tabular{llll}{
+   Helper \tab Source raster \tab What it summarizes \tab Scale \cr
+   \code{kernel_var()} \tab Any numeric layer \tab Kernel-weighted mean of the cell values \tab Sigma, estimated, with a standard error \cr
+   \code{landscape_var()} \tab Categorical, with integer class codes \tab Composition, edges, aggregation, information theory, or one focal class \tab Hard radius, estimated without a standard error, or fixed \cr
+   \code{surface_var()} \tab Continuous, such as elevation or canopy height \tab Variation, distribution shape, slope, or relief \tab Hard radius (estimated or fixed), or sigma with \code{weighted = TRUE} \cr
 }
 
-Edge metrics (require adjacency information; cell IDs are cached internally):
-\describe{
-  \item{\code{"ed"}}{Edge density (m/ha).}
-  \item{\code{"te"}}{Total edge length (m).}
-  \item{\code{"lsi"}}{Landscape shape index.}
+
+A kernel mean describes how much of something surrounds a point. Landscape
+and surface metrics describe how it is arranged or how much it varies, so
+they complement the mean rather than replace it. Note that for a metric,
+changing the radius changes both the spatial scale and the statistical
+quantity summarized. Landscape metrics require finite, integer-like class
+codes, and both metric types require square raster cells.
+
+Whether a scale is a smooth kernel width or a hard radius decides how it
+can be estimated and reported. \link{multiScaleR-kernels} explains the
+difference, and why a hard radius has a stepped likelihood and no Hessian
+standard error.
 }
 
-Adjacency metrics (configuration; built from cell-pair counts):
-\describe{
-  \item{\code{"ai"}}{Aggregation index (\%). Area-weighted percentage of like
-    adjacencies relative to the maximum possible for each class. Higher values
-    mean classes are more spatially aggregated.}
-  \item{\code{"pladj"}}{Proportion of like adjacencies (\%). Percentage of all
-    cell-pair boundaries that fall between cells of the same class.}
-  \item{\code{"contag"}}{Contagion index (\%). Ranges from near 0 (maximum
-    interspersion of classes) to 100 (a single class). Requires at least 2
-    classes within the buffer.}
-  \item{\code{"iji"}}{Interspersion and juxtaposition index (\%). The evenness
-    of the adjacencies among the different classes, ignoring like adjacencies.
-    Ranges from near 0 (one class pair dominates the between-class
-    boundaries) to 100 (every class is equally adjacent to every other).
-    Undefined, and returned as \code{NA}, for fewer than 3 classes. For
-    optimized scales, prescreen for usable variation because local windows
-    with too few classes or between-class adjacencies can produce all
-    \code{NA} values.}
-}
+\section{Combine covariate types}{
+One \code{msr_vars()} call can mix all three types, including several covariates
+from the same source layer. For example, a kernel-weighted mean of forest
+cover and a fixed-radius edge density of the same layer:
 
-Information theory metrics (configuration and composition; built from the
-class-pair co-occurrence matrix following Nowosad and Stepinski, 2019). The
-\code{base} argument sets the logarithm base; set \code{base = 2} for bits, as
-in \code{landscapemetrics}:
-\describe{
-  \item{\code{"ent"}}{Marginal entropy, H(x). The diversity of the cell values
-    entering adjacencies; it increases with the number and evenness of classes.}
-  \item{\code{"joinent"}}{Joint entropy, H(x, y). The diversity of the
-    class-pair adjacencies themselves; the total complexity of the pattern.}
-  \item{\code{"condent"}}{Conditional entropy, H(y | x). The configurational
-    complexity that remains once composition is accounted for: the uncertainty
-    about a neighbor's class given the focal cell's class.}
-  \item{\code{"mutinf"}}{Mutual information, I(y, x). How much knowing a cell's
-    class tells you about its neighbor. Both clumping and regular alternation
-    can make neighboring classes predictable. Its magnitude also depends on
-    marginal entropy, so it is not a composition-independent aggregation index.}
-  \item{\code{"relmutinf"}}{Relative mutual information, I(y, x) / H(x). Mutual
-    information rescaled by marginal entropy to the range 0 to 1, so that
-    configuration can be compared across landscapes of differing composition.
-    It is 1 when mutual information is 0 (the \code{landscapemetrics}
-    convention) and is unaffected by \code{base}.}
-}
-
-Class-level metrics (describe a single focal class; require the \code{class}
-argument):
-\describe{
-  \item{\code{"clumpy"}}{Clumpiness index for the focal class. Ranges from -1
-    (maximally disaggregated) through 0 (randomly distributed) to 1 (maximally
-    clumped), correcting the proportion of like adjacencies for the class's own
-    abundance. Returned as \code{NA} where the class fills or is absent from
-    the buffer.}
-  \item{\code{"pland"}}{Percentage of landscape (\%). The focal class's share
-    of the valid buffer cells.}
-  \item{\code{"ca"}}{Class area (hectares) of the focal class within the
-    buffer.}
-}
-
-Adjacency and information-theory projections are class-count limited to avoid
-accidental use of continuous rasters and to keep FFT projection times bounded.
-The current ceilings are 200 classes for the like-adjacency metrics
-(\code{"ai"}, \code{"pladj"}, \code{"clumpy"}) and 50 classes for the metrics
-built from the full class-pair matrix (\code{"contag"}, \code{"iji"}, and the
-information-theory family), whose cost scales with the square of the class
-count.
-
-During model optimization, categorical adjacency metrics reuse sorted cell
-and neighbor-pair entry distances instead of rescanning every buffered cell
-at each radius. Metrics on the same source and radius share their counts.
-This can reduce repeated fitting time, at the cost of additional retained
-cache memory, which is included in the package's worker-memory estimates.
-Radius boundaries and metric definitions are unchanged. This optimization
-does not make hard-radius metrics smooth or remove local-optimum concerns.
-
-Before optimizing the scale of \code{"iji"}, \code{"siei"}, or \code{"msiei"},
-inspect a pilot \code{kernel_prep()} result or a few fixed radii. These
-metrics can be undefined or nearly constant when buffers contain too few
-classes, too few between-class adjacencies, or nearly identical evenness at
-all sample points. In that case, use a larger radius, increase \code{max_D},
-or choose a more stable diversity, entropy, or edge metric.
-
-\strong{Supported surface texture metrics}
-
-Surface metrics (require a continuous raster):
-\describe{
-  \item{\code{"sa"}}{Average roughness: the mean absolute deviation of the
-    neighborhood values from their mean.}
-  \item{\code{"sq"}}{Root mean square (RMS) roughness: the sample standard
-    deviation of the neighborhood values. More sensitive to large deviations
-    than \code{"sa"}.}
-  \item{\code{"ssk"}}{Skewness: the asymmetry of the neighborhood value
-    distribution. Positive when occasional high values dominate, negative
-    when occasional low values do.}
-  \item{\code{"sku"}}{Kurtosis (excess): the peakedness and tail weight of
-    the neighborhood value distribution relative to a normal distribution
-    (which has excess kurtosis 0).}
-  \item{\code{"sdq"}}{Root mean square slope: the RMS of the local gradient
-    magnitude, a measure of how steeply the surface changes (terrain or
-    structural ruggedness).}
-  \item{\code{"sdr"}}{Surface area ratio: the percentage by which the true
-    3D surface area exceeds the flat projected area. Behaves as a continuous
-    edge-density analog (more relief gives a larger ratio).}
-}
-The dispersion and shape metrics (\code{"sa"}, \code{"sq"}, \code{"ssk"},
-\code{"sku"}) match the \code{geodiv} package (\code{sq} uses an N - 1
-denominator as \code{stats::sd()} does; \code{ssk} uses the bias-adjusted
-skewness and \code{sku} the excess kurtosis, matching \code{geodiv}'s
-defaults). \code{"sdq"} is reported as a true slope (the gradient is divided
-by the cell resolution); \code{geodiv::sdq()} instead uses a cell spacing of
-one, so the two agree after multiplying by the resolution. \code{"sdr"} is
-computed in physical units (real elevation values and the real cell size),
-so a tilted plane of slope \code{s} returns \code{(sqrt(1 + s^2) - 1) * 100};
-\code{geodiv::sdr()} instead rescales the surface to a unit range and so is
-dimensionless. The physical definition is the interpretable one for terrain
-and, unlike the rescaled version, can be projected by FFT.
-
-Raster projection of \code{"sq"}, \code{"ssk"}, \code{"sku"}, \code{"sdq"},
-and \code{"sdr"} uses fast Fourier transform (FFT) convolution; projection of
-\code{"sa"} uses an exact compiled masked focal pass, because average
-roughness has no closed-form FFT decomposition. \code{"sdq"} and \code{"sdr"}
-use each cell's neighbors, so (like the landscape edge metrics) they cache
-raster cell IDs internally, and their projection agrees with point extraction
-to within a small boundary tolerance rather than bit-for-bit.
-
-\strong{Mixing covariate types}
-
-Multiple covariate types can be combined in one \code{msr_vars()} call. For
-example, a kernel-weighted mean of forest cover and a fixed-radius edge
-density metric can both be defined and passed together to
-\code{\link{kernel_prep}}:
-
-\preformatted{
-vars <- msr_vars(
+\if{html}{\out{<div class="sourceCode">}}\preformatted{vars <- msr_vars(
   forest_mean  = kernel_var("forest"),
   forest_ed500 = landscape_var("forest", metric = "ed", radius = 500)
 )
 kernel_inputs <- kernel_prep(pts, rasters, max_D = 1000,
                              scale_vars = vars)
+}\if{html}{\out{</div>}}
+
+A covariate with a fixed \code{radius} is computed once and is not re-evaluated
+during optimization, which can save considerable time. Under
+\code{kernel = "expow"}, a hard-radius covariate does not use the kernel shape.
+Its reported shape and shape standard error are \code{NA}, and its unused shape
+position is left out of model-selection parameter counts.
+
+Not every fitting route accepts every covariate type. Kernel means,
+weighted \code{"sq"}, and fixed-radius metrics work with every route, including
+the analytic backends of \code{\link[=multiScale_optim]{multiScale_optim()}} and \code{\link[=multiScale_bayes]{multiScale_bayes()}},
+within each route's kernel restrictions. Those routes need a Gaussian or
+negative exponential kernel for weighted \code{"sq"}. An estimated hard radius,
+and any weighted metric other than \code{"sq"}, needs the default refit
+backend. See \link{multiScaleR-fitting-methods} and
+\code{vignette("v07-fitting-methods", package = "multiScaleR")} for the full
+feature table.
 }
 
-Covariates with a fixed \code{radius} are computed once and not re-evaluated
-during optimization, which can meaningfully reduce computation time.
+\section{Landscape metric definitions}{
+Each landscape metric summarizes the cells whose centers lie within the
+radius. In the formulas, \code{n} is the number of valid (non-missing) cells,
+\code{n_i} the number in class \code{i}, \code{p_i = n_i / n}, \code{m} the number of classes
+present, \code{res} the cell size in map units, and \code{A = n * res^2 / 10000} the
+buffer area (hectares when map units are meters). \code{g_ij} counts pairs of
+cells that share a side, have classes \code{i} and \code{j}, and both lie in the
+buffer. Each pair is counted in both directions, and \code{q_ij = g_ij / sum(g)}.
+Logarithms use \code{base} where marked, and the natural log otherwise.
+
+\strong{Composition} (how many classes, and how evenly they share the buffer):\tabular{llll}{
+   Code \tab Name \tab Definition \tab Units or range \cr
+   \code{shdi} \tab Shannon diversity \tab \code{-sum(p_i * log(p_i))}, with \code{base} \tab Log units, 0 or more \cr
+   \code{shei} \tab Shannon evenness \tab \code{shdi / log(m)}, with \code{base}. 0 when \code{m = 1} \tab 0 to 1 \cr
+   \code{sidi} \tab Simpson diversity \tab \code{1 - sum(p_i^2)} \tab 0 to 1 \cr
+   \code{siei} \tab Simpson evenness \tab \code{sidi / (1 - 1 / m)}. \code{NA} when \code{m = 1} \tab 0 to 1 \cr
+   \code{msidi} \tab Modified Simpson diversity \tab \code{-log(sum(p_i^2))} \tab Natural log units, 0 or more \cr
+   \code{msiei} \tab Modified Simpson evenness \tab \code{msidi / log(m)}. Undefined when \code{m = 1} \tab 0 to 1 \cr
+   \code{pr} \tab Patch richness \tab \code{m} \tab Number of classes \cr
+   \code{prd} \tab Patch richness density \tab \code{m / A * 100} \tab Classes per 100 ha \cr
+   \code{rpr} \tab Relative patch richness \tab \code{m / classes_max * 100} \tab Percent \cr
+   \code{ta} \tab Total area \tab \code{A} \tab Hectares \cr
 }
+
+
+\strong{Edge} (how much boundary separates different classes). Here \code{E} is the
+number of cell sides shared by two buffer cells of different classes, and
+\code{B} the number of cell sides on the buffer's outer boundary or next to a
+missing cell:\tabular{llll}{
+   Code \tab Name \tab Definition \tab Units or range \cr
+   \code{te} \tab Total edge \tab \code{E * res} \tab Map units (meters) \cr
+   \code{ed} \tab Edge density \tab \code{E * res / A} \tab Meters per hectare \cr
+   \code{lsi} \tab Landscape shape index \tab \code{(E + B) / Pmin(n)}, where \code{Pmin(n)} is the smallest possible perimeter, in cell sides, of \code{n} cells \tab Ratio, 1 or more \cr
+}
+
+
+\strong{Aggregation} (whether cells of a class sit together or are mixed with
+other classes):\tabular{llll}{
+   Code \tab Name \tab Definition \tab Units or range \cr
+   \code{pladj} \tab Proportion of like adjacencies \tab \code{sum(g_ii) / sum(g) * 100} \tab Percent \cr
+   \code{ai} \tab Aggregation index \tab \code{sum(p_i * (g_ii / 2) / gmax_i) * 100}, where \code{gmax_i} is the most like adjacencies \code{n_i} cells can have \tab Percent \cr
+   \code{contag} \tab Contagion \tab \code{(1 + sum(q_ij * log(q_ij)) / (2 * log(m))) * 100}. \code{NA} when \code{m < 2} \tab 0 (interspersed) to 100 (one class) \cr
+   \code{iji} \tab Interspersion and juxtaposition \tab \code{-sum(e * log(e)) / log(m * (m - 1) / 2) * 100}, where \code{e} is each class pair's share of the adjacencies between different classes. \code{NA} when \code{m < 3} or no such adjacencies exist \tab Near 0 (one pair dominates) to 100 (all pairs equally adjacent) \cr
+}
+
+
+\strong{Information theory} (pattern complexity, split into composition and
+configuration, following Nowosad and Stepinski 2019). With
+\code{q_i = sum_j(q_ij)}:\tabular{llll}{
+   Code \tab Name \tab Definition \tab Units or range \cr
+   \code{ent} \tab Marginal entropy, H(x) \tab \code{-sum(q_i * log(q_i))}, with \code{base} \tab Log units. Rises with the number and evenness of classes \cr
+   \code{joinent} \tab Joint entropy, H(x, y) \tab \code{-sum(q_ij * log(q_ij))}, with \code{base} \tab Log units. Total complexity of the pattern \cr
+   \code{condent} \tab Conditional entropy, H(y given x) \tab \code{joinent - ent} \tab Log units. Uncertainty about a neighbor's class given a cell's class \cr
+   \code{mutinf} \tab Mutual information, I(y, x) \tab \code{ent - condent} \tab Log units. How much a cell's class tells you about its neighbor's \cr
+   \code{relmutinf} \tab Relative mutual information \tab \code{mutinf / ent}, and 1 when \code{mutinf = 0} \tab 0 to 1, unaffected by \code{base} \cr
+}
+
+
+Both clumping and regular alternation make neighbors predictable and raise
+\code{mutinf}. Its size also depends on \code{ent}, so it is not a
+composition-free aggregation index. \code{relmutinf} rescales it so that
+configuration can be compared across buffers with different composition.
+
+\strong{Class level} (one focal class \code{k}, set with \code{class}):\tabular{llll}{
+   Code \tab Name \tab Definition \tab Units or range \cr
+   \code{pland} \tab Percentage of landscape \tab \code{n_k / n * 100}. 0 when the class is absent \tab Percent \cr
+   \code{ca} \tab Class area \tab \code{n_k * res^2 / 10000}. 0 when the class is absent \tab Hectares \cr
+   \code{clumpy} \tab Clumpiness index \tab With \code{G = g_kk / (4 * n_k - Pmin(n_k))} and \code{P = n_k / n}: \code{(G - P) / (1 - P)} when \code{G >= P} or \code{P >= 0.5}, otherwise \code{(G - P) / (-P)}, as in \code{landscapemetrics}. \code{NA} when the class is absent or fills the buffer \tab Unitless. 0 when like adjacencies match the share \code{P} \cr
+}
+}
+
+\section{Surface metric definitions}{
+Each surface metric summarizes the values \code{z} of the \code{n} valid cells whose
+centers lie within the radius. \code{s} is the sample standard deviation
+(\code{"sq"}) and \code{res} the cell size in map units.\tabular{llll}{
+   Code \tab Name \tab Definition \tab Units \cr
+   \code{sa} \tab Average roughness \tab \code{sum(abs(z - mean(z))) / n} \tab Raster units \cr
+   \code{sq} \tab Root mean square roughness \tab \code{sqrt(sum((z - mean(z))^2) / (n - 1))}. \code{NA} when \code{n < 2} \tab Raster units \cr
+   \code{ssk} \tab Skewness \tab \code{sqrt(n * (n - 1)) / (n - 2) * (sum((z - mean(z))^3) / n) / s^3}. \code{NA} when \code{n < 3} or \code{s = 0} \tab Unitless. Positive when a few high values stand out \cr
+   \code{sku} \tab Excess kurtosis \tab \code{(sum((z - mean(z))^4) / n) / s^4 - 3}. \code{NA} when \code{s = 0} \tab Unitless. 0 for normally distributed values \cr
+   \code{sdq} \tab Root mean square slope \tab Square root of the mean of \code{((z - z_right)^2 + (z - z_below)^2) / res^2} over cells whose right and lower neighbors are both in the buffer \tab Raster units per map unit \cr
+   \code{sdr} \tab Surface area ratio \tab \code{(sum(a) / (k * res^2) - 1) * 100}, where \code{a} is the three-dimensional area of each of the \code{k} blocks of 2 x 2 cell centers in the buffer \tab Percent \cr
+}
+
+
+\code{"sa"}, \code{"sq"}, \code{"ssk"}, and \code{"sku"} match the \code{geodiv} package. \code{"sdq"} is
+a true slope (rise over run). \code{geodiv::sdq()} assumes a cell spacing of 1,
+so it equals \code{"sdq"} multiplied by \code{res}. \code{"sdr"} uses the real values and
+cell size, so a plane tilted at slope \code{t} returns
+\code{(sqrt(1 + t^2) - 1) * 100}. \code{geodiv::sdr()} rescales the surface to a
+unit range first, so its values differ. Read \code{"sdq"} and \code{"sdr"} as a slope
+and an area ratio only when the raster values and the map share units, as
+elevation in meters does.
+}
+
+\section{Kernel-weighted surface metrics}{
+With \code{weighted = TRUE}, each cell gets the kernel weight \code{w = w(d)} of its
+distance \code{d} from the point (see \link{multiScaleR-kernels}), using the cells
+extracted within \code{max_D}. With the weighted mean
+\code{mu = sum(w * z) / sum(w)}:\tabular{ll}{
+   Code \tab Weighted definition \cr
+   \code{sa} \tab \code{sum(w * abs(z - mu)) / sum(w)} \cr
+   \code{sq} \tab \code{sqrt(sum(w * (z - mu)^2) / sum(w))}, and 0 for constant values \cr
+   \code{ssk} \tab \code{(sum(w * (z - mu)^3) / sum(w)) / sq^3}. \code{NA} when \code{sq = 0} \cr
+   \code{sku} \tab \code{(sum(w * (z - mu)^4) / sum(w)) / sq^4 - 3}. \code{NA} when \code{sq = 0} \cr
+}
+
+
+Weighted \code{"sq"} divides by the sum of weights, so it is a population-style
+spread and differs from the \code{n - 1} form of the unweighted metric. The
+weighted skewness and kurtosis use plain standardized moments, without the
+small-sample adjustment of the unweighted \code{"ssk"}. Weighted \code{"sq"} is
+smooth in sigma except where the weighted spread is zero. Absolute
+deviations (\code{"sa"}) and the standardized higher moments have additional
+points where they are not smooth or not defined. Within one evaluation,
+weighted metrics reuse weights and centered moments only when their
+source, scale, shape, and valid cells match exactly. Their scales are
+still estimated separately. Under \code{kernel = "fixed"}, the fitted scale is
+a hard cutoff radius. It has no standard error or Wald limits, although
+the weighted definitions above still apply.
+}
+
+\section{Check a metric before you optimize it}{
+Before estimating the radius of \code{"iji"}, \code{"siei"}, or \code{"msiei"}, inspect a
+pilot \code{\link[=kernel_prep]{kernel_prep()}} result or a few fixed radii. These metrics can be
+undefined or nearly constant when buffers hold too few classes, too few
+adjacencies between different classes, or nearly identical evenness at
+every point. \code{"iji"} in particular returns \code{NA} with fewer than three
+classes, and small buffers can make it \code{NA} everywhere. If so, use a larger
+radius, increase \code{max_D}, or choose a more stable diversity, entropy, or
+edge metric. A candidate scale that leaves a covariate undefined at a
+modeled observation is rejected during optimization, so every candidate is
+compared on the same observations.
+
+The adjacency and information-theory metrics accept a limited number of
+classes, which guards against passing a continuous raster by mistake and
+keeps raster projection times bounded. The limits are 200 classes for the
+like-adjacency metrics (\code{"ai"}, \code{"pladj"}, \code{"clumpy"}) and 50 for the
+metrics built from the full class-pair table (\code{"contag"}, \code{"iji"}, and the
+information-theory metrics), whose cost grows with the square of the class
+count.
+
+During optimization, the adjacency metrics reuse sorted cell and
+neighbor-pair distances instead of rescanning every buffered cell at each
+radius, and metrics on the same source and radius share their counts. This
+saves time at the cost of retained memory, which
+\code{\link[=estimate_multiscale_ram]{estimate_multiscale_ram()}} includes. It does not change radius boundaries
+or metric definitions, and it does not make a hard radius smooth or remove
+concerns about local optima.
+}
+
+\section{Map a metric}{
+\code{\link[=kernel_scale.raster]{kernel_scale.raster()}} computes the same covariates for every raster cell.
+Projection of \code{"sq"}, \code{"ssk"}, \code{"sku"}, \code{"sdq"}, \code{"sdr"}, and the landscape
+metrics uses fast Fourier transform (FFT) convolution by default.
+Unweighted \code{"sa"} uses an exact compiled moving-window pass instead,
+because average roughness cannot be written as a convolution. \code{"sdq"} and
+\code{"sdr"} use each cell's neighbors, so their projected values agree with
+point extraction to within a small tolerance at the buffer boundary rather
+than exactly. Set \code{fft = FALSE} in \code{\link[=kernel_scale.raster]{kernel_scale.raster()}} to use direct
+moving-window calculations instead.
+}
+
 \examples{
-## Kernel-weighted mean only (equivalent to default behavior)
-vars <- msr_vars(
-  forest_prop = kernel_var("forest")
-)
+## Kernel-weighted mean only (the same as omitting scale_vars)
+vars <- msr_vars(forest_prop = kernel_var("forest"))
+vars
 
-## Combining kernel, landscape, and surface covariates
+## Combine kernel, landscape, and surface covariates. The printed table
+## shows which scales are estimated (optimize = TRUE) and which are fixed.
 vars <- msr_vars(
-  forest_prop = kernel_var("forest"),
-  forest_ed   = landscape_var("forest", metric = "ed"),
+  forest_prop    = kernel_var("forest"),
+  forest_ed      = landscape_var("forest", metric = "ed"),
   cover_shdi_500 = landscape_var("landcover", metric = "shdi", radius = 500),
-  elev_sd     = surface_var("elevation", metric = "sq")
+  elev_sd        = surface_var("elevation", metric = "sq")
 )
+print(vars)
 
-## landscape_var with natural-log Shannon diversity (the default)
-landscape_var("landcover", metric = "shdi")
-
-## landscape_var with log2 Shannon diversity and a fixed 250 m radius
+## Shannon diversity in bits within a fixed 250 m radius
 landscape_var("landcover", metric = "shdi", radius = 250, base = 2)
 
-## Configuration: interspersion (landscape-level), no class argument
+## Interspersion of the whole buffer needs no focal class
 landscape_var("landcover", metric = "iji", radius = 500)
 
-## Information theory in bits (set base = 2 to match landscapemetrics)
-landscape_var("landcover", metric = "mutinf", radius = 500, base = 2)
-
-## Class-level metrics require `class`: clumpiness and cover of class 3
+## Class-level metrics need `class`, here clumpiness and cover of class 3
 landscape_var("landcover", metric = "clumpy", radius = 500, class = 3)
 landscape_var("landcover", metric = "pland", radius = 500, class = 3)
 
-## surface_var: optimized RMS roughness, and fixed-radius average roughness
+## Surface metrics with an estimated hard radius, a fixed radius, and
+## kernel weights (sigma estimated)
 surface_var("elevation", metric = "sq")
 surface_var("ndvi", metric = "sa", radius = 300)
-
-## Kernel-weighted roughness: optimize the scale of effect of heterogeneity
 surface_var("elevation", metric = "sq", weighted = TRUE)
 
-## Define a single optimized kernel-weighted mean covariate
-kv <- kernel_var("forest")
+## Compute covariates at survey points from the bundled landscape
+land <- terra::rast(system.file("extdata", "landscape.tif",
+                                package = "multiScaleR"))
+# land3 is continuous. Build a three-class layer from it
+land$cover <- terra::classify(land$land3,
+                              rbind(c(-Inf, 0.45, 1),
+                                    c(0.45, 0.55, 2),
+                                    c(0.55, Inf, 3)))
+data("surv_pts")
+vars <- msr_vars(
+  land1_prop   = kernel_var("land1"),
+  cover_shdi   = landscape_var("cover", metric = "shdi", radius = 400),
+  land3_rough  = surface_var("land3", metric = "sq", radius = 300)
+)
+inputs <- kernel_prep(pts = terra::vect(surv_pts)[1:20, ],
+                      raster_stack = land, max_D = 500,
+                      scale_vars = vars, verbose = FALSE)
+# Standardized covariates, one column per declared covariate
+head(inputs$kernel_dat)
+
 }
 \references{
 Nowosad, J., & Stepinski, T. F. (2019). Information theory as a consistent
@@ -386,9 +397,10 @@ framework for quantification and classification of landscape patterns.
 \doi{10.1007/s10980-019-00830-x}
 }
 \seealso{
-\code{\link{kernel_prep}}, \code{\link{multiScale_optim}},
-  \code{\link{kernel_scale.raster}}. For a worked walkthrough of the landscape
-  metrics see \code{vignette("v04-landscape-metrics", package = "multiScaleR")},
-  and for the continuous-surface metrics see
-  \code{vignette("v05-surface-metrics", package = "multiScaleR")}.
+\code{\link[=kernel_prep]{kernel_prep()}}, \code{\link[=multiScale_optim]{multiScale_optim()}}, \code{\link[=kernel_scale.raster]{kernel_scale.raster()}},
+and \link{multiScaleR-kernels}. For worked examples, see
+\code{vignette("v04-landscape-metrics", package = "multiScaleR")} for the
+landscape metrics and
+\code{vignette("v05-surface-metrics", package = "multiScaleR")} for the
+surface metrics.
 }

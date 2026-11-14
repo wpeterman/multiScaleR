@@ -4,14 +4,108 @@
 \name{multiScaleR-package}
 \alias{multiScaleR}
 \alias{multiScaleR-package}
-\title{multiScaleR}
+\title{multiScaleR: estimate scales of effect for spatial covariates}
 \description{
-This package is for optimizing scales of effect when modeling ecological processes in space. Specifically, the scale parameter of a distance-weighted kernel distribution is identified for all environmental layers included in the model.
+The \emph{scale of effect} is the distance over which a landscape variable
+influences an ecological response, such as how far from a pond the
+surrounding forest still affects salamander counts. multiScaleR estimates it
+directly. It weights the raster cells around each survey point with a
+distance \emph{kernel}, and it chooses the kernel scale (sigma) that maximizes
+the likelihood of your regression model. You fit your model once at
+starting values, and multiScaleR does the search, reports each scale with
+its uncertainty, and helps you compare, check, and map the result.
 }
 \details{
 \if{html}{
   \figure{logo.png}{options: width=150 alt='Package logo'}
 }
+}
+\section{Start here}{
+Work through \code{vignette("v01-quickstart", package = "multiScaleR")}, then
+\code{vignette("v02-user-guide", package = "multiScaleR")}. Run
+\code{browseVignettes("multiScaleR")} to see all 15 vignettes, which cover
+mapping, landscape and surface metrics, year-specific rasters, fitting
+methods, cross-validation, intervals, step selection, spatial fields,
+distance-removal models, and Bayesian models. \link{multiScaleR-glossary}
+defines the terms they use.
+}
+
+\section{The basic workflow}{
+\tabular{ll}{
+   Step \tab Functions \cr
+   1. Describe the covariates \tab \code{\link[=kernel_var]{kernel_var()}}, \code{\link[=landscape_var]{landscape_var()}}, \code{\link[=surface_var]{surface_var()}}, \code{\link[=msr_vars]{msr_vars()}} \cr
+   2. Prepare the points and rasters \tab \code{\link[=kernel_prep]{kernel_prep()}}, \code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}, \code{\link[=estimate_multiscale_ram]{estimate_multiscale_ram()}} \cr
+   3. Fit your model at starting values \tab Your usual function, such as \code{glm()} or \code{unmarked::pcount()} \cr
+   4. Estimate the scales \tab \code{\link[=multiScale_optim]{multiScale_optim()}} or \code{\link[=multiScale_bayes]{multiScale_bayes()}} \cr
+   5. Read and check the fit \tab \code{summary()}, \code{plot()}, \code{\link[=diagnostics]{diagnostics()}}, \code{\link[=profile_sigma]{profile_sigma()}}, \code{\link[=kernel_dist]{kernel_dist()}}, \code{\link[=plot_kernel]{plot_kernel()}} \cr
+   6. Compare models \tab \code{\link[=aic_tab]{aic_tab()}}, \code{\link[=bic_tab]{bic_tab()}}, \code{\link[=cross_validate]{cross_validate()}}, \code{\link[=cv_tab]{cv_tab()}}, \code{\link[=select_cv]{select_cv()}} \cr
+   7. Predict and map \tab \code{predict()}, \code{\link[=kernel_scale.raster]{kernel_scale.raster()}}, \code{\link[=plot_marginal_effects]{plot_marginal_effects()}}, \code{\link[=prepare_prediction]{prepare_prediction()}} \cr
+}
+}
+
+\section{Specialized models and tools}{
+\itemize{
+\item \strong{Choosing a fitting method}: \link{multiScaleR-fitting-methods} describes
+each backend of \code{\link[=multiScale_optim]{multiScale_optim()}}.
+\item \strong{Cross-validation for other model types}: \code{\link[=cross_validate_glm]{cross_validate_glm()}},
+\code{\link[=cross_validate_clogit]{cross_validate_clogit()}}, \code{\link[=cross_validate_field]{cross_validate_field()}},
+\code{\link[=cross_validate_mixed]{cross_validate_mixed()}}, \code{\link[=cross_validate_bayes]{cross_validate_bayes()}}, with fold builders
+\code{\link[=spatial_cv_folds]{spatial_cv_folds()}} and \code{\link[=grouped_cv_folds]{grouped_cv_folds()}}.
+\item \strong{Occupancy and abundance models from \code{unmarked}}:
+\code{\link[=prepare_unmarked_data]{prepare_unmarked_data()}}, \code{\link[=validate_unmarked_data]{validate_unmarked_data()}}.
+\item \strong{Distance-removal models}: \code{\link[=prepare_gdr_histories]{prepare_gdr_histories()}},
+\code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}}, \code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}, \code{\link[=gdr_start_values]{gdr_start_values()}},
+\code{\link[=make_gdr_refitter]{make_gdr_refitter()}}, \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}},
+\code{\link[=response_field_geometry]{response_field_geometry()}}.
+\item \strong{Bayesian models}, in which a scale may vary among years or with a
+covariate: \code{\link[=multiScale_bayes]{multiScale_bayes()}}, \code{\link[=check_bayes_setup]{check_bayes_setup()}},
+\code{\link[=simulate_bayes_prior]{simulate_bayes_prior()}}, \code{\link[=posterior_scales]{posterior_scales()}}, \code{\link[=predict_scales]{predict_scales()}},
+\code{\link[=diagnose_bayes_scales]{diagnose_bayes_scales()}}, \code{\link[=diagnose_bayes_probabilities]{diagnose_bayes_probabilities()}},
+\code{\link[=diagnose_bayes_laplace]{diagnose_bayes_laplace()}}.
+\item \strong{Assessing NB2 scales over the full likelihood range}:
+\code{\link[=scale_inference]{scale_inference()}}.
+\item \strong{Simulating data with known scales of effect}: \code{\link[=sim_rast]{sim_rast()}},
+\code{\link[=sim_dat]{sim_dat()}}, \code{\link[=sim_dat_unmarked]{sim_dat_unmarked()}}, \code{\link[=sim_dat_gdr]{sim_dat_gdr()}}.
+}
+}
+
+\section{Reference topics}{
+\tabular{ll}{
+   Topic \tab What it covers \cr
+   \link{multiScaleR-kernels} \tab Kernel families, sigma and shape, hard radii, effective distance \cr
+   \link{multiScaleR-fitting-methods} \tab Backends, their requirements, and the uncertainty each reports \cr
+   \link{multiScaleR-prediction} \tab Prediction quantities and the uncertainty each route carries \cr
+   \link{multiScaleR-glossary} \tab Definitions of the terms used in the documentation \cr
+   \link[=multiScaleR-class]{multiScaleR} \tab The fitted object from \code{\link[=multiScale_optim]{multiScale_optim()}} \cr
+   \link[=multiScaleR_data-class]{multiScaleR_data} \tab The prepared inputs from \code{\link[=kernel_prep]{kernel_prep()}} \cr
+   \link[=multiScaleR_bayes-class]{multiScaleR_bayes} \tab The fitted object from \code{\link[=multiScale_bayes]{multiScale_bayes()}} \cr
+   \link[=multiScaleR_cv-class]{multiScaleR_cv} \tab Cross-validation results \cr
+}
+}
+
+\section{Experimental tools}{
+These tools are experimental. Their arguments and results may change in a
+later release without a deprecation period: \code{\link[=cross_validate_bayes]{cross_validate_bayes()}},
+\code{\link[=cross_validate_mixed]{cross_validate_mixed()}}, the count, binary, and positive families of
+\code{\link[=cross_validate_field]{cross_validate_field()}}, \code{\link[=diagnose_bayes_laplace]{diagnose_bayes_laplace()}}, and the
+\code{radius_grid} argument of \code{\link[=multiScale_optim]{multiScale_optim()}}.
+}
+
+\section{Citation}{
+Run \code{citation("multiScaleR")} for the paper describing the method.
+}
+
+\examples{
+# Estimate the scale of effect of habitat on simulated counts
+data(pts)
+data(count_data)
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
+inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                      kernel = "gaussian", verbose = FALSE)
+start_model <- glm(y ~ hab, family = poisson, data = count_data)
+fit <- multiScale_optim(start_model, inputs, verbose = FALSE)
+summary(fit)   # sigma near the simulated value of 75 map units
 }
 \seealso{
 Useful links:

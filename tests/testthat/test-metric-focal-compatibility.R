@@ -29,6 +29,7 @@ test_that("weighted surface raster metrics support focal smoothing under all ker
 })
 
 test_that("hard-radius texture and categorical metrics support focal smoothing", {
+  skip_on_cran()
   f <- refit_spatial_fixture()
   for (metric in c("sa", "sq", "ssk", "sku", "sdq", "sdr")) {
     specs <- msr_vars(texture = surface_var("elev", metric, radius = 31))

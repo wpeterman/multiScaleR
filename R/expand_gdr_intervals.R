@@ -1,73 +1,105 @@
 #' Expand Site and Survey Covariates into GDR Intervals
 #'
-#' Repeat explicitly selected covariates into native removal-interval rows and
-#' prepare a copy of the GDR frame with its keyed alignment and source aliases.
-#' @param object An `unmarkedFrameGDR` with its original paired response,
-#'   site, primary-survey and observation covariates.
-#' @param event_keys Data frame in native site-major, primary-survey order,
-#'   including completed zero surveys. Supply original survey identifiers.
-#' @param event_id Character vector of columns identifying a survey in
-#'   `event_keys`. Compound keys are supported.
-#' @param interval_units Nonempty label for original removal-duration units,
-#'   such as `"minutes"`. Durations are retained without conversion.
-#' @param site_covariates Character vector naming static site covariates to
-#'   repeat. Default: none. Optional names specify new observation-column
-#'   aliases, for example `c(rem_forest = "forest", rem_observer = "Observer")`.
-#'   Unnamed entries retain their source names. Selection is explicit; no
-#'   formula variables or observer roles are inferred.
-#' @param yearly_covariates Character vector naming native primary-survey
-#'   covariates to repeat, with the same optional alias convention. Default:
-#'   none. These rows refer to native primary periods, not necessarily years.
-#' @param interval One string naming the retained numeric removal-interval
-#'   index. Default: `"interval"`. It must not collide with an event key or
-#'   another requested observation column.
-#' @param site_id Optional physical-site identifier columns in `event_keys`,
-#'   passed to [prepare_gdr_intervals()].
-#' @param effort Optional event-order effort vector, passed to
-#'   [prepare_gdr_intervals()]. Surveyed zeros and unsurveyed missing responses
-#'   keep their original meanings.
-#' @param expected_event_keys Optional independently supplied event mapping
-#'   in native order, passed to [prepare_gdr_intervals()].
-#' @return An `msr_gdr_intervals` list as returned by [prepare_gdr_intervals()],
-#'   with the copied frame in `data`, survey audit, complete alignment and
-#'   protocol. `protocol$expanded_covariates` is a data frame with `source_table`
-#'   (`"site"` or `"yearly"`), original `source` name and observation-column
-#'   `target` alias. Its rows identify every repeated field. An empty selection
-#'   adds only the interval index. `fit_eligibility_established` stays `FALSE`.
+#' Copy chosen site covariates, or covariates recorded once per visit, into
+#' the observation table of an `unmarkedFrameGDR`, which has one row per
+#' survey and removal interval. A removal formula reads its covariates from
+#' that table, so a covariate constant within a survey, such as the observer,
+#' must be repeated there before you can use it in the removal formula. The
+#' function also adds the interval number and returns a copy of the frame
+#' with a record of how every row was aligned.
+#'
+#' @param object An `unmarkedFrameGDR` with its original counts and its site,
+#'   yearly and observation covariates.
+#' @param event_keys Data frame with one row per survey event, in the frame's
+#'   order (all primary periods of the first frame row, then the second, and
+#'   so on). Include completed surveys with zero counts. Use the original
+#'   survey identifiers.
+#' @param event_id Character vector naming the column(s) of `event_keys` that
+#'   identify a survey.
+#' @param interval_units Character string naming the time unit of the removal
+#'   intervals, such as `"minutes"`. Interval lengths are kept, not converted.
+#' @param site_covariates Character vector naming the site covariates
+#'   (`siteCovs`) to repeat. The default is none. Name an element to give the
+#'   copy a new name, for example
+#'   `c(rem_forest = "forest", rem_observer = "Observer")`. Unnamed elements
+#'   keep the source name. Nothing is inferred from model formulas, so list
+#'   every covariate you need.
+#' @param yearly_covariates Character vector naming covariates in the frame's
+#'   yearly table (`yearlySiteCovs`, one row per primary period) to repeat,
+#'   with the same naming convention. The default is none. Despite the name,
+#'   these rows are primary periods (visits), not necessarily years.
+#' @param interval Character string, default `"interval"`. The name of the
+#'   new column holding the interval number (1, 2, ...). It must differ from
+#'   the event keys and from the other new columns.
+#' @param site_id Optional column(s) of `event_keys` that identify the
+#'   physical site, passed to [prepare_gdr_intervals()] and
+#'   [validate_unmarked_data()].
+#' @param effort Optional numeric vector of survey effort, one value per
+#'   event, passed to [validate_unmarked_data()]. Positive values mark
+#'   completed surveys, zero marks unsurveyed events and `NA` marks unknown
+#'   effort.
+#' @param expected_event_keys Optional independent event list in frame
+#'   order, passed to [validate_unmarked_data()].
+#' @return A list of class `msr_gdr_intervals`, as from
+#'   [prepare_gdr_intervals()]: `data` is the copied frame with the new
+#'   observation columns, `survey_audit` is the survey audit, `alignment`
+#'   records which input row fills each observation row, and `protocol`
+#'   records units, interval lengths and the added columns. In addition,
+#'   `protocol$expanded_covariates` is a data frame with one row per copied
+#'   covariate: `source_table` (`"site"` or `"yearly"`), the `source` column
+#'   and its `target` name in the observation table. With no covariates
+#'   selected, only the interval column is added. `fit_eligibility_established`
+#'   is always `FALSE`.
 #' @details
-#' The native removal random-term model frame can evaluate fixed covariates
-#'   from the observation table as well as its grouping factor. Repeating only
-#'   an observer label can therefore leave a formula such as
-#'   `~ rem_forest + I(interval == 1) + (1 | rem_observer)` incomplete. Select
-#'   all survey-constant fields needed by that observation formula.
+#' # Why repeat covariates
 #'
-#' Static site fields repeat across every primary survey and interval for the
-#'   site. Primary-survey fields repeat only within their own survey. Original
-#'   column classes, matrix columns, factor levels, contrasts and missing values
-#'   are preserved. No model is fitted, no predictor is standardized and no
-#'   missingness decision is made here. Original covariate tables, responses,
-#'   geometry and durations remain unchanged.
+#' When the removal formula contains a random effect, `unmarked` evaluates
+#' the random-effect part on the observation table, and that step also needs
+#' the formula's fixed covariates there. Repeating only an observer label can
+#' therefore leave a
+#' formula such as `~ rem_forest + I(interval == 1) + (1 | rem_observer)`
+#' without `rem_forest`. Select every survey-constant covariate the
+#' observation formula needs.
 #'
-#' Use aliases for different component roles. For example, `forest` in abundance
-#'   and `rem_forest` in removal are distinct inputs. An alias copies the values
-#'   present at preparation; it does not keep later changes synchronized. The
-#'   existing guard against optimizing a static site name shadowed by an
-#'   observation or primary-survey column remains in force. Existing observation
-#'   columns cannot be overwritten. Interval-varying measurements can instead
-#'   be supplied directly through [prepare_gdr_intervals()].
+#' # How values are repeated
 #'
-#' Data alignment does not qualify native TMB controls, likelihood-only fitting,
-#'   latent integration, start agreement, score, covariance or identification.
-#'   Priors, parameter counts, diagnostics and uncertainty methods are unchanged.
+#' A site covariate is repeated for every primary period and interval at that
+#' site. A yearly covariate is repeated only for the intervals of its own
+#' primary period. Column classes, matrix columns, factor levels, contrasts
+#' and missing values are kept. Nothing is standardized, imputed or dropped,
+#' and the original covariate tables, counts, distance bands and interval
+#' lengths are unchanged. Existing observation columns cannot be overwritten.
+#' For covariates that change from one interval to the next, use
+#' [prepare_gdr_intervals()] directly.
+#'
+#' # Name copies by role
+#'
+#' Give a copy a new name when the same field plays different roles, for
+#' example `forest` in the abundance formula and `rem_forest` in the removal
+#' formula. A copy holds the values present when it was made. If you later
+#' change the site covariate, for example while estimating its scale of
+#' effect, the copy does not change with it. [multiScale_optim()] also stops
+#' if a covariate whose scale it estimates shares its name with a column in
+#' the observation or yearly tables, so new names avoid that conflict.
+#'
+#' Aligning the data does not show that a model fitted to it converges or
+#' that its parameters are identifiable. See the "Add covariates for the time
+#' intervals" section of
+#' `vignette("v12-distance-removal", package = "multiScaleR")` for a worked
+#' example.
 #' @seealso [prepare_gdr_intervals()], [prepare_gdr_histories()],
 #'   [validate_unmarked_data()]
 #' @examples
+#' # Two surveys, two distance bands and three removal intervals
 #' frame <- unmarked::unmarkedFrameGDR(matrix(0, 2, 2), matrix(0, 2, 3),
 #'   siteCovs = data.frame(forest = c(.2, .8), Observer = factor(c("A", "B"))),
 #'   dist.breaks = c(0, 25, 75), unitsIn = "m", period.lengths = c(1, 2, 1))
 #' keys <- data.frame(survey = c("s1", "s2"))
+#' # Copy forest and observer into the interval table under new names
 #' prepared <- expand_gdr_intervals(frame, keys, "survey", "minutes",
 #'   site_covariates = c(rem_forest = "forest", rem_observer = "Observer"))
+#' # One row per survey and interval, ready for a removal formula such as
+#' # ~ rem_forest + I(interval == 1) + (1 | rem_observer)
 #' unmarked::obsCovs(prepared$data)
 #' prepared$protocol$expanded_covariates
 #' @export

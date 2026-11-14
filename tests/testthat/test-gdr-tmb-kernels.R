@@ -1,4 +1,5 @@
 test_that("native TMB S4 results work with all four kernel refit paths", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")
   frame <- f$model@data; n <- nrow(frame@siteCovs)
   distances <- rep(list(c(.1, .4, .9)), n)

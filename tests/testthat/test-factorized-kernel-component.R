@@ -1,4 +1,5 @@
 test_that("exact kernel components preserve native targets and existing constructor dimensions", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   preparations <- 0L; endpoints <- 0L; maximum <- 0
   for (kernel in c("gaussian", "exp"))

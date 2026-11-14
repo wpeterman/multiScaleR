@@ -7,6 +7,7 @@
 # ssf_fixture() and ssf_native_loglik() are in helper-step-selection.R.
 
 test_that("fixed-knot ns() fits through conditional_logit from a plain clogit() call", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   fx <- ssf_fixture()
   # The bindings a user gets from library(survival) and library(splines).
@@ -38,6 +39,7 @@ test_that("fixed-knot ns() fits through conditional_logit from a plain clogit() 
 })
 
 test_that("fixed-knot bs() fits through conditional_logit from a plain clogit() call", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   fx <- ssf_fixture()
   coxph <- survival::coxph; Surv <- survival::Surv; strata <- survival::strata
@@ -52,6 +54,7 @@ test_that("fixed-knot bs() fits through conditional_logit from a plain clogit() 
 })
 
 test_that("a saved spline call that differs from the fixed recipe is still rejected", {
+  skip_on_cran()
   skip_if_not_installed("survival")
   fx <- ssf_fixture()
   coxph <- survival::coxph; Surv <- survival::Surv; strata <- survival::strata
@@ -66,6 +69,13 @@ test_that("a saved spline call that differs from the fixed recipe is still rejec
   attr(tt, "predvars") <- pv
   m_ns$terms <- tt
   attr(m_ns$model, "terms") <- tt
+  # Some survival versions keep the basis attributes in the model frame, and a
+  # frame that carries them is checked directly. Strip them so the check must
+  # use the saved prediction call, whatever the installed survival version.
+  nm <- grep("^ns[(]", names(m_ns$model), value = TRUE)
+  basis <- m_ns$model[[nm]]
+  m_ns$model[[nm]] <- matrix(as.numeric(basis), nrow = nrow(basis),
+                             dimnames = list(NULL, colnames(basis)))
   expect_error(
     multiScale_optim(m_ns, fx$inputs, backend = "conditional_logit",
                      n_cores = 1, verbose = FALSE),

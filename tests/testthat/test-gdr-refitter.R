@@ -1,4 +1,5 @@
 test_that("C refitters preserve evaluated settings, starts, penalties and final uncertainty", {
+  skip_on_cran()
   for (mixture in c("P", "NB", "ZIP")) {
     fixture <- gdr_refit_fixture(mixture)
     model <- fixture$model
@@ -49,4 +50,3 @@ test_that("C refitters preserve evaluated settings, starts, penalties and final 
     }
   }
 })
-

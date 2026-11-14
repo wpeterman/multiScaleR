@@ -2,17 +2,37 @@
 % Please edit documentation in R/data_files.R
 \name{count_data}
 \alias{count_data}
-\title{Example data frame}
+\title{Simulated counts for the hab example}
 \format{
-A data frame with 75 rows and 2 columns. Data were simulated from a Poisson distribution with an intercept of 0.5, a \code{hab} effect of 0.75, and scale of effect (sigma) of 75.
-\describe{
-\item{y}{   --> Simulated counts at spatial locations}
-\item{hab}{ --> Scaled and centered weighted mean values from the \code{hab} raster at each of the \code{pts}}
+A data frame with 75 rows, one per point in \link{pts}, and 2 columns:
+\itemize{
+\item \code{y}: integer count at each point.
+\item \code{hab}: kernel-weighted mean of the binary \code{hab.tif} raster around each
+point, centered and scaled to unit variance.
 }
+}
+\source{
+Simulated for this package.
 }
 \usage{
 data(count_data)
 }
 \description{
-Example count data to be used for optimizing scales of effect
+Simulated counts at the 75 points in \link{pts}, for learning to estimate a
+scale of effect with the \code{hab.tif} raster.
+}
+\details{
+Counts were simulated from a Poisson distribution with an
+intercept of 0.5, a \code{hab} coefficient of 0.75 (log scale), and a Gaussian
+scale of effect (sigma) of 75 map units. A fit that recovers a sigma near
+75 and a coefficient near 0.75 is working as intended.
+}
+\examples{
+data(count_data)
+head(count_data)
+# Starting model: hab will be replaced by values at each candidate scale
+glm(y ~ hab, family = poisson, data = count_data)
+}
+\seealso{
+\link{pts}, \link{hab}, \code{\link[=multiScale_optim]{multiScale_optim()}}.
 }

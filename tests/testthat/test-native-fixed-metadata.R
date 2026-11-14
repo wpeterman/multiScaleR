@@ -1,6 +1,7 @@
 # Bounded native-provider conformance, using the existing spatial fixture.
 # These tests qualify prediction geometry, not recovery or interval calibration.
 test_that("native qualified fixed transforms preserve fitted targets and all row routes", {
+  skip_on_cran()
   f <- refit_spatial_fixture()
   dat <- f$data; dat$y <- dat$y + as.integer(dat$site)^2
   make <- function(kind, qualified) {

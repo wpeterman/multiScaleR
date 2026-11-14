@@ -78,6 +78,7 @@ gam_contrast_fixture <- local({
 })
 
 test_that("native GAM coding stays fixed across package prediction routes", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   f <- gam_contrast_fixture(); dat <- f$data
   old_options <- options(contrasts = c("contr.treatment", "contr.helmert"))

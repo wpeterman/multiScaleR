@@ -106,6 +106,7 @@ test_that("analytic SQ fits use checked rasters without claiming joint scale unc
 })
 
 test_that("joint NB2 weighted-SQ rasters use the analytic conditional covariance", {
+  skip_on_cran()
   skip_if_not_installed("MASS")
   skip_if_not_installed("RTMB")
   f <- refit_spatial_fixture()

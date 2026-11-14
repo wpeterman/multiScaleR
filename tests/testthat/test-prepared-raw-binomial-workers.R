@@ -1,4 +1,5 @@
 test_that("a fresh installed worker evaluates frozen raw contexts without native models", {
+  skip_on_cran()
   skip_if_not_installed("lpSolve")
   skip_if_not_installed("gmp")
   f <- raw_binomial_fixture()

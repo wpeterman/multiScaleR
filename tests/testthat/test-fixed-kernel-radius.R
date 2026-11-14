@@ -16,6 +16,7 @@ test_that("fixed kernels classify every estimated scale as a hard radius", {
 })
 
 test_that("saved fixed-kernel fits cannot report legacy Hessian radius limits", {
+  skip_on_cran()
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   base <- make_core_fixture()$opt
   for (kind in c("kernel", "weighted", "surface", "landscape", "legacy")) {

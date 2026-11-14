@@ -33,6 +33,7 @@ test_that("independent log weights retain finite references and exact SQ endpoin
 })
 
 test_that("large annual SD preserves independent normalized coordinate values", {
+  skip_on_cran()
   errors <- setNames(rep(0, 3), c("2", "8", "32"))
   ranges <- matrix(c(rep(Inf, 3), rep(-Inf, 3)), ncol = 2L)
   for (kernel in c("gaussian", "exp"))

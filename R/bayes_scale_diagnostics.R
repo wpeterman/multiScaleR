@@ -1,74 +1,110 @@
 #' Check Sampling Precision of Fitted Bayesian Scales
 #'
-#' Check chain mixing and simulation precision for fitted log distances and
+#' Check chain mixing and simulation precision for the quantities you report
+#' from a sampled fit, the log scale of each landscape predictor and the
 #' between-group SDs. These derived quantities can mix differently from the
-#' individual coefficients checked by the original sampler diagnostics.
+#' individual parameters checked by the sampler's own diagnostics.
 #'
-#' @param object A \code{\link{multiScale_bayes}} fit. Computing new diagnostics
-#'   requires the original unpermuted post-warmup chains from NUTS or slice sampling.
-#'   Prepared, approximate, and compact fits return an unavailable report.
-#' @param probs Numeric vector of distinct probabilities strictly between zero
-#'   and one. Defaults to \code{c(0.025, 0.5, 0.975)}, the endpoints and median
-#'   of a central 95% interval. Changing this vector changes the quantiles
-#'   whose simulation error is reported, not any diagnostic threshold.
-#' @return A list with the following components:
-#'   \describe{
-#'     \item{available, reason}{Whether full chain diagnostics could be computed
-#'       and an explanation when they are unavailable.}
-#'     \item{raw_diagnostics}{The original, unchanged sampler or approximation
-#'       diagnostics stored in the fit.}
-#'     \item{parameters}{A data frame identifying each derived \code{variable},
-#'       \code{quantity}, landscape \code{covariate}, \code{group}, representative
-#'       observation \code{row}, and \code{units}, followed by \code{rhat},
-#'       \code{ess_bulk}, and \code{ess_tail}. Quantities are \code{log_distance},
-#'       \code{scale_group_sd}, and \code{response_group_sd}.}
-#'     \item{quantiles}{A data frame with the same identifying columns plus
-#'       \code{probability}, \code{estimate}, and \code{mcse}, the estimated Monte
-#'       Carlo standard error of that quantile. Both estimate and MCSE use the
-#'       stated units. Undefined diagnostics remain \code{NA}.}
-#'     \item{chains, iterations}{Actual numbers of retained chains and
-#'       post-warmup iterations per chain, or \code{NA} when unavailable.}
-#'     \item{derived_passed}{Whether at least two chains, Rhat no greater than
-#'       1.01, and bulk and tail effective sample sizes of at least 100 per
-#'       chain hold for every derived quantity. \code{NA} when unavailable.}
-#'     \item{passed}{Whether both the original sampler checks and the derived
-#'       checks passed. \code{NA} when derived diagnostics are unavailable.
-#'       For slice fits sampled without posterior installed, the original
-#'       parameter checks are computed from the stored chains. The fit's
-#'       stored diagnostics stay as recorded at fitting.}
-#'     \item{criteria, notes}{The fixed derived checks and their limitations.}
-#'   }
-#' @details Landscape distances are diagnosed on the natural log axis in map
-#'   units, avoiding overflow and the potentially infinite arithmetic distance
-#'   moments permitted by the hierarchical priors. Exponentiate an estimated
-#'   log-distance quantile to express it in map units. Its MCSE is on the log
-#'   axis; it is computational uncertainty, not a posterior interval or a
-#'   biological SD. Scale-group SDs measure population variation in log
-#'   distance. Response-group SDs use the response linear-predictor axis.
+#' @param object A fitted [multiScale_bayes()] object. New diagnostics need the
+#'   original unpermuted post-warmup chains from NUTS (`sampler`) or slice
+#'   sampling (`chains`). Prepared, approximate, and compact fits return an
+#'   unavailable report.
+#' @param probs Numeric vector of distinct probabilities strictly between 0
+#'   and 1. The default `c(0.025, 0.5, 0.975)` gives the median and the limits
+#'   of a central 95% interval. Changing it changes which quantiles have their
+#'   simulation error reported, not any diagnostic threshold.
 #'
-#'   The function uses \code{posterior} for rank-normalized Rhat, effective
-#'   sample sizes, and quantile MCSE. A passed screen does not guarantee a
-#'   precise tail endpoint or discovery of every mode. Compare MCSE with the
-#'   precision your scientific decision needs, inspect independent runs when
-#'   tails matter, and assess the likelihood and priors separately.
+#' @return A list with these elements.
+#'   * `available`, `reason`: whether full chain diagnostics could be computed,
+#'     and an explanation when they could not.
+#'   * `raw_diagnostics`: the sampler or approximation diagnostics stored in
+#'     the fit, unchanged.
+#'   * `parameters`: a data frame with one row per derived quantity.
+#'     `variable` is an internal label. `quantity` is `"log_distance"`,
+#'     `"scale_group_sd"`, or `"response_group_sd"`. `covariate`, `group`, and
+#'     a representative observation `row` identify it, and `units` states its
+#'     units. `rhat`, `ess_bulk`, and `ess_tail` give the rank-normalized
+#'     Rhat and the bulk and tail effective sample sizes.
+#'   * `quantiles`: a data frame with the same identifying columns plus
+#'     `probability`, the quantile `estimate`, and its Monte Carlo standard
+#'     error `mcse`, both in the stated units. Undefined values are `NA`.
+#'   * `chains`, `iterations`: the number of retained chains and of
+#'     post-warmup iterations per chain, or `NA` when unavailable.
+#'   * `derived_passed`: `TRUE` when there are at least two chains and every
+#'     derived quantity has Rhat at most 1.01 and bulk and tail ESS of at
+#'     least 100 per chain. `NA` when unavailable.
+#'   * `passed`: `TRUE` when both the original sampler checks and the derived
+#'     checks pass. `NA` when unavailable. For a slice fit sampled without
+#'     the posterior package, the original parameter checks are computed here
+#'     from the stored chains, while the fit's stored diagnostics stay as
+#'     recorded.
+#'   * `criteria`, `notes`: the fixed derived checks and their limits.
 #'
-#'   Permuted or thinned stored draws do not reconstruct the original chain
-#'   order or full-chain precision. Compact examples therefore retain their
-#'   original diagnostic evidence but cannot provide new chain diagnostics.
-#'   For chain plots in bayesplot, use \code{fit$chains} for a slice fit or
-#'   \code{rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)}
-#'   for a NUTS fit. The scale vignette shows trace, rank, and density plots
-#'   alongside the derived diagnostics. Use the stored numerical checks for
-#'   Laplace draws and weighted importance candidates.
-#' @seealso \code{\link{multiScale_bayes}}, \code{\link{posterior_scales}},
-#'   \code{\link{plot.multiScaleR_bayes}}, \code{\link{diagnose_bayes_probabilities}},
-#'   and \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
+#' @details
+#' # Read the report
+#'
+#' | Column | Acceptable | If it fails |
+#' |:-------|:-----------|:------------|
+#' | `rhat` | 1.01 or less | Refit with another `seed` and compare. A weak landscape effect leaves its scale poorly identified, and longer chains do not cure that |
+#' | `ess_bulk`, `ess_tail` | At least 100 per chain (400 for four chains) | Increase `iter`, or switch from slice sampling to NUTS |
+#' | `mcse` | No fixed cutoff. Small next to the precision your question needs | Increase `iter`, and compare independent runs when an interval limit matters |
+#'
+#' Landscape scales are diagnosed on the natural log axis in map units, which
+#' avoids overflow and the infinite arithmetic distance moments that the
+#' hierarchical priors allow (see [posterior_scales()]). Exponentiate a
+#' log-distance quantile to express it in map units. Its MCSE is on the log
+#' axis, so an MCSE of 0.01 is about 1% of the distance. The MCSE is
+#' computational uncertainty, not a posterior interval or a biological SD.
+#' Scale-group SDs measure population variation in log distance.
+#' Response-group SDs use the response linear-predictor axis.
+#'
+#' The posterior package computes rank-normalized Rhat, effective sample
+#' sizes, and quantile MCSE. A passed screen guarantees neither a precise tail
+#' endpoint nor discovery of every mode. Compare the MCSE with the precision
+#' your scientific decision needs, inspect independent runs when tails
+#' matter, and assess the likelihood and priors separately.
+#'
+#' # Why compact fits cannot be checked
+#'
+#' Permuted or thinned stored draws cannot rebuild the original chain order or
+#' full-chain precision. Compact examples therefore keep their original
+#' diagnostic evidence but cannot provide new chain diagnostics. Laplace
+#' draws and weighted importance candidates are not MCMC chains, so use the
+#' stored numerical checks for those fits.
+#'
+#' # Draw chain plots
+#'
+#' For chain plots in bayesplot, pass `fit$chains` for a slice fit, or
+#' `rstan::extract(fit$sampler, permuted = FALSE, inc_warmup = FALSE)` for a
+#' NUTS fit. `vignette("v13-bayesian-scales", package = "multiScaleR")` shows
+#' trace plots alongside these diagnostics, and
+#' `vignette("v15-bayesian-computation", package = "multiScaleR")` works
+#' through a fit that fails them.
+#'
+#' @seealso [multiScale_bayes()], [posterior_scales()],
+#'   [plot.multiScaleR_bayes()], [diagnose_bayes_probabilities()],
+#'   [multiScaleR_bayes-class]
 #' @examples
+#' # A stored slice fit that keeps its four original chains
+#' shared <- readRDS(system.file("extdata", "cache-bayesian-scales.rds",
+#'   package = "multiScaleR"))$fit
+#' if (requireNamespace("posterior", quietly = TRUE)) {
+#'   report <- diagnose_bayes_scales(shared)
+#'   print(report$passed)   # sampler and derived checks together
+#'   # Agreement among chains and effective sample size for each log sigma
+#'   print(report$parameters[c("covariate", "rhat", "ess_bulk", "ess_tail")])
+#'   # Interval limits of log sigma, with their Monte Carlo standard errors
+#'   q <- report$quantiles
+#'   print(data.frame(q[c("covariate", "probability")],
+#'                    sigma_m = exp(q$estimate), mcse_log = q$mcse))
+#' }
+#'
+#' # A compact fit keeps thinned, permuted draws and cannot be checked
 #' example <- readRDS(system.file("extdata", "bayesian-annual-example.rds",
 #'                               package = "multiScaleR"))
-#' report <- diagnose_bayes_scales(example$fits$pooled)
-#' report$available  # FALSE: the compact example contains no full sampler
-#' report$reason
+#' compact <- diagnose_bayes_scales(example$fits$pooled)
+#' compact$available  # FALSE: the compact example contains no full sampler
+#' compact$reason
 #' @export
 diagnose_bayes_scales <- function(object, probs = c(0.025, 0.5, 0.975)) {
   if (!inherits(object, "multiScaleR_bayes"))

@@ -1,4 +1,5 @@
 test_that("latent Gaussian integration retains normalization and an uninformative scale limit", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site=8,n_year=3)
   angle <- 2*pi*(as.integer(f$data$site)-1)/8

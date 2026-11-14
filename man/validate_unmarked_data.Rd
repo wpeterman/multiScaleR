@@ -18,69 +18,143 @@ validate_unmarked_data(
 \method{print}{msr_unmarked_audit}(x, ...)
 }
 \arguments{
-\item{object}{An \code{unmarkedFrameGDR} containing paired distance and removal
-counts. Other frame classes are not yet supported.}
+\item{object}{An \code{unmarkedFrameGDR} holding paired distance and removal
+counts for point surveys. Other frame classes are not supported.}
 
-\item{event_keys}{A data frame with one row per site and primary period,
-in native site-major order: all periods at the first site, then all periods
-at the second site. Supply original survey identifiers, independently of
-any artificial frame-row index.}
+\item{event_keys}{A data frame with one row per survey event, in the
+frame's order. An event is one primary period at one frame row, so with
+one visit per point there is one row per frame row. With several primary
+periods, list all periods of the first frame row, then all periods of the
+second, and so on. Use the original survey identifiers, such as a point
+name and date, rather than a row number.}
 
 \item{event_id}{Character vector naming the columns of \code{event_keys} that
-together identify one survey event. Their combinations must be unique.}
+together identify one survey event. Their combinations should be unique;
+repeated combinations are reported.}
 
-\item{site_id}{Optional character vector naming physical-site columns in
-\code{event_keys}. Repeated sites across distinct events are allowed.}
+\item{site_id}{Optional character vector naming the columns of
+\code{event_keys} that identify the physical site. A site may appear in
+several events (repeat visits). The default \code{NULL} skips the site checks.}
 
-\item{interval_units}{One nonempty character string giving the time unit of
+\item{interval_units}{Character string naming the time unit of
 \code{object@period.lengths}, for example \code{"minutes"}. Removal probabilities
-are defined per this unit. The audit records the label without converting it.}
+are per unit of this time. The label is recorded, not converted.}
 
-\item{effort}{Optional numeric vector in event order. Positive values mean
-surveyed events; zero means not surveyed; \code{NA} means effort is unknown.
-Unsurveyed events must contain missing counts rather than observed zeros.
-Without this vector, the audit cannot establish effort from counts alone.}
+\item{effort}{Optional numeric vector with one value per event, in event
+order, such as minutes surveyed. A positive value marks a completed
+survey, zero marks an event that was not surveyed (its counts must be
+\code{NA}), and \code{NA} marks unknown effort. With the default \code{NULL}, the audit
+adds a warning, because counts alone cannot separate a completed survey
+with no detections from one that never happened.}
 
-\item{expected_event_keys}{Optional independent data frame in the intended
-frame order, containing the \code{event_id} columns. Use it to detect a reordered
-or unmatched event mapping. Keys alone cannot prove their own alignment.}
+\item{expected_event_keys}{Optional data frame, built independently of
+\code{event_keys} (for example from the field schedule), with the \code{event_id}
+columns in the order the frame should have. Rows whose keys differ are
+reported. A key table cannot show by itself that it is in the right
+order.}
 
 \item{x}{An object returned by \code{validate_unmarked_data()}.}
 
 \item{...}{Further arguments passed to the data-frame print method.}
 }
 \value{
-A list with class \code{msr_unmarked_audit}. \code{valid} is \code{TRUE} when no
-errors were found; warnings still require interpretation. \code{findings} is a
-data frame with severity, code, message, native event/row/primary positions,
-and the supplied key columns. Global findings have missing positions.
-\code{events} retains the supplied event mapping. \code{summary} records frame
-dimensions, error/warning counts, and the number of missing event histories.
-\code{protocol} records distance and removal units, breaks, and interval lengths.
-\code{effort} retains the supplied effort vector.
-Printing shows the error/warning counts and at most ten findings, returning
-the object invisibly. The complete findings table remains in the object.
+A list of class \code{msr_unmarked_audit}:
+\itemize{
+\item \code{valid}: \code{TRUE} when no errors were found. Warnings can remain, so read
+them too.
+\item \code{findings}: a data frame with one row per finding. Columns are
+\code{severity} (\code{"error"} or \code{"warning"}), \code{code} (see "Finding codes"),
+\code{message}, the event's position in frame order (\code{.event}), its frame
+row (\code{.site_row}) and primary period (\code{.primary}), followed by the
+\code{event_keys} columns for that event. Findings about the whole frame
+have missing positions.
+\item \code{events}: \code{event_keys} as supplied.
+\item \code{summary}: the number of frame rows (\code{sites}), \code{primary_periods},
+\code{events}, \code{errors} and \code{warnings}, and \code{missing_histories}, the number
+of events with both count tables fully missing.
+\item \code{protocol}: \code{distance_units}, \code{interval_units}, \code{distance_breaks} and
+\code{interval_lengths} from the frame.
+\item \code{effort}: the supplied effort vector.
+}
+
+Printing shows the error and warning counts and at most ten findings,
+and returns the object invisibly. The full table stays in \verb{$findings}.
 }
 \description{
-Check an explicit survey-event mapping and the paired counts in an
-\code{unmarkedFrameGDR}. Findings identify records that need review. The function
-does not combine surveys, reorder rows, remove records, or repair counts.
+Check an \code{unmarkedFrameGDR} against a table of original survey identifiers
+before you fit a model. The audit looks for split or duplicated surveys,
+covariates out of line with the surveys, distance and removal counts that
+disagree, and counts that conflict with survey effort. It only reports. It
+does not combine surveys, reorder rows, remove records or repair counts.
 }
-\details{
-Distance and removal margins describe the same detected individuals. Equal
-totals are necessary but cannot identify an event that was split into two
-artificial surveys. Supply the original event keys so such duplicates can
-be reported. Index-like key names generate a warning, not an inferred repair.
+\section{Identify survey events and physical sites}{
+A physical site can be visited more than once. Give each visit its own
+event identifier, and keep the site in a separate column named by
+\code{site_id}. A row number from a spreadsheet cannot show that a detection
+record and a zero-detection record belong to the same survey, so resolve
+survey identities when you build the frame from the original records, for
+example with \code{\link[=prepare_gdr_histories]{prepare_gdr_histories()}}.
 
-Fully missing histories differ from surveyed events with zero detections.
-Partly missing paired margins are flagged because their totals cannot be
-compared reliably. Shared key columns in site, annual, or observation
-covariates are checked against the supplied mapping in native row order.
-Character and factor categories, including the literal string \code{"None"},
-are preserved. This audit does not decide how detections outside a survey
-radius should be truncated or how raw bird histories should be aggregated.
+The distance and removal tables count the same birds, so their totals
+must match for each event. Matching totals are necessary but cannot reveal
+a survey split across two frame rows. Supplying the original event keys
+lets the audit report such a split as \code{duplicate_event}. Key names that
+look like row indices (such as \code{index}, \code{row_id} or \code{X}) give a warning.
+When an \code{event_id} or \code{site_id} column also appears in the site, yearly or
+observation covariates, its values are compared with \code{event_keys} row by
+row. Without \code{expected_event_keys} or such shared columns, unique keys
+alone cannot prove that the rows are aligned.
 }
+
+\section{Record survey effort}{
+A survey that took place and detected nothing is an observed zero. A
+survey that never took place should have fully missing counts in both
+tables. Supply \code{effort} so the audit can tell these apart. Counts that are
+missing in only one table, or in only some columns, are reported because
+their totals cannot be compared. Character and factor values, including the
+literal string \code{"None"}, are kept as values and not treated as missing.
+}
+
+\section{Finding codes}{
+\tabular{lll}{
+   Code \tab Severity \tab Meaning \cr
+   \code{frame_layout} \tab error \tab The count tables do not have matching rows and complete primary-period blocks. Other checks are skipped \cr
+   \code{survey_type} \tab error \tab The frame is not a point survey \cr
+   \code{event_layout} \tab error \tab \code{event_keys} does not have one row per event. Other checks are skipped \cr
+   \code{missing_event_key} \tab error \tab An event identifier is missing or blank \cr
+   \code{duplicate_event} \tab error \tab One event key appears in more than one event, as when a survey is split \cr
+   \code{index_like_event_key} \tab warning \tab An \code{event_id} column name looks like a row index \cr
+   \code{missing_site_key} \tab error \tab A site identifier is missing or blank \cr
+   \code{physical_site_alignment} \tab error \tab Primary periods in one frame row have different site keys \cr
+   \code{event_alignment} \tab error \tab The key differs from \code{expected_event_keys} in that row \cr
+   \code{duplicate_reference_event} \tab error \tab \code{expected_event_keys} repeats an event \cr
+   \code{covariate_layout} \tab error \tab A covariate table has the wrong number of rows or repeated names \cr
+   \code{covariate_key_alignment} \tab error \tab A key column in a covariate table differs from \code{event_keys} \cr
+   \code{response_slot_alignment} \tab error \tab The frame's response and removal tables disagree \cr
+   \code{distance_breaks} \tab error \tab Distance breaks do not start at zero, increase, and match the distance columns \cr
+   \code{distance_units} \tab error \tab Distance units are not \code{"m"} or \code{"km"} \cr
+   \code{interval_lengths} \tab error \tab Interval lengths are not positive whole numbers, one per removal column \cr
+   \code{invalid_counts} \tab error \tab A count is negative, fractional, infinite or \code{NaN} \cr
+   \code{partial_history} \tab error \tab An event's counts are only partly missing \cr
+   \code{unequal_totals} \tab error \tab Distance and removal totals differ for the event \cr
+   \code{effort_unspecified} \tab warning \tab No \code{effort} was supplied \cr
+   \code{invalid_effort} \tab error \tab Effort is negative or infinite \cr
+   \code{unsurveyed_counts} \tab error \tab An event with zero effort has counts, including zeros \cr
+   \code{surveyed_missing} \tab error \tab An event with positive effort has fully missing counts \cr
+   \code{unknown_effort} \tab warning \tab Effort is \code{NA} for the event \cr
+}
+
+
+The audit does not decide how to treat a bird first detected beyond the
+survey radius and later inside it, or how to turn raw bird records into
+counts. \code{\link[=prepare_gdr_histories]{prepare_gdr_histories()}} handles that step. See the "Check that
+the records line up with the surveys" section of
+\code{vignette("v12-distance-removal", package = "multiScaleR")} for the audit
+in a full workflow.
+}
+
 \examples{
+# Two visits to site A, one frame row each, with matching totals
 frame <- unmarked::unmarkedFrameGDR(
   yDistance = matrix(c(1, 0, 0, 0), 2, byrow = TRUE),
   yRemoval = matrix(c(0, 1, 0, 0), 2, byrow = TRUE),
@@ -89,6 +163,19 @@ frame <- unmarked::unmarkedFrameGDR(
 keys <- data.frame(site = c("A", "A"), visit = c("spring", "summer"))
 audit <- validate_unmarked_data(frame, keys, c("site", "visit"),
   site_id = "site", interval_units = "minutes", effort = c(3, 3))
-audit$valid
-audit$findings
+audit$valid      # TRUE: no errors and, with effort supplied, no warnings
+audit
+
+# Give both rows the same key, as if one survey had been split in two.
+# Their totals still match, but the event mapping is now invalid.
+split_keys <- keys
+split_keys$visit[2] <- "spring"
+split_audit <- validate_unmarked_data(frame, split_keys, c("site", "visit"),
+  site_id = "site", interval_units = "minutes", effort = c(3, 3))
+split_audit$valid
+split_audit$findings[, c("severity", "code", ".event", "visit")]
+}
+\seealso{
+\code{\link[=prepare_gdr_histories]{prepare_gdr_histories()}}, \code{\link[=prepare_gdr_intervals]{prepare_gdr_intervals()}},
+\code{\link[=expand_gdr_intervals]{expand_gdr_intervals()}}, \code{\link[=sim_dat_gdr]{sim_dat_gdr()}}
 }

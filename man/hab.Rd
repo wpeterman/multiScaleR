@@ -2,17 +2,25 @@
 % Please edit documentation in R/data_files.R
 \name{hab}
 \alias{hab}
-\title{Example raster}
+\title{Example habitat raster}
 \format{
-A binary SpatRaster object
-\describe{
-\item{hab}{ --> A binary raster}
+A \code{SpatRaster} with one layer, \code{hab}, of 400 by 400 cells of 10
+map units (an extent of 0 to 4000 in each direction) and no coordinate
+reference system. Cells are 1 for habitat and 0 otherwise.
 }
+\source{
+Simulated for this package.
 }
 \description{
-Example habitat raster for optimizing scales of effect
+A binary habitat raster stored as \code{hab.tif} in the package's \code{extdata}
+folder, used with \link{pts} and \link{count_data}.
 }
 \examples{
-hab <- terra::rast(system.file("extdata",
-                   "hab.tif", package = 'multiScaleR'))
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
+hab
+terra::plot(hab)
+}
+\seealso{
+\link{pts}, \link{count_data}.
 }

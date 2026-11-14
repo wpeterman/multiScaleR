@@ -59,6 +59,7 @@ test_that("joint NB2 matches profile fitting and observed uncertainty", {
 })
 
 test_that("exact Poisson fits preserve prediction and uncertainty contracts", {
+  skip_on_cran()
   f <- profile_glm_fixture(n = 300, seed = 723, theta = Inf)
   # Deterministically underdispersed counts place the NB2 maximum at alpha zero.
   f$data$y <- round(f$mu)

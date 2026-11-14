@@ -123,6 +123,7 @@ cv_stage1_fixture <- function() {
 }
 
 test_that("explicit-fold GLM CV refits scales and preserves every planned row", {
+  skip_on_cran()
   z <- cv_stage1_fixture(); f <- z$fixture
   expect_lte(z$planned_scale_fits, 24L)
   for (name in names(z$fits)) {
@@ -456,6 +457,7 @@ test_that("malformed grouped raster identities stop before scale fitting", {
 })
 
 test_that("compact native selection preserves ecological penalties and diagnostics", {
+  skip_on_cran()
   z <- cv_stage1_fixture()
   cases <- c(z$fits, list(refit = z$refit, sq = z$sq, multiple = z$multiple), z$other, z$grouped)
   for (x in cases) {

@@ -134,6 +134,7 @@ test_that("posterior summaries distinguish scales, response effects and fitted m
 })
 
 test_that("AD posterior values and gradients agree with an independent numeric calculation", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- bayesian_scale_fixture(n_site = 4, n_year = 3)

@@ -20,6 +20,7 @@ test_that("GDR numerical policies are explicit plain metadata with unchanged def
 })
 
 test_that("completed GDR optimizer points survive a declared covariance interruption", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")
   directory <- gdr_test_audit_path("gdr-pre-covariance-")
   callback <- make_gdr_refitter(f$model, f$starts, directory, tmb_settings = f$settings)
@@ -74,6 +75,7 @@ test_that("completed GDR optimizer points survive a declared covariance interrup
 })
 
 test_that("native zero-inner policy retains joint inference, counts and independent references", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("mixed")
   settings <- f$settings
   settings$random.start <- "zero"
@@ -176,6 +178,7 @@ test_that("positive curvature alone cannot admit a nonstationary or mismatched m
 })
 
 test_that("zero-random-effect parents retain zero latent diagnostics and native counts", {
+  skip_on_cran()
   for (kind in c("P", "NB")) {
     f <- gdr_tmb_refit_fixture(kind)
     d <- attr(f$model, "msr_gdr_tmb_diagnostics")
@@ -196,6 +199,7 @@ test_that("zero-random-effect parents retain zero latent diagnostics and native 
 })
 
 test_that("field fitting and refitting retain typed points and their fixed-range target", {
+  skip_on_cran()
   f <- gdr_native_field_fixture(); model <- f$model
   field <- .msr_gdr_field_guard(model)
   files <- list.files(dirname(field$audit_file), pattern = "-attempt-[12]-point[.]rds$", full.names = TRUE)

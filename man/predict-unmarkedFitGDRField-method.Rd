@@ -2,7 +2,7 @@
 % Please edit documentation in R/gdr_response_field_predict.R
 \name{predict,unmarkedFitGDRField-method}
 \alias{predict,unmarkedFitGDRField-method}
-\title{Predict Components of a Fixed-Range GDR Response Field}
+\title{Predict from a Distance-Removal Model with a Fixed-Range Abundance Field}
 \usage{
 \S4method{predict}{unmarkedFitGDRField}(
   object,
@@ -19,52 +19,158 @@
 )
 }
 \arguments{
-\item{object}{An \link[=unmarkedFitGDRField-class]{unmarkedFitGDRField} returned by
-\code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}.}
+\item{object}{An \link[=unmarkedFitGDRField-class]{unmarkedFitGDRField} returned
+by \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}.}
 
-\item{type}{Active native component, \code{"lambda"}, \code{"dist"} or \code{"rem"}.
-Default \code{"lambda"}; \code{"state"} is an alias for abundance/density.}
+\item{type}{Character. The model component to predict: \code{"lambda"}
+(density, the default), \code{"dist"} (distance scale) or \code{"rem"} (removal
+probability). \code{"state"} is accepted as another name for \code{"lambda"}.}
 
-\item{newdata}{Explicit prediction data frame or native GDR frame. Default
-\code{NULL} uses retained training rows for the selected component. Fixed
-transformations and factors retain their training definitions.}
+\item{newdata}{A data frame of covariate values, or an \code{unmarkedFrameGDR}
+with the fitted survey protocol (one visit, the same distance bands and
+the same interval lengths). The default \code{NULL} predicts for the rows used
+in fitting. Transformations, factor levels and spline bases keep their
+definitions from fitting. With the default, removal predictions have one
+row per survey and removal interval.}
 
-\item{backTransform}{Logical; default \code{TRUE} returns the native density,
-distance-key or removal-probability scale. \code{FALSE} returns the link scale.}
+\item{backTransform}{Logical, default \code{TRUE}. \code{TRUE} returns density per
+square kilometer, the distance scale in meters or the removal probability
+per unit of interval time. \code{FALSE} returns the link scale (log, log or
+logit).}
 
-\item{na.rm}{Logical native interface flag. Default \code{TRUE}. This field route
-requires complete prediction rows and rejects missing fixed predictors.}
+\item{na.rm}{Logical, default \code{TRUE}. Kept for compatibility with
+\code{unmarked}. Rows with missing predictor values are not dropped. They
+stop the prediction, so remove them first.}
 
-\item{appendData}{Logical; default \code{FALSE}. If \code{TRUE}, append prediction
-columns to the supplied component rows.}
+\item{appendData}{Logical, default \code{FALSE}. If \code{TRUE}, the prediction
+columns are added to the right of the prediction rows.}
 
-\item{level}{Confidence level between zero and one, default 0.95. \code{NULL}
-omits confidence limits while retaining point predictions and SEs.}
+\item{level}{Confidence level between 0 and 1, default 0.95. \code{NULL} skips
+the limits, which are then returned as \code{NA}.}
 
-\item{re.form}{\code{NULL} (default) retains conditional response effects. \code{NA}
-sets every response effect to zero; this does not integrate the field.}
+\item{re.form}{\code{NULL} (default) includes the fitted field, and any observer
+intercepts in the distance component. \code{NA} sets all of them to zero. A
+zero-field prediction describes a block with no deviation. It is not an
+average over blocks.}
 
-\item{coords}{Optional two-column projected coordinates for abundance
-predictions at new locations. Default \code{NULL} uses original known abundance
-states named in the new rows. New states require explicit coordinates.}
+\item{coords}{Optional two-column matrix or data frame of projected
+coordinates for
+abundance predictions at new locations, one row per row of \code{newdata}.
+The default \code{NULL} locates each row by its level of the grouping factor
+(for example \code{block = "b3"}), which must be a fitted level.}
 
-\item{crs}{CRS of explicit new coordinates. Required with \code{coords}; it must
-equal the fitted projected CRS. Coordinates are never transformed silently.}
+\item{crs}{The CRS of \code{coords}, as an EPSG code or other input accepted by
+\code{sf::st_crs()}. Required with \code{coords}. It must equal the CRS used in
+fitting, because coordinates are never transformed.}
 
-\item{...}{Reserved. Unrecognized controls stop.}
+\item{...}{Not used. Unrecognized arguments stop the prediction.}
 }
 \value{
-A data frame with \code{Predicted}, \code{SE}, \code{lower} and \code{upper} on the
-requested component scale. Confidence limits are constructed on the link
-scale before back-transformation. The \code{response_field_uncertainty}
-attribute identifies fitted full joint predictor variance separately from
-new-location residual field variance. Both enter the conditional predictor
-SE; neither is observation noise or ecological-scale uncertainty. Density
-point predictions are inverse-link conditional predictors, not lognormal
-field averages. Fixed range has no uncertainty in this model.
+A data frame with one row per prediction row:
+\itemize{
+\item \code{Predicted}: the prediction on the scale set by \code{backTransform}.
+\item \code{SE}: its standard error on the same scale. Back-transformed SEs use the
+delta method.
+\item \code{lower}, \code{upper}: confidence limits at \code{level}, computed on the link
+scale and then back-transformed, so they are not symmetric around
+\code{Predicted}.
+}
+
+The attribute \code{response_field_uncertainty} explains the SE. Its element
+\code{fitted_joint_predictor_variance} is the link-scale variance from the
+fitted coefficients and field. \code{new_field_residual_predictor_variance} is
+the extra link-scale variance at new locations (zero at fitted blocks).
+\code{SE_includes_new_field_residual} is \code{TRUE} when any row has that extra
+variance. \code{omitted} lists what the SE leaves out: observation noise and
+uncertainty in the ecological scales and the range.
 }
 \description{
-Predict Components of a Fixed-Range GDR Response Field
+Predict density, the distance scale or the removal probability from a
+model fitted by \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}. Abundance predictions include
+the fitted field, at fitted blocks or at new projected locations, and their
+standard errors include the field's uncertainty.
+}
+\section{Choose where to predict}{
+For abundance, each prediction needs a field value. A row whose grouping
+factor names a fitted block uses that block's fitted deviation. A row with
+a location in \code{coords} uses the field value predicted at that location
+from the fitted block deviations. At a fitted block location this equals
+the block's own deviation. Far from all blocks, compared with the range, it
+shrinks toward zero. For raster maps, use \code{\link[=response_field_geometry]{response_field_geometry()}} with
+\code{\link[=predict.multiScaleR]{predict.multiScaleR()}} instead of calling this method cell by cell.
+
+For \code{type = "dist"} with an observer random intercept, rows must name
+fitted observers unless \code{re.form = NA}.
+}
+
+\section{What the standard errors include}{
+The SE combines two link-scale variances. The first comes from the joint
+covariance of the fitted coefficients and field values, including their
+cross-covariances. The second applies only at new locations. It is the
+field variance left after conditioning on the fitted blocks, evaluated at
+the estimated field SD. It is zero at a fitted block and grows toward the
+full field variance far from all blocks. Neither
+variance is observation noise, so these are confidence intervals for the
+expected value, not prediction intervals for a new count.
+
+A density prediction is \code{exp()} of the linear predictor at the fitted field
+values. It is not the average density over possible field values. The
+intervals treat the ecological scales of effect and the correlation range
+as known.
+}
+
+\examples{
+\donttest{
+# The field needs unmarked 1.5.2 and TMB 1.9.25.
+if (requireNamespace("TMB", quietly = TRUE) &&
+    utils::packageVersion("unmarked") == "1.5.2" &&
+    utils::packageVersion("TMB") == "1.9.25") {
+  # Eight survey blocks 1 km apart, six point counts in each
+  block <- factor(rep(paste0("b", 1:8), each = 6))
+  hab <- rep(seq(-1, 1, length.out = 6), 8)
+  shift <- c(-0.4, -0.3, -0.1, 0, 0.1, 0.2, 0.35, 0.4)[block]
+  sim <- sim_dat_gdr(density = exp(log(400) + 0.5 * hab + shift),
+    distance_scale = 40, removal = 0.2, dist_breaks = c(0, 25, 50, 75),
+    interval_lengths = c(2, 3, 5), interval_units = "minutes",
+    site_covs = data.frame(hab = hab, block = block), seed = 1)
+  template <- unmarked::gdistremoval(lambdaformula = ~ hab + (1 | block),
+    removalformula = ~ 1, distanceformula = ~ 1, data = sim$observed,
+    keyfun = "halfnorm", mixture = "P", output = "density",
+    unitsOut = "kmsq", K = 60, engine = "TMB",
+    starts = c(log(400), 0, log(40), qlogis(0.2), log(0.3)))
+  block_xy <- cbind(x = 500000 + 1000 * (as.integer(block) - 1),
+                    y = 4400000)
+  rownames(block_xy) <- rownames(unmarked::siteCovs(sim$observed))
+  cold <- c("beta_lambda[1]" = log(300), "beta_lambda[2]" = 0,
+            "beta_dist[1]" = log(30), "beta_rem[1]" = qlogis(0.4),
+            "lsigma_lambda[1]" = log(0.5))
+  settings <- list(method = "BFGS", se = TRUE, threads = 1L,
+                   control = list(maxit = 2500L, reltol = 1e-10))
+  field_fit <- fit_gdr_response_field(template, block_xy, crs = 32617,
+    range = 2000, cold_starts = list(cold = cold),
+    audit_dir = tempfile("gdr-field-"), tmb_settings = settings)
+
+  # Density (birds per square km) at average habitat: in block b3, at a
+  # point halfway between blocks b3 and b4, and with the field set to zero
+  in_block <- predict(field_fit, type = "lambda",
+    newdata = data.frame(hab = 0, block = factor("b3", levels(block))))
+  between <- predict(field_fit, type = "lambda",
+    newdata = data.frame(hab = 0), coords = cbind(502500, 4400000),
+    crs = 32617)
+  no_field <- predict(field_fit, type = "lambda",
+    newdata = data.frame(hab = 0), re.form = NA)
+  dens <- rbind(in_block, between, no_field)
+  rownames(dens) <- c("block b3", "between b3 and b4", "no field")
+  print(dens)
+  # The SE between blocks adds field variance left after conditioning on
+  # the fitted blocks (both variances on the log scale)
+  u <- attr(between, "response_field_uncertainty")
+  print(c(fitted = unname(u$fitted_joint_predictor_variance),
+          between_blocks = unname(u$new_field_residual_predictor_variance)))
+  # Removal probability per minute, one row per survey and interval
+  print(head(predict(field_fit, type = "rem"), 3))
+}
+}
 }
 \seealso{
 \code{\link[=fit_gdr_response_field]{fit_gdr_response_field()}}, \code{\link[=make_gdr_refitter]{make_gdr_refitter()}}

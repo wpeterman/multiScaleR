@@ -101,6 +101,7 @@ test_that("fixed raw spline knots and hard radii keep native contracts", {
 })
 
 test_that("raw native C GDR callbacks preserve observations, controls and final SEs", {
+  skip_on_cran()
   skip_if_not_installed("unmarked")
   skip_if(as.character(packageVersion("unmarked")) != "1.5.2", "Native GDR provider needs qualification")
   f <- gdr_refit_fixture("P")

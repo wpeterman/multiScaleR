@@ -1,131 +1,144 @@
-#' Profile Model Fit Across Sigma Parameter Space
+#' Profile Model Fit Across Sigma
 #'
-#' Evaluates the model log-likelihood and AICc at a series of sigma values
-#' spanning the optimization range for each spatial covariate. This provides
-#' a diagnostic view of the likelihood surface and helps assess whether the
-#' optimized sigma is at a clear minimum or on a flat plateau.
+#' Evaluates the log-likelihood and AICc of a fitted model at a grid of sigma
+#' values (or hard radii) for each optimized covariate. The resulting curve
+#' shows whether an estimate sits at a clear optimum or on a flat plateau,
+#' which tells you how well the data identify the scale of effect. Plot the
+#' result with [plot.sigma_profile()].
 #'
-#' @param x A fitted \code{multiScaleR} object returned by
-#'   \code{\link{multiScale_optim}}.
-#' @param n_pts Positive integer (>= 3). Number of sigma values to evaluate
-#'   for each covariate along the profile grid. More points give a smoother
-#'   profile at the cost of additional model refits. Default: \code{10}.
-#'   Ignored when \code{sigma_values} is supplied.
-#' @param metric Character. Metric to display on the y-axis of the profile.
-#'   One of \code{"AICc"} (default) or \code{"LL"} (log-likelihood). The
-#'   optimized sigma minimizes negative log-likelihood, so the \code{"LL"}
-#'   profile should peak at the optimized value and \code{"AICc"} should
-#'   show a minimum.
-#' @param verbose Logical. Print per-covariate progress messages. Default:
-#'   \code{TRUE}.
-#' @param n_cores Optional positive integer. Number of CPU cores to use when
-#'   profiling covariates in parallel. Parallel profiling is applied across
-#'   covariates with a PSOCK cluster. Default: \code{NULL} (serial profiling).
-#' @param spacing Character. Spacing of the automatically generated sigma grid.
-#'   \code{"log"} (default) concentrates evaluation points at small sigma
-#'   values where the likelihood surface typically changes more rapidly.
-#'   \code{"linear"} provides equal spacing across the range.
-#' @param sigma_values Optional positive numeric vector of sigma values (in the
-#'   original projection units) to evaluate directly. When supplied,
-#'   \code{spacing}, \code{sigma_range}, and \code{n_pts} are ignored. Duplicate
-#'   values are removed and remaining values are sorted before profiling.
-#'   Must contain at least 3 unique values.
-#' @param sigma_range Optional positive numeric vector of length 2 giving the
-#'   minimum and maximum sigma values (in projection units) for the generated
-#'   profile grid. Defaults to the optimization range stored in \code{x}
-#'   (\code{min_D} to \code{max_D}). Ignored when \code{sigma_values} is
+#' @param x A fitted `multiScaleR` object returned by [multiScale_optim()].
+#'   Fits from `backend = "joint_mixed"` are not supported.
+#' @param n_pts Positive integer, at least 3. Number of sigma values in the
+#'   generated grid for each covariate. More values give a smoother curve at
+#'   the cost of more model refits. Ignored when `sigma_values` is supplied.
+#'   Default: `10`.
+#' @param metric Character. Which quantity [plot.sigma_profile()] draws:
+#'   `"AICc"` (default) or `"LL"` (log-likelihood). Both are always computed.
+#'   The log-likelihood is highest, and AICc lowest, at the best-supported
+#'   sigma.
+#' @param verbose Logical. Print a progress message for each covariate.
+#'   Default: `TRUE`.
+#' @param n_cores Optional positive integer. Number of CPU cores used to
+#'   profile covariates in parallel, one covariate per worker (a PSOCK
+#'   cluster). Default: `NULL` (serial). The analytic and
+#'   conditional-logistic backends always profile serially.
+#' @param spacing Character. Spacing of the generated grid. `"log"` (default)
+#'   places more values at small sigma, where the likelihood usually changes
+#'   fastest. `"linear"` spaces them evenly. Ignored when `sigma_values` is
 #'   supplied.
+#' @param sigma_values Optional positive numeric vector of sigma values, in
+#'   map units, to evaluate directly. Duplicates are removed and the values
+#'   are sorted, and at least 3 unique values are required. When supplied,
+#'   `spacing`, `sigma_range`, and `n_pts` are ignored.
+#' @param sigma_range Optional positive numeric vector of length 2 giving the
+#'   smallest and largest sigma, in map units, of the generated grid. Default:
+#'   the search range of the fit, `min_D` to `max_D`. Ignored when
+#'   `sigma_values` is supplied.
 #'
-#' @return A list of class \code{sigma_profile} containing:
-#' \describe{
-#'   \item{profiles}{A data frame with columns \code{variable}, \code{sigma},
-#'     \code{LL}, and \code{AICc}.}
-#'   \item{opt_sigma}{A named numeric vector of the optimized sigma for each
-#'     covariate.}
-#'   \item{metric}{The metric used for profiling.}
-#'   \item{spacing}{The profile grid type: \code{"log"}, \code{"linear"}, or
-#'     \code{"custom"}.}
-#'   \item{sigma_grid}{The sigma values evaluated for each covariate.}
-#' }
+#' @return A list of class `sigma_profile` with these elements:
+#' * `profiles`: data frame with one row per covariate and grid value, and
+#'   columns `variable` (covariate name), `sigma` (map units), `LL`
+#'   (log-likelihood of the refit model), and `AICc`. AICc is `NA` when the
+#'   number of observations `n` is not larger than `K + 1`, where `K` is the
+#'   parameter count.
+#' * `opt_sigma`: named numeric vector with the estimated sigma of each
+#'   covariate, in map units.
+#' * `metric`: the metric chosen for plotting.
+#' * `spacing`: the grid type, `"log"`, `"linear"`, or `"custom"` (for
+#'   `sigma_values`).
+#' * `sigma_grid`: the sigma values evaluated, shared by all covariates.
 #'
 #' @details
-#' For each spatial covariate, sigma is varied across a sequence of candidate
-#' values, while all other sigma values are held at their optimized values. By
-#' default this is a log-spaced sequence from the minimum to maximum distance
-#' considered during optimization. Users can instead request linear spacing with
-#' \code{spacing = "linear"} or supply exact values with \code{sigma_values}.
-#' At each evaluation point the model is refit and the log-likelihood extracted.
-#' AICc uses all free fitted likelihood parameters (including ancillary and
-#' unmarked detection or variance parameters), plus estimated sigma and shape
-#' parameters, and the existing model observation count. Parameter counting
-#' follows \code{\link{aic_tab}}. AICc is \code{NA} when \code{n <= K + 1}.
-#' Hard-radius metrics can be profiled in native-refit expow mixtures; their
-#' inactive shape positions do not affect the profile or parameter count.
-#' Their likelihood changes in steps, so a plotted grid does not justify a
-#' smooth-curvature SE or establish confidence-interval calibration.
-#' If all refits return the optimizer penalty, profiling stops with an error
-#' instead of returning an artificial flat profile. Keep the model formula and
-#' data available to the stored model call, or provide a working
-#' \code{refit_fn} to \code{\link{multiScale_optim}}.
+#' # How the profile is computed
 #'
-#' Fits from \code{backend = "profile_glm"}, \code{"joint_nb2"} and
-#' \code{"conditional_logit"} profile serially, and every sigma value must lie
-#' within the fitted bounds (\code{min_D} to \code{max_D}). For a
-#' \code{"conditional_logit"} fit, each grid value is the log-likelihood of a
-#' native \code{survival::coxph()} refit at that sigma, with the coefficients
-#' refit and every other scale held at its estimate. That backend withholds
-#' scale uncertainty, so \code{summary(fit, profile = TRUE)} returns no profile
-#' interval for it. The grid describes the likelihood surface only.
+#' For each covariate in turn, sigma is set to each grid value while every
+#' other sigma (and any shape) stays at its estimate. The model is refit at
+#' each value, so its coefficients adjust, and the log-likelihood is
+#' recorded. Because the other scales are not re-optimized, a model with
+#' several covariates gives a slice through the likelihood surface rather than
+#' a full profile likelihood. AICc counts all free likelihood parameters
+#' (including ancillary, `unmarked` detection, and variance parameters) plus
+#' the estimated sigma and shape parameters, as in [aic_tab()], and uses the
+#' model's observation count.
 #'
-#' Log-spacing concentrates evaluation points at smaller sigma values where the
-#' likelihood surface often changes more rapidly, and spaces them out at larger
-#' sigma values where the surface tends to be flatter.
+#' **How to read the profile.** A sharp peak in log-likelihood (or trough in
+#' AICc) at the estimate means the data identify the scale well. A flat curve
+#' over a wide range means many scales fit about equally well, so treat the
+#' estimate with caution. A curve still improving at `max_D` suggests the
+#' scale may lie beyond the search range. In that case, increase `max_D` in
+#' [kernel_prep()] and refit. For a profile-likelihood interval for sigma,
+#' use `summary(fit, profile = TRUE)`. See
+#' `vignette("v09-estimates-and-intervals", package = "multiScaleR")`.
 #'
-#' Linear spacing can be useful when the profile needs equal resolution across a
-#' specific sigma interval. User-supplied \code{sigma_values} are sorted and
-#' duplicate values are removed before profiling to avoid redundant refits.
+#' If every refit fails and returns the optimizer's penalty value, profiling
+#' stops with an error instead of returning an artificially flat profile.
+#' Keep the model formula and data available to the stored model call, or
+#' give [multiScale_optim()] a working `refit_fn`.
 #'
-#' @seealso \code{\link{plot.sigma_profile}}, \code{\link{multiScale_optim}}
+#' # Profile a hard radius
+#'
+#' Landscape metrics, unweighted surface metrics, and every covariate fitted
+#' with `kernel = "fixed"` have a hard radius, so a cell either counts fully
+#' or not at all. The covariate changes only when the radius passes a cell
+#' center, so the likelihood changes in steps. The Hessian standard error is
+#' therefore not a useful measure of uncertainty, and the default summary
+#' shows `NA` for the standard error and Wald interval. Use this profile to
+#' inspect the likelihood, and report the estimate as a radius in map units.
+#' The plot joins grid values with straight lines, so it does not show the
+#' steps between them, and an interval read from a profile cutoff does not by
+#' itself establish coverage for a stepped likelihood. Candidate scales that
+#' make a covariate undefined at a modeled observation are rejected during
+#' fitting, so all likelihoods compare the same observations. Hard-radius
+#' covariates can be profiled in exponential-power fits, and their unused
+#' shape positions do not affect the profile or the parameter count. See
+#' [multiScaleR-kernels].
+#'
+#' # Analytic and conditional-logistic fits
+#'
+#' Fits from `backend = "profile_glm"`, `"joint_nb2"`, and
+#' `"conditional_logit"` profile serially, and every sigma value must lie
+#' within the fitted bounds (`min_D` to `max_D`). For a `"conditional_logit"`
+#' fit, each grid value is the log-likelihood of a native
+#' `survival::coxph()` refit at that sigma, with the coefficients refit and
+#' every other scale held at its estimate. That backend withholds scale
+#' uncertainty, so `summary(fit, profile = TRUE)` returns no profile interval
+#' for it. The grid describes the likelihood surface only.
+#'
+#' @seealso [plot.sigma_profile()], [multiScale_optim()],
+#'   [summary.multiScaleR()], [multiScaleR-kernels].
 #'
 #' @examples
 #' \donttest{
-#' data('pts')
-#' data('count_data')
-#' hab <- terra::rast(system.file('extdata',
-#'                    'hab.tif', package = 'multiScaleR'))
+#' data("pts")
+#' data("count_data")
+#' hab <- terra::rast(system.file("extdata", "hab.tif",
+#'                                package = "multiScaleR"))
 #'
 #' kernel_inputs <- kernel_prep(pts = pts,
 #'                              raster_stack = hab,
 #'                              max_D = 250,
-#'                              kernel = 'gaussian')
-#'
-#' mod <- glm(y ~ hab,
-#'            family = poisson,
-#'            data = count_data)
-#'
+#'                              kernel = "gaussian",
+#'                              verbose = FALSE)
+#' mod <- glm(y ~ hab, family = poisson,
+#'            data = data.frame(count_data["y"], kernel_inputs$kernel_dat))
 #' opt <- multiScale_optim(fitted_mod = mod,
-#'                         kernel_inputs = kernel_inputs)
+#'                         kernel_inputs = kernel_inputs,
+#'                         verbose = FALSE)
 #'
-#' ## Profile sigma
-#' prof <- profile_sigma(opt)
-#' plot(prof)
-#'
-#' ## More evaluation points
-#' prof <- profile_sigma(opt, n_pts = 20)
-#' plot(prof)
+#' ## Default: 10 log-spaced values from min_D to max_D
+#' prof <- profile_sigma(opt, verbose = FALSE)
+#' # Log-likelihood and AICc at each sigma (m)
+#' prof$profiles
+#' plot(prof)   # AICc is lowest near the estimated sigma (dashed line)
 #'
 #' ## Linearly spaced values between explicit limits
 #' prof <- profile_sigma(opt, n_pts = 8, spacing = "linear",
-#'                       sigma_range = c(25, 250))
-#' plot(prof)
+#'                       sigma_range = c(25, 250), verbose = FALSE)
 #'
-#' ## User-supplied sigma values
-#' prof <- profile_sigma(opt, sigma_values = c(25, 50, 100, 150, 250))
-#' plot(prof)
-#'
-#' ## Profile log-likelihood instead of AICc
-#' prof <- profile_sigma(opt, metric = "LL")
-#' plot(prof)
+#' ## Your own sigma values, drawn as log-likelihood
+#' prof <- profile_sigma(opt, sigma_values = c(25, 50, 75, 100, 150, 250),
+#'                       metric = "LL", verbose = FALSE)
+#' plot(prof)   # log-likelihood peaks near the estimate
 #' }
 #'
 #' @export
@@ -426,18 +439,41 @@ profile_sigma <- function(x,
 }
 
 
-#' Plot Sigma Profile
+#' Plot a Sigma Profile
 #'
-#' Plots the profiled log-likelihood or AICc across sigma values for each
-#' spatial covariate. The optimized sigma is marked with a vertical red line.
+#' Draws one panel per covariate from a [profile_sigma()] result. Each panel
+#' plots AICc or the log-likelihood (whichever `metric` was chosen in
+#' [profile_sigma()]) against sigma, with points at the evaluated values and a
+#' dashed red vertical line at the estimated sigma.
 #'
-#' @param x An object of class \code{sigma_profile} from \code{\link{profile_sigma}}.
-#' @param ... Additional arguments (not currently used).
+#' @param x A `sigma_profile` object from [profile_sigma()].
+#' @param ... Not used.
 #'
-#' @return A list of \code{ggplot} objects (one per covariate), returned
-#'   invisibly. Plots are printed as a side effect.
+#' @return A named list of `ggplot` objects, one per covariate, returned
+#'   invisibly. Each plot is printed as a side effect. Modify a stored plot
+#'   and print it again to customize it.
 #'
-#' @seealso \code{\link{profile_sigma}}
+#' @details
+#' **How to read the plot.** The x-axis is sigma in map units, and the
+#' y-axis is AICc (lower is better) or the log-likelihood (higher is better).
+#' A clear trough in AICc, or peak in log-likelihood, at the dashed line means
+#' the data identify the scale of effect well. A flat curve means many
+#' scales fit about equally well. Points are joined with straight lines, so
+#' a hard-radius covariate's stepped likelihood is not shown between grid
+#' values. See [profile_sigma()] for how the values are computed.
+#'
+#' @seealso [profile_sigma()]
+#'
+#' @examples
+#' ## A stored profile from the Quick Start fit (two covariates, 15 values each)
+#' prof <- readRDS(system.file("extdata", "cache-quickstart.rds",
+#'                             package = "multiScaleR"))$prof
+#' # One AICc panel each for land1 and land2. AICc is lowest near the
+#' # estimated sigma (dashed line)
+#' p <- plot(prof)
+#'
+#' # The stored ggplot objects can be modified and drawn again
+#' p$land1 + ggplot2::labs(x = "sigma (m)")
 #'
 #' @export
 #' @method plot sigma_profile

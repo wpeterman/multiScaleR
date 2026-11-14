@@ -19,110 +19,203 @@ cross_validate_glm(
 )
 }
 \arguments{
-\item{formula}{Two-sided GLM formula. The response is a data column or
-\code{cbind(successes, failures)}. An \code{I()} wrapper is also accepted.
-Predictor expressions, interactions, factors, offsets and supported learned
-transformations use the existing backend's native formula machinery.
-Supply every variable in \code{data} or the prepared spatial inputs.}
+\item{formula}{Two-sided model formula, written as for \code{\link[stats:glm]{stats::glm()}}. The
+response must be a column of \code{data}, optionally wrapped in \code{I()}, or
+\code{cbind(successes, failures)} for grouped binomial data. Predictors can
+include factors, interactions, offsets, and the data-dependent terms
+\code{scale()}, \code{poly()}, \code{splines::ns()}, and \code{splines::bs()}. Use \code{y ~ 1}
+for a null model. Every variable must be a column of \code{data}.}
 
-\item{data}{Data frame of raw responses and predictor variables, with unique
-row IDs matching the fold plan. Supply every formula variable explicitly.}
+\item{data}{Data frame with one row per observation, holding the raw
+responses and every predictor. Its row names are the row IDs that the
+folds refer to, and they must be unique. Do not supply predictors
+standardized or transformed with all rows (see "What each fold fits").}
 
-\item{folds}{Uniquely named list of explicit splits. Each split contains
-nonempty character vectors \code{analysis} and \code{assessment} of row
-IDs. They must be disjoint within a split. Splits can omit rows for spatial
-buffers and can repeat assessment rows across splits. Keep dependent sites,
-animals or other sampling groups together when defining the splits.}
+\item{folds}{Named list of explicit splits, for example from
+\code{\link[=grouped_cv_folds]{grouped_cv_folds()}} or \code{\link[=spatial_cv_folds]{spatial_cv_folds()}}. Each split is a list of two
+character vectors of row IDs, \code{analysis} and \code{assessment}, which must not
+overlap. A row can be left out of a split entirely (for example, by a
+spatial buffer) and can be assessed in more than one split. Keep rows that
+share a site, animal, or other sampling unit on the same side of every
+split.}
 
-\item{family}{Character response family: \code{"gaussian"} uses the identity
-link, \code{"poisson"}, \code{"nbinom2"} and \code{"Gamma"} use log links,
-and \code{"binomial"} uses the logit link. Lowercase \code{"gamma"} is an
-alias. NB2 means variance equals mean plus mean squared divided by theta;
-Gamma variance equals dispersion times mean squared. The default is
-\code{"gaussian"}. Other links and quasi-likelihood targets are unqualified.}
+\item{family}{Character response family. Choose \code{"gaussian"} (identity
+link, the default), \code{"poisson"} (log), \code{"binomial"} (logit), \code{"nbinom2"}
+(negative binomial, log), or \code{"Gamma"} (log). Lowercase \code{"gamma"} is
+accepted. For \code{"nbinom2"} the variance is mu + mu^2 / theta, where mu is
+the expected count and theta the size parameter, so a small theta means
+strong extra variation. For \code{"Gamma"} the variance is dispersion x mu^2.
+Other links and quasi-likelihood families are not supported.}
 
-\item{weights}{Optional nonnegative integer frequency weights, one per data
-row in its supplied order. Names, when present, must match that order.
-Gaussian weights must all equal one. Binomial trials belong in the
-two-column response, separately from frequency weights; weighted proportions
-are not accepted. A backend may impose stricter native weight requirements.}
+\item{weights}{Optional case frequencies, one nonnegative whole number per
+row of \code{data} in the same order. If the vector has names, they must equal
+the row names. A weight of 3 counts the row three times. A weight of 0
+keeps the row in the records but out of the fit and the scores. The
+default \code{NULL} gives every row a weight of one. Gaussian models accept
+only weights of one. For binomial data, put the trial counts in a
+\code{cbind(successes, failures)} response, not in \code{weights}. Weighted
+proportions are rejected. Some scale-fitting backends add their own
+weight requirements.}
 
-\item{glm_control}{Named native \code{stats::glm.control()} controls.}
+\item{glm_control}{Named list of \code{\link[stats:glm.control]{stats::glm.control()}} settings for the
+GLM fitted in each fold. The default keeps the settings of \code{glm()}.}
 
-\item{metrics}{Optional character vector of score names. Defaults are
-\code{c("rmse", "mae")} for Gaussian, \code{c("rmse", "mae",
-"neg_log_score", "deviance")} for Poisson, and
-\code{c("neg_log_score", "brier")} for binomial. NB2/Gamma default to
-\code{c("rmse", "mae", "neg_log_score")}. Their nuisance-dependent
-deviances are not comparison metrics. Lower values are better.}
+\item{metrics}{Optional character vector of scores to record. The defaults
+depend on \code{family}. They are \code{c("rmse", "mae")} for Gaussian,
+\code{c("rmse", "mae", "neg_log_score", "deviance")} for Poisson,
+\code{c("neg_log_score", "brier")} for binomial, and
+\code{c("rmse", "mae", "neg_log_score")} for NB2 and Gamma. You can request a
+subset of the defaults, but not other scores. NB2 and Gamma leave out the
+deviance because its value depends on theta or the dispersion, which
+makes it unsuitable for comparing models. Lower is better for every
+score, and the \link[=multiScaleR_cv-class]{multiScaleR_cv} page defines each one.}
 
-\item{keep_fits}{Logical. Default \code{FALSE} keeps compact predictions,
-scales and diagnostics. Set \code{TRUE} to retain full fold models in memory
-for inspection; this can use substantially more memory.}
+\item{keep_fits}{Logical. The default \code{FALSE} keeps the predictions, scores,
+fold estimates, and compact diagnostics. \code{TRUE} also keeps the full fitted
+model of every fold in \code{fits}, which can use much more memory. You need
+full fits only to inspect the fold models or to have \code{\link[=select_cv]{select_cv()}} return
+the selected fits.}
 
-\item{keep_selection}{Logical. Default \code{FALSE} does not retain native
-training-selection records. Set \code{TRUE} to use \code{\link{select_cv}}
-without keeping full fits. Records are captured from each actual training
-fit and add no model fitting or diagnostic eligibility.}
+\item{keep_selection}{Logical. \code{TRUE} keeps a compact record of each fold's
+training likelihood and parameter count in \code{selection_records}, which is
+what \code{\link[=select_cv]{select_cv()}} needs when \code{keep_fits = FALSE}. The records come from
+the fits already run, so they add no fitting time. The default is
+\code{FALSE}.}
 
-\item{theta}{Optional finite positive NB2 size fixed before CV, or \code{NULL}
-(default) to estimate it separately in each training set. Fixed theta adds
-no nuisance parameter to K and requires \code{backend = "refit"} for scales.
-Do not choose theta from assessment outcomes. Other families reject it.}
+\item{theta}{Optional NB2 size parameter fixed in advance, one positive
+number. The default \code{NULL} estimates theta in each fold with
+\code{\link[MASS:glm.nb]{MASS::glm.nb()}}. A fixed theta is fitted with
+\code{glm(family = MASS::negative.binomial(theta))} and adds no parameter to
+K. Fix it only from information independent of the assessment outcomes.
+Other families reject it.}
 
-\item{dispersion}{Optional finite positive Gamma dispersion fixed before CV,
-or \code{NULL} (default) for the native training Gamma AIC convention,
-deviance divided by the sum of frequency weights. Fixed dispersion adds
-no nuisance parameter to K. It is supplied to a scoped known-dispersion
-family before fitting, with its normalized density and native coefficient
-SE convention. Other families reject it.}
+\item{dispersion}{Optional Gamma dispersion fixed in advance, one positive
+number. The default \code{NULL} estimates it in each fold as the training
+deviance divided by the sum of the frequency weights, the value native
+Gamma AIC uses. A fixed dispersion adds no parameter to K and is built
+into the Gamma density before fitting. Fix it only from information
+independent of the assessment outcomes. Other families reject it.}
 }
 \value{
-A \code{multiScaleR_cv} object as described in
-\code{\link{cross_validate}}, with backend \code{"glm"}, no estimated
-spatial scales, and ordinary GLM fits when \code{keep_fits = TRUE}.
-Compact \code{targets} metadata records used row IDs, observed outcomes,
-trials and frequency weights for guarded model comparison. Optional
-\code{selection_records} have the same contract as \code{cross_validate()}.
+A list of class \code{multiScaleR_cv}, with class
+\code{multiScaleR_distribution_cv} added for \code{"nbinom2"} and \code{"Gamma"}. It has
+the elements of a \code{\link[=cross_validate]{cross_validate()}} result, with these differences.
+\code{settings$backend} is \code{"glm"}. \code{training} holds only the coefficients of
+each fold, plus the frozen nuisance parameter for NB2 and Gamma.
+\code{diagnostics} holds the convergence record of each fold's GLM, and \code{fits}
+holds ordinary \code{glm} objects when \code{keep_fits = TRUE}. See
+\link[=multiScaleR_cv-class]{multiScaleR_cv} for every element and how to read each score.
 }
 \description{
-Fit a GLM using only each fold's analysis rows, then score its held-out
-response predictions. This provides null and nonspatial reference models for
-the same folds used to validate estimated ecological scales.
+Fit a GLM to the analysis rows of each fold and score its predictions for
+the held-out rows. No scales of effect are estimated. Use this function to
+build null and nonspatial reference models on the same folds you give
+\code{\link[=cross_validate]{cross_validate()}}, so that a scale-of-effect model has a baseline to beat.
 }
-\details{
-This adapter supports the same qualified GLM families, outcome and
-frequency-weight definitions as \code{cross_validate()}. Formulas, factors,
-interactions and offsets use native GLM machinery. Supported saved
-\code{scale()}, \code{poly()}, natural-spline and B-spline transformations
-use training constants even inside expressions and offsets. See
-\code{cross_validate()} for supported inputs and custom-recipe limitations.
-All learned preprocessing must occur within the training fit; do not supply
-predictors standardized with assessment data.
-
-NB2 uses \code{MASS::glm.nb()} when theta is estimated and
-\code{glm(family = MASS::negative.binomial(theta))} when it is fixed.
-Gamma retains its native deviance-based AIC scale when dispersion is
-estimated. Known Gamma dispersion uses the normalized fixed-scale family
-constructed before fitting. Coefficients and native coefficient SEs are
-retained; density dispersion is not a replacement for the SE convention.
-Nuisance parameters and supported training transformations are frozen
-before assessment prediction. See \code{cross_validate()} for their counts,
-support, compact metadata and uncertainty distinctions.
-
-No ecological scale is estimated here. Use \code{cross_validate()} for
-training-only spatial scale refitting. Predictions use fitted parameters;
-parameter uncertainty is not integrated, observation intervals are not
-provided and calibration is not established. Fold failures and native
-warnings are retained. No missing rows are silently dropped.
+\section{What each fold fits}{
+Each fold fits \code{glm()} to its analysis rows with the declared family and
+frequency weights, then predicts the expected response of the assessment
+rows. The families, response forms, weights, and scores are those of
+\code{\link[=cross_validate]{cross_validate()}}. Factors, interactions, and offsets use the native GLM
+machinery. The constants of \code{scale()}, \code{poly()}, \code{splines::ns()}, and
+\code{splines::bs()} come from the analysis rows, even inside expressions and
+offsets. Any other preprocessing that learns from the data must also
+happen within the analysis rows of each fold, so do not supply predictors
+standardized with all rows. The section "Formula terms that learn from the
+data" in \code{\link[=cross_validate]{cross_validate()}} lists the supported terms and their limits.
+Missing values are never dropped silently, and native warnings and failed
+folds are kept.
 }
+
+\section{Binomial responses}{
+A binomial response can be numeric or logical 0/1 values, a two-level
+factor (the second level counts as a success), or
+\code{cbind(successes, failures)} for several trials per row. Keep trial counts
+in the response and case frequencies in \code{weights}, because the two are
+scored differently.
+\itemize{
+\item The negative log score of a row is the negative log binomial probability
+of its observed number of successes, given its trials. Rows are averaged
+with their frequency weights.
+\item The Brier score of a row is the squared error of the predicted success
+probability, averaged over the row's trials. Rows are averaged with
+weights equal to frequency weight x trials, so the pooled Brier score is
+a mean per trial. A row with many trials counts more in the Brier score
+than in the log score.
+\item A row with zero trials or zero weight stays in \code{predictions} but
+contributes to neither score.
+\item An observed outcome given zero probability produces an infinite log
+score. It is kept as is, not clipped.
+}
+}
+
+\section{Negative binomial and Gamma responses}{
+\code{"nbinom2"} fits \code{\link[MASS:glm.nb]{MASS::glm.nb()}} when theta is estimated and
+\code{glm(family = MASS::negative.binomial(theta))} when it is fixed, so it
+needs the MASS package. \code{"Gamma"} uses a log link. In each fold the
+nuisance parameter (theta, or the Gamma dispersion) is estimated from the
+analysis rows, frozen, and used to score the assessment rows. Coefficients
+and their native standard errors are those of the native fit. A fixed
+Gamma \code{dispersion} is built into a normalized Gamma family before fitting.
+The section "Negative binomial and Gamma responses" in \code{\link[=cross_validate]{cross_validate()}}
+describes how these parameters enter K and the rules they follow.
+\subsection{How to read the Gamma dispersion}{
+
+\code{distribution[[fold]]$dispersion} is the training deviance divided by the
+training sum of case frequencies, the value native Gamma AIC uses. It is
+held fixed when the held-out Gamma densities are scored. Native
+coefficient standard errors use the Pearson dispersion instead, so they
+can rest on a different number. The density dispersion does not replace
+that coefficient uncertainty. \code{convention} records the rule that produced
+the value, and \code{estimated} is \code{FALSE} when you fixed it with \code{dispersion}.
+Supply \code{theta} or \code{dispersion} only when the value is known or was fixed
+independently of the assessment outcomes.
+}
+}
+
+\section{What the scores do and do not include}{
+Predictions use each fold's fitted parameters as if they were known. They
+do not integrate parameter uncertainty, provide prediction intervals, or
+establish calibration. Use \code{\link[=cross_validate]{cross_validate()}} to estimate scales of effect
+within the same folds.
+}
+
 \examples{
-dat <- data.frame(y = c(1, 2, 0, 3, 2, 1, 4, 2), x = 1:8)
-folds <- grouped_cv_folds(rep(letters[1:4], each = 2), k = 2)
-cv <- cross_validate_glm(y ~ x, dat, folds, family = "poisson")
-cv
+data("landscape_counts")   # counts and a site-level covariate
+data("surv_pts")           # survey locations
+# Three spatial folds. The simulated coordinates are in meters.
+folds <- spatial_cv_folds(crds(vect(surv_pts)), block_size = 1000, k = 3,
+                          crs = 32617)
+
+# Null and site-only reference models on the same folds
+null_cv <- cross_validate_glm(counts ~ 1, landscape_counts, folds,
+                              family = "poisson")
+site_cv <- cross_validate_glm(counts ~ site, landscape_counts, folds,
+                              family = "poisson")
+site_cv   # pooled held-out scores, lower is better
+cv_tab(list(null = null_cv, site = site_cv), metric = "neg_log_score")
+
+# Negative binomial: theta is estimated in each fold and frozen for scoring
+if (requireNamespace("MASS", quietly = TRUE)) {
+  nb_cv <- cross_validate_glm(counts ~ site, landscape_counts, folds,
+                              family = "nbinom2")
+  sapply(nb_cv$distribution, function(d) d$theta)   # small theta: overdispersed
+}
+
+# Gamma model for a strictly positive response
+i <- 1:96
+positive <- data.frame(
+  y = exp(0.2 + 0.35 * sin(i * 0.73)) *
+    rep(c(0.3, 0.6, 1.1, 2.4, 0.8, 1.8, 0.4, 1.6), 12),
+  x = sin(i * 0.73))
+gamma_folds <- grouped_cv_folds(rep(letters[1:12], each = 8), k = 3)
+gamma_cv <- cross_validate_glm(y ~ x, positive, gamma_folds, family = "Gamma")
+gamma_cv$summary
+# Training deviance / sum of case frequencies, frozen for scoring each fold
+sapply(gamma_cv$distribution, function(d) d$dispersion)
 }
 \seealso{
-\code{\link{cross_validate}}, \code{\link{cv_tab}},
-\code{\link{select_cv}}
+\code{\link[=cross_validate]{cross_validate()}}, \code{\link[=cv_tab]{cv_tab()}}, \code{\link[=select_cv]{select_cv()}},
+\link[=multiScaleR_cv-class]{multiScaleR_cv}, and
+\code{vignette("v08-cross-validation", package = "multiScaleR")}.
 }

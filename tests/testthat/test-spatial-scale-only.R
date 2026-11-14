@@ -30,6 +30,7 @@ spatial_only_fixture <- function(kernel, family, metric, target = "posterior") {
 }
 
 test_that("spatial-only fields preserve target, derivatives, priors and Gaussian-block guards", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   cases <- 0L
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2"))
@@ -110,6 +111,7 @@ test_that("spatial-only prediction needs no year and propagates a coherent joint
 })
 
 test_that("spatial-only zero-slope latent integration is normalized and SD remains unidentifiable", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (metric in c("mean", "sq")) {
     target <- if (metric == "mean") "marginal_likelihood" else "posterior"

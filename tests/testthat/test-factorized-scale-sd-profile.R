@@ -44,6 +44,7 @@ annual_profile_reference <- function(spec, parameters, sd) {
 }
 
 test_that("annual SD traces preserve normalized fixed targets and exact limits", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- annual_sd_profile_fixture()
   before <- serialize(f$spec, NULL); rng <- .Random.seed
@@ -150,6 +151,7 @@ test_that("annual profiles reject unsupported scopes before fitting", {
 })
 
 test_that("annual conditional selection retains lower and competing candidates", {
+  skip_on_cran()
   f <- annual_sd_profile_fixture(); calls <- 0L
   local_mocked_bindings(.msr_fixed_sd_profile_attempt = function(spec, sd, initial, iter.max, ...) {
     calls <<- calls + 1L; i <- (calls - 1L) %% 3L + 1L

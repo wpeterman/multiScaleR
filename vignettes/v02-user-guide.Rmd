@@ -221,7 +221,7 @@ The arguments below carry the decisions that matter.
 | `bin` | `TRUE` | Summarizes the extracted cells into distance bins. The optimizer then works with the bins, so its speed no longer depends on `max_D`. `bin = FALSE` forces the exact cell-by-cell calculation |
 | `nbins` | `256` | Number of distance bins. The default reproduces the exact estimates to several significant figures |
 | `store_cell_data` | `TRUE` | Keeps the cell values after binning. `FALSE` keeps only the bins, which is enough to optimize, profile, and project |
-| `sigma` | `max_D / 2` | Starting sigma for each covariate, in map units. The default is recommended |
+| `sigma` | `max_D / 2` | Sigma used to compute the covariates for the starting model, in map units. It does not set where the search starts. The default is recommended |
 
 A large `max_D` costs extraction time and memory, not optimization time. If
 memory is the constraint, drop the cell values.
@@ -279,8 +279,9 @@ opt_full <- multiScale_optim(fitted_mod    = mod_full,
                              verbose       = FALSE)   # no progress messages
 ```
 
-The search starts every sigma at `max_D / 2` unless you supply starting values
-or request screened starts (see [Choose a start strategy]). This fit takes
+The search starts every sigma at one quarter of the way from five cell widths
+to 80% of `max_D`, which is 415 m here, unless you supply starting values or
+request screened starts (see [Choose a start strategy]). This fit takes
 under a second. Slower models, such as mixed or `unmarked` models, can run in
 parallel with `n_cores`. Each worker holds its own copy of the inputs, so
 check the memory cost first.
@@ -812,8 +813,9 @@ also warns that an effective distance approaches `max_D`. Prepare the inputs
 again with the larger `max_D` it suggests before you interpret these scales.
 
 `plot()` and `plot_marginal_effects()` work as they do for a GLM. The effect
-panels show expected abundance by default, and `type = "det"` shows detection
-probability.
+panels show expected abundance by default. `type = "det"` plots detection
+probability against the detection covariates, so it draws nothing for this
+model, whose detection is constant.
 
 Two points matter when you compare `pcount()` models.
 
@@ -1047,6 +1049,8 @@ pred <- terra::predict(r_scaled, opt$opt_mod, type = "response")
   covariate types each fitting method accepts.
 - **`vignette("v13-bayesian-scales", package = "multiScaleR")`**, scales of effect
   that vary among years in a Bayesian model.
+- The help page `?"multiScaleR-glossary"` defines the terms used in these
+  vignettes.
 
 # References
 

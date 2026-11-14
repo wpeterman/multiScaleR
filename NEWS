@@ -1,3 +1,44 @@
+multiScaleR 0.7.47
+
+* New reference topics: `?"multiScaleR-kernels"` (kernel families, hard
+  radii, and effective distance), `?"multiScaleR-fitting-methods"` (what each
+  backend of `multiScale_optim()` requires and reports),
+  `?"multiScaleR-prediction"` (what each prediction represents and how
+  uncertain it is), and `?"multiScaleR-glossary"`, which every vignette now
+  links to.
+* New pages describe the objects returned by `multiScale_optim()`,
+  `kernel_prep()`, `multiScale_bayes()`, and the cross-validation functions
+  (`class?multiScaleR`, `class?multiScaleR_data`, `class?multiScaleR_bayes`,
+  `class?multiScaleR_cv`). Help indexes now include an A-Z bar.
+* The longest help pages are organized into headed sections:
+  `multiScale_optim()`, `multiScale_bayes()`, `predict.multiScaleR()`,
+  `cross_validate()`, `kernel_scale.raster()`, and `msr_vars()`. The backend
+  details formerly in `?multiScale_optim` are in
+  `?"multiScaleR-fitting-methods"`.
+* Reference material taken out of the vignettes in 0.7.38 is now on the
+  relevant help pages.
+* Every exported function, method, and data set has a runnable example.
+* Help corrections: under the analytic backends, `par` takes scales in
+  internal distance units (map distance divided by `unit_conv`), not
+  divided by `max_D`; `kernel_scale.raster(match_buffer = TRUE)` works with
+  both smoothing engines, not only `fft = TRUE`; `kernel_prep()` uses a
+  default exponential power shape of 2; `sim_rast()` thresholds its binary
+  layers at fixed values of the rescaled surface and its `sill` argument does
+  not change the output; `sim_dat()` places points on a square grid;
+  `summary.multiScaleR()` documents all of its returned elements. The user
+  guide no longer says the search starts at `max_D / 2`.
+* The README, `?multiScaleR`, and the DESCRIPTION title and description are
+  rewritten.
+* A spline test no longer depends on whether the installed survival version
+  keeps basis attributes in the model frame.
+* Tests that took more than 2 seconds, and tests that need RTMB, now call
+  `skip_on_cran()`, so the suite runs in about 4 minutes on CRAN instead of
+  about 34. No test was removed. The GitHub Actions check sets
+  `NOT_CRAN = true`, so it still runs every test.
+* `landscape.tif` is stored with lossless DEFLATE compression. Its values,
+  layer names, and geometry are unchanged, and the package is about 120 KB
+  smaller.
+
 multiScaleR 0.7.46
 
 * Help pages are now written in roxygen markdown, so code in backticks
@@ -158,6 +199,9 @@ Documentation
   covariates and maps, fitting and evaluation, specialized models, and
   Bayesian estimation. They share one running example where the feature
   allows, and each explains how to read its output.
+* Help pages organized into headed sections, new reference topics on
+  kernels, fitting methods, predictions, and terms, pages describing each
+  returned object, and runnable examples for every exported function.
 * A package website, https://wpeterman.github.io/multiScaleR/, and a citation
   file. Binaries are available from R-universe,
   <https://wpeterman.r-universe.dev>.

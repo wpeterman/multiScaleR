@@ -1,4 +1,5 @@
 test_that("large-SD signed-score moments retain full normalized nuisance identities", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   maximum <- c(mass = 0, value = 0, gradient = 0, hessian = 0)
   for (kernel in c("gaussian", "exp"))

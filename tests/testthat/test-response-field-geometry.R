@@ -36,6 +36,7 @@ test_that("field geometry binds explicit projected rows and rejects changed cont
 })
 
 test_that("response-field cells retain native values and SEs across serial batches", {
+  skip_on_cran()
   skip_if_not_installed("glmmTMB")
   for (family in c("poisson", "gaussian")) {
     f <- native_response_field_fixture(family)

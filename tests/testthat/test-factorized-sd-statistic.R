@@ -24,6 +24,7 @@ response_statistic_reference <- function(spec, p, sd) {
 }
 
 test_that("response SD statistics use a qualified same-target unrestricted candidate", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- response_sd_statistic_fixture()
   before <- serialize(f$spec, NULL); rng <- .Random.seed

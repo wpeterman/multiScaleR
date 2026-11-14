@@ -2,78 +2,136 @@
 % Please edit documentation in R/print_methods.R
 \name{summary.multiScaleR}
 \alias{summary.multiScaleR}
-\title{Summarize multiScaleR objects}
+\title{Summarize a multiScaleR fit}
 \usage{
 \method{summary}{multiScaleR}(object, profile = FALSE, dimension = c("2d", "1d"), ...)
 }
 \arguments{
-\item{object}{An object of class \code{multiScaleR}.}
+\item{object}{An object of class \code{multiScaleR} from \code{\link[=multiScale_optim]{multiScale_optim()}}.}
 
-\item{profile}{Logical. If \code{TRUE}, use profile-likelihood confidence
-limits for `sigma` when feasible. Defaults to \code{FALSE} so summaries
-remain fast. The default refit backend caches profile results during the
-current R session; the analytic-profile backend recomputes them.
-Set \code{options(multiScaleR.profile_cache_max_bytes = 64 * 1024^2)}
-to bound retained refit cache entries (64 MiB by default), or use zero to
-disable caching and clear retained entries on the next profile request.
-Oversized entries and custom refits compute uncached. Cache-key storage
-failures warn and compute the same intervals directly; numerical profile
-failures still raise errors. The returned refit scale table records cache
-availability in its \code{profile_cache} attribute. This option bounds
-retained entries, not temporary key construction or numerical-profile RAM.}
+\item{profile}{Logical. If \code{TRUE}, report profile-likelihood confidence
+limits for sigma where feasible instead of Wald limits. Default: \code{FALSE},
+which keeps summaries fast. See "Profile-likelihood intervals" below.}
 
-\item{dimension}{Character. \code{"2d"} (default) reports the radius
-containing \code{prob} of ideal planar kernel weight as the selected
-distance. \code{"1d"} restores the original distance along a line.
-Both definitions remain available in the returned object and printed output.}
+\item{dimension}{Character. \code{"2d"} (default) reports, as the selected
+distance, the radius that holds \code{prob} of the weight of an ideal kernel on
+a plane. \code{"1d"} restores the original distance along a line. Both
+definitions remain in the returned object and the printed output.}
 
-\item{...}{Optional arguments passed to the method (e.g., \code{prob} for cumulative kernel weight threshold).}
+\item{...}{Optional arguments. \code{prob}, a number strictly between 0 and 1,
+sets the proportion of cumulative kernel weight used for the distances.
+Default: \code{0.9}.}
 }
 \value{
-An object of class \code{summary_multiScaleR}. Kernel-scale limits
-  default to Wald intervals. Scale distances, in map units, come in two
-  forms: \code{opt_dist} (also \code{opt_distance}) holds the selected
-  definition, which defaults to 2D rather than the 1D definition used through
-  version 0.7.3. \code{dimension} records that selection.
-  \code{opt_dist_1d} always holds the one-dimensional distance, the distance at
-  which the kernel's cumulative density along a line through the point
-  reaches \code{prob} (about 1.65 sigma for a Gaussian kernel at 90\%).
-  \code{opt_dist_2d} holds the two-dimensional distance, the radius of the
-  circle around the point that holds \code{prob} of the weight of an ideal,
-  untruncated kernel on a plane (about 2.15 sigma for a Gaussian kernel at
-  90\%). Both tables have columns
-  \code{Mean}, \code{2.5\%}, and \code{97.5\%}, and hard-radius covariates
-  report their radius in both. See \code{\link{kernel_dist}} for when to
-  use each. For hard-radius landscape and unweighted surface metrics,
-  and all estimated radii under \code{kernel = "fixed"}, Hessian
-  standard errors and Wald limits are shown as
-  \code{NA}; use \code{profile = TRUE} for profile-likelihood limits.
-  Profiling errors are reported instead of silently returning invalid limits.
+An object of class \code{summary_multiScaleR}, a list that prints as a
+report. Its elements:
+\itemize{
+\item \code{opt_scale}: data frame with one row per optimized covariate and columns
+\code{Mean} (estimated sigma, map units), \code{SE}, \verb{2.5\%}, and \verb{97.5\%}. Its
+\code{interval_method} attribute records \code{"wald"} or \code{"profile"} for each
+row.
+\item \code{opt_shape}: the same table for the shape parameter under
+\code{kernel = "expow"}, otherwise \code{NULL}.
+\item \code{opt_dist_1d}: distances in map units, with columns \code{Mean}, \verb{2.5\%}, and
+\verb{97.5\%}, at which a kernel's cumulative weight along a line through the
+point reaches \code{prob} (about 1.65 sigma for a Gaussian kernel at 90\%).
+\item \code{opt_dist_2d}: the radius, in map units and with the same columns, of
+the circle around the point that holds \code{prob} of the weight of an ideal,
+untruncated kernel on a plane (about 2.15 sigma for a Gaussian kernel at
+90\%).
+\item \code{opt_dist} and \code{opt_distance}: two names for the distance table selected
+by \code{dimension} (2D by default, rather than the 1D definition used
+through version 0.7.3).
+\item \code{dimension}: the selected definition, \code{"2d"} or \code{"1d"}.
+\item \code{prob}: the cumulative weight proportion used for the distances.
+\item \code{fitted_mod}: the model refit at the estimated scales (\code{opt_mod} of the
+fit).
+\item \code{kernel}: the kernel name.
+\item \code{hard_radius}: names of covariates whose scale is a hard radius.
+\item \code{diagnostics}, \code{warn_message}, \code{next_run}, \code{call}: copied from the fit;
+see \link[=multiScaleR-class]{multiScaleR}.
+\item \code{backend}: the backend name, present for the analytic and
+conditional-logistic backends.
+}
 }
 \description{
-Summarizes output from \code{multiScale_optim}.
+Summarizes a fit from \code{\link[=multiScale_optim]{multiScale_optim()}}: the estimated scales of effect
+with standard errors and intervals, the distances that contain most of each
+kernel's weight, and the fitted model at those scales.
 }
-\details{
-For \code{backend = "profile_glm"} or \code{"joint_nb2"}, default scale limits use joint information
-on log scales and are omitted when identifiability checks fail. A returned
-Wald interval describes local curvature around the selected optimum and
-can extend beyond the searched scale range. Coverage can be below the
-nominal level even for an interior fit. Inspect the likelihood over the
+\section{Read the summary}{
+Sigma is the kernel's scale parameter, and it is not itself a distance you
+can report. The distance tables translate it into the distance that holds
+90 percent (by default) of the kernel's weight, which is usually the number
+to report as the scale of effect. Hard-radius covariates report their
+radius in both tables. See \code{\link[=kernel_dist]{kernel_dist()}} and \link{multiScaleR-kernels} for
+when to use each definition and for the formulas.
+
+Kernel-scale limits default to Wald intervals from the Hessian. For
+hard-radius landscape and unweighted surface metrics, and every radius
+estimated under \code{kernel = "fixed"}, Hessian standard errors and Wald limits
+are shown as \code{NA}; use \code{profile = TRUE} for profile-likelihood limits. An
+error during profiling is reported rather than returning invalid limits.
+
+Set \code{dimension = "1d"} to keep the original \code{opt_dist} and \code{opt_distance}
+values in existing scripts. For extraction that does not depend on the
+setting, use \code{opt_dist_1d} or \code{opt_dist_2d}. Neither choice changes the
+fitted sigma, coefficients, or likelihood. The 2D radius is for an ideal
+continuous kernel; \code{max_D}, raster edges, missing cells, and cell geometry
+can change the realized weight in the prepared data.
+}
+
+\section{Profile-likelihood intervals}{
+The default refit backend caches profile results during the current R
+session; the analytic backends recompute them. Set
+\code{options(multiScaleR.profile_cache_max_bytes = 64 * 1024^2)} to bound the
+retained cache entries (64 MiB by default), or set it to zero to disable
+caching and clear retained entries at the next profile request. Oversized
+entries and custom refits are computed without the cache. A failure to
+store a cache key warns and computes the same intervals directly, while
+numerical profile failures still raise errors. The returned refit scale
+table records cache availability in its \code{profile_cache} attribute. The
+option bounds retained entries, not temporary key construction or the
+memory used by the numerical profile.
+}
+
+\section{Analytic backends}{
+For \code{backend = "profile_glm"} or \code{"joint_nb2"}, default scale limits use
+joint information on the log scale and are omitted when the
+identifiability checks fail (see \link{multiScaleR-fitting-methods}). A returned
+Wald interval describes the local curvature around the selected optimum
+and can extend beyond the searched scale range. Coverage can fall below the
+nominal level even for an interior fit, so inspect the likelihood over the
 admissible range when scale inference matters.
 
-The analytic \code{profile = TRUE} summary follows the connected likelihood
-region around the fitted scale. An endpoint at a search bound is
-bound-limited. For a supported one-scale NB2 fit, \code{\link{scale_inference}}
-checks the full range and reports detected regions. Compare additional
-optimizer starts, including both bounds, if a full-range profile suggests
-a competing optimum. The printed coefficient summary remains conditional
-on optimized kernels. Use \code{\link{vcov.multiScaleR}} for joint covariance.
+With \code{profile = TRUE}, the analytic summary follows the connected
+likelihood region around the fitted scale, and an endpoint at a search
+bound is labeled bound-limited. For a supported one-scale NB2 fit,
+\code{\link[=scale_inference]{scale_inference()}} checks the full range and reports the regions it
+detects. If a full-range profile suggests a competing optimum, compare
+additional starts, including both bounds. The printed coefficient summary
+still conditions on the estimated kernels; use \code{\link[=vcov.multiScaleR]{vcov.multiScaleR()}} for the
+joint covariance.
+}
 
-Set \code{dimension = "1d"} to preserve the original \code{opt_dist} and
-\code{opt_distance} values in existing scripts. For a dimension-independent
-extraction, use \code{opt_dist_1d} or \code{opt_dist_2d}. Neither selection
-changes the fitted sigma, coefficients, or likelihood. The 2D radius is for
-an ideal continuous kernel; \code{max_D}, raster edges, missing cells, and
-cell geometry can change the realized weight in the prepared data. See
-\code{\link{kernel_dist}} for formulas and examples.
+\examples{
+data(pts)
+data(count_data)
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
+inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                      kernel = "gaussian", verbose = FALSE)
+fit <- multiScale_optim(glm(y ~ hab, family = poisson, data = count_data),
+                        inputs, verbose = FALSE)
+s <- summary(fit)
+s$opt_scale     # sigma with Wald limits, in map units
+s$opt_dist_2d   # radius holding 90 percent of the kernel weight
+
+# Profile-likelihood limits instead of Wald limits
+summary(fit, profile = TRUE)$opt_scale
+}
+\seealso{
+\code{\link[=multiScale_optim]{multiScale_optim()}}, \code{\link[=print.summary_multiScaleR]{print.summary_multiScaleR()}},
+\code{\link[=profile_sigma]{profile_sigma()}}, \code{\link[=kernel_dist]{kernel_dist()}}, and
+\code{vignette("v09-estimates-and-intervals", package = "multiScaleR")}.
 }

@@ -1,33 +1,55 @@
 #' Check Optional Software for Bayesian Scale Models
 #'
-#' Check whether the R packages needed by a Bayesian inference method can be
-#' loaded and meet the package's minimum versions. Nothing is installed, no
-#' model is fitted, and compiler or sampling performance is not tested.
+#' Check whether the R packages that a [multiScale_bayes()] computation
+#' method needs can be loaded and meet the package's minimum versions.
+#' Nothing is installed, no model is fitted, and neither the compiler nor
+#' sampling performance is tested.
 #'
-#' @param method Inference method to check: \code{"sample"} (default) needs
-#'   RTMB, tmbstan, rstan, and posterior; \code{"laplace"} and
-#'   \code{"marginal"} need RTMB. \code{"slice"} and \code{"prepare"} need
-#'   no optional packages for serial fitting. Install posterior (version
-#'   1.6.0 or later) for slice chain diagnostics.
-#' @param correction \code{"none"} (default) or \code{"importance"} for
-#'   \code{method = "marginal"}. Importance correction also needs posterior.
-#' @param cores Requested worker limit. Values greater than one also check
-#'   processx for fitting methods. Preparation uses one process.
-#' @return A \code{multiScaleR_bayes_setup} list with \code{method},
-#'   \code{correction}, \code{ready} (whether package checks passed),
-#'   \code{packages} (a data frame with \code{package}, \code{minimum},
-#'   installed \code{version}, \code{loadable}, \code{meets_version},
-#'   \code{passed}, and a diagnostic \code{message}), and \code{notes}.
-#'   A passed check does not certify a working compiler, successful sampling,
-#'   convergence, or adequate memory. Fit a small model next.
-#' @details Preparation can validate your data and formulas before installing
-#'   sampling software. For installation instructions, including Windows
-#'   toolchain guidance, see
-#'   \code{vignette("v13-bayesian-scales", package = "multiScaleR")}.
-#' @seealso \code{\link{multiScale_bayes}}
+#' @param method Computation method to check, as in [multiScale_bayes()].
+#'   `"sample"` (default, NUTS) needs RTMB, tmbstan, rstan, and posterior.
+#'   `"laplace"` and `"marginal"` need RTMB. `"slice"` and `"prepare"` need
+#'   no optional packages to run in one process. Slice chain diagnostics need
+#'   posterior (version 1.6.0 or later).
+#' @param correction `"none"` (default) or `"importance"`. Importance
+#'   correction applies only to `method = "marginal"` and also needs
+#'   posterior.
+#' @param cores Requested number of worker processes; default 1. A value
+#'   greater than one also checks processx, which parallel fits need. It has
+#'   no effect for `"prepare"`, which always uses one process.
+#'
+#' @return An object of class `multiScaleR_bayes_setup`, a list with these
+#'   elements.
+#'   * `method`, `correction`: the settings checked.
+#'   * `ready`: `TRUE` when every listed package loads and meets its minimum
+#'     version.
+#'   * `packages`: a data frame with one row per package and columns
+#'     `package`, `minimum` (the minimum version, or `NA` when any version
+#'     works), installed `version`, `loadable`, `meets_version`, `passed`, and
+#'     a diagnostic `message` that says what to install or update.
+#'   * `notes`: what the check does and does not cover.
+#'
+#'   Printing the object lists the packages and the notes, and returns it
+#'   invisibly. A passed check does not certify a working compiler,
+#'   successful sampling, convergence, or adequate memory. Fit a small model
+#'   next.
+#'
+#' @details Preparation (`method = "prepare"`) validates your data and
+#'   formulas before you install any sampling software. Installing the NUTS
+#'   packages from source can require a C++ compiler, which on Windows comes
+#'   with Rtools. `vignette("v13-bayesian-scales", package = "multiScaleR")`
+#'   covers installation, and
+#'   `vignette("v15-bayesian-computation", package = "multiScaleR")` compares
+#'   the methods.
+#'
+#' @seealso [multiScale_bayes()]
 #' @examples
-#' check_bayes_setup(method = "prepare")
-#' check_bayes_setup(method = "slice", cores = 2)
+#' check_bayes_setup(method = "prepare")  # always ready: nothing to install
+#'
+#' # Packages for slice sampling on two workers. `ready` is FALSE when
+#' # processx is missing. The message column says what to install.
+#' setup <- check_bayes_setup(method = "slice", cores = 2)
+#' setup$ready
+#' setup$packages[c("package", "loadable", "passed")]
 #' @export
 check_bayes_setup <- function(method = c("sample", "laplace", "marginal", "prepare", "slice"),
                               correction = c("none", "importance"), cores = 1L) {
@@ -69,8 +91,8 @@ check_bayes_setup <- function(method = c("sample", "laplace", "marginal", "prepa
 }
 
 #' @rdname check_bayes_setup
-#' @param x A setup-check object.
-#' @param ... Reserved for extensions; unsupported arguments cause an error.
+#' @param x A `multiScaleR_bayes_setup` object from `check_bayes_setup()`.
+#' @param ... Not used. Supplying any further argument is an error.
 #' @export
 print.multiScaleR_bayes_setup <- function(x, ...) {
   if (length(list(...))) stop("Unused print arguments.", call. = FALSE)

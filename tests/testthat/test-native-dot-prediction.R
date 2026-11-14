@@ -125,6 +125,7 @@ test_that("native dot snapshots retain original fitted outputs and parameter cou
 })
 
 test_that("dot curves retain active offset covariates and interaction annotations", {
+  skip_on_cran()
   f <- native_dot_fixture()
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   for (name in names(f$fits)) {

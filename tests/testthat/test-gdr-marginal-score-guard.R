@@ -1,4 +1,5 @@
 test_that("generic native GDR eligibility rejects excessive finite marginal scores", {
+  skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")
   original <- attr(f$model, "msr_gdr_tmb_diagnostics")
   # Selection-only stubs preserve a real fitted template and its covariance.

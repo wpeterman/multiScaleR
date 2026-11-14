@@ -14,6 +14,7 @@ test_that("event assessment respects overlap and simulation uncertainty", {
 })
 
 test_that("the diagnostic preserves the original fit and caller RNG", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   skip_if_not_installed("posterior", minimum_version = "1.6.0")
   f <- bayesian_scale_fixture(n_site = 9L, n_year = 3L)
@@ -49,6 +50,7 @@ test_that("the diagnostic preserves the original fit and caller RNG", {
 })
 
 test_that("fresh weighted scale reference agrees with independent quadrature", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   skip_if_not_installed("posterior", minimum_version = "1.6.0")
   f <- bayesian_scale_fixture(n_site = 18L, n_year = 1L)

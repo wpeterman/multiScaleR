@@ -107,320 +107,485 @@
   out
 }
 
-#' Predict from an analytic multiscale model
+#' Predict from a fitted multiscale model
 #'
-#' @description Predict the expected response, with optional uncertainty from
-#'   joint estimation of regression coefficients and spatial kernel parameters.
-#' @param object A \code{multiScaleR} fit using \code{backend = "profile_glm"}
-#'   or \code{backend = "joint_nb2"}, or an experimental
-#'   \code{backend = "joint_mixed"} fit with native conditional prediction.
-#'   Also accepts \code{backend = "conditional_logit"} and native-refit fits.
-#' @param newdata A data frame containing fixed covariates and formula offset
-#'   variables. Row names must match point IDs in \code{kernel_inputs}. Kernel
-#'   columns are computed from the prepared data, replacing any supplied values.
-#'   Alternatively, supply checked \code{SpatRaster} output from
-#'   \code{\link{kernel_scale.raster}}; see Raster prediction below.
-#' @param kernel_inputs Prepared inputs from \code{\link{kernel_prep}} for new
-#'   locations, with the same kernel and covariate names as the fit. If both
-#'   \code{newdata} and \code{kernel_inputs} are omitted, predict the retained
-#'   fitting rows. For analytic GLM fits, if only \code{newdata} is omitted,
-#'   an empty frame is constructed
-#'   from prepared point IDs; this works only without additional covariates.
-#'   Conditional-logistic fits with optimized weighted surface SQ also require
-#'   matching raw buffers and source/metric specifications in these inputs.
-#' @param type Predict on the \code{"response"} or \code{"link"} scale for
-#'   analytic fits. Native-refit fits also accept their provider's prediction
-#'   components. Their defaults are response, unmarked state, or Cox linear
-#'   predictor, as appropriate. Unmarked raster prediction requires an explicit
-#'   component. Cox response probabilities are not supplied by this wrapper.
-#' @param se.fit Return standard errors of the estimated mean.
-#' @param uncertainty \code{"joint"} includes estimated kernel scales, shapes,
-#'   and their covariance with coefficients. \code{"conditional"} holds kernel
-#'   parameters fixed. Both account for estimated dispersion in the coefficient
-#'   information matrix, when applicable.
-#' @param interval \code{"none"} or \code{"confidence"}. Confidence limits
-#'   describe the expected response, not future observations.
-#' @param level Confidence level strictly between zero and one.
-#' @param ... Native prediction controls for refit and \code{joint_mixed}
-#'   models. For refit points, also accepts \code{join_by} and
-#'   \code{include_fixed} for verified spatial preparation. Use a named
-#'   \code{native_args} list for controls that share a wrapper argument name,
-#'   such as \code{native_args = list(level = 0)} for nlme population predictions.
-#'   Native S3 and ordinary unmarked S4 argument abbreviations are resolved
-#'   before row and uncertainty
-#'   checks using the provider's exact-first argument matching. They cannot
-#'   replace the wrapper's verified prediction inputs or bypass its guards.
-#'   Ordinary LM, GLM and time-fixed unpenalized Cox predictions use their
-#'   original fitted terms for dot shortcuts and active formula inputs. Variables
-#'   removed with minus terms do not need prediction columns. Original learned
-#'   transformations, factor coding, offsets, coefficients and covariance are
-#'   retained in a local prediction context.
-#'   Zero-effect predictions may omit random-only grouping or slope inputs,
-#'   while all fixed predictors and offsets remain required. Setting effects
-#'   to zero does not integrate over their distribution. For lme4 partial
-#'   \code{re.form} formulas, supply the fixed predictors and the grouping/slope
-#'   variables in the selected effects. Native validation still checks that the
-#'   selected effects belong to the fitted model.
-#'   Raster controls go in a named \code{raster_args} list; see Details.
+#' @description
+#' Predict the expected response, a linear predictor, or a native model
+#' component from a [multiScale_optim()] fit, at the fitted rows, at new
+#' points, or across a raster. Kernel-weighted covariates are recomputed at the
+#' fitted scales of effect and standardized with the mean and standard
+#' deviation of the fitted data. Fits from the analytic backends
+#' (`"profile_glm"` and `"joint_nb2"`) can also carry joint uncertainty in the
+#' kernel scales and the regression coefficients.
+#'
+#' [multiScaleR-prediction] explains which quantity each route returns and
+#' what its uncertainty includes. This page gives the arguments and the rules
+#' for each backend. `vignette("v09-estimates-and-intervals", package =
+#' "multiScaleR")` compares conditional and joint intervals, and
+#' `vignette("v03-map-predictions", package = "multiScaleR")` maps predictions.
+#'
+#' @param object A fitted `multiScaleR` object from [multiScale_optim()], from
+#'   any backend: `"profile_glm"`, `"joint_nb2"`, `"conditional_logit"`, the
+#'   experimental `"joint_mixed"`, or the default `"refit"`.
+#' @param newdata Where to predict. One of:
+#'   * `NULL` (the default), with `kernel_inputs = NULL`, to predict the rows
+#'     used to fit the model.
+#'   * A data frame of new rows, supplied together with `kernel_inputs`. It
+#'     must hold every non-spatial variable in the model formula: fixed
+#'     covariates, offset inputs, and grouping variables. Row names must match
+#'     the point IDs in `kernel_inputs`, unless you supply `join_by` keys (refit
+#'     backend). Kernel-weighted columns are computed for you and replace any
+#'     columns of the same name.
+#'   * A `SpatRaster` from [kernel_scale.raster()], to predict every cell.
+#'     Leave `kernel_inputs` as `NULL`. See "Predict across a raster".
+#' @param kernel_inputs A `multiScaleR_data` object from [kernel_prep()] for
+#'   the new points. Prepare it with the fitted kernel, the same covariates and
+#'   source or metric definitions, and the same binned or exact evaluation as
+#'   the fit. Kernel means in the analytic, conditional logistic, and joint
+#'   mixed backends need binned inputs (`bin = TRUE`). Its own distance unit
+#'   conversion is applied, and the
+#'   reported scales stay in map units. Default `NULL`. For the analytic
+#'   backends, a model with no non-spatial covariates can omit `newdata`, and a
+#'   frame is built from the prepared point IDs. Conditional logistic fits with
+#'   an optimized weighted surface SQ metric also need matching raw cell
+#'   buffers and source or metric specifications here.
+#' @param type Scale or component to predict. For the analytic and joint mixed
+#'   backends, `"response"` (the default, the model's expected response) or
+#'   `"link"` (the linear predictor). For `"conditional_logit"`, `"response"`
+#'   (the default, a probability within each choice set), `"link"`, or
+#'   `"risk"`. For native refits, any type the provider accepts. When `type`
+#'   is not supplied, a refit predicts the response for most models, `"state"`
+#'   for `unmarked` occupancy and count models, and the linear predictor
+#'   (`"lp"`) for Cox models, which have no response probability here. Raster
+#'   prediction from an `unmarked` model needs an explicit `type`.
+#' @param se.fit Logical. If `TRUE`, also return standard errors of the
+#'   predicted mean, on the scale of `type`. Default `FALSE`.
+#' @param uncertainty Which parameters the standard errors and intervals let
+#'   vary. `"joint"` (the default) includes the estimated kernel scales and
+#'   shapes and their covariance with the coefficients. It is available only
+#'   for the analytic backends at points. `"conditional"` holds the kernel
+#'   parameters at their estimates. Both include an estimated dispersion in
+#'   the coefficient information when the family has one. Every other route
+#'   needs `uncertainty = "conditional"` whenever it returns a standard error
+#'   and stops otherwise.
+#' @param interval `"none"` (the default) or `"confidence"`. Confidence limits
+#'   describe the expected response, not a future observation. They are
+#'   available only for the analytic backends at points.
+#' @param level Confidence level for `interval = "confidence"`, strictly
+#'   between zero and one. Default `0.95`.
+#' @param ... Further controls. Which ones apply depends on the backend:
+#'   * `include_fixed`: logical, default `FALSE`. Set `TRUE` to recompute
+#'     declared fixed-radius predictors at new points. See "Recompute
+#'     fixed-radius predictors". This is the only control that the analytic
+#'     and conditional logistic backends use.
+#'   * `join_by`: refit backend only. A data frame of site keys, one row per
+#'     prepared point in `kernel_inputs` order, that lets several `newdata`
+#'     rows share one site, for example one row per site and year. See
+#'     [prepare_unmarked_data()] for the key rules.
+#'   * Native prediction controls for `"joint_mixed"` and refit models, such
+#'     as `re.form` or `allow.new.levels`. Put a control whose name matches a
+#'     wrapper argument in a named `native_args` list, for example
+#'     `native_args = list(level = 0)` for nlme population predictions.
+#'     Native argument abbreviations are resolved with the provider's
+#'     exact-first matching before any other check. They cannot replace the
+#'     wrapper's verified inputs or bypass its checks.
+#'   * `raster_args`: a named list of raster controls. See "Predict across a
+#'     raster".
+#'
 #' @details
-#' The fitted-term repair is qualified for ordinary \code{lm}, \code{glm},
-#' \code{MASS::glm.nb}, \code{coxph} and \code{clogit} structures. Other native
-#' subclasses retain their existing provider path.
+#' # Choose the rows to predict
 #'
-#' For \code{conditional_logit}, \code{type = "response"} returns probabilities
-#' normalized within each supplied choice set, not occurrence probabilities or
-#' a utilization distribution. \code{type = "link"} returns the uncentered
-#' linear predictor; differences within a set describe relative selection.
-#' The exact type \code{"risk"} returns \code{exp(eta)}, a relative selection
-#' score, not an occurrence probability or utilization distribution. New link
-#' and risk predictions require matching spatial inputs and all fixed formula
-#' inputs; they do not require choice-set IDs. Response predictions additionally
-#' require explicit choice-set IDs, at least two alternatives per set, and
-#' complete prediction choice sets defined by the caller. \code{se.fit = TRUE}
-#' requires \code{uncertainty = "conditional"}, holding scales fixed; intervals
-#' and joint uncertainty are unavailable. Formula offsets and training
-#' standardization are preserved. Link and risk outputs leave formula offsets
-#' unshifted; risk SEs use \code{risk * SE(link)}. Native
-#' \code{opt_mod} prediction methods use
-#' their own survival conventions and require already standardized covariates.
+#' * **Fitted rows.** Omit `newdata` and `kernel_inputs`. The analytic
+#'   backends rebuild the fitted design. Native refits return the provider's
+#'   prediction for its fitted rows.
+#' * **New points.** Run [kernel_prep()] at the new points with the fitted
+#'   kernel, `max_D`, and covariate definitions, then supply the matching
+#'   `newdata`. For the refit backend, supply both or neither.
+#' * **A map.** Smooth and standardize the raster with
+#'   [kernel_scale.raster()], then pass the result as `newdata`.
 #'
-#' New predictors use the training sample's center and sample standard deviation;
-#' they are never standardized within the prediction sample. Fixed transforms,
-#' factor contrasts, and offsets follow the fitted terms object. New factor
-#' levels, missing values, and unmatched point IDs are errors for the GLM backends.
-#' Every non-kernel variable named in the formula must be supplied in
-#' \code{newdata}; values are not borrowed from the formula environment.
-#' Use literal constants in transform arguments such as \code{poly(z, 2)}.
+#' New kernel-weighted values are standardized with the fitted data's mean and
+#' sample standard deviation. They are never standardized within the
+#' prediction sample. Every non-spatial variable named in the formula must be
+#' supplied in `newdata`. Values are not borrowed from the formula
+#' environment. For the analytic backends, new factor levels, missing values,
+#' and unmatched point IDs are errors. Use literal constants in transform
+#' arguments, such as `poly(z, 2)`. Preparing distance bins again at new
+#' points can shift their representative distances slightly, so a prediction
+#' at a fitted location can differ slightly from the fitted value.
 #'
-#' Standard errors use the delta method. Confidence limits are computed on the
-#' link scale and then transformed. Joint uncertainty is refused for boundary
-#' or weakly identified fits; point predictions remain available. The
-#' \code{joint_nb2} exact-Poisson boundary supports point predictions and
-#' explicitly conditional intervals, holding both scales and the Poisson
-#' dispersion boundary fixed. Joint intervals remain unavailable there.
-#' The ordinary
-#' \code{object$opt_mod} is a conditional GLM whose own prediction methods expect
-#' already standardized kernel predictors and do not include scale uncertainty.
-#' @return Without standard errors or intervals, a named numeric vector.
-#'   Otherwise a list containing \code{fit}, \code{se.fit}, \code{type}, and
-#'   \code{uncertainty}; confidence intervals add \code{lower}, \code{upper},
-#'   and \code{level}. Binomial response predictions are probabilities.
-#'   For \code{joint_mixed}, returns the native glmmTMB prediction vector or,
-#'   with \code{se.fit = TRUE}, its list containing \code{fit} and \code{se.fit}.
-#'   Native-refit results follow the provider's output. Computed-raster inputs
-#'   return a \code{SpatRaster} of predictions, with SE layers when requested
-#'   and available. Unmarked SE output retains the native \code{Predicted},
-#'   \code{SE}, \code{lower}, and \code{upper} columns as layers, with native
-#'   confidence-level semantics. No observation noise is added.
-#' @seealso \code{\link{multiScale_optim}}, \code{\link{vcov.multiScaleR}},
-#'   \code{\link{prepare_prediction}} for repeated summaries of fixed rows.
-#' @details For \code{joint_mixed}, prediction delegates to the final native
-#'   glmmTMB model. Standard errors require \code{uncertainty = "conditional"}
-#'   and exclude scale estimation uncertainty; confidence intervals are not
-#'   provided by this wrapper. Supply both \code{newdata} and matching
-#'   \code{kernel_inputs} for new rows. Include all fixed-effect, offset, and
-#'   grouping variables. Kernel means need binned summaries; weighted surface
-#'   SQ needs matching source specifications, raw cell buffers, and row IDs.
-#'   Spatial columns are recomputed using the
-#'   training means and standard deviations. Additional arguments, including
-#'   \code{re.form} and \code{allow.new.levels}, follow native glmmTMB behavior.
-#'   The default includes fitted random effects; \code{re.form = NA} sets them
-#'   to zero and does not integrate over their distribution. Use native
-#'   \code{predict(object$opt_mod, ...)} for other glmmTMB prediction types.
+#' # Match the fitted formula
 #'
-#' \strong{Fixed-radius point predictors.} For analytic GLM/NB2, conditional
-#' logistic, joint mixed, and native-refit models, \code{include_fixed = TRUE}
-#' recomputes declared fixed-radius predictors from matching spatial inputs.
-#' Their original prepared numeric columns and means/sample SDs must be verified
-#' against the retained native model frame. Source, metric, radius, kernel,
-#' resolution, buffer extent (\code{max_D}), and observation-to-site alignment
-#' must match. The default keeps
-#' these columns explicit. Fixed radii add no scale parameters or uncertainty.
+#' Fixed transformations, factor contrasts, and offsets follow the fitted
+#' terms. For ordinary `lm`, `glm`, `MASS::glm.nb`, and time-fixed,
+#' unpenalized `coxph` and `clogit` refits, prediction uses the original
+#' fitted terms. A dot shortcut such as `~ .` keeps its fitted meaning, and
+#' new data columns never enter the design. Variables removed with a minus
+#' term need no prediction column, while active interactions and offsets keep
+#' their inputs. The original coefficients, covariance, factor coding, and
+#' learned transformations are retained. Other native subclasses use their
+#' provider's own prediction path. `unmarked::pcount()` (version 1.5.2)
+#' rejects dot formulas when fitting, so write `unmarked` component formulas
+#' explicitly.
 #'
-#' \strong{Native-refit points.} Spatial means and metrics are recomputed from
+#' Standard `scale()`, `poly()`, `splines::ns()`, and `splines::bs()` calls,
+#' including namespace-qualified calls, keep their training constants (center
+#' and spread, polynomial coefficients, spline knots) for supported LM, GLM,
+#' GAM, lme4, glmmTMB, time-fixed unpenalized Cox, and ordinary `unmarked`
+#' occupancy and count predictions. New rows never relearn them, and a single
+#' new value or a constant raster does not define a new standard deviation.
+#' Nested expressions such as `I(scale(z)^2)` and transformed formula offsets
+#' recover one standard learner per evaluated predictor from its retained
+#' attributes, using an aligned evaluated training frame. Missing or ambiguous
+#' attributes, several learners in one predictor, and unsupported
+#' transformations need precomputed training predictors or complete saved
+#' prediction calls. Scaling arguments keep their original order and standard
+#' abbreviations. Custom functions keep their own semantics. Legacy analytic
+#' fits can recover this metadata, but numerical snapshots from
+#' [prepare_prediction()] must be prepared again.
+#'
+#' # Analytic GLM backends
+#'
+#' For `"profile_glm"` and `"joint_nb2"`, standard errors use the delta
+#' method. With `uncertainty = "joint"`, they include the derivative of each
+#' prediction with respect to the kernel scales and shapes, including how the
+#' training mean and standard deviation change with scale. Confidence limits
+#' are computed on the link scale and then transformed, and response-scale
+#' standard errors are `abs(d mu / d eta)` times the link-scale standard
+#' error. Binomial response predictions are probabilities.
+#'
+#' Joint uncertainty is refused for fits at a parameter bound or with weak
+#' identifiability. `fit$uncertainty$reasons` says why, and point predictions
+#' and conditional uncertainty remain available. At the exact Poisson
+#' boundary of a `"joint_nb2"` fit, point predictions and explicitly
+#' conditional intervals hold both the scales and the Poisson dispersion
+#' boundary fixed. Use [vcov.multiScaleR()] for the covariance matrices.
+#'
+#' The native model in `fit$opt_mod` is a conditional GLM. Its own prediction
+#' methods expect kernel predictors that are already standardized and do not
+#' include scale uncertainty.
+#'
+#' # Conditional logistic backend
+#'
+#' For `"conditional_logit"`, `type = "response"` returns probabilities
+#' normalized within each supplied choice set. They are not occurrence
+#' probabilities or a utilization distribution. `type = "link"` returns the
+#' linear predictor, including formula offsets, and differences within a set
+#' describe relative selection. `type = "risk"` returns `exp(link)`, a
+#' relative selection score. Link and risk predictions at new points need
+#' matching spatial inputs and every fixed formula input, but no choice-set
+#' IDs. Response predictions also need explicit choice-set IDs, at least two
+#' alternatives per set, and complete choice sets that you define.
+#'
+#' `se.fit = TRUE` requires `uncertainty = "conditional"`. Risk standard
+#' errors are `risk x SE(link)`, and response standard errors use the delta
+#' method through the within-set normalization. Intervals and joint
+#' uncertainty are unavailable. Formula offsets and training standardization
+#' are preserved. The native `fit$opt_mod` prediction methods use their own
+#' survival conventions and require already standardized covariates.
+#'
+#' # Joint mixed backend
+#'
+#' For `"joint_mixed"`, prediction delegates to the final native glmmTMB
+#' model at the selected scales, with `type = "response"` or `"link"`.
+#' Standard errors require `uncertainty = "conditional"` and exclude scale
+#' uncertainty. This wrapper provides no confidence intervals. For new rows,
+#' supply both `newdata` and matching `kernel_inputs`, including every
+#' fixed-effect, offset, and grouping variable. Kernel means need binned
+#' summaries, and weighted surface SQ needs matching source specifications,
+#' raw cell buffers, and row IDs. Spatial columns are recomputed with the
+#' training mean and standard deviation.
+#'
+#' Additional arguments, such as `re.form` and `allow.new.levels`, follow
+#' native glmmTMB behavior. The default includes the fitted random effects,
+#' and `re.form = NA` sets them to zero without integrating over their
+#' distribution. Use native `predict(fit$opt_mod, ...)` for other glmmTMB
+#' prediction types, or bind one with [prepare_prediction()].
+#'
+#' # Native refits
+#'
+#' The default `"refit"` backend returns the provider's own prediction for
+#' the model in `fit$opt_mod`, with spatial means and metrics recomputed from
 #' matching source definitions, prepared rows, physical distance units, and
-#' selected scales. Unused prepared variables are ignored. Training means and
-#' sample standard deviations are retained. Supply both \code{newdata} and
-#' \code{kernel_inputs}, or omit both for fitting rows. Explicit \code{join_by}
-#' keys support repeated site scenarios. Set \code{include_fixed = TRUE} to
-#' verify and reproduce modeled fixed-radius predictors from the original
-#' preparation. See \code{\link{prepare_unmarked_data}} for the key and fixed
-#' normalization requirements. Standard errors require
-#' \code{uncertainty = "conditional"} and native support. Unsupported native
-#' SE requests raise an error. Wrapper confidence intervals are unavailable.
-#' Standard \code{scale()}, \code{poly()}, \code{splines::ns()} and
-#' \code{splines::bs()} calls, including namespace-qualified calls, use
-#' their retained training transformation for supported LM/GLM, GAM, lme4,
-#' glmmTMB and time-fixed, unpenalized native Cox predictions. GAMs with multiple linear predictors retain each
-#' component's terms, coefficient spans and native output columns. Response
-#' columns keep the fitted family's meaning; for example, the second
-#' \code{mgcv::gaulss()} response column is reciprocal standard deviation,
-#' and multinomial response columns are category probabilities. New rows do not relearn the center or
-#' spread. Recovery requires an aligned evaluated training frame. Legacy full
-#' analytic fits can recover this metadata; numerical-only snapshots must be
-#' prepared again. Nested expressions and transformed offsets recover one
-#' standard learner per evaluated predictor from its original retained
-#' attributes. Missing or ambiguous attributes, multiple learners in one
-#' predictor, and unsupported transformations require precomputed training
-#' predictors or complete saved prediction calls. New prediction rows never
-#' supply the training constants. Scaling arguments retain their original
-#' order and standard abbreviations. Custom functions retain their own semantics.
-#' Identified native TMB GDR response-field models retain their conditional
-#' component predictor and full joint covariance through the unmarked adapter.
-#' Explicit new abundance coordinates require the fitted projected CRS. Native
-#' snapshots store numeric outputs only; field maps require a checked geometry
-#' descriptor and type = "lambda". New-location field residual variance is
-#' distinct from observation noise and ecological-scale uncertainty.
-#' GDR field rasters require one worker, including zero-effect references;
-#' native fit/tape worker transport remains unqualified.
-#' Logical raster inputs use 0/1 encoding and regain their training types
-#' before the frozen component design is evaluated; other codes stop.
-
-
+#' the selected scales. Unused prepared variables are ignored. Supply both
+#' `newdata` and `kernel_inputs`, or omit both for the fitted rows. Explicit
+#' `join_by` keys let several prediction rows share one site.
 #'
-#' Native glmmTMB exponential, Gaussian and Matern response fields retain their
-#' provider predictions and mean-prediction SEs through the refit adapter at
-#' selected kernel scales. Conformance checks cover Gaussian, log-Poisson,
-#' logit-binomial, log-NB2 and log-Gamma responses with one shared projected field
-#' without a year effect. Supply the native coordinate factor and grouping
-#' columns explicitly, including newly constructed \code{glmmTMB::numFactor()}
-#' positions and \code{allow.new.levels = TRUE} when appropriate. A response
-#' field's covariance range differs from the ecological kernel scale.
-#' \code{re.form = NA} sets response random effects to zero; it does not
-#' integrate over their distribution. SEs retain the native method's meaning
-#' and remain conditional on selected ecological scales. Fixed-row snapshots
-#' keep those outputs and their response-field contracts, without a model.
-#' These conformance checks do not qualify scale recovery, interval coverage
-#' or a spatial field in the \code{joint_mixed} likelihood. A full spatial
-#' raster needs matching field coordinates per cell; a constant site scenario
-#' does not provide them. Use explicit native point rows or a checked
-#' \code{\link{response_field_geometry}} descriptor for coordinate-aware maps.
+#' Standard errors require `uncertainty = "conditional"` and a provider that
+#' supplies them. An unsupported native standard-error request raises an
+#' error rather than returning zero. The wrapper's own `interval` must stay
+#' `"none"`. Native covariance, variance, and interval controls also require
+#' `uncertainty = "conditional"`, even with `se.fit = FALSE`, and cannot add
+#' uncertainty in the kernel parameters. Cross-row native covariance, such as
+#' glmmTMB's `cov.fit = TRUE`, needs point predictions, which keep the native
+#' covariance output.
+#' * **Linear models.** For an ordinary `lm` refit,
+#'   `native_args = list(interval = "confidence", level = 0.9)` returns
+#'   native confidence limits for the mean, and `interval = "prediction"`
+#'   within that list returns limits for a future observation, including the
+#'   residual variance. Both keep the native `fit`, `lwr`, and `upr` columns
+#'   for points and maps.
+#' * **Random effects.** Native random-effect controls keep their meaning.
+#'   For glmmTMB and lme4, `re.form = NA` sets the random effects to zero.
+#'   For nlme, use `native_args = list(level = 0)`. Zero-effect predictions can
+#'   omit random-only grouping and slope inputs, but every fixed predictor and
+#'   offset remains required. For partial lme4 `re.form` formulas, supply the
+#'   fixed predictors and the grouping and slope variables of the selected
+#'   effects. Native validation still checks that the selected effects belong
+#'   to the fitted model.
+#' * **spaMM.** spaMM refits use their retained native model frames to verify
+#'   fixed features. Zero and selected `re.form` predictions need only the
+#'   fixed inputs and the selected random-effect inputs. The generic `se.fit`
+#'   interface is unavailable when the native method does not return a
+#'   standard-error list. Native `variances` and `intervals` attributes keep
+#'   their own scales and targets and require point predictions. `fixefVar`
+#'   and `predVar` are on the linear-predictor scale. `residVar` and
+#'   `respVar` are on the response scale and include observation noise.
+#' * **Cox models.** Predictions are linear predictors (`"lp"`, also selected
+#'   by `type = "link"`) or relative risks (`"risk"`). Neither is a
+#'   probability. Use the `"conditional_logit"` backend for choice-set
+#'   probabilities.
 #'
-#' Ordinary unmarked occupancy and pcount state/detection predictions freeze
-#' supported fixed scaling, polynomial and spline terms from original raw
-#' covariates before site removal, including nested calls and formula offsets.
-#' Keep those original covariates and the fitted designs. Reconstructed designs
-#' and offsets must match the native fit before new rows are evaluated. This
-#' check preserves the fitted target; it does not authenticate edited raw data.
-#' Factor contrasts use retained metadata or exactly recoverable original
-#' columns for factor main effects. More ambiguous missing coding needs explicit saved training
-#' contrasts. Native observation rows, missing-site handling,
-#' covariance, confidence levels and derived ZIP abundance remain native.
-#' Point, prepared and raster predictions use the same checked transformations.
-#' For explicit data-frame rows, ordinary unmarked predictions prepare only the
-#' requested state or detection component's training metadata. Raster chunks and
-#' effect curves reuse that component's checked basis. Unrelated component
-#' metadata is not evaluated. Native frame inputs or omitted newdata retain both
-#' components because native missing-row removal depends on both designs.
-#' Derived ZIP means and confidence limits still use native zero-inflation
-#' estimates and covariance. Full model parameter counts and diagnostics are
-#' unchanged, even when a prediction uses only one regression component.
-#' Known-group columns retain their original order for frame subsets.
+#' # Predict from unmarked models
+#'
+#' Name the component with `type`, such as `"state"` or `"det"`.
+#' [multiScaleR-prediction] lists what each component means. Supply
+#' `newdata` in the row layout that native `unmarked` prediction expects for
+#' that component, with row names that match the prepared point IDs or with
+#' explicit `join_by` keys. See [prepare_unmarked_data()] for the key and
+#' fixed-radius rules. Without
+#' `se.fit`, the result is the vector of native `Predicted` values. With
+#' `se.fit = TRUE` and `uncertainty = "conditional"`, it is the native table
+#' with confidence limits at the native level.
+#'
+#' Ordinary occupancy and `pcount` state and detection predictions freeze
+#' supported fixed scaling, polynomial, and spline terms from the original raw
+#' covariates before site removal, including nested calls and formula
+#' offsets. Keep those original covariates and the fitted designs. The
+#' reconstructed designs and offsets must match the native fit before new rows
+#' are evaluated. This check preserves the fitted target, but it cannot
+#' detect edits to raw data that leave the evaluated design unchanged. Factor
+#' contrasts use retained metadata, or original columns for factor main
+#' effects when those recover the coding exactly. Other missing coding needs
+#' explicit saved training contrasts.
+#'
+#' For explicit data-frame rows, only the requested component's training
+#' metadata is prepared. Raster chunks and effect curves reuse that
+#' component's checked basis. A native `unmarkedFrame` input, or an omitted
+#' `newdata`, keeps both components, because native missing-row removal
+#' depends on both designs. Derived ZIP means and limits still use the native
+#' zero-inflation estimate and covariance, and the full model's parameter
+#' count and diagnostics are unchanged. Native observation rows, missing-site
+#' handling, and confidence levels stay native, and frame subsets keep their
+#' original known-group columns.
+#'
 #' Conditional predictions with learned random-effect terms need precomputed
 #' original training predictors. Zero-effect requests do not evaluate those
-#' unused terms or require new random-only grouping or slope inputs.
-#' Unmarked treats every non-NULL \code{re.form} as zero random effects;
-#' these controls do not select partial effects or integrate over them.
-#' Other unmarked classes retain their provider's prediction requirements.
-#' Qualified GDR predictions retain the original lambda, active phi, distance
-#' and removal component recipes using their native site, primary-period and
-#' interval rows. Native C and TMB designs are checked before using frozen
-#' scaling, polynomial/spline terms or factor interactions. Points, prepared
-#' outputs, effect curves and raster chunks share these terms. Component-scoped
-#' rows need only that component's inputs; native GDR frames retain their native
-#' layout and missing-covariate checks. Logical raster inputs use the selected
-#' component's training types. Native component covariance and conditioning
-#' are unchanged; zero effects are not integration over unknown groups.
-#' Native GAM term selection, exclusions and
-#' smoothing-parameter covariance requests retain their native behavior;
-#' none includes uncertainty in the selected spatial scales.
-#' Package predictions from the native mgcv GAM method retain saved factor
-#' coding for interaction-only terms when session contrast options change.
-#' Fitted coefficients, covariance and diagnostics remain unchanged. Other
-#' GAM providers retain their native prediction methods.
-#' Package BAM predictions retain the native discrete and block algorithms while
-#' restoring fitted coding in serial and native worker calls. Explicit term
-#' exclusions also reach the native worker predictor. Worker mgcv versions and
-#' prediction implementations must agree with the parent. Other providers keep
-#' their native dispatch; numerical snapshots do not retain external clusters.
-#' Optimized discrete predictions for native binomial and Poisson BAMs retain
-#' native values, warning behavior and output geometry across point, snapshot
-#' and raster routes. Raster comparisons use the exact native prediction batch.
-#' Ordinary BAM workers retain \code{iterms} matrices, term labels and the native
-#' intercept constant, including models without factor coding. Native GAM
-#' controls forwarded through BAM, such as \code{iterms.type} and
-#' \code{unconditional}, reach those workers; native warning conditions also
-#' reach the parent call. Transported calls identify the native method and
-#' controls, with symbolic references to model and prediction data. Their
-#' messages and classes are retained without carrying those evaluated data.
-#' A BAM smoothing-covariance request preserves the
-#' provider's covariance-retention decision and unavailable-correction warning.
-#' Optimized discrete prediction retains its native \code{iterms}-to-\code{terms}
-#' warning and target. Select \code{discrete = FALSE} for ordinary \code{iterms}.
-#' Native providers may also warn when selecting terms from a model with no
-#' parametric coefficients. These warnings retain their native meaning.
-#' For ziplss response predictions, the native mean is unchanged and its
-#' standard error propagates full native coefficient covariance through both
-#' predictors, preserving signed cross-covariance. This omits count noise and
-#' ecological-scale uncertainty. Custom family prediction hooks remain guarded.
-#' Random-effect controls retain native meaning; setting effects to zero is
-#' not integration over the random-effect distribution.
-#' For ordinary lm response predictions, \code{native_args = list(interval =
-#' "confidence", level = 0.9)} requests native mean confidence limits;
-#' \code{interval = "prediction"} within that list requests limits for a future
-#' observation, including residual noise. Both require
-#' \code{uncertainty = "conditional"} and retain the native fit/lower/upper
-#' columns for points and maps. They hold kernel parameters fixed. The wrapper's
-#' own \code{interval} remains \code{"none"}.
+#' unused terms or need new random-only grouping or slope inputs. `unmarked`
+#' treats every non-`NULL` `re.form` as zero random effects. It does not
+#' select partial effects or integrate over them. Other `unmarked` classes
+#' keep their provider's prediction requirements.
 #'
-#' \strong{Raster prediction.} First call \code{kernel_scale.raster()} with
-#' the fitted object, \code{scale_center = TRUE}, and
-#' \code{match_buffer = TRUE}. Modeled fixed metrics additionally require
-#' \code{include_fixed = TRUE}. Supply categorical scenarios through
-#' \code{site_values}; logical predictors are restored to their fitted type
-#' during prediction. The retained descriptor checks scales, source and metric
-#' definitions, normalization, and support against this fit. It does not
-#' reconstruct a lost descriptor or establish that supplied maps have the
-#' correct scientific provenance. Recompute after saving and reloading cells
-#' through file formats that discard R attributes.
-#' spaMM refits use retained native model frames for fixed-feature verification.
-#' Zero and selected \code{re.form} predictions require only fixed inputs and
-#' selected random-effect inputs. Native variance attributes retain their own
-#' scales and targets; the generic \code{se.fit} interface remains unavailable
-#' if the native method does not supply a standard-error list.
-#' Cross-row \code{cov.fit = TRUE} and spaMM variance/interval attributes require
-#' point predictions. Raster chunks cannot retain those objects and reject
-#' these controls explicitly. Point predictions preserve native covariance
-#' outputs, including SEs triggered by native controls.
-#' Native covariance, variance and interval controls also require
-#' \code{uncertainty = "conditional"}, even when \code{se.fit = FALSE};
-#' they cannot add uncertainty in the selected kernel parameters.
+#' Qualified `gdistremoval()` predictions keep the original `"lambda"`,
+#' active `"phi"`, `"dist"`, and `"rem"` component recipes, with their native
+#' site, primary-period, and removal-interval rows. Native C and TMB designs
+#' are checked before frozen scaling, polynomial, spline, or factor
+#' interaction terms are used. Points, prepared outputs, effect curves, and
+#' raster chunks share these terms. Rows for one component need only that
+#' component's inputs, and native GDR frames keep their native layout and
+#' missing-covariate checks. Native component covariance and conditioning are
+#' unchanged, and zero effects do not integrate over unknown groups.
 #'
-#' Raster outputs retain \code{prediction_contract} and
-#' \code{projection_contract} attributes, including requested clamping,
-#' smoothing, and offset controls. Recompute the preparation after editing cells.
+#' # Recompute fixed-radius predictors
 #'
-#' Raster SEs are conditional on the selected kernel parameters, with
-#' \code{interval = "none"}. Analytic GLM/NB2 maps use the same retained
-#' coefficient information as point predictions. Other maps use native
-#' prediction. Native matrix components return one band per column; when native
-#' SEs are supplied, fit and SE bands retain their corresponding column order.
-#' GAM term and basis-matrix outputs keep their native component meaning.
-#' Native smoothing-covariance requests do not add kernel-scale uncertainty. Cox maps default to linear predictors; conditional-logistic
-#' maps require \code{type = "link"} or \code{"risk"}, since choice
-#' probabilities need complete point choice sets. Supply native controls in
-#' \code{native_args}. The \code{raster_args} list accepts \code{filename},
-#' \code{overwrite}, \code{wopt}, \code{const}, \code{cores}, \code{na.rm},
-#' and \code{field_geometry}. The latter takes a checked
-#' \code{response_field_geometry()} descriptor for one shared exponential,
-#' Gaussian or Matern response field. It requires a matching projected CRS, uses cell-center
-#' coordinates and one worker, and gates serial native batch expansion against
-#' an explicit working-memory budget. New positions require an explicit
-#' \code{allow.new.levels = TRUE} in \code{native_args}. Native SEs and zero-field references
-#' keep their point-prediction meanings. No joint raster covariance is added.
-#' Internally created worker clusters are stopped on exit. Rasterization,
-#' distance binning, and partial source coverage remain separate approximation
-#' choices. A single selected-scale raster is not a Bayesian posterior map.
+#' By default, declared fixed-radius predictors are inputs you supply in
+#' `newdata`. For the analytic, conditional logistic, joint mixed, and refit
+#' backends, `include_fixed = TRUE` recomputes them from matching spatial
+#' inputs instead. Their original prepared values and training means and
+#' sample standard deviations must first be verified against the retained
+#' native model frame. Source, metric, radius, kernel, resolution, buffer
+#' extent (`max_D`), and observation-to-site alignment must match. Fixed radii
+#' add no scale parameters or uncertainty.
+#'
+#' # Predict across a raster
+#'
+#' First call [kernel_scale.raster()] with the fitted object,
+#' `scale_center = TRUE`, and `match_buffer = TRUE`. `match_buffer = TRUE`
+#' needs square cells in a projected or local planar coordinate reference
+#' system, at the prepared resolution.
+#' Modeled fixed-radius metrics also require `include_fixed = TRUE` there.
+#' Set categorical and other non-spatial scenario values with `site_values`,
+#' and offset inputs with `offset_values`. A simple `log()` offset defaults to
+#' a raw value of 1 and a direct offset to 0, and a compound offset such as
+#' `offset(log(effort * duration))` needs explicit values. Logical predictors
+#' are coded 0 and 1 in the raster and regain their fitted type during
+#' prediction. The descriptor attached to the raster checks scales, source and
+#' metric definitions, normalization, and support against this fit. It does
+#' not rebuild a lost descriptor or establish that the maps have the right
+#' scientific provenance. Recompute the raster after editing cells or saving
+#' it in a file format that drops R attributes.
+#'
+#' Raster standard errors are conditional on the selected kernel parameters,
+#' with `interval = "none"`. Analytic GLM maps use the same coefficient
+#' information as point predictions. Other maps use native prediction, and
+#' native matrix components return one layer per column, with standard-error
+#' layers in the same column order. Cox maps default to linear predictors.
+#' Conditional logistic maps need `type = "link"` or `"risk"`, because choice
+#' probabilities need complete point choice sets. `unmarked` maps need an
+#' explicit component. Native cross-row covariance (`cov.fit = TRUE`) and
+#' spaMM variance or interval attributes are rejected, because raster chunks
+#' cannot keep them. Supply native controls in `native_args`. A raster
+#' prediction from one set of selected scales is not a Bayesian posterior map.
+#'
+#' The `raster_args` list accepts `filename`, `overwrite`, `wopt`, `const`,
+#' `cores`, `na.rm`, and `field_geometry`. `cores` defaults to one worker,
+#' and clusters created internally are stopped on exit. `field_geometry`
+#' takes a checked [response_field_geometry()] descriptor, as described in
+#' "Spatial response fields". Rasterization, distance binning, and partial source
+#' coverage remain separate approximation choices.
+#'
+#' # Spatial response fields
+#'
+#' Native glmmTMB exponential, Gaussian, and Matern response fields keep their
+#' provider predictions and mean-prediction standard errors at the selected
+#' kernel scales. Conformance checks cover Gaussian, log-Poisson,
+#' logit-binomial, log-NB2, and log-Gamma responses with one shared projected
+#' field without a year effect. Supply the native coordinate factor and
+#' grouping columns explicitly, including new [glmmTMB::numFactor()]
+#' positions and `allow.new.levels = TRUE` when appropriate. A field's
+#' covariance range is distinct from the ecological kernel scale.
+#' `re.form = NA` sets the response random effects to zero without
+#' integrating over their distribution. These checks do not qualify scale
+#' recovery, interval coverage, or a spatial field in the `"joint_mixed"`
+#' likelihood. A full raster needs matching field coordinates in each cell,
+#' which a constant site scenario does not provide. Use explicit native point
+#' rows or `raster_args = list(field_geometry = ...)` for coordinate-aware
+#' maps. That route requires a matching projected coordinate reference
+#' system, uses cell-center coordinates and one worker, limits native batch
+#' expansion to an explicit working-memory budget, and needs
+#' `allow.new.levels = TRUE` in `native_args` for new positions.
+#'
+#' Identified native TMB `gdistremoval()` response-field models keep their
+#' conditional component predictor and full joint covariance through the
+#' `unmarked` adapter. New abundance coordinates require the fitted projected
+#' coordinate reference system. Field maps need a checked geometry descriptor
+#' and `type = "lambda"`, and they run on one worker, including zero-effect
+#' references. The residual field variance at new locations is distinct from
+#' observation noise and from ecological-scale uncertainty.
+#'
+#' # GAM and BAM predictions
+#'
+#' GAMs with several linear predictors keep each component's terms,
+#' coefficient spans, and native output columns. Response columns keep the
+#' fitted family's meaning. For example, the second `mgcv::gaulss()` response
+#' column is a reciprocal standard deviation, and multinomial response columns
+#' are category probabilities. For `mgcv::ziplss()` response predictions, the
+#' native mean is unchanged, and its standard error propagates the full native
+#' coefficient covariance through both predictors, keeping signed
+#' cross-covariance. It omits count noise and ecological-scale uncertainty.
+#' Custom family prediction hooks remain guarded.
+#'
+#' Native term selection, exclusions, and smoothing-parameter covariance
+#' requests (`unconditional`) keep their native behavior, and none adds
+#' uncertainty in the selected scales. Package predictions keep the saved
+#' factor coding of interaction-only terms when session contrast options
+#' change. BAM predictions keep the native discrete and block algorithms,
+#' restore fitted coding in serial and native worker calls, and pass explicit
+#' term exclusions and controls such as `iterms.type` and `unconditional` to
+#' those workers. Worker mgcv versions must match the parent. Optimized
+#' discrete predictions for binomial and Poisson BAMs keep their native
+#' values, warnings, and output geometry across point, snapshot, and raster
+#' routes, including the native warning that resets `iterms` to `terms`. Set
+#' `discrete = FALSE` for ordinary `iterms`. Native warnings, such as one for
+#' selecting terms from a model without parametric coefficients, reach the
+#' calling session with their native meaning.
+#'
+#' @return The class depends on the route.
+#' * **Analytic backends, no standard errors or interval:** a numeric vector
+#'   of predictions on the scale of `type`, named by row ID.
+#' * **Analytic backends with `se.fit = TRUE` or `interval = "confidence"`:**
+#'   a list with `fit` (the predictions), `se.fit` (standard errors on the
+#'   scale of `type`), `type`, and `uncertainty` (`"joint"` or
+#'   `"conditional"`). Confidence intervals add `lower` and `upper`, on the
+#'   scale of `type`, and `level`.
+#' * **`"conditional_logit"`:** a named numeric vector, or with
+#'   `se.fit = TRUE` a list with `fit`, `se.fit`, `type`, and
+#'   `uncertainty = "conditional"`.
+#' * **`"joint_mixed"`:** the native glmmTMB prediction vector, or with
+#'   `se.fit = TRUE` its list with `fit` and `se.fit`.
+#' * **Native refits:** the provider's own output, with a
+#'   [prediction_contract] attribute that records the quantity and its
+#'   uncertainty. For an `unmarked` model this is the vector of native
+#'   `Predicted` values, or with `se.fit = TRUE` the native data frame with
+#'   `Predicted` (the component on its natural scale), `SE`, and the
+#'   confidence limits `lower` and `upper`.
+#' * **Raster input:** a `SpatRaster` of predictions, with a standard-error
+#'   layer when requested and available, and `prediction_contract` and
+#'   `projection_contract` attributes that record the controls used.
+#'   `unmarked` output keeps the native `Predicted`, `SE`, `lower`, and
+#'   `upper` columns as layers.
+#'
+#' No route adds observation noise, except the native `lm` prediction
+#' interval and the spaMM response variances (see "Native refits").
+#'
+#' @seealso [multiScaleR-prediction] for the quantity and uncertainty of each
+#'   route, [vcov.multiScaleR()] for the covariance matrices,
+#'   [prepare_prediction()] for repeated summaries of fixed rows,
+#'   [prepare_unmarked_data()] for keyed `unmarked` prediction rows,
+#'   [kernel_scale.raster()] for prediction rasters, [plot_marginal_effects()]
+#'   for effect curves, and [multiScale_optim()].
+#'
+#' @examples
+#' ## Running example: counts at 100 survey points and two landscape layers
+#' data("landscape_counts")
+#' data("surv_pts")
+#' pts <- terra::vect(surv_pts)
+#' land <- terra::rast(system.file("extdata", "landscape.tif",
+#'                                 package = "multiScaleR"))[[c("land1", "land2")]]
+#'
+#' ## The simulated layers are in meters but carry no coordinate reference
+#' ## system. Declare a local planar one so raster prediction can check cells.
+#' terra::crs(land) <- "local"
+#' terra::crs(pts) <- "local"
+#'
+#' ## bin = TRUE stores the distance bins that the analytic backend needs
+#' inputs <- kernel_prep(pts, land, max_D = 1700, kernel = "gaussian",
+#'                       bin = TRUE, verbose = FALSE)
+#' dat <- data.frame(landscape_counts, inputs$kernel_dat)
+#' start <- glm(counts ~ site + land1 + land2, family = poisson(), data = dat)
+#' fit <- multiScale_optim(start, inputs, backend = "profile_glm",
+#'                         n_cores = 1, verbose = FALSE)
+#'
+#' ## Expected counts at the first three survey points
+#' predict(fit)[1:3]
+#'
+#' ## 95% limits for the expected count. Joint limits let the scales vary,
+#' ## conditional limits hold them at their estimates.
+#' joint <- predict(fit, interval = "confidence")
+#' cond <- predict(fit, interval = "confidence", uncertainty = "conditional")
+#' round(cbind(expected = joint$fit,
+#'             joint_lower = joint$lower, joint_upper = joint$upper,
+#'             cond_lower = cond$lower, cond_upper = cond$upper)[1:3, ], 2)
+#'
+#' ## Back-transform a link-scale prediction yourself: exponentiate the
+#' ## estimate and its limits, never the standard error. This reproduces the
+#' ## joint limits for the first point.
+#' eta <- predict(fit, type = "link", se.fit = TRUE)
+#' exp(eta$fit[1] + c(-1, 1) * qnorm(0.975) * eta$se.fit[1])
+#'
+#' ## New points: prepare their landscape with the fitted settings, then give
+#' ## site values whose row names ("1", "2", "3") match the prepared point IDs
+#' new_inputs <- kernel_prep(pts[1:3], land, max_D = 1700, kernel = "gaussian",
+#'                           bin = TRUE, verbose = FALSE)
+#' new_sites <- data.frame(site = c(-1, 0, 1))
+#' predict(fit, new_sites, new_inputs, se.fit = TRUE)
+#'
+#' ## Map the expected count and its conditional standard error. The site
+#' ## layer holds the mean of site, so the map describes an average site.
+#' layers <- kernel_scale.raster(land, multiScaleR = fit, scale_center = TRUE,
+#'                               match_buffer = TRUE, verbose = FALSE)
+#' count_map <- predict(fit, layers, se.fit = TRUE, uncertainty = "conditional")
+#' terra::plot(count_map)
 #' @exportS3Method stats::predict
 predict.multiScaleR <- function(object, newdata = NULL, kernel_inputs = NULL,
                                 type = c("response", "link"), se.fit = FALSE,

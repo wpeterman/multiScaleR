@@ -1,4 +1,5 @@
 test_that("cached joint densities and conditional probabilities match ordinary evaluation", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   for (kernel in c("gaussian", "exp")) for (family in c("gaussian", "poisson", "binomial", "nbinom2")) {
     f <- bayesian_scale_fixture(n_site = 3, n_year = 2, kernel = kernel)
@@ -33,6 +34,7 @@ test_that("cached joint densities and conditional probabilities match ordinary e
 })
 
 test_that("cached reconstruction preserves collapsed Gaussian groups and SD extremes", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
   # Response groups are nested within years, so their Gaussian integral does
@@ -57,6 +59,7 @@ test_that("cached reconstruction preserves collapsed Gaussian groups and SD extr
 })
 
 test_that("conditional caches reject stale specifications and incompatible inputs", {
+  skip_on_cran()
   skip_if_not_installed("RTMB")
   f <- bayesian_scale_fixture(n_site = 3, n_year = 2)
   s <- multiScaleR:::.msr_marginal_prepare(count ~ habitat + temp, f$inputs, f$data,

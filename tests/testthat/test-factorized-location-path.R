@@ -13,6 +13,7 @@ location_path_fixture <- function(kernel, family, response, surface, design) {
 }
 
 test_that("common location paths preserve normalized group limits across supported designs", {
+  skip_on_cran()
   cases <- 0L; maximum <- 0; pointwise <- 0
   ratios <- c(-.75, 0, .75)
   for (kernel in c("gaussian", "exp"))

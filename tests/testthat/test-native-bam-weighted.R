@@ -87,6 +87,7 @@ weighted_bam_native <- function(entry, data, type, optimized, exclude = NULL) {
 }
 
 test_that("weighted and legacy NB BAM points and snapshots retain native targets", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
   cases <- weighted_bam_fixture(); expect_length(cases, 8L)
@@ -119,6 +120,7 @@ test_that("weighted and legacy NB BAM points and snapshots retain native targets
 })
 
 test_that("weighted and legacy NB BAM maps use exact native callback batches", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
   callback <- .msr_native_raster_eval
@@ -164,6 +166,7 @@ test_that("weighted and legacy NB BAM maps use exact native callback batches", {
 })
 
 test_that("weighted and legacy NB BAM curves keep conditional means and raw reference axes", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   open_null_device(); on.exit(grDevices::dev.off(), add = TRUE)
   old <- options(contrasts = c("contr.treatment", "contr.poly")); on.exit(options(old), add = TRUE)
@@ -255,6 +258,7 @@ test_that("large-weight NB bookkeeping verifies density without cancellation or 
 })
 
 test_that("weighted NB BAM native workers preserve geometry and diagnostics", {
+  skip_on_cran()
   skip_if_not_installed("mgcv")
   old <- options(contrasts = c("contr.sum", "contr.poly")); on.exit(options(old), add = TRUE)
   pool <- parallel::makePSOCKcluster(2L); on.exit(parallel::stopCluster(pool), add = TRUE)
