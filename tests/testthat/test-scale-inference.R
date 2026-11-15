@@ -177,7 +177,12 @@ test_that("no-intercept NB2 profiles recover oscillating conditional GLM fits", 
       mu = exp(drop(X * beta) + setup$obj$offset), size = theta, log = TRUE))
     independent <- optimize(objective, c(-20, 20), tol = 1e-10)
     expect_equal(value$value, independent$objective, tolerance = 1e-8)
-    expect_equal(unname(value$beta), independent$minimum, tolerance = 1e-6)
+    # glm.fit() stops on a relative deviance change of 1e-11. Near the optimum
+    # the deviance changes with the square of the coefficient error, so NB2
+    # coefficients are reliable only to about 1e-6 (about 1e-6 relative error
+    # at theta = 20 on both x86-64 and macOS arm64). The profile value above
+    # is the quantity inference uses, and it agrees to 1e-8.
+    expect_equal(unname(value$beta), independent$minimum, tolerance = 1e-5)
     numeric_score <- (suppressWarnings(setup$obj$fn(p + c(1e-5, 0))) -
                        suppressWarnings(setup$obj$fn(p - c(1e-5, 0)))) / 2e-5
     expect_equal(value$gradient[1], numeric_score, tolerance = 1e-5)

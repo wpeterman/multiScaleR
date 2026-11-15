@@ -76,7 +76,13 @@
   radius <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n)
   left <- center - radius - r - z * mcse
   right <- center + radius - r + z * mcse
-  event_ess <- if (r > 0 && r < 1 && mcse > 0) r * (1 - r) / mcse^2 else NA_real_
+  # The event ESS is undefined when every positively weighted reference draw
+  # agrees. Test the indicators themselves: a weighted sum need not round to
+  # exactly 0 or 1 where sum() has no extended-precision accumulator (macOS
+  # arm64), and a sum just below 1 would report an enormous ESS.
+  active <- reference[weight > 0]
+  varies <- any(active) && !all(active)
+  event_ess <- if (varies && r > 0 && r < 1 && mcse > 0) r * (1 - r) / mcse^2 else NA_real_
   status <- if (!overlap || !is.finite(event_ess) || event_ess < 400 ||
       !is.finite(split) || split > min(.05, tolerance)) "unresolved" else
     if (left > tolerance || right < -tolerance) "discrepancy" else

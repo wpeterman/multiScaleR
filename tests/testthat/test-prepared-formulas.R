@@ -180,8 +180,12 @@ test_that("quoted Bayesian kernel names retain predictions and shared scale coor
   expect_equal(nrow(attr(actual, "new_groups")), 0)
   # Unicode text rendering needs a device that supports Unicode fonts. The
   # prediction assertions above also run on platforms without Cairo.
-  if (!capabilities("cairo")) skip("Cairo is required to render Unicode labels.")
-  grDevices::cairo_pdf(tempfile(fileext = ".pdf"))
+  # capabilities("cairo") can be TRUE while the Cairo library still fails to
+  # load (macOS without XQuartz), so check that the device actually opened.
+  if (capabilities("cairo"))
+    suppressWarnings(try(grDevices::cairo_pdf(tempfile(fileext = ".pdf")), silent = TRUE))
+  if (!identical(names(grDevices::dev.cur()), "cairo_pdf"))
+    skip("A working Cairo device is required to render Unicode labels.")
   on.exit(grDevices::dev.off(), add = TRUE)
   plots <- plot_marginal_effects(fit, length.out = 5)
   expect_true(name %in% names(plots))

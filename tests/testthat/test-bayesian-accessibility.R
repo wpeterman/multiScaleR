@@ -147,8 +147,10 @@ test_that("the bundled annual example is portable and uses eligible actual fits"
   prepared <- multiScale_bayes(count ~ habitat + factor(year) + (1 | site),
     e$inputs, e$data, scales = list(habitat = ~1 + (1 | year)),
     row_id = "site_year", priors = list(scale_median = 250), method = "prepare")
+  # The bundled fit was prepared on x86-64. Other platforms, such as macOS
+  # arm64, reproduce its specification only to rounding error in the last digit.
   for (nm in c("V", "C", "delta", "center", "spread", "X_fixed", "y"))
-    expect_identical(prepared$specification[[nm]], f$specification[[nm]])
+    expect_equal(prepared$specification[[nm]], f$specification[[nm]], tolerance = 1e-12)
   expect_s3_class(plot(f), "ggplot")
   expect_s3_class(plot(f, type = "group_sd"), "ggplot")
   expect_equal(nrow(e$comparison), 15L)

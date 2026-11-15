@@ -11,6 +11,18 @@ test_that("event assessment respects overlap and simulation uncertainty", {
   expect_identical(assess(first, c(rep(TRUE, n / 2L), rep(FALSE, n / 2L)),
     w, .05, TRUE)$status, "unresolved")
   expect_identical(assess(first, first, w, .001, TRUE)$status, "unresolved")
+
+  # A reference that never varies stays unresolved when its weights do not
+  # sum to exactly 1. Without extended precision (macOS arm64), sum(w) above
+  # falls just below 1. Shrinking one weight reproduces that on every platform.
+  w_short <- w; w_short[1L] <- w_short[1L] * (1 - 1e-9)
+  expect_lt(sum(w_short), 1)
+  expect_identical(assess(first, rep(TRUE, n), w_short, .05, TRUE)$status, "unresolved")
+  expect_true(is.na(assess(first, rep(TRUE, n), w_short, .05, TRUE)$indicator_ess))
+  expect_identical(assess(first, rep(FALSE, n), w_short, .05, TRUE)$status, "unresolved")
+  # Zero-weight draws do not count as variation in the reference.
+  w_zero <- w; w_zero[1L] <- 0; w_zero <- w_zero / sum(w_zero)
+  expect_true(is.na(assess(first, c(FALSE, rep(TRUE, n - 1L)), w_zero, .05, TRUE)$indicator_ess))
 })
 
 test_that("the diagnostic preserves the original fit and caller RNG", {
