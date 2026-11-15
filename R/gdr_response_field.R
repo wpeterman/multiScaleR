@@ -120,9 +120,9 @@
   projection_env <- list2env(list(m = m, n = n, max_memory_mb = max_memory_mb,
     declared = declared, locations = locations, range = range, lower = lower,
     field_id = field_id), parent = environment(.msr_gdr_response_field_context))
-  numeric_budget <- budget; environment(numeric_budget) <- projection_env
+  numeric_budget <- .msr_drop_srcref(budget); environment(numeric_budget) <- projection_env
   projection_env$budget <- numeric_budget
-  environment(project) <- projection_env
+  project <- .msr_drop_srcref(project); environment(project) <- projection_env
   if (.geometry_only) return(list(project = project, field = definition,
     field_id = field_id, numeric_projection_portable = TRUE,
     fit_admission_established = FALSE, prediction_recipe_qualified = FALSE))

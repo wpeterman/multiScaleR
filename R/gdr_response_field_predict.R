@@ -30,7 +30,7 @@
   # or its native TMB constructor/tape through an unused caller binding.
   scope <- list2env(list(field = field, forms = forms),
     parent = environment(.msr_gdr_field_prediction_function))
-  environment(predictor) <- scope
+  predictor <- .msr_drop_srcref(predictor); environment(predictor) <- scope
   predictor
 }
 

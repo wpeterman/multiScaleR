@@ -235,3 +235,21 @@ extract_call_function_package <- function(x) {
 
   NULL
 }
+
+#' Drop source references from a closure kept in a returned object
+#'
+#' When multiScaleR is loaded with `keep.source = TRUE` (as covr does, and as
+#' `pkgload::load_all()` does in interactive sessions), every closure defined
+#' inside a package function carries a source reference to its whole source
+#' file. That text then travels with each serialized copy sent to a worker or
+#' saved with `saveRDS()`, and it enters the digests that guard stored
+#' contexts. Ordinary installs keep no source, so the closure comes back
+#' unchanged. `utils::removeSource()` keeps the environment and attributes.
+#'
+#' @param fn A closure.
+#' @return `fn` without source references.
+#' @noRd
+.msr_drop_srcref <- function(fn) {
+  if (is.null(attr(fn, "srcref"))) return(fn)
+  utils::removeSource(fn)
+}

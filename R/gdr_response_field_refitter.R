@@ -52,6 +52,6 @@
   scope <- list2env(list(field = field, cold_starts = cold_starts, audit_dir = audit_dir,
     original_frame = original_frame, original_key = original_key, provenance = provenance),
     parent = environment(.msr_gdr_field_refitter))
-  environment(callback) <- scope
+  callback <- .msr_drop_srcref(callback); environment(callback) <- scope
   callback
 }

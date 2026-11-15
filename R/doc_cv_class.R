@@ -338,8 +338,7 @@
 #' not apply. See [cross_validate_bayes()] for its elements.
 #'
 #' @name multiScaleR_cv-class
-#' @aliases multiScaleR_choice_cv-class multiScaleR_field_cv-class
-#'   multiScaleR_mixed_cv-class multiScaleR_bayes_cv-class
+#' @aliases multiScaleR_choice_cv-class multiScaleR_field_cv-class multiScaleR_mixed_cv-class multiScaleR_bayes_cv-class
 #' @examples
 #' data("landscape_counts")
 #' data("surv_pts")

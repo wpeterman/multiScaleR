@@ -91,14 +91,15 @@
   # scalar programs, never the caller frame, training data or an AD objective.
   value_env <- list2env(list(r = recipe, f = input$value),
     parent = environment(.msr_spline_columns))
-  value <- eval(quote(function(kernel) .msr_spline_columns(r, f(kernel), 0L)), value_env)
+  value <- .msr_drop_srcref(
+    eval(quote(function(kernel) .msr_spline_columns(r, f(kernel), 0L)), value_env))
   derivative <- lapply(input$derivative, function(df) {
     env <- list2env(list(r = recipe, f = input$value, d = df),
       parent = environment(.msr_spline_columns))
-    eval(quote(function(kernel) {
+    .msr_drop_srcref(eval(quote(function(kernel) {
       slope <- .msr_spline_columns(r, f(kernel), 1L); chain <- d(kernel)
       lapply(slope, function(x) x * chain)
-    }), env)
+    }), env))
   })
   list(value = value, derivative = derivative, zero = input$zero, width = width,
     nodes = as.integer(input$nodes + 16L * width * length(centers)),

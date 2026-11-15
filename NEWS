@@ -1,3 +1,22 @@
+multiScaleR 0.7.49
+
+Bug fixes
+
+* Closures that multiScaleR keeps inside returned objects no longer carry
+  source references. These are the spline programs of raw-design binomial
+  contexts and the projection, prediction, and refit functions of
+  distance-removal response fields. When the package was loaded with
+  `keep.source = TRUE`, as under covr or `devtools::load_all()` in an
+  interactive session, every serialized copy of these objects held a whole
+  source file, so copies sent to parallel workers grew to several
+  megabytes. Installs that keep no source, the default, were not affected.
+
+Documentation
+
+* The spatial fields vignette rebuilds its stored `glmmTMB` fit with
+  `glmmTMB::up2date()`, so the vignette builds under glmmTMB 1.1.15, which
+  cannot use a fit saved under 1.1.14 without it.
+
 multiScaleR 0.7.48
 
 Changes that can affect existing scripts
