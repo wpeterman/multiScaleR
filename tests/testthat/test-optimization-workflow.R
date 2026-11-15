@@ -892,6 +892,12 @@ test_that("multiScale_optim covers parallel and unmarked branches via mocks", {
 
 test_that("PSOCK workers load the same multiScaleR namespace as the main session", {
   skip_on_cran()
+  # Under covr on Linux CI, a real PSOCK worker started by these end-to-end
+  # tests has intermittently lost its socket right after cluster_prep()
+  # exported its variables ("error writing to connection"), in a different
+  # test on each run. R CMD check runs them cleanly on all five CI platforms,
+  # and test-internals-and-helpers.R still covers cluster_prep() under covr.
+  skip_on_covr()
   skip_if_not_installed("pkgload")
 
   fix <- make_core_fixture()
@@ -954,6 +960,7 @@ test_that("cluster_prep exports library paths for PSOCK workers", {
 
 test_that("screened starts run on real PSOCK workers", {
   skip_on_cran()
+  skip_on_covr() # See the namespace test above.
   skip_if_not_installed("pkgload")
 
   fix <- make_core_fixture()
@@ -998,6 +1005,7 @@ test_that("screened starts run on real PSOCK workers", {
 
 test_that("PSOCK optimization works for unqualified MASS model calls", {
   skip_on_cran()
+  skip_on_covr() # See the namespace test above.
   skip_if_not_installed("MASS")
   skip_if_not_installed("pkgload")
 
@@ -1042,6 +1050,7 @@ test_that("PSOCK optimization works for unqualified MASS model calls", {
 
 test_that("PSOCK optimization works for nested clogit wrappers", {
   skip_on_cran()
+  skip_on_covr() # See the namespace test above.
   skip_if_not_installed("survival")
   skip_if_not_installed("pkgload")
 
