@@ -890,6 +890,48 @@ test_that("multiScale_optim covers parallel and unmarked branches via mocks", {
   expect_equal(rownames(mocked_unmark$scale_est), c("bin1", "cont1"))
 })
 
+test_that("parallel optimization stops every worker when worker setup fails", {
+  fix <- make_core_fixture()
+  calls <- new.env(parent = emptyenv())
+  calls$stopped <- character()
+  calls$default <- list()
+  # Two fake workers. Worker "a" has died, so stopping it fails.
+  fake_cl <- structure(list(list(id = "a"), list(id = "b")),
+                       class = c("SOCKcluster", "cluster"))
+
+  expect_error(
+    with_mocked_bindings(
+      multiScale_optim(
+        fitted_mod = fix$fitted_mod,
+        kernel_inputs = fix$kernel_inputs,
+        par = 0.2,
+        n_cores = 2,
+        PSOCK = TRUE,
+        verbose = FALSE
+      ),
+      makeCluster = function(...) fake_cl,
+      setDefaultCluster = function(cl = NULL) {
+        calls$default <- c(calls$default, list(cl))
+        invisible(NULL)
+      },
+      cluster_prep = function(model, cl) stop("forced setup failure"),
+      optimParallel = function(...) stop("Optimization must not start"),
+      stopCluster = function(cl) {
+        calls$stopped <- c(calls$stopped, cl[[1]]$id)
+        if (identical(cl[[1]]$id, "a")) stop("error writing to connection")
+        invisible(NULL)
+      },
+      .package = "multiScaleR"
+    ),
+    "forced setup failure"
+  )
+
+  # The original error surfaces, the live worker is still stopped after the
+  # dead one fails, and the default cluster no longer points at the workers.
+  expect_identical(calls$stopped, c("a", "b"))
+  expect_null(calls$default[[length(calls$default)]])
+})
+
 test_that("PSOCK workers load the same multiScaleR namespace as the main session", {
   skip_on_cran()
   # Under covr on Linux CI, a real PSOCK worker started by these end-to-end

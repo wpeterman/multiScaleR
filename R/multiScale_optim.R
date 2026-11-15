@@ -359,7 +359,7 @@
     } else {
       makeCluster(n_screen_cores)
     }
-    on.exit(stopCluster(cl), add = TRUE)
+    on.exit(.msr_stop_cluster(cl), add = TRUE)
     cluster_prep(fitted_mod, cl)
 
     screened_try <- try(
@@ -1133,32 +1133,35 @@ multiScale_optim <- function(fitted_mod,
     } else {
       cl <- makeCluster(n_cores)
     }
-    setDefaultCluster(cl = cl)
-    cluster_prep(fitted_mod, cl)
-
-    ## Run parallel optimization
-    opt_results <- try(
-      optimParallel(
-        par = par,
-        fn = kernel_scale_fn,
-        hessian = TRUE,
-        lower = lwr,
-        upper = uppr,
-        fitted_mod = fitted_mod,
-        d_list = kernel_inputs$d_list,
-        cov_df = kernel_inputs$raw_cov,
-        kernel = kernel_inputs$kernel,
-        join_by = join_by,
-        opt_context = opt_context,
-        control = list(maxit = 1000),
-        parallel = list(forward = FALSE, loginfo = TRUE)
-      ),
-      silent = TRUE
-    )
-
-    ## Stop parallel cluster
-    setDefaultCluster(cl = NULL)
-    stopCluster(cl)
+    ## Prepare the workers and run the parallel optimization. The finally
+    ## clause clears the default cluster and stops the workers even when
+    ## worker setup fails or the user interrupts the run, so no worker
+    ## processes outlive this call.
+    opt_results <- tryCatch({
+      setDefaultCluster(cl = cl)
+      cluster_prep(fitted_mod, cl)
+      try(
+        optimParallel(
+          par = par,
+          fn = kernel_scale_fn,
+          hessian = TRUE,
+          lower = lwr,
+          upper = uppr,
+          fitted_mod = fitted_mod,
+          d_list = kernel_inputs$d_list,
+          cov_df = kernel_inputs$raw_cov,
+          kernel = kernel_inputs$kernel,
+          join_by = join_by,
+          opt_context = opt_context,
+          control = list(maxit = 1000),
+          parallel = list(forward = FALSE, loginfo = TRUE)
+        ),
+        silent = TRUE
+      )
+    }, finally = {
+      setDefaultCluster(cl = NULL)
+      .msr_stop_cluster(cl)
+    })
 
     ## If parallel optimization failed
     if (inherits(opt_results, "try-error")) {

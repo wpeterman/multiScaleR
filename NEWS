@@ -1,3 +1,13 @@
+multiScaleR 0.7.52
+
+Bug fixes
+
+* `multiScale_optim()` now stops its parallel workers and clears the default
+  cluster when worker setup fails or the run is interrupted. Previously the
+  workers kept running until R closed their connections, which produced
+  "closing unused connection" warnings. A worker that has already died no
+  longer prevents the remaining workers from being stopped.
+
 multiScaleR 0.7.50
 
 Bug fixes

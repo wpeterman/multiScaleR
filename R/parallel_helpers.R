@@ -253,3 +253,20 @@ extract_call_function_package <- function(x) {
   if (is.null(attr(fn, "srcref"))) return(fn)
   utils::removeSource(fn)
 }
+
+#' Stop every worker in a cluster, tolerating workers that already died
+#'
+#' `parallel::stopCluster()` stops the workers in turn and gives up at the
+#' first one it cannot reach, so a single worker that died earlier leaves the
+#' remaining workers running. Stopping each worker separately shuts down every
+#' reachable worker. Cleanup errors are ignored because the caller has either
+#' finished its work or is already reporting the error that ended it.
+#'
+#' @param cl A cluster from `parallel::makeCluster()` or
+#'   `parallel::makeForkCluster()`.
+#' @return `NULL`, invisibly.
+#' @noRd
+.msr_stop_cluster <- function(cl) {
+  for (i in seq_along(cl)) try(stopCluster(cl[i]), silent = TRUE)
+  invisible(NULL)
+}
