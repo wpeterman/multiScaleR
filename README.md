@@ -146,7 +146,7 @@ leave out:
 | `?"multiScaleR-prediction"` | What each prediction represents and how uncertain it is |
 | `?"multiScaleR-glossary"` | Plain-language definitions of the terms used |
 
-`NEWS` lists the changes in each version, including the switch to planar
+`NEWS.md` lists the changes in each version, including the switch to planar
 (2D) kernel distances in version 0.7.4.
 
 ## Experimental tools

@@ -66,14 +66,12 @@ The package follows semantic versioning with a development suffix.
 - Development versions have four components, `MAJOR.MINOR.PATCH.9000` and up, and are used on every branch other than `master`. The first three components are the most recent release.
 - When making a commit on a development branch, increase the fourth component by 1 (for example `1.0.0.9000` to `1.0.0.9001`) and update `DESCRIPTION` to match.
 - Do not change the first three components unless a release is explicitly requested. The size of the release increment is decided at release time from the accumulated changes, not per commit.
-- Transition: the four-component scheme starts once 1.0.0 is released. Until then, branches numbered 0.7.x continue to increase the version by 0.0.1 per commit.
 - From 1.0.0 onward, a breaking change to an exported function requires either a deprecation cycle (warn for one MINOR release, then remove) or a MAJOR release. Functions documented as experimental are exempt.
 
 ## Updating rules
 - Provide a succinct, minimal review of what the update contains.
-- Record user-facing changes in the news file (`NEWS`; it becomes `NEWS.md` at the 1.0.0 release) as brief bullets.
-  - Under the four-component scheme, add bullets to a single `multiScaleR (development version)` section at the top of the file. Do not create a section per development version.
-  - Until then, add an entry under the new 0.7.x version number.
+- Record user-facing changes in `NEWS.md` as brief bullets.
+  - Add bullets to a single `multiScaleR (development version)` section at the top of the file. Do not create a section per development version.
 - Do not commit changes until explicitly asked. Minor related edits can accumulate into one commit.
 
 ## Release rules
