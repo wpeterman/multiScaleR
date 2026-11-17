@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Methods for Optimizing Scales of Effect • multiScaleR</title>
+<title>Estimate Scales of Effect for Spatial Ecological Models • multiScaleR</title>
 <!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
 <link rel="icon" type="”image/svg+xml”" href="favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -14,9 +14,9 @@
 <link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Methods for Optimizing Scales of Effect">
-<meta name="description" content="A tool for optimizing scales of effect when modeling ecological processes in space. Specifically, the scale parameter of a distance-weighted kernel distribution is identified for all environmental layers included in the model. Includes functions to assist in model selection, model evaluation, efficient transformation of raster surfaces using fast Fourier transformation, and projecting models. For more details see Peterman (2026) &lt;doi:10.1007/s10980-025-02267-x&gt;.">
-<meta property="og:description" content="A tool for optimizing scales of effect when modeling ecological processes in space. Specifically, the scale parameter of a distance-weighted kernel distribution is identified for all environmental layers included in the model. Includes functions to assist in model selection, model evaluation, efficient transformation of raster surfaces using fast Fourier transformation, and projecting models. For more details see Peterman (2026) &lt;doi:10.1007/s10980-025-02267-x&gt;.">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Estimate Scales of Effect for Spatial Ecological Models">
+<meta name="description" content="Estimates the scale of effect, the distance over which a landscape variable influences an ecological response. Raster values around each sample location are weighted with a distance kernel, and the kernel scale that maximizes the likelihood of a fitted regression model is found. Works with linear, generalized linear, additive, and mixed models, with unmarked occupancy, abundance, and distance-removal models, and with step-selection models, and fits Bayesian models in which scales vary among years or with covariates. Also provides kernel-weighted landscape and surface metrics, cross-validation, model selection tables, fast kernel smoothing of rasters for mapping predictions, and simulation of data with known scales of effect. For more details see Peterman (2026) &lt;doi:10.1007/s10980-025-02267-x&gt;.">
+<meta property="og:description" content="Estimates the scale of effect, the distance over which a landscape variable influences an ecological response. Raster values around each sample location are weighted with a distance kernel, and the kernel scale that maximizes the likelihood of a fitted regression model is found. Works with linear, generalized linear, additive, and mixed models, with unmarked occupancy, abundance, and distance-removal models, and with step-selection models, and fits Bayesian models in which scales vary among years or with covariates. Also provides kernel-weighted landscape and surface metrics, cross-validation, model selection tables, fast kernel smoothing of rasters for mapping predictions, and simulation of data with known scales of effect. For more details see Peterman (2026) &lt;doi:10.1007/s10980-025-02267-x&gt;.">
 <meta property="og:image" content="https://wpeterman.github.io/multiScaleR/logo.png">
 </head>
 <body>
@@ -27,7 +27,7 @@
 
     <a class="navbar-brand me-2" href="index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,25 +36,39 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="articles/quickstart.html">Get started</a></li>
+<li class="nav-item"><a class="nav-link" href="articles/v01-quickstart.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="articles/quickstart.html">multiScaleR Quick-Start Guide</a></li>
-    <li><a class="dropdown-item" href="articles/multiScaleR_Guide.html">multiScaleR User Guide</a></li>
+    <li><a class="dropdown-item" href="articles/v01-quickstart.html">01. Quick start</a></li>
+    <li><a class="dropdown-item" href="articles/v02-user-guide.html">02. User guide</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Covariate types</h6></li>
-    <li><a class="dropdown-item" href="articles/landscape_metric_covariates.html">Landscape Metric Covariates</a></li>
-    <li><a class="dropdown-item" href="articles/surface_metric_covariates.html">Surface Texture Covariates</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Covariates and maps</h6></li>
+    <li><a class="dropdown-item" href="articles/v03-map-predictions.html">03. Mapping Predictions and Limiting Extrapolation</a></li>
+    <li><a class="dropdown-item" href="articles/v04-landscape-metrics.html">04. Landscape Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="articles/v05-surface-metrics.html">05. Surface Texture Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="articles/v06-year-specific-rasters.html">06. Using Year-Specific Rasters in One Model</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="articles/year-specific-rasters.html">Using Year-Specific Rasters in One Model</a></li>
-    <li><a class="dropdown-item" href="articles/spatial_projection_clamping.html">Spatial Projection and Clamping</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Fitting and evaluation</h6></li>
+    <li><a class="dropdown-item" href="articles/v07-fitting-methods.html">07. Choose a Fitting Method for Your Model</a></li>
+    <li><a class="dropdown-item" href="articles/v08-cross-validation.html">08. Cross-Validate Scale-of-Effect Models</a></li>
+    <li><a class="dropdown-item" href="articles/v09-estimates-and-intervals.html">09. What Your Estimates and Intervals Mean</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Specialized models</h6></li>
+    <li><a class="dropdown-item" href="articles/v10-step-selection.html">10. Estimate Scales of Effect in Step-Selection Models</a></li>
+    <li><a class="dropdown-item" href="articles/v11-spatial-fields.html">11. Account for Spatial Autocorrelation with a Spatial Field</a></li>
+    <li><a class="dropdown-item" href="articles/v12-distance-removal.html">12. Fit Distance-Removal Models with Scales of Effect</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Bayesian scale estimation</h6></li>
+    <li><a class="dropdown-item" href="articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -81,7 +95,7 @@
 <img src="logo.png" class="logo" alt=""><h1 id="multiscaler-">multiScaleR <a class="anchor" aria-label="anchor" href="#multiscaler-"></a>
 </h1>
 </div>
-<p>README last updated: 2026-11-11</p>
+<p>README last updated: 2026-11-14</p>
 <!-- Status badges. Kept in a table (not a "badges: start/end" block) so that
      pkgdown shows them on the home page instead of moving them to the sidebar. -->
 <table class="table">
@@ -110,13 +124,26 @@
 <td><a href="https://cran.r-project.org/package=multiScaleR" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/grand-total/multiScaleR" alt="CRAN downloads"></a></td>
 <td><a href="https://doi.org/10.1007/s10980-025-02267-x" class="external-link"><img src="https://img.shields.io/badge/DOI-10.1007/s10980--025--02267--x-yellow.svg" alt="DOI"></a></td>
 </tr>
+<tr>
+<td><a href="https://wpeterman.r-universe.dev/multiScaleR" class="external-link"><img src="https://wpeterman.r-universe.dev/multiScaleR/badges/checks" alt="r-universe checks"></a></td>
+<td><a href="https://wpeterman.r-universe.dev/multiScaleR" class="external-link"><img src="https://wpeterman.r-universe.dev/multiScaleR/badges/version" alt="r-universe version"></a></td>
+<td></td>
+<td></td>
+</tr>
 </tbody>
 </table>
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>multiScaleR is an R package to identify the scale of effect of spatial environmental variables in regression analyses.</p>
-<p>Functions to simulate data with known scales of effect are included with this package.</p>
+<p>The <em>scale of effect</em> is the distance over which a landscape variable influences an ecological response. multiScaleR estimates it directly. It weights the raster cells around each survey point with a distance kernel and chooses the kernel scale (sigma) that maximizes the likelihood of your regression model. You fit your model once at starting values, and multiScaleR searches over scales, reports each one with its uncertainty, and helps you compare, check, and map the result.</p>
+<p>multiScaleR works with:</p>
+<ul>
+<li>linear, generalized linear, additive, and mixed models;</li>
+<li>occupancy and abundance models from <code>unmarked</code>, including distance-removal models;</li>
+<li>step-selection models fitted with <code><a href="https://rdrr.io/pkg/survival/man/clogit.html" class="external-link">survival::clogit()</a></code> or <code>amt</code>;</li>
+<li>Bayesian models in which a scale of effect can vary among years or with a covariate.</li>
+</ul>
+<p>It also computes kernel-weighted landscape and surface metrics, cross-validates models with spatial or grouped folds, maps predictions across a landscape, and simulates data with known scales of effect so you can test a design before collecting data.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -124,9 +151,16 @@
 <p>Install the CRAN release with:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"multiScaleR"</span><span class="op">)</span></span></code></pre></div>
+<p>Install the latest build from R-universe with:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span></span>
+<span>  <span class="st">"multiScaleR"</span>,</span>
+<span>  repos <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"https://wpeterman.r-universe.dev"</span>, <span class="st">"https://cloud.r-project.org"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>R-universe rebuilds multiScaleR from the <code>master</code> branch on GitHub whenever that branch changes. This version can therefore be newer than the CRAN release. R-universe provides precompiled Windows and macOS binaries with the vignettes already built, so this route does not require Rtools.</p>
 <p>If installing from GitHub on Windows, you may need Rtools to compile the package from source. Choose the Rtools release that matches your version of R and follow the installation instructions at <a href="https://cran.r-project.org/bin/windows/Rtools/" class="external-link uri">https://cran.r-project.org/bin/windows/Rtools/</a>.</p>
 <p>Then execute the following commands in R:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Install 'remotes' package, if needed</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"remotes"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span>, repos <span class="op">=</span> <span class="st">"https://cloud.r-project.org"</span><span class="op">)</span></span>
@@ -136,21 +170,153 @@
 <span>                        build_vignettes <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="co"># Install &amp; build vignette</span></span>
 <span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://wpeterman.github.io/multiScaleR/">multiScaleR</a></span><span class="op">)</span> <span class="co"># Load the package</span></span></code></pre></div>
-<p>The package vignettes provide worked analyses of simulated data and explain the main workflows.</p>
 </div>
 <div class="section level2">
-<h2 id="kernel-distance-reporting">Kernel distance reporting<a class="anchor" aria-label="anchor" href="#kernel-distance-reporting"></a>
+<h2 id="a-first-example">A first example<a class="anchor" aria-label="anchor" href="#a-first-example"></a>
 </h2>
-<p>Starting with version 0.7.4, <code><a href="reference/kernel_dist.html">kernel_dist()</a></code>, kernel plots, and the selected summary distance default to <code>dimension = "2d"</code>: the radius containing the requested share of an ideal kernel’s total weight on a plane. At 90%, a Gaussian kernel with sigma = 300 m has a planar radius of about 644 m, compared with the original line-based distance of about 493 m. Raster edges, missing cells, cell geometry, and <code>max_D</code> can change the weight actually retained at a site.</p>
-<p>Set <code>dimension = "1d"</code> in <code><a href="reference/kernel_dist.html">kernel_dist()</a></code>, <code><a href="reference/plot_kernel.html">plot_kernel()</a></code>, <code>plot(fit)</code>, or <code>summary(fit)</code> to restore the original definition. Summary <code>opt_dist</code> and <code>opt_distance</code> follow that selection; <code>opt_dist_1d</code> and <code>opt_dist_2d</code> always identify the two definitions explicitly. This reporting switch does not change the fitted sigma, coefficients, or likelihood. Simulation extents, projection windows, and stored optimization warnings retain their historical 1D cutoffs. See <code><a href="articles/multiScaleR_Guide.html">vignette("multiScaleR_Guide", package = "multiScaleR")</a></code> for interpretation and migration examples.</p>
+<p>The package includes simulated counts at 75 points, generated with a habitat effect whose true scale of effect (sigma) is 75 map units.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://wpeterman.github.io/multiScaleR/">multiScaleR</a></span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">pts</span><span class="op">)</span>          <span class="co"># survey points</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">count_data</span><span class="op">)</span>   <span class="co"># counts at each point</span></span>
+<span><span class="va">hab</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/rast.html" class="external-link">rast</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"hab.tif"</span>, package <span class="op">=</span> <span class="st">"multiScaleR"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 1. Weight the habitat raster around each point with a Gaussian kernel</span></span>
+<span><span class="va">inputs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/kernel_prep.html">kernel_prep</a></span><span class="op">(</span>pts <span class="op">=</span> <span class="va">pts</span>, raster_stack <span class="op">=</span> <span class="va">hab</span>, max_D <span class="op">=</span> <span class="fl">250</span>,</span>
+<span>                      kernel <span class="op">=</span> <span class="st">"gaussian"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 2. Fit your model once, at the starting scale</span></span>
+<span><span class="va">start_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">hab</span>, family <span class="op">=</span> <span class="va">poisson</span>, data <span class="op">=</span> <span class="va">count_data</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># 3. Estimate the scale of effect</span></span>
+<span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/multiScale_optim.html">multiScale_optim</a></span><span class="op">(</span><span class="va">start_model</span>, <span class="va">inputs</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>   <span class="co"># sigma, its interval, and the distance holding 90% of the weight</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>      <span class="co"># the fitted kernel weight curve</span></span></code></pre></div>
+<p>The estimated sigma is close to the simulated value of 75, and <code><a href="https://rspatial.github.io/terra/reference/summary.html" class="external-link">summary()</a></code> converts it into the distance that contains 90% of the kernel’s weight, which is the number to report as the scale of effect.</p>
 </div>
 <div class="section level2">
-<h2 id="marginal-effects-for-unmarked-models">Marginal effects for unmarked models<a class="anchor" aria-label="anchor" href="#marginal-effects-for-unmarked-models"></a>
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
-<p>Version 0.7.4 fixes marginal-effect plots for models with factors such as <code>Year</code>, extra site-ID columns, and repeated site-year rows linked by <code>join_by</code>. Predictors are recovered from the state or abundance formula. Numeric predictors are held at their observed means and categorical predictors at their first observed values in other panels. Factors receive a point and confidence interval for each observed level.</p>
-<p>For random-effects models, plots set site effects to zero explicitly. These are conditional predictions, not averages over years, sites, or the random-effect distribution. Their intervals are conditional on the selected scale. See <code><a href="reference/plot_marginal_effects.html">?plot_marginal_effects</a></code> for supported prediction types and factor contrast handling. Existing fitted objects can be plotted without rerunning scale optimization.</p>
+<p>The vignettes work through simulated data and explain how to read each result. Start with the quick start and the user guide, then turn to the topics you need. Open one in R with <code><a href="articles/v01-quickstart.html">vignette("v01-quickstart", package = "multiScaleR")</a></code>, or read them all on the <a href="https://wpeterman.github.io/multiScaleR/articles/">package website</a>.</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr>
+<th align="left">Vignette</th>
+<th align="left">Name in <code><a href="https://rdrr.io/r/utils/vignette.html" class="external-link">vignette()</a></code>
+</th>
+</tr></thead>
+<tbody>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v01-quickstart.html">01. Quick start</a></td>
+<td align="left"><code>v01-quickstart</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.html">02. User guide</a></td>
+<td align="left"><code>v02-user-guide</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v03-map-predictions.html">03. Mapping predictions and limiting extrapolation</a></td>
+<td align="left"><code>v03-map-predictions</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v04-landscape-metrics.html">04. Landscape metrics as covariates</a></td>
+<td align="left"><code>v04-landscape-metrics</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v05-surface-metrics.html">05. Surface texture metrics as covariates</a></td>
+<td align="left"><code>v05-surface-metrics</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v06-year-specific-rasters.html">06. Using year-specific rasters in one model</a></td>
+<td align="left"><code>v06-year-specific-rasters</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v07-fitting-methods.html">07. Choose a fitting method for your model</a></td>
+<td align="left"><code>v07-fitting-methods</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v08-cross-validation.html">08. Cross-validate scale-of-effect models</a></td>
+<td align="left"><code>v08-cross-validation</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v09-estimates-and-intervals.html">09. What your estimates and intervals mean</a></td>
+<td align="left"><code>v09-estimates-and-intervals</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v10-step-selection.html">10. Estimate scales of effect in step-selection models</a></td>
+<td align="left"><code>v10-step-selection</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v11-spatial-fields.html">11. Account for spatial autocorrelation with a spatial field</a></td>
+<td align="left"><code>v11-spatial-fields</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v12-distance-removal.html">12. Fit distance-removal models with scales of effect</a></td>
+<td align="left"><code>v12-distance-removal</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.html">13. Estimate scales of effect with a Bayesian model</a></td>
+<td align="left"><code>v13-bayesian-scales</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.html">14. Predict new sites and years from a Bayesian model</a></td>
+<td align="left"><code>v14-bayesian-prediction</code></td>
+</tr>
+<tr>
+<td align="left"><a href="https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.html">15. Choose and check a Bayesian computation method</a></td>
+<td align="left"><code>v15-bayesian-computation</code></td>
+</tr>
+</tbody>
+</table>
+<p>Reference topics in the help system give the details that the vignettes leave out:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr>
+<th align="left">Help topic</th>
+<th align="left">What it covers</th>
+</tr></thead>
+<tbody>
+<tr>
+<td align="left"><code><a href="reference/multiScaleR-package.html">?multiScaleR</a></code></td>
+<td align="left">Package overview and the main functions, step by step</td>
+</tr>
+<tr>
+<td align="left"><code><a href="reference/multiScaleR-kernels.html">?"multiScaleR-kernels"</a></code></td>
+<td align="left">Kernel families, sigma, hard radii, and effective distance</td>
+</tr>
+<tr>
+<td align="left"><code><a href="reference/multiScaleR-fitting-methods.html">?"multiScaleR-fitting-methods"</a></code></td>
+<td align="left">The fitting backends and the uncertainty each reports</td>
+</tr>
+<tr>
+<td align="left"><code><a href="reference/multiScaleR-prediction.html">?"multiScaleR-prediction"</a></code></td>
+<td align="left">What each prediction represents and how uncertain it is</td>
+</tr>
+<tr>
+<td align="left"><code><a href="reference/multiScaleR-glossary.html">?"multiScaleR-glossary"</a></code></td>
+<td align="left">Plain-language definitions of the terms used</td>
+</tr>
+</tbody>
+</table>
+<p><code>NEWS.md</code> lists the changes in each version, including the switch to planar (2D) kernel distances in version 0.7.4.</p>
+</div>
+<div class="section level2">
+<h2 id="experimental-tools">Experimental tools<a class="anchor" aria-label="anchor" href="#experimental-tools"></a>
+</h2>
+<p><code><a href="reference/cross_validate_bayes.html">cross_validate_bayes()</a></code>, <code><a href="reference/cross_validate_mixed.html">cross_validate_mixed()</a></code>, the count, binary, and positive families of <code><a href="reference/cross_validate_field.html">cross_validate_field()</a></code>, <code><a href="reference/diagnose_bayes_laplace.html">diagnose_bayes_laplace()</a></code>, and the <code>radius_grid</code> argument of <code><a href="reference/multiScale_optim.html">multiScale_optim()</a></code> are experimental. Their arguments and results may change in a later release without a deprecation period.</p>
+</div>
+<div class="section level2">
+<h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
+</h2>
+<p>Run <code>citation("multiScaleR")</code> to cite the paper that describes the method and the package version you used.</p>
 <p align="center">
-<img src="reference/figures/logo.png" height="200"></p>
+<img src="reference/figures/logo.png" alt="multiScaleR package logo" height="200"></p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -15,23 +15,37 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/quickstart.html">Get started</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/v01-quickstart.html">Get started</a></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/quickstart.html">multiScaleR Quick-Start Guide</a></li>
-    <li><a class="dropdown-item" href="../articles/multiScaleR_Guide.html">multiScaleR User Guide</a></li>
+    <li><a class="dropdown-item" href="../articles/v01-quickstart.html">01. Quick start</a></li>
+    <li><a class="dropdown-item" href="../articles/v02-user-guide.html">02. User guide</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Covariate types</h6></li>
-    <li><a class="dropdown-item" href="../articles/landscape_metric_covariates.html">Landscape Metric Covariates</a></li>
-    <li><a class="dropdown-item" href="../articles/surface_metric_covariates.html">Surface Texture Covariates</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Covariates and maps</h6></li>
+    <li><a class="dropdown-item" href="../articles/v03-map-predictions.html">03. Mapping Predictions and Limiting Extrapolation</a></li>
+    <li><a class="dropdown-item" href="../articles/v04-landscape-metrics.html">04. Landscape Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v05-surface-metrics.html">05. Surface Texture Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v06-year-specific-rasters.html">06. Using Year-Specific Rasters in One Model</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/year-specific-rasters.html">Using Year-Specific Rasters in One Model</a></li>
-    <li><a class="dropdown-item" href="../articles/spatial_projection_clamping.html">Spatial Projection and Clamping</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Fitting and evaluation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v07-fitting-methods.html">07. Choose a Fitting Method for Your Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v08-cross-validation.html">08. Cross-Validate Scale-of-Effect Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v09-estimates-and-intervals.html">09. What Your Estimates and Intervals Mean</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Specialized models</h6></li>
+    <li><a class="dropdown-item" href="../articles/v10-step-selection.html">10. Estimate Scales of Effect in Step-Selection Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v11-spatial-fields.html">11. Account for Spatial Autocorrelation with a Spatial Field</a></li>
+    <li><a class="dropdown-item" href="../articles/v12-distance-removal.html">12. Fit Distance-Removal Models with Scales of Effect</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Bayesian scale estimation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/wpeterman/multiScaleR/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -52,6 +66,78 @@
     </div>
 
     <div class="section level2">
+      <h2 id="concepts-and-objects">Concepts and objects<a class="anchor" aria-label="anchor" href="#concepts-and-objects"></a></h2>
+
+      <div class="section-desc"><p>Start here. Background on kernels, fitting methods, and predictions, a glossary of terms, and descriptions of the objects the main functions return.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="multiScaleR-package.html">multiScaleR</a></code> <code><a href="multiScaleR-package.html">multiScaleR-package</a></code>
+
+        </dt>
+        <dd>multiScaleR: estimate scales of effect for spatial covariates</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR-glossary.html">multiScaleR-glossary</a></code>
+
+        </dt>
+        <dd>Glossary of terms used in multiScaleR</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR-kernels.html">multiScaleR-kernels</a></code>
+
+        </dt>
+        <dd>Kernels and scales of effect</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR-fitting-methods.html">multiScaleR-fitting-methods</a></code>
+
+        </dt>
+        <dd>Fitting methods for estimating scales of effect</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR-prediction.html">multiScaleR-prediction</a></code>
+
+        </dt>
+        <dd>Prediction quantities and their uncertainty</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR-class.html">multiScaleR-class</a></code>
+
+        </dt>
+        <dd>Fitted multiScaleR objects</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR_data-class.html">multiScaleR_data-class</a></code>
+
+        </dt>
+        <dd>Prepared inputs for scale estimation</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR_bayes-class.html">multiScaleR_bayes-class</a></code>
+
+        </dt>
+        <dd>Bayesian landscape-scale fits</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR_cv-class.html">multiScaleR_cv-class</a></code> <code><a href="multiScaleR_cv-class.html">multiScaleR_choice_cv-class</a></code> <code><a href="multiScaleR_cv-class.html">multiScaleR_field_cv-class</a></code> <code><a href="multiScaleR_cv-class.html">multiScaleR_mixed_cv-class</a></code> <code><a href="multiScaleR_cv-class.html">multiScaleR_bayes_cv-class</a></code>
+
+        </dt>
+        <dd>Cross-validation results</dd>
+      </dl></div><div class="section level2">
       <h2 id="prepare-inputs">Prepare inputs<a class="anchor" aria-label="anchor" href="#prepare-inputs"></a></h2>
 
       <div class="section-desc"><p>Build the kernel inputs and declare how each raster covariate is summarized before optimization.</p></div>
@@ -66,7 +152,7 @@
           <code><a href="kernel_prep.html">kernel_prep()</a></code>
 
         </dt>
-        <dd>Kernel Scale Preparation</dd>
+        <dd>Prepare Kernel Inputs for Scale Optimization</dd>
 
         <dt>
 
@@ -77,21 +163,35 @@
 
         <dt>
 
-          <code><a href="msr_vars.html">msr_vars()</a></code> <code><a href="msr_vars.html">kernel_var()</a></code> <code><a href="msr_vars.html">landscape_var()</a></code> <code><a href="msr_vars.html">surface_var()</a></code>
+          <code><a href="msr_vars.html">msr_vars()</a></code> <code><a href="msr_vars.html">kernel_var()</a></code> <code><a href="msr_vars.html">landscape_var()</a></code> <code><a href="msr_vars.html">surface_var()</a></code> <code><a href="msr_vars.html">print(<i>&lt;multiScaleR_vars&gt;</i>)</a></code>
 
         </dt>
-        <dd>Define multiScaleR covariate transformations</dd>
+        <dd>Define Model Covariates from Raster Layers</dd>
 
         <dt>
 
-          <code><a href="estimate_multiscale_ram.html">estimate_multiscale_ram()</a></code>
+          <code><a href="prepare_unmarked_data.html">prepare_unmarked_data()</a></code>
+
+        </dt>
+        <dd>Prepare spatial covariates for native unmarked prediction</dd>
+
+        <dt>
+
+          <code><a href="validate_unmarked_data.html">validate_unmarked_data()</a></code> <code><a href="validate_unmarked_data.html">print(<i>&lt;msr_unmarked_audit&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Audit Survey Identities and Paired Distance-Removal Counts</dd>
+
+        <dt>
+
+          <code><a href="estimate_multiscale_ram.html">estimate_multiscale_ram()</a></code> <code><a href="estimate_multiscale_ram.html">print(<i>&lt;multiScaleR_ram&gt;</i>)</a></code>
 
         </dt>
         <dd>Estimate Memory Requirements for Multiscale Optimization</dd>
       </dl></div><div class="section level2">
       <h2 id="optimize-scales-of-effect">Optimize scales of effect<a class="anchor" aria-label="anchor" href="#optimize-scales-of-effect"></a></h2>
 
-      <div class="section-desc"><p>Estimate the scale of effect for each covariate and assess the fit.</p></div>
+      <div class="section-desc"><p>Estimate the scale of effect for each covariate by maximum likelihood and assess the fit.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -103,14 +203,21 @@
           <code><a href="multiScale_optim.html">multiScale_optim()</a></code>
 
         </dt>
-        <dd>Multiscale optimization</dd>
+        <dd>Estimate scales of effect by maximum likelihood</dd>
 
         <dt>
 
           <code><a href="profile_sigma.html">profile_sigma()</a></code>
 
         </dt>
-        <dd>Profile Model Fit Across Sigma Parameter Space</dd>
+        <dd>Profile Model Fit Across Sigma</dd>
+
+        <dt>
+
+          <code><a href="scale_inference.html">scale_inference()</a></code>
+
+        </dt>
+        <dd>Profile and Bootstrap Inference for an NB2 Scale</dd>
 
         <dt>
 
@@ -118,6 +225,85 @@
 
         </dt>
         <dd>Retrieve diagnostics from multiScaleR objects</dd>
+
+        <dt>
+
+          <code><a href="vcov.multiScaleR.html">vcov(<i>&lt;multiScaleR&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Covariance matrices for an analytic multiscale fit</dd>
+      </dl></div><div class="section level2">
+      <h2 id="bayesian-scale-estimation">Bayesian scale estimation<a class="anchor" aria-label="anchor" href="#bayesian-scale-estimation"></a></h2>
+
+      <div class="section-desc"><p>Estimate scales of effect with full posterior uncertainty.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="multiScale_bayes.html">summary(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScale_bayes.html">print(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScale_bayes.html">multiScale_bayes()</a></code>
+
+        </dt>
+        <dd>Estimate Scales of Effect with Bayesian Inference</dd>
+
+        <dt>
+
+          <code><a href="check_bayes_setup.html">check_bayes_setup()</a></code> <code><a href="check_bayes_setup.html">print(<i>&lt;multiScaleR_bayes_setup&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Check Optional Software for Bayesian Scale Models</dd>
+
+        <dt>
+
+          <code><a href="simulate_bayes_prior.html">simulate_bayes_prior()</a></code>
+
+        </dt>
+        <dd>Simulate Prior Predictive Responses and Landscape Scales</dd>
+
+        <dt>
+
+          <code><a href="posterior_scales.html">posterior_scales()</a></code>
+
+        </dt>
+        <dd>Summarize Posterior Landscape Scales</dd>
+
+        <dt>
+
+          <code><a href="diagnose_bayes_scales.html">diagnose_bayes_scales()</a></code>
+
+        </dt>
+        <dd>Check Sampling Precision of Fitted Bayesian Scales</dd>
+
+        <dt>
+
+          <code><a href="diagnose_bayes_probabilities.html">diagnose_bayes_probabilities()</a></code>
+
+        </dt>
+        <dd>Check Monte Carlo Precision of Scale Probabilities</dd>
+
+        <dt>
+
+          <code><a href="diagnose_bayes_laplace.html">diagnose_bayes_laplace()</a></code>
+
+        </dt>
+        <dd>Assess Fitted Scale Probabilities from an Uncorrected Laplace Fit</dd>
+
+        <dt>
+
+          <code><a href="plot.multiScaleR_bayes.html">plot(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Plot Bayesian Landscape Scales and Group Variation</dd>
+
+        <dt>
+
+          <code><a href="simulate.multiScaleR_bayes.html">simulate(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Simulate Posterior Predictive Responses</dd>
       </dl></div><div class="section level2">
       <h2 id="summarize-and-compare-models">Summarize and compare models<a class="anchor" aria-label="anchor" href="#summarize-and-compare-models"></a></h2>
 
@@ -133,49 +319,342 @@
           <code><a href="summary.multiScaleR.html">summary(<i>&lt;multiScaleR&gt;</i>)</a></code>
 
         </dt>
-        <dd>Summarize multiScaleR objects</dd>
+        <dd>Summarize a multiScaleR fit</dd>
 
         <dt>
 
           <code><a href="kernel_dist.html">kernel_dist()</a></code>
 
         </dt>
-        <dd>Scale Distance</dd>
+        <dd>Convert Sigma into an Effective Distance</dd>
 
         <dt>
 
           <code><a href="aic_tab.html">aic_tab()</a></code>
 
         </dt>
-        <dd>multiScaleR model selection</dd>
+        <dd>Rank models by AIC or AICc</dd>
 
         <dt>
 
           <code><a href="bic_tab.html">bic_tab()</a></code>
 
         </dt>
-        <dd>multiScaleR model selection</dd>
+        <dd>Rank models by BIC</dd>
+
+        <dt>
+
+          <code><a href="check_bayes_setup.html">check_bayes_setup()</a></code> <code><a href="check_bayes_setup.html">print(<i>&lt;multiScaleR_bayes_setup&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Check Optional Software for Bayesian Scale Models</dd>
+
+        <dt>
+
+          <code><a href="cross_validate.html">cross_validate()</a></code> <code><a href="cross_validate.html">print(<i>&lt;multiScaleR_cv&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Cross-Validate Estimated Scales with Explicit Folds</dd>
+
+        <dt>
+
+          <code><a href="cross_validate_clogit.html">cross_validate_clogit()</a></code> <code><a href="cross_validate_clogit.html">print(<i>&lt;multiScaleR_choice_cv&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Cross-Validate Conditional Choices in Complete Matched Sets</dd>
+
+        <dt>
+
+          <code><a href="estimate_multiscale_ram.html">estimate_multiscale_ram()</a></code> <code><a href="estimate_multiscale_ram.html">print(<i>&lt;multiScaleR_ram&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Estimate Memory Requirements for Multiscale Optimization</dd>
+
+        <dt>
+
+          <code><a href="grouped_cv_folds.html">grouped_cv_folds()</a></code> <code><a href="grouped_cv_folds.html">print(<i>&lt;multiScaleR_folds&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Create Grouped Cross-Validation Folds</dd>
+
+        <dt>
+
+          <code><a href="msr_vars.html">msr_vars()</a></code> <code><a href="msr_vars.html">kernel_var()</a></code> <code><a href="msr_vars.html">landscape_var()</a></code> <code><a href="msr_vars.html">surface_var()</a></code> <code><a href="msr_vars.html">print(<i>&lt;multiScaleR_vars&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Define Model Covariates from Raster Layers</dd>
+
+        <dt>
+
+          <code><a href="multiScale_bayes.html">summary(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScale_bayes.html">print(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScale_bayes.html">multiScale_bayes()</a></code>
+
+        </dt>
+        <dd>Estimate Scales of Effect with Bayesian Inference</dd>
+
+        <dt>
+
+          <code><a href="prepare_gdr_histories.html">prepare_gdr_histories()</a></code> <code><a href="prepare_gdr_histories.html">print(<i>&lt;msr_gdr_histories&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Convert Linked Bird Records into Paired Distance-Removal Counts</dd>
+
+        <dt>
+
+          <code><a href="prepare_gdr_intervals.html">prepare_gdr_intervals()</a></code> <code><a href="prepare_gdr_intervals.html">print(<i>&lt;msr_gdr_intervals&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Add Interval-Level Covariates to a Distance-Removal Frame</dd>
+
+        <dt>
+
+          <code><a href="prepare_prediction.html">prepare_prediction()</a></code> <code><a href="prepare_prediction.html">predict(<i>&lt;multiScaleR_prediction&gt;</i>)</a></code> <code><a href="prepare_prediction.html">print(<i>&lt;multiScaleR_prediction&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Prepare a fixed set of predictions for repeated use</dd>
 
         <dt>
 
           <code><a href="print.multiScaleR.html">print(<i>&lt;multiScaleR&gt;</i>)</a></code>
 
         </dt>
-        <dd>Print method for multiScaleR</dd>
+        <dd>Print a multiScaleR fit</dd>
 
         <dt>
 
           <code><a href="print.multiScaleR_data.html">print(<i>&lt;multiScaleR_data&gt;</i>)</a></code>
 
         </dt>
-        <dd>Print method for multiScaleR_data</dd>
+        <dd>Print prepared multiScaleR inputs</dd>
 
         <dt>
 
           <code><a href="print.summary_multiScaleR.html">print(<i>&lt;summary_multiScaleR&gt;</i>)</a></code>
 
         </dt>
-        <dd>Print method for summary_multiScaleR</dd>
+        <dd>Print a summary of a multiScaleR fit</dd>
+
+        <dt>
+
+          <code><a href="sim_dat_gdr.html">sim_dat_gdr()</a></code> <code><a href="sim_dat_gdr.html">print(<i>&lt;msr_gdr_simulation&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Simulate Paired Distance-Removal Surveys with Retained Truth</dd>
+
+        <dt>
+
+          <code><a href="validate_unmarked_data.html">validate_unmarked_data()</a></code> <code><a href="validate_unmarked_data.html">print(<i>&lt;msr_unmarked_audit&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Audit Survey Identities and Paired Distance-Removal Counts</dd>
+      </dl></div><div class="section level2">
+      <h2 id="cross-validation">Cross-validation<a class="anchor" aria-label="anchor" href="#cross-validation"></a></h2>
+
+
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="cross_validate.html">cross_validate()</a></code> <code><a href="cross_validate.html">print(<i>&lt;multiScaleR_cv&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Cross-Validate Estimated Scales with Explicit Folds</dd>
+
+        <dt>
+
+          <code><a href="cross_validate_glm.html">cross_validate_glm()</a></code>
+
+        </dt>
+        <dd>Cross-Validate an Ordinary GLM Reference Model</dd>
+
+        <dt>
+
+          <code><a href="cross_validate_clogit.html">cross_validate_clogit()</a></code> <code><a href="cross_validate_clogit.html">print(<i>&lt;multiScaleR_choice_cv&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Cross-Validate Conditional Choices in Complete Matched Sets</dd>
+
+        <dt>
+
+          <code><a href="cross_validate_field.html">cross_validate_field()</a></code>
+
+        </dt>
+        <dd>Cross-Validate a Spatial Response Field</dd>
+
+        <dt>
+
+          <code><a href="cross_validate_mixed.html">cross_validate_mixed()</a></code>
+
+        </dt>
+        <dd>Cross-Validate Mixed-Effects Models</dd>
+
+        <dt>
+
+          <code><a href="cross_validate_bayes.html">cross_validate_bayes()</a></code>
+
+        </dt>
+        <dd>Cross-Validate Bayesian Scale Models</dd>
+
+        <dt>
+
+          <code><a href="cv_tab.html">cv_tab()</a></code>
+
+        </dt>
+        <dd>Compare Cross-Validated Prediction Scores</dd>
+
+        <dt>
+
+          <code><a href="select_cv.html">select_cv()</a></code>
+
+        </dt>
+        <dd>Validate Training-Only Model Selection Within CV Folds</dd>
+
+        <dt>
+
+          <code><a href="grouped_cv_folds.html">grouped_cv_folds()</a></code> <code><a href="grouped_cv_folds.html">print(<i>&lt;multiScaleR_folds&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Create Grouped Cross-Validation Folds</dd>
+
+        <dt>
+
+          <code><a href="spatial_cv_folds.html">spatial_cv_folds()</a></code>
+
+        </dt>
+        <dd>Create Spatially Blocked Cross-Validation Folds</dd>
+      </dl></div><div class="section level2">
+      <h2 id="prediction-and-spatial-projection">Prediction and spatial projection<a class="anchor" aria-label="anchor" href="#prediction-and-spatial-projection"></a></h2>
+
+      <div class="section-desc"><p>Apply fitted scales to new observations and to rasters.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="kernel_scale.raster.html">kernel_scale.raster()</a></code>
+
+        </dt>
+        <dd>Apply Kernels to Raster Layers for Mapping</dd>
+
+        <dt>
+
+          <code><a href="prepare_prediction.html">prepare_prediction()</a></code> <code><a href="prepare_prediction.html">predict(<i>&lt;multiScaleR_prediction&gt;</i>)</a></code> <code><a href="prepare_prediction.html">print(<i>&lt;multiScaleR_prediction&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Prepare a fixed set of predictions for repeated use</dd>
+
+        <dt>
+
+          <code><a href="predict_scales.html">predict_scales()</a></code>
+
+        </dt>
+        <dd>Predict Landscape Scales for New Covariates and Groups</dd>
+
+        <dt>
+
+          <code><a href="predict.multiScaleR.html">predict(<i>&lt;multiScaleR&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Predict from a fitted multiscale model</dd>
+
+        <dt>
+
+          <code><a href="predict.multiScaleR_bayes.html">predict(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Predict Means from a Bayesian Scale Model</dd>
+
+        <dt>
+
+          <code><a href="prediction_contract.html">prediction_contract</a></code>
+
+        </dt>
+        <dd>Read prediction contracts</dd>
+      </dl></div><div class="section level2">
+      <h2 id="distance-removal-models">Distance-removal models<a class="anchor" aria-label="anchor" href="#distance-removal-models"></a></h2>
+
+      <div class="section-desc"><p>Data preparation, fitting helpers, and audits for generalized distance-removal (GDR) models, including spatial response fields.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="prepare_gdr_histories.html">prepare_gdr_histories()</a></code> <code><a href="prepare_gdr_histories.html">print(<i>&lt;msr_gdr_histories&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Convert Linked Bird Records into Paired Distance-Removal Counts</dd>
+
+        <dt>
+
+          <code><a href="prepare_gdr_intervals.html">prepare_gdr_intervals()</a></code> <code><a href="prepare_gdr_intervals.html">print(<i>&lt;msr_gdr_intervals&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Add Interval-Level Covariates to a Distance-Removal Frame</dd>
+
+        <dt>
+
+          <code><a href="expand_gdr_intervals.html">expand_gdr_intervals()</a></code>
+
+        </dt>
+        <dd>Expand Site and Survey Covariates into GDR Intervals</dd>
+
+        <dt>
+
+          <code><a href="gdr_start_values.html">gdr_start_values()</a></code>
+
+        </dt>
+        <dd>List the Starting-Value Order of a Distance-Removal Model</dd>
+
+        <dt>
+
+          <code><a href="make_gdr_refitter.html">make_gdr_refitter()</a></code>
+
+        </dt>
+        <dd>Create an Audited Refit Function for Distance-Removal Models</dd>
+
+        <dt>
+
+          <code><a href="fit_gdr_response_field.html">fit_gdr_response_field()</a></code>
+
+        </dt>
+        <dd>Fit a Fixed-Range Spatial Abundance Field to a Distance-Removal Model</dd>
+
+        <dt>
+
+          <code><a href="response_field_geometry.html">response_field_geometry()</a></code>
+
+        </dt>
+        <dd>Bind Projected Coordinates to a Fitted Response Field</dd>
+
+        <dt>
+
+          <code><a href="unmarkedFitGDRField-class.html">confint(<i>&lt;unmarkedFitGDRField&gt;</i>)</a></code> <code><a href="unmarkedFitGDRField-class.html">update(<i>&lt;unmarkedFitGDRField&gt;</i>)</a></code> <code><a href="unmarkedFitGDRField-class.html">simulate(<i>&lt;unmarkedFitGDRField&gt;</i>)</a></code> <code><a href="unmarkedFitGDRField-class.html">profile(<i>&lt;unmarkedFitGDRField&gt;</i>)</a></code> <code><a href="unmarkedFitGDRField-class.html">ranef(<i>&lt;unmarkedFitGDRField&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Fitted Distance-Removal Model with a Fixed-Range Abundance Field</dd>
+
+        <dt>
+
+          <code><a href="predict-unmarkedFitGDRField-method.html">predict(<i>&lt;unmarkedFitGDRField&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Predict from a Distance-Removal Model with a Fixed-Range Abundance Field</dd>
+
+        <dt>
+
+          <code><a href="vcov-unmarkedFitGDRField-method.html">vcov(<i>&lt;unmarkedFitGDRField&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Covariance Matrix for a Distance-Removal Model with a Fixed-Range Field</dd>
       </dl></div><div class="section level2">
       <h2 id="plot">Plot<a class="anchor" aria-label="anchor" href="#plot"></a></h2>
 
@@ -198,37 +677,21 @@
           <code><a href="plot.sigma_profile.html">plot(<i>&lt;sigma_profile&gt;</i>)</a></code>
 
         </dt>
-        <dd>Plot Sigma Profile</dd>
+        <dd>Plot a Sigma Profile</dd>
 
         <dt>
 
           <code><a href="plot_kernel.html">plot_kernel()</a></code>
 
         </dt>
-        <dd>Plot kernel densities</dd>
+        <dd>Plot a Kernel Weight Curve</dd>
 
         <dt>
 
           <code><a href="plot_marginal_effects.html">plot_marginal_effects()</a></code>
 
         </dt>
-        <dd>Plot Marginal Effects from a Fitted Model</dd>
-      </dl></div><div class="section level2">
-      <h2 id="spatial-projection">Spatial projection<a class="anchor" aria-label="anchor" href="#spatial-projection"></a></h2>
-
-      <div class="section-desc"><p>Apply the optimized kernels to rasters for spatial prediction.</p></div>
-
-      <dl></dl></div><div class="section level2">
-
-
-
-
-      <dl><dt>
-
-          <code><a href="kernel_scale.raster.html">kernel_scale.raster()</a></code>
-
-        </dt>
-        <dd>Apply kernel smoothing to raster layers</dd>
+        <dd>Plot marginal effects from a fitted model</dd>
       </dl></div><div class="section level2">
       <h2 id="simulation">Simulation<a class="anchor" aria-label="anchor" href="#simulation"></a></h2>
 
@@ -244,21 +707,28 @@
           <code><a href="sim_rast.html">sim_rast()</a></code>
 
         </dt>
-        <dd>Simulate spatially autocorrelated raster surfaces</dd>
+        <dd>Simulate Spatially Autocorrelated Raster Surfaces</dd>
 
         <dt>
 
           <code><a href="sim_dat.html">sim_dat()</a></code>
 
         </dt>
-        <dd>Simulate data for optimizing scales of effect</dd>
+        <dd>Simulate Responses at Known Scales of Effect</dd>
 
         <dt>
 
           <code><a href="sim_dat_unmarked.html">sim_dat_unmarked()</a></code>
 
         </dt>
-        <dd>Simulate data for optimizing scales of effect with `unmarked`</dd>
+        <dd>Simulate data for optimizing scales of effect with <code>unmarked</code></dd>
+
+        <dt>
+
+          <code><a href="sim_dat_gdr.html">sim_dat_gdr()</a></code> <code><a href="sim_dat_gdr.html">print(<i>&lt;msr_gdr_simulation&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Simulate Paired Distance-Removal Surveys with Retained Truth</dd>
       </dl></div><div class="section level2">
       <h2 id="example-data">Example data<a class="anchor" aria-label="anchor" href="#example-data"></a></h2>
 
@@ -274,58 +744,42 @@
           <code><a href="count_data.html">count_data</a></code>
 
         </dt>
-        <dd>Example data frame</dd>
+        <dd>Simulated counts for the hab example</dd>
 
         <dt>
 
           <code><a href="landscape_counts.html">landscape_counts</a></code>
 
         </dt>
-        <dd>Example data frame</dd>
+        <dd>Simulated counts for the vignette example</dd>
 
         <dt>
 
           <code><a href="hab.html">hab</a></code>
 
         </dt>
-        <dd>Example raster</dd>
+        <dd>Example habitat raster</dd>
 
         <dt>
 
           <code><a href="landscape.html">landscape</a></code>
 
         </dt>
-        <dd>Simulated raster</dd>
+        <dd>Example landscape raster</dd>
 
         <dt>
 
           <code><a href="pts.html">pts</a></code>
 
         </dt>
-        <dd>Spatial sample points</dd>
+        <dd>Survey points for the hab example</dd>
 
         <dt>
 
           <code><a href="surv_pts.html">surv_pts</a></code>
 
         </dt>
-        <dd>Spatial sample points</dd>
-      </dl></div><div class="section level2">
-      <h2 id="package">Package<a class="anchor" aria-label="anchor" href="#package"></a></h2>
-
-
-
-      <dl></dl></div><div class="section level2">
-
-
-
-
-      <dl><dt>
-
-          <code><a href="multiScaleR-package.html">multiScaleR</a></code> <code><a href="multiScaleR-package.html">multiScaleR-package</a></code>
-
-        </dt>
-        <dd>multiScaleR</dd>
+        <dd>Survey points for the vignette example</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

@@ -1,19 +1,38 @@
 # multiScaleR
 
-README last updated: 2026-11-11
+README last updated: 2026-11-14
 
 | CI | Development | CRAN | License |
 |----|----|----|----|
 | [![R-CMD-check](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml/badge.svg)](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml) | [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) | [![CRAN status](https://www.r-pkg.org/badges/version/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
 | [![codecov](https://codecov.io/gh/wpeterman/multiScaleR/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/multiScaleR) | [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![DOI](https://img.shields.io/badge/DOI-10.1007/s10980--025--02267--x-yellow.svg)](https://doi.org/10.1007/s10980-025-02267-x) |
+| [![r-universe checks](https://wpeterman.r-universe.dev/multiScaleR/badges/checks)](https://wpeterman.r-universe.dev/multiScaleR) | [![r-universe version](https://wpeterman.r-universe.dev/multiScaleR/badges/version)](https://wpeterman.r-universe.dev/multiScaleR) |  |  |
 
 ## Overview
 
-multiScaleR is an R package to identify the scale of effect of spatial
-environmental variables in regression analyses.
+The *scale of effect* is the distance over which a landscape variable
+influences an ecological response. multiScaleR estimates it directly. It
+weights the raster cells around each survey point with a distance kernel
+and chooses the kernel scale (sigma) that maximizes the likelihood of
+your regression model. You fit your model once at starting values, and
+multiScaleR searches over scales, reports each one with its uncertainty,
+and helps you compare, check, and map the result.
 
-Functions to simulate data with known scales of effect are included with
-this package.
+multiScaleR works with:
+
+- linear, generalized linear, additive, and mixed models;
+- occupancy and abundance models from `unmarked`, including
+  distance-removal models;
+- step-selection models fitted with
+  [`survival::clogit()`](https://rdrr.io/pkg/survival/man/clogit.html)
+  or `amt`;
+- Bayesian models in which a scale of effect can vary among years or
+  with a covariate.
+
+It also computes kernel-weighted landscape and surface metrics,
+cross-validates models with spatial or grouped folds, maps predictions
+across a landscape, and simulates data with known scales of effect so
+you can test a design before collecting data.
 
 ## Installation
 
@@ -23,6 +42,22 @@ Install the CRAN release with:
 
 install.packages("multiScaleR")
 ```
+
+Install the latest build from R-universe with:
+
+``` r
+
+install.packages(
+  "multiScaleR",
+  repos = c("https://wpeterman.r-universe.dev", "https://cloud.r-project.org")
+)
+```
+
+R-universe rebuilds multiScaleR from the `master` branch on GitHub
+whenever that branch changes. This version can therefore be newer than
+the CRAN release. R-universe provides precompiled Windows and macOS
+binaries with the vignettes already built, so this route does not
+require Rtools.
 
 If installing from GitHub on Windows, you may need Rtools to compile the
 package from source. Choose the Rtools release that matches your version
@@ -44,53 +79,127 @@ remotes::install_github("wpeterman/multiScaleR",
 library(multiScaleR) # Load the package
 ```
 
-The package vignettes provide worked analyses of simulated data and
-explain the main workflows.
+## A first example
 
-## Kernel distance reporting
+The package includes simulated counts at 75 points, generated with a
+habitat effect whose true scale of effect (sigma) is 75 map units.
 
-Starting with version 0.7.4,
-[`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md),
-kernel plots, and the selected summary distance default to
-`dimension = "2d"`: the radius containing the requested share of an
-ideal kernel’s total weight on a plane. At 90%, a Gaussian kernel with
-sigma = 300 m has a planar radius of about 644 m, compared with the
-original line-based distance of about 493 m. Raster edges, missing
-cells, cell geometry, and `max_D` can change the weight actually
-retained at a site.
+``` r
 
-Set `dimension = "1d"` in
-[`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md),
-[`plot_kernel()`](https://wpeterman.github.io/multiScaleR/reference/plot_kernel.md),
-`plot(fit)`, or `summary(fit)` to restore the original definition.
-Summary `opt_dist` and `opt_distance` follow that selection;
-`opt_dist_1d` and `opt_dist_2d` always identify the two definitions
-explicitly. This reporting switch does not change the fitted sigma,
-coefficients, or likelihood. Simulation extents, projection windows, and
-stored optimization warnings retain their historical 1D cutoffs. See
-[`vignette("multiScaleR_Guide", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/multiScaleR_Guide.md)
-for interpretation and migration examples.
+library(multiScaleR)
+data(pts)          # survey points
+data(count_data)   # counts at each point
+hab <- terra::rast(system.file("extdata", "hab.tif", package = "multiScaleR"))
 
-## Marginal effects for unmarked models
+# 1. Weight the habitat raster around each point with a Gaussian kernel
+inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                      kernel = "gaussian")
 
-Version 0.7.4 fixes marginal-effect plots for models with factors such
-as `Year`, extra site-ID columns, and repeated site-year rows linked by
-`join_by`. Predictors are recovered from the state or abundance formula.
-Numeric predictors are held at their observed means and categorical
-predictors at their first observed values in other panels. Factors
-receive a point and confidence interval for each observed level.
+# 2. Fit your model once, at the starting scale
+start_model <- glm(y ~ hab, family = poisson, data = count_data)
 
-For random-effects models, plots set site effects to zero explicitly.
-These are conditional predictions, not averages over years, sites, or
-the random-effect distribution. Their intervals are conditional on the
-selected scale. See
-[`?plot_marginal_effects`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
-for supported prediction types and factor contrast handling. Existing
-fitted objects can be plotted without rerunning scale optimization.
+# 3. Estimate the scale of effect
+fit <- multiScale_optim(start_model, inputs)
+summary(fit)   # sigma, its interval, and the distance holding 90% of the weight
+plot(fit)      # the fitted kernel weight curve
+```
 
-![](reference/figures/logo.png)
+The estimated sigma is close to the simulated value of 75, and
+[`summary()`](https://rspatial.github.io/terra/reference/summary.html)
+converts it into the distance that contains 90% of the kernel’s weight,
+which is the number to report as the scale of effect.
+
+## Learn more
+
+The vignettes work through simulated data and explain how to read each
+result. Start with the quick start and the user guide, then turn to the
+topics you need. Open one in R with
+[`vignette("v01-quickstart", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v01-quickstart.md),
+or read them all on the [package
+website](https://wpeterman.github.io/multiScaleR/articles/).
+
+| Vignette | Name in [`vignette()`](https://rdrr.io/r/utils/vignette.html) |
+|:---|:---|
+| [01. Quick start](https://wpeterman.github.io/multiScaleR/articles/v01-quickstart.html) | `v01-quickstart` |
+| [02. User guide](https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.html) | `v02-user-guide` |
+| [03. Mapping predictions and limiting extrapolation](https://wpeterman.github.io/multiScaleR/articles/v03-map-predictions.html) | `v03-map-predictions` |
+| [04. Landscape metrics as covariates](https://wpeterman.github.io/multiScaleR/articles/v04-landscape-metrics.html) | `v04-landscape-metrics` |
+| [05. Surface texture metrics as covariates](https://wpeterman.github.io/multiScaleR/articles/v05-surface-metrics.html) | `v05-surface-metrics` |
+| [06. Using year-specific rasters in one model](https://wpeterman.github.io/multiScaleR/articles/v06-year-specific-rasters.html) | `v06-year-specific-rasters` |
+| [07. Choose a fitting method for your model](https://wpeterman.github.io/multiScaleR/articles/v07-fitting-methods.html) | `v07-fitting-methods` |
+| [08. Cross-validate scale-of-effect models](https://wpeterman.github.io/multiScaleR/articles/v08-cross-validation.html) | `v08-cross-validation` |
+| [09. What your estimates and intervals mean](https://wpeterman.github.io/multiScaleR/articles/v09-estimates-and-intervals.html) | `v09-estimates-and-intervals` |
+| [10. Estimate scales of effect in step-selection models](https://wpeterman.github.io/multiScaleR/articles/v10-step-selection.html) | `v10-step-selection` |
+| [11. Account for spatial autocorrelation with a spatial field](https://wpeterman.github.io/multiScaleR/articles/v11-spatial-fields.html) | `v11-spatial-fields` |
+| [12. Fit distance-removal models with scales of effect](https://wpeterman.github.io/multiScaleR/articles/v12-distance-removal.html) | `v12-distance-removal` |
+| [13. Estimate scales of effect with a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.html) | `v13-bayesian-scales` |
+| [14. Predict new sites and years from a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.html) | `v14-bayesian-prediction` |
+| [15. Choose and check a Bayesian computation method](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.html) | `v15-bayesian-computation` |
+
+Reference topics in the help system give the details that the vignettes
+leave out:
+
+| Help topic | What it covers |
+|:---|:---|
+| [`?multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.md) | Package overview and the main functions, step by step |
+| [`?"multiScaleR-kernels"`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md) | Kernel families, sigma, hard radii, and effective distance |
+| [`?"multiScaleR-fitting-methods"`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-fitting-methods.md) | The fitting backends and the uncertainty each reports |
+| [`?"multiScaleR-prediction"`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-prediction.md) | What each prediction represents and how uncertain it is |
+| [`?"multiScaleR-glossary"`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-glossary.md) | Plain-language definitions of the terms used |
+
+`NEWS.md` lists the changes in each version, including the switch to
+planar (2D) kernel distances in version 0.7.4.
+
+## Experimental tools
+
+[`cross_validate_bayes()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_bayes.md),
+[`cross_validate_mixed()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_mixed.md),
+the count, binary, and positive families of
+[`cross_validate_field()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_field.md),
+[`diagnose_bayes_laplace()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_laplace.md),
+and the `radius_grid` argument of
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+are experimental. Their arguments and results may change in a later
+release without a deprecation period.
+
+## Citation
+
+Run `citation("multiScaleR")` to cite the paper that describes the
+method and the package version you used.
+
+![multiScaleR package logo](reference/figures/logo.png)
 
 # Package index
+
+## Concepts and objects
+
+Start here. Background on kernels, fitting methods, and predictions, a
+glossary of terms, and descriptions of the objects the main functions
+return.
+
+- [`multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.md)
+  [`multiScaleR-package`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.md)
+  : multiScaleR: estimate scales of effect for spatial covariates
+- [`multiScaleR-glossary`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-glossary.md)
+  : Glossary of terms used in multiScaleR
+- [`multiScaleR-kernels`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md)
+  : Kernels and scales of effect
+- [`multiScaleR-fitting-methods`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-fitting-methods.md)
+  : Fitting methods for estimating scales of effect
+- [`multiScaleR-prediction`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-prediction.md)
+  : Prediction quantities and their uncertainty
+- [`multiScaleR-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-class.md)
+  : Fitted multiScaleR objects
+- [`multiScaleR_data-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_data-class.md)
+  : Prepared inputs for scale estimation
+- [`multiScaleR_bayes-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_bayes-class.md)
+  : Bayesian landscape-scale fits
+- [`multiScaleR_cv-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_cv-class.md)
+  [`multiScaleR_choice_cv-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_cv-class.md)
+  [`multiScaleR_field_cv-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_cv-class.md)
+  [`multiScaleR_mixed_cv-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_cv-class.md)
+  [`multiScaleR_bayes_cv-class`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_cv-class.md)
+  : Cross-validation results
 
 ## Prepare inputs
 
@@ -98,114 +207,299 @@ Build the kernel inputs and declare how each raster covariate is
 summarized before optimization.
 
 - [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
-  : Kernel Scale Preparation
+  : Prepare Kernel Inputs for Scale Optimization
 - [`kernel_prep_by_group()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep_by_group.md)
   : Prepare Kernel Inputs from Group-Specific Rasters
 - [`msr_vars()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
   [`kernel_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
   [`landscape_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
   [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
-  : Define multiScaleR covariate transformations
+  [`print(`*`<multiScaleR_vars>`*`)`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  : Define Model Covariates from Raster Layers
+- [`prepare_unmarked_data()`](https://wpeterman.github.io/multiScaleR/reference/prepare_unmarked_data.md)
+  : Prepare spatial covariates for native unmarked prediction
+- [`validate_unmarked_data()`](https://wpeterman.github.io/multiScaleR/reference/validate_unmarked_data.md)
+  [`print(`*`<msr_unmarked_audit>`*`)`](https://wpeterman.github.io/multiScaleR/reference/validate_unmarked_data.md)
+  : Audit Survey Identities and Paired Distance-Removal Counts
 - [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  [`print(`*`<multiScaleR_ram>`*`)`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
   : Estimate Memory Requirements for Multiscale Optimization
 
 ## Optimize scales of effect
 
-Estimate the scale of effect for each covariate and assess the fit.
+Estimate the scale of effect for each covariate by maximum likelihood
+and assess the fit.
 
 - [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
-  : Multiscale optimization
+  : Estimate scales of effect by maximum likelihood
 - [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
-  : Profile Model Fit Across Sigma Parameter Space
+  : Profile Model Fit Across Sigma
+- [`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md)
+  : Profile and Bootstrap Inference for an NB2 Scale
 - [`diagnostics()`](https://wpeterman.github.io/multiScaleR/reference/diagnostics.md)
   : Retrieve diagnostics from multiScaleR objects
+- [`vcov(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/vcov.multiScaleR.md)
+  : Covariance matrices for an analytic multiscale fit
+
+## Bayesian scale estimation
+
+Estimate scales of effect with full posterior uncertainty.
+
+- [`summary(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  [`print(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  : Estimate Scales of Effect with Bayesian Inference
+- [`check_bayes_setup()`](https://wpeterman.github.io/multiScaleR/reference/check_bayes_setup.md)
+  [`print(`*`<multiScaleR_bayes_setup>`*`)`](https://wpeterman.github.io/multiScaleR/reference/check_bayes_setup.md)
+  : Check Optional Software for Bayesian Scale Models
+- [`simulate_bayes_prior()`](https://wpeterman.github.io/multiScaleR/reference/simulate_bayes_prior.md)
+  : Simulate Prior Predictive Responses and Landscape Scales
+- [`posterior_scales()`](https://wpeterman.github.io/multiScaleR/reference/posterior_scales.md)
+  : Summarize Posterior Landscape Scales
+- [`diagnose_bayes_scales()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_scales.md)
+  : Check Sampling Precision of Fitted Bayesian Scales
+- [`diagnose_bayes_probabilities()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_probabilities.md)
+  : Check Monte Carlo Precision of Scale Probabilities
+- [`diagnose_bayes_laplace()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_laplace.md)
+  : Assess Fitted Scale Probabilities from an Uncorrected Laplace Fit
+- [`plot(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR_bayes.md)
+  : Plot Bayesian Landscape Scales and Group Variation
+- [`simulate(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/simulate.multiScaleR_bayes.md)
+  : Simulate Posterior Predictive Responses
 
 ## Summarize and compare models
 
 - [`summary(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md)
-  : Summarize multiScaleR objects
+  : Summarize a multiScaleR fit
 - [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md)
-  : Scale Distance
+  : Convert Sigma into an Effective Distance
 - [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md)
-  : multiScaleR model selection
+  : Rank models by AIC or AICc
 - [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md)
-  : multiScaleR model selection
+  : Rank models by BIC
+- [`check_bayes_setup()`](https://wpeterman.github.io/multiScaleR/reference/check_bayes_setup.md)
+  [`print(`*`<multiScaleR_bayes_setup>`*`)`](https://wpeterman.github.io/multiScaleR/reference/check_bayes_setup.md)
+  : Check Optional Software for Bayesian Scale Models
+- [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md)
+  [`print(`*`<multiScaleR_cv>`*`)`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md)
+  : Cross-Validate Estimated Scales with Explicit Folds
+- [`cross_validate_clogit()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md)
+  [`print(`*`<multiScaleR_choice_cv>`*`)`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md)
+  : Cross-Validate Conditional Choices in Complete Matched Sets
+- [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  [`print(`*`<multiScaleR_ram>`*`)`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  : Estimate Memory Requirements for Multiscale Optimization
+- [`grouped_cv_folds()`](https://wpeterman.github.io/multiScaleR/reference/grouped_cv_folds.md)
+  [`print(`*`<multiScaleR_folds>`*`)`](https://wpeterman.github.io/multiScaleR/reference/grouped_cv_folds.md)
+  : Create Grouped Cross-Validation Folds
+- [`msr_vars()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  [`kernel_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  [`landscape_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  [`print(`*`<multiScaleR_vars>`*`)`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  : Define Model Covariates from Raster Layers
+- [`summary(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  [`print(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  : Estimate Scales of Effect with Bayesian Inference
+- [`prepare_gdr_histories()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.md)
+  [`print(`*`<msr_gdr_histories>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.md)
+  : Convert Linked Bird Records into Paired Distance-Removal Counts
+- [`prepare_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_intervals.md)
+  [`print(`*`<msr_gdr_intervals>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_intervals.md)
+  : Add Interval-Level Covariates to a Distance-Removal Frame
+- [`prepare_prediction()`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md)
+  [`predict(`*`<multiScaleR_prediction>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md)
+  [`print(`*`<multiScaleR_prediction>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md)
+  : Prepare a fixed set of predictions for repeated use
 - [`print(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/print.multiScaleR.md)
-  : Print method for multiScaleR
+  : Print a multiScaleR fit
 - [`print(`*`<multiScaleR_data>`*`)`](https://wpeterman.github.io/multiScaleR/reference/print.multiScaleR_data.md)
-  : Print method for multiScaleR_data
+  : Print prepared multiScaleR inputs
 - [`print(`*`<summary_multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/print.summary_multiScaleR.md)
-  : Print method for summary_multiScaleR
+  : Print a summary of a multiScaleR fit
+- [`sim_dat_gdr()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_gdr.md)
+  [`print(`*`<msr_gdr_simulation>`*`)`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_gdr.md)
+  : Simulate Paired Distance-Removal Surveys with Retained Truth
+- [`validate_unmarked_data()`](https://wpeterman.github.io/multiScaleR/reference/validate_unmarked_data.md)
+  [`print(`*`<msr_unmarked_audit>`*`)`](https://wpeterman.github.io/multiScaleR/reference/validate_unmarked_data.md)
+  : Audit Survey Identities and Paired Distance-Removal Counts
+
+## Cross-validation
+
+- [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md)
+  [`print(`*`<multiScaleR_cv>`*`)`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md)
+  : Cross-Validate Estimated Scales with Explicit Folds
+- [`cross_validate_glm()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_glm.md)
+  : Cross-Validate an Ordinary GLM Reference Model
+- [`cross_validate_clogit()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md)
+  [`print(`*`<multiScaleR_choice_cv>`*`)`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md)
+  : Cross-Validate Conditional Choices in Complete Matched Sets
+- [`cross_validate_field()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_field.md)
+  : Cross-Validate a Spatial Response Field
+- [`cross_validate_mixed()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_mixed.md)
+  : Cross-Validate Mixed-Effects Models
+- [`cross_validate_bayes()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_bayes.md)
+  : Cross-Validate Bayesian Scale Models
+- [`cv_tab()`](https://wpeterman.github.io/multiScaleR/reference/cv_tab.md)
+  : Compare Cross-Validated Prediction Scores
+- [`select_cv()`](https://wpeterman.github.io/multiScaleR/reference/select_cv.md)
+  : Validate Training-Only Model Selection Within CV Folds
+- [`grouped_cv_folds()`](https://wpeterman.github.io/multiScaleR/reference/grouped_cv_folds.md)
+  [`print(`*`<multiScaleR_folds>`*`)`](https://wpeterman.github.io/multiScaleR/reference/grouped_cv_folds.md)
+  : Create Grouped Cross-Validation Folds
+- [`spatial_cv_folds()`](https://wpeterman.github.io/multiScaleR/reference/spatial_cv_folds.md)
+  : Create Spatially Blocked Cross-Validation Folds
+
+## Prediction and spatial projection
+
+Apply fitted scales to new observations and to rasters.
+
+- [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  : Apply Kernels to Raster Layers for Mapping
+- [`prepare_prediction()`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md)
+  [`predict(`*`<multiScaleR_prediction>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md)
+  [`print(`*`<multiScaleR_prediction>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md)
+  : Prepare a fixed set of predictions for repeated use
+- [`predict_scales()`](https://wpeterman.github.io/multiScaleR/reference/predict_scales.md)
+  : Predict Landscape Scales for New Covariates and Groups
+- [`predict(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/predict.multiScaleR.md)
+  : Predict from a fitted multiscale model
+- [`predict(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/predict.multiScaleR_bayes.md)
+  : Predict Means from a Bayesian Scale Model
+- [`prediction_contract`](https://wpeterman.github.io/multiScaleR/reference/prediction_contract.md)
+  : Read prediction contracts
+
+## Distance-removal models
+
+Data preparation, fitting helpers, and audits for generalized
+distance-removal (GDR) models, including spatial response fields.
+
+- [`prepare_gdr_histories()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.md)
+  [`print(`*`<msr_gdr_histories>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.md)
+  : Convert Linked Bird Records into Paired Distance-Removal Counts
+- [`prepare_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_intervals.md)
+  [`print(`*`<msr_gdr_intervals>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_intervals.md)
+  : Add Interval-Level Covariates to a Distance-Removal Frame
+- [`expand_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/expand_gdr_intervals.md)
+  : Expand Site and Survey Covariates into GDR Intervals
+- [`gdr_start_values()`](https://wpeterman.github.io/multiScaleR/reference/gdr_start_values.md)
+  : List the Starting-Value Order of a Distance-Removal Model
+- [`make_gdr_refitter()`](https://wpeterman.github.io/multiScaleR/reference/make_gdr_refitter.md)
+  : Create an Audited Refit Function for Distance-Removal Models
+- [`fit_gdr_response_field()`](https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.md)
+  : Fit a Fixed-Range Spatial Abundance Field to a Distance-Removal
+  Model
+- [`response_field_geometry()`](https://wpeterman.github.io/multiScaleR/reference/response_field_geometry.md)
+  : Bind Projected Coordinates to a Fitted Response Field
+- [`confint(`*`<unmarkedFitGDRField>`*`)`](https://wpeterman.github.io/multiScaleR/reference/unmarkedFitGDRField-class.md)
+  [`update(`*`<unmarkedFitGDRField>`*`)`](https://wpeterman.github.io/multiScaleR/reference/unmarkedFitGDRField-class.md)
+  [`simulate(`*`<unmarkedFitGDRField>`*`)`](https://wpeterman.github.io/multiScaleR/reference/unmarkedFitGDRField-class.md)
+  [`profile(`*`<unmarkedFitGDRField>`*`)`](https://wpeterman.github.io/multiScaleR/reference/unmarkedFitGDRField-class.md)
+  [`ranef(`*`<unmarkedFitGDRField>`*`)`](https://wpeterman.github.io/multiScaleR/reference/unmarkedFitGDRField-class.md)
+  : Fitted Distance-Removal Model with a Fixed-Range Abundance Field
+- [`predict(`*`<unmarkedFitGDRField>`*`)`](https://wpeterman.github.io/multiScaleR/reference/predict-unmarkedFitGDRField-method.md)
+  : Predict from a Distance-Removal Model with a Fixed-Range Abundance
+  Field
+- [`vcov(`*`<unmarkedFitGDRField>`*`)`](https://wpeterman.github.io/multiScaleR/reference/vcov-unmarkedFitGDRField-method.md)
+  : Covariance Matrix for a Distance-Removal Model with a Fixed-Range
+  Field
 
 ## Plot
 
 - [`plot(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.md)
   : Plot method for multiScaleR objects
 - [`plot(`*`<sigma_profile>`*`)`](https://wpeterman.github.io/multiScaleR/reference/plot.sigma_profile.md)
-  : Plot Sigma Profile
+  : Plot a Sigma Profile
 - [`plot_kernel()`](https://wpeterman.github.io/multiScaleR/reference/plot_kernel.md)
-  : Plot kernel densities
+  : Plot a Kernel Weight Curve
 - [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
-  : Plot Marginal Effects from a Fitted Model
-
-## Spatial projection
-
-Apply the optimized kernels to rasters for spatial prediction.
-
-- [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
-  : Apply kernel smoothing to raster layers
+  : Plot marginal effects from a fitted model
 
 ## Simulation
 
 - [`sim_rast()`](https://wpeterman.github.io/multiScaleR/reference/sim_rast.md)
-  : Simulate spatially autocorrelated raster surfaces
+  : Simulate Spatially Autocorrelated Raster Surfaces
+
 - [`sim_dat()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat.md)
-  : Simulate data for optimizing scales of effect
+  : Simulate Responses at Known Scales of Effect
+
 - [`sim_dat_unmarked()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_unmarked.md)
-  : Simulate data for optimizing scales of effect with \`unmarked\`
+  :
+
+  Simulate data for optimizing scales of effect with `unmarked`
+
+- [`sim_dat_gdr()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_gdr.md)
+  [`print(`*`<msr_gdr_simulation>`*`)`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_gdr.md)
+  : Simulate Paired Distance-Removal Surveys with Retained Truth
 
 ## Example data
 
 - [`count_data`](https://wpeterman.github.io/multiScaleR/reference/count_data.md)
-  : Example data frame
+  : Simulated counts for the hab example
 - [`landscape_counts`](https://wpeterman.github.io/multiScaleR/reference/landscape_counts.md)
-  : Example data frame
+  : Simulated counts for the vignette example
 - [`hab`](https://wpeterman.github.io/multiScaleR/reference/hab.md) :
-  Example raster
+  Example habitat raster
 - [`landscape`](https://wpeterman.github.io/multiScaleR/reference/landscape.md)
-  : Simulated raster
+  : Example landscape raster
 - [`pts`](https://wpeterman.github.io/multiScaleR/reference/pts.md) :
-  Spatial sample points
+  Survey points for the hab example
 - [`surv_pts`](https://wpeterman.github.io/multiScaleR/reference/surv_pts.md)
-  : Spatial sample points
-
-## Package
-
-- [`multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.md)
-  [`multiScaleR-package`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.md)
-  : multiScaleR
+  : Survey points for the vignette example
 
 # Articles
 
 ### Getting started
 
-- [multiScaleR Quick-Start
-  Guide](https://wpeterman.github.io/multiScaleR/articles/quickstart.md):
-- [multiScaleR User
-  Guide](https://wpeterman.github.io/multiScaleR/articles/multiScaleR_Guide.md):
+- [01. Quick
+  start](https://wpeterman.github.io/multiScaleR/articles/v01-quickstart.md):
+- [02. User
+  guide](https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.md):
 
-### Covariate types
+### Covariates and maps
 
-Scale-dependent covariates beyond the kernel-weighted mean.
+Map predictions, and use landscape metrics, surface texture, and
+year-specific rasters as scale-dependent covariates.
 
-- [Landscape Metric
-  Covariates](https://wpeterman.github.io/multiScaleR/articles/landscape_metric_covariates.md):
-- [Surface Texture
-  Covariates](https://wpeterman.github.io/multiScaleR/articles/surface_metric_covariates.md):
+- [03. Mapping Predictions and Limiting
+  Extrapolation](https://wpeterman.github.io/multiScaleR/articles/v03-map-predictions.md):
+- [04. Landscape Metrics as
+  Covariates](https://wpeterman.github.io/multiScaleR/articles/v04-landscape-metrics.md):
+- [05. Surface Texture Metrics as
+  Covariates](https://wpeterman.github.io/multiScaleR/articles/v05-surface-metrics.md):
+- [06. Using Year-Specific Rasters in One
+  Model](https://wpeterman.github.io/multiScaleR/articles/v06-year-specific-rasters.md):
 
-### Workflows
+### Fitting and evaluation
 
-- [Using Year-Specific Rasters in One
-  Model](https://wpeterman.github.io/multiScaleR/articles/year-specific-rasters.md):
-- [Spatial Projection and
-  Clamping](https://wpeterman.github.io/multiScaleR/articles/spatial_projection_clamping.md):
+Choose a fitting method, cross-validate models, and interpret estimates
+and intervals.
+
+- [07. Choose a Fitting Method for Your
+  Model](https://wpeterman.github.io/multiScaleR/articles/v07-fitting-methods.md):
+- [08. Cross-Validate Scale-of-Effect
+  Models](https://wpeterman.github.io/multiScaleR/articles/v08-cross-validation.md):
+- [09. What Your Estimates and Intervals
+  Mean](https://wpeterman.github.io/multiScaleR/articles/v09-estimates-and-intervals.md):
+
+### Specialized models
+
+Step-selection models, spatial response fields, and distance-removal
+surveys.
+
+- [10. Estimate Scales of Effect in Step-Selection
+  Models](https://wpeterman.github.io/multiScaleR/articles/v10-step-selection.md):
+- [11. Account for Spatial Autocorrelation with a Spatial
+  Field](https://wpeterman.github.io/multiScaleR/articles/v11-spatial-fields.md):
+- [12. Fit Distance-Removal Models with Scales of
+  Effect](https://wpeterman.github.io/multiScaleR/articles/v12-distance-removal.md):
+
+### Bayesian scale estimation
+
+- [13. Estimate Scales of Effect with a Bayesian
+  Model](https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.md):
+- [14. Predict New Sites and Years from a Bayesian
+  Model](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.md):
+- [15. Choose and Check a Bayesian Computation
+  Method](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.md):

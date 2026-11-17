@@ -2,13 +2,22 @@ pandoc: 3.8.3
 pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
-  landscape_metric_covariates: landscape_metric_covariates.html
-  multiScaleR_Guide: multiScaleR_Guide.html
-  quickstart: quickstart.html
-  spatial_projection_clamping: spatial_projection_clamping.html
-  surface_metric_covariates: surface_metric_covariates.html
-  year-specific-rasters: year-specific-rasters.html
-last_built: 2026-11-11T19:49Z
+  v01-quickstart: v01-quickstart.html
+  v02-user-guide: v02-user-guide.html
+  v03-map-predictions: v03-map-predictions.html
+  v04-landscape-metrics: v04-landscape-metrics.html
+  v05-surface-metrics: v05-surface-metrics.html
+  v06-year-specific-rasters: v06-year-specific-rasters.html
+  v07-fitting-methods: v07-fitting-methods.html
+  v08-cross-validation: v08-cross-validation.html
+  v09-estimates-and-intervals: v09-estimates-and-intervals.html
+  v10-step-selection: v10-step-selection.html
+  v11-spatial-fields: v11-spatial-fields.html
+  v12-distance-removal: v12-distance-removal.html
+  v13-bayesian-scales: v13-bayesian-scales.html
+  v14-bayesian-prediction: v14-bayesian-prediction.html
+  v15-bayesian-computation: v15-bayesian-computation.html
+last_built: 2026-11-17T22:12Z
 urls:
   reference: https://wpeterman.github.io/multiScaleR/reference
   article: https://wpeterman.github.io/multiScaleR/articles

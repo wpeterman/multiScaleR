@@ -1,0 +1,952 @@
+# Changelog
+
+## multiScaleR 1.0.0
+
+multiScaleR 1.0.0 is the first release since 0.7.4. It adds Bayesian
+scale estimation, new fitting backends, cross-validation that
+re-estimates scales, and prediction tools, and it reorganizes the
+documentation.
+
+Some new tools are experimental, so their arguments and results may
+change in a later release without a deprecation period:
+[`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md),
+[`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md),
+the `profile_glm` backend and the `radius_grid` argument of
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+predictions from the `joint_mixed` backend,
+[`cross_validate_bayes()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_bayes.md),
+[`cross_validate_mixed()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_mixed.md),
+the count, binary, and positive families of
+[`cross_validate_field()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_field.md),
+and
+[`diagnose_bayes_laplace()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_laplace.md).
+Their help pages say so.
+
+### New tools
+
+- [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  estimates scales of effect in a Bayesian model, with shared,
+  covariate-dependent, and partially pooled scales. Slice sampling needs
+  no Stan toolchain.
+  [`posterior_scales()`](https://wpeterman.github.io/multiScaleR/reference/posterior_scales.md),
+  [`predict_scales()`](https://wpeterman.github.io/multiScaleR/reference/predict_scales.md),
+  [`predict()`](https://rspatial.github.io/terra/reference/predict.html),
+  and [`simulate()`](https://rdrr.io/r/stats/simulate.html) summarize
+  and predict from a fit, and
+  [`check_bayes_setup()`](https://wpeterman.github.io/multiScaleR/reference/check_bayes_setup.md),
+  [`simulate_bayes_prior()`](https://wpeterman.github.io/multiScaleR/reference/simulate_bayes_prior.md),
+  [`diagnose_bayes_scales()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_scales.md),
+  and
+  [`diagnose_bayes_probabilities()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_probabilities.md)
+  check the setup, priors, and chains.
+  [`diagnose_bayes_laplace()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_laplace.md)
+  checks a scale probability from a fast approximation.
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  gains opt-in fitting backends: `profile_glm` and `joint_nb2` for GLM
+  and negative binomial models, `joint_mixed` for glmmTMB
+  random-intercept models, and `conditional_logit` for step-selection
+  models fitted with
+  [`survival::clogit()`](https://rdrr.io/pkg/survival/man/clogit.html)
+  or `amt`. The default `refit` backend is unchanged.
+- Cross-validation re-estimates the scales in every fold:
+  [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md),
+  [`cross_validate_glm()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_glm.md),
+  [`cross_validate_clogit()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md),
+  [`cross_validate_mixed()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_mixed.md),
+  [`cross_validate_field()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_field.md),
+  and
+  [`cross_validate_bayes()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_bayes.md),
+  with spatial and grouped folds from
+  [`spatial_cv_folds()`](https://wpeterman.github.io/multiScaleR/reference/spatial_cv_folds.md)
+  and
+  [`grouped_cv_folds()`](https://wpeterman.github.io/multiScaleR/reference/grouped_cv_folds.md),
+  and comparisons with
+  [`cv_tab()`](https://wpeterman.github.io/multiScaleR/reference/cv_tab.md)
+  and
+  [`select_cv()`](https://wpeterman.github.io/multiScaleR/reference/select_cv.md).
+- `multiScale_optim(radius_grid = )` compares listed radii for landscape
+  and surface metrics with a hard radius.
+- [`predict()`](https://rspatial.github.io/terra/reference/predict.html)
+  works on fitted objects at survey points, new points, and rasters, and
+  [`prepare_prediction()`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md)
+  stores prediction snapshots. Prediction and effect plots cover more
+  model classes, including GAM and BAM, Cox and `clogit`, spaMM, lme4,
+  glmmTMB, and `unmarked` models with factors and repeated site-year
+  rows.
+- glmmTMB spatial response fields can be fitted with the default backend
+  and mapped with
+  [`response_field_geometry()`](https://wpeterman.github.io/multiScaleR/reference/response_field_geometry.md).
+- Distance-removal (GDR) models from `unmarked` gain data checks and
+  preparation
+  ([`validate_unmarked_data()`](https://wpeterman.github.io/multiScaleR/reference/validate_unmarked_data.md),
+  [`prepare_unmarked_data()`](https://wpeterman.github.io/multiScaleR/reference/prepare_unmarked_data.md),
+  [`prepare_gdr_histories()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.md),
+  [`prepare_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_intervals.md),
+  [`expand_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/expand_gdr_intervals.md)),
+  simulation
+  ([`sim_dat_gdr()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_gdr.md)),
+  and a spatial abundance field
+  ([`fit_gdr_response_field()`](https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.md),
+  [`make_gdr_refitter()`](https://wpeterman.github.io/multiScaleR/reference/make_gdr_refitter.md),
+  [`gdr_start_values()`](https://wpeterman.github.io/multiScaleR/reference/gdr_start_values.md)).
+- [`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md)
+  examines the scale likelihood of single-kernel NB2 models, with
+  optional bootstrap calibration.
+- Landscape and surface metrics at a fixed radius can enter analytic and
+  Bayesian models as fixed predictors. `covariate_transform = "raw"`
+  keeps optimized covariates in their own units with the default
+  backend.
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  warns when the default refit search returns its starting values, names
+  the remedy, and records `start_stall` in
+  [`diagnostics()`](https://wpeterman.github.io/multiScaleR/reference/diagnostics.md).
+
+### Changes that can affect existing scripts
+
+- [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+  captions are off by default. Set `add_label = TRUE` to restore them.
+- `pct_mx` clamping moves each limit by a share of the observed range,
+  so projected values change when `pct_mx` is not 0.
+- [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md)
+  and
+  [`plot_kernel()`](https://wpeterman.github.io/multiScaleR/reference/plot_kernel.md)
+  take `shape` in place of `beta`. `beta` still works in this release,
+  with a deprecation warning.
+- [`library(multiScaleR)`](https://wpeterman.github.io/multiScaleR/) no
+  longer attaches `sf`.
+- Estimated fixed-kernel scales are reported as hard radii, without
+  Hessian standard errors. Use `summary(fit, profile = TRUE)` for an
+  interval.
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  screens starting values by default for `kernel = "fixed"`, so
+  fixed-kernel estimates can change. Set `start_strategy = "single"` to
+  restore the old single start.
+- CLUMPY follows the FRAGSTATS sign for dispersed classes, so it can be
+  negative where it was positive.
+- [`sim_rast()`](https://wpeterman.github.io/multiScaleR/reference/sim_rast.md)
+  gives different layers for the same `user_seed`, because its fields
+  are now simulated correctly.
+- [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  averages over the mapped cells near raster edges with the default
+  `fft = TRUE`, as
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  does at survey points. In 0.7.4, a raster with no missing cells was
+  smoothed as if the area beyond its edge held zeros, which pulled
+  values toward zero. Smoothed layers and projected maps change within
+  the kernel’s reach of the edge.
+- [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  with `fft = FALSE` keeps missing source cells missing instead of
+  filling them. With `na.rm = FALSE`, windows that extend beyond the
+  raster edge return `NA`.
+- [`predict()`](https://rspatial.github.io/terra/reference/predict.html)
+  under the analytic backends stops on arguments it cannot use.
+- The vignettes have new names.
+
+### Bug fixes
+
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  withholds Wald standard errors, and warns, when a refit failed at one
+  of the points used to compute the Hessian. The failure penalty had
+  produced standard errors near zero with no warning.
+- [`sim_dat()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat.md)
+  counts the points of an `sf` object correctly, sets `max_D` for the
+  `"expow"` kernel from each layer’s sigma and shape, places points
+  inside rasters whose extent does not start at the origin, and gives
+  generated points the raster’s coordinate reference system.
+- Parallel
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  runs stop their workers when worker setup fails or the run is
+  interrupted, instead of leaving them running until R closes their
+  connections.
+
+### Documentation
+
+- Fifteen vignettes in reading order: the quick start and user guide,
+  then covariates and maps, fitting and evaluation, specialized models,
+  and Bayesian estimation. They share one running example where the
+  feature allows, and each explains how to read its output.
+- Help pages organized into headed sections, new reference topics on
+  kernels, fitting methods, predictions, and terms, pages describing
+  each returned object, and runnable examples for every exported
+  function.
+- A package website, <https://wpeterman.github.io/multiScaleR/>, and a
+  citation file. Binaries are available from R-universe,
+  <https://wpeterman.r-universe.dev>.
+
+## multiScaleR 0.7.4
+
+- Marginal-effect plots for unmarked models recover predictor columns
+  from component formulas, including factors and repeated site-year
+  data. Numeric covariates are selected by name, categorical covariates
+  retain their levels, and random effects are set to zero explicitly for
+  conditional predictions.
+- Parallel optimization now stops before screening or worker creation
+  when the requested workers exceed the estimated RAM budget, with
+  guidance for serial execution or eligible lean-mode inputs. RAM
+  estimates include the binned summaries sent to workers. Unknown RAM
+  estimates do not block execution.
+- BREAKING REPORTING CHANGE:
+  [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md),
+  kernel plots, and the selected summary distance now default to the 2D
+  radius containing the requested share of ideal untruncated planar
+  kernel weight. Set `dimension = "1d"` to restore the original
+  line-based definition. Fitted sigma values are unchanged.
+- Summary `opt_dist` and `opt_distance` follow the selected dimension;
+  use `opt_dist_1d` or `opt_dist_2d` for explicitly defined tables.
+  Print methods show the selected definition first and retain the other
+  for comparison.
+- Kernel plots identify sigma, dimension, and radius or distance, and
+  mark hard-radius covariates at their full buffer radius.
+  Exponential-power 1D quantiles use the exact gamma formula, including
+  long-tailed kernels.
+- Simulation extents, projection windows, and stored optimization
+  diagnostics retain their explicit 1D cutoff definitions.
+
+## multiScaleR 0.7.3
+
+- AIC, AICc, BIC, and sigma profiles count all free unmarked model
+  parameters, including detection and variance components, using
+  validated native metadata. Selection tables use explicit S4 likelihood
+  dispatch; inconsistent metadata now raises an error instead of
+  counting predictor names. AICc tables reject insufficient sample
+  sizes, while profiles retain NA for undefined AICc.
+- Clarify installation guidance and standardize terminology in help
+  files and vignettes. Model-selection examples use bundled data with
+  adequate sample size.
+
+## multiScaleR 0.7.2
+
+CRAN release: 2026-10-05
+
+- `join_by` now preserves unmarked response and site-covariate row
+  alignment, validates site keys, and rejects mismatched rows instead of
+  recycling values.
+- Optimization supports unmarked fits with component formula lists,
+  including tested
+  [`pcountOpen()`](https://ecoverseR.github.io/unmarked/reference/pcountOpen.html)
+  and
+  [`colext()`](https://ecoverseR.github.io/unmarked/reference/colext.html)
+  workflows with static site covariates.
+- Refit checks and sample-size diagnostics account for repeated and
+  removed unmarked sites. Documentation and tests cover multi-year site
+  mapping.
+
+## multiScaleR 0.7.1
+
+- [`kernel_prep_by_group()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep_by_group.md)
+  prepares pooled model inputs from aligned annual or other
+  group-specific rasters, with shared distance bins and pooled scaling.
+- Adjacency metric projection now works on non-square rasters.
+  Optimization rejects candidate scales that would change the fitted
+  sample and reports when the starting model already excluded prepared
+  observations.
+- Hard-radius metrics display radius rather than sigma and omit invalid
+  Hessian standard errors and Wald intervals; profile intervals remain
+  available on request. Profiling reports refit failures instead of
+  returning an all-penalty likelihood profile.
+- Raster projection supplies input layers for model offsets and accepts
+  scenario values through `offset_values`. Model selection includes
+  ancillary likelihood parameters such as negative-binomial dispersion
+  in its count.
+- [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+  holds offset-only variables at their sample mean for prediction
+  without drawing misleading effect panels for them.
+- Preparation and optimization stop early with rename guidance when a
+  raster layer, derived covariate, or model predictor is named `x`,
+  which is reserved for internal coordinates.
+- [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  extracts raster cells in batches of 25 points to reduce temporary
+  extraction memory while preserving point order and results.
+- [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md)
+  gains `dimension = "2d"`, the radius of a circle holding `prob` of an
+  ideal, untruncated planar kernel’s weight. For a Gaussian kernel at
+  90%, it is about 2.15 sigma, versus 1.65 sigma along a line.
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html)
+  and [`print()`](https://rdrr.io/r/base/print.html) report both
+  distances, and
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html)
+  returns the planar table as `opt_dist_2d`; `opt_dist` and the
+  [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md)
+  default are unchanged.
+
+## multiScaleR 0.7.0
+
+CRAN release: 2026-07-01
+
+- CRAN resubmission: reduce Windows incoming check time by loading
+  cached vignette objects for slow fitted-model summaries and plots. The
+  calls used to regenerate those objects remain visible in the
+  vignettes, and the cache can be rebuilt with
+  `data-raw/generate_vignette_cache.R`.
+- Vignettes are self-contained for CRAN rebuilds. The main guide uses
+  package data and bundled example objects rather than downloading
+  precomputed objects from GitHub during vignette setup.
+- [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+  is faster when profiling models with multiple expensive covariates.
+  Along the profile grid only the profiled covariate’s sigma changes, so
+  the kernel-weighted columns of the other covariates are now computed
+  once and reused, and only the profiled covariate is re-evaluated at
+  each grid point. The reproducible benchmark in
+  `tools/benchmarks/profile_sigma_covariate_reuse_benchmark.R` checks
+  that the profile values match the legacy full-recompute loop before
+  timing. On the local benchmark, the current path was 2.61x faster for
+  four landscape metrics and 2.40x faster for four weighted surface
+  metrics.
+- Internal: the covariate-weighting step of `kernel_scale_fn()` is
+  factored into `.msr_kernel_cov_w()` (which can compute a single
+  covariate column), and the objective accepts a precomputed covariate
+  matrix via a new `cov_w` argument. Behavior of the optimizer and the
+  profile-likelihood intervals is unchanged.
+- [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  and scale profiling now provide metric-specific guidance when fragile
+  landscape metrics cannot be scaled because the derived covariate is
+  all `NA` or has zero variance. The messages call out the common
+  failure modes for `iji`, `siei`, and `msiei`, and the landscape-metric
+  documentation now recommends prescreening these metrics before
+  optimizing their scales.
+
+## multiScaleR 0.6.36
+
+- [`landscape_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  gains nine categorical metrics, all reproducing the values returned by
+  the `landscapemetrics` package (FRAGSTATS conventions) for both the
+  fixed-buffer path and the FFT raster projection.
+- Configuration: `"iji"` (interspersion and juxtaposition), the evenness
+  of the adjacencies among different classes. Like contagion, it is
+  built from the per-window class-pair co-occurrence matrix that already
+  powers `"contag"`, so it adds no extra convolutions.
+- Information theory (Nowosad & Stepinski 2019): `"ent"` (marginal
+  entropy), `"condent"` (conditional entropy), `"joinent"` (joint
+  entropy), `"mutinf"` (mutual information), and `"relmutinf"` (relative
+  mutual information). These separate composition from configuration,
+  which the diversity and contagion metrics confound. The `base`
+  argument now sets the logarithm base for these entropies as well as
+  the diversity metrics; set `base = 2` for bits, matching
+  `landscapemetrics`. The ratio metrics (`"relmutinf"`, `"iji"`) are
+  unaffected by `base`.
+- Class-level metrics, supplied through a new `class` argument naming
+  the focal class: `"clumpy"` (clumpiness index, -1 to 1), `"pland"`
+  (percentage of landscape), and `"ca"` (class area in hectares).
+  `class` is required for these three metrics and is not accepted for
+  any other metric.
+- The landscape-metric vignette gains tables for the new families and a
+  worked example contrasting composition (`"ent"`) with configuration
+  (`"mutinf"`, `"clumpy"`).
+
+## multiScaleR 0.6.35
+
+- [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  gains the `"sdr"` metric (surface area ratio): the percentage by which
+  the true 3D surface area of the neighborhood exceeds its flat
+  projected area. It behaves as a continuous edge-density analog and
+  uses the same quad triangulation as
+  [`geodiv::surface_area()`](https://rdrr.io/pkg/geodiv/man/surface_area.html).
+  Unlike [`geodiv::sdr()`](https://rdrr.io/pkg/geodiv/man/sdr.html),
+  which rescales the surface to a unit range and is dimensionless,
+  multiScaleR computes `"sdr"` in physical units (real elevation values
+  and the real cell size), so a tilted plane of slope `s` returns
+  `(sqrt(1 + s^2) - 1) * 100`. The physical definition is the
+  interpretable one for terrain and, unlike the rescaled version, is
+  FFT-projectable.
+- `"sdr"` joins `"sdq"` as a neighbor-based surface metric (it caches
+  raster cell IDs and its projection matches point extraction to a small
+  boundary tolerance). Kernel weighting is not offered for the
+  slope/area family.
+
+## multiScaleR 0.6.34
+
+- [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  gains a `weighted` argument. With `weighted = TRUE`, the distribution
+  metrics (`"sa"`, `"sq"`, `"ssk"`, `"sku"`) are computed as
+  kernel-weighted moments: each cell is weighted by the model’s distance
+  kernel (gaussian, exp, or expow) and the optimized parameter is the
+  kernel scale (sigma) rather than a hard neighborhood radius. Because
+  the weights vary smoothly with sigma, the likelihood is smooth in the
+  scale parameter, so
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  estimates the scale of effect of heterogeneity with a standard error,
+  exactly as it does for a kernel-weighted mean. The default
+  (`weighted = FALSE`) is unchanged.
+- Weighted surface metrics are supported with every kernel, including
+  `"expow"`, since they use the kernel (and its shape). Weighting is not
+  available for the slope metric `"sdq"`, and the scale is always
+  optimized (no fixed `radius`).
+- Projection of weighted `"sq"`, `"ssk"`, and `"sku"` uses
+  kernel-weighted FFT power sums; weighted `"sa"` uses the compiled
+  focal pass, now generalized to accept per-cell weights (a 0/1 mask
+  reproduces the unweighted result exactly).
+- Added a vignette section contrasting hard-radius and kernel-weighted
+  roughness.
+
+## multiScaleR 0.6.33
+
+- [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  gains three metrics: `"ssk"` (skewness) and `"sku"` (excess kurtosis),
+  which describe the shape of the neighborhood value distribution, and
+  `"sdq"` (root mean square slope), which describes local gradient
+  steepness or ruggedness. With `"sa"` and `"sq"` this completes the
+  dispersion, distribution-shape, and slope families of gradient surface
+  metrics. `"ssk"` and `"sku"` match `geodiv`’s adjusted-skewness and
+  excess-kurtosis defaults; `"sdq"` matches
+  [`geodiv::sdq()`](https://rdrr.io/pkg/geodiv/man/sdq.html) after
+  accounting for cell resolution (multiScaleR reports a true slope,
+  dividing the gradient by the cell size).
+- Raster projection of `"ssk"`, `"sku"`, and `"sdq"` uses FFT
+  convolution. The moment projections center on the global raster mean
+  first to avoid floating-point cancellation in the third and fourth
+  power sums. Like the landscape edge metrics, `"sdq"` caches raster
+  cell IDs and its projection agrees with point extraction to within a
+  small boundary tolerance.
+- Added the `surface_metric_covariates` vignette section demonstrating
+  the shape and slope surfaces.
+
+## multiScaleR 0.6.32
+
+- Added
+  [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md),
+  a new covariate specification for continuous surface texture metrics,
+  alongside the existing
+  [`kernel_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  and
+  [`landscape_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md).
+  Two metrics are supported in this release: `"sa"` (average roughness,
+  the mean absolute deviation from the neighborhood mean) and `"sq"`
+  (root mean square roughness, the sample standard deviation of the
+  neighborhood values). Both definitions match the `geodiv` package.
+  These metrics summarize within-neighborhood heterogeneity of a
+  continuous raster (elevation, NDVI, canopy height, temperature, and
+  similar surfaces) rather than its mean, so they complement
+  [`kernel_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md).
+  The buffer radius can be fixed or optimized, and the covariates flow
+  through
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md),
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+  and
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  exactly like landscape metrics.
+- [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  projections in
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  compute `"sq"` with fast Fourier transform (FFT) convolution and
+  `"sa"` with an exact masked focal pass. Average roughness has no
+  closed-form FFT decomposition, so `"sa"` is projected with a compiled
+  focal routine (`surface_sa_focal_cpp`) rather than an R closure; this
+  is exact and roughly twice as fast as the equivalent
+  [`terra::focal()`](https://rspatial.github.io/terra/reference/focal.html)
+  call in benchmarks. Surface metrics require a continuous raster with
+  square cells.
+- Added `geodiv` to `Suggests`; the surface-metric tests use it as a
+  validation oracle and are skipped when it is not installed.
+- Added the `surface_metric_covariates` vignette, which walks through
+  defining, fitting, optimizing, and projecting surface texture
+  covariates and how to interpret roughness at different scales.
+
+## multiScaleR 0.6.31
+
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  no longer queries system RAM on every call. The `next_run`
+  recommendation previously invoked
+  [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  at the end of each fit, which shelled out to an external process
+  (PowerShell on Windows) and rebuilt the optimization context; under
+  load this could make
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  appear to hang after the optimization had finished. The parallel
+  worker-count suggestion is now obtained only on demand by calling
+  [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  directly. `next_run$n_cores` is now `NULL`.
+  [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)’s
+  own RAM query is also bounded by a 5-second timeout so it degrades to
+  `NA` instead of blocking.
+- [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  now precomputes distance-binned summaries of kernel-weighted
+  covariates (`bin = TRUE`, `nbins = 256` by default).
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md),
+  and the screened-start path evaluate kernel covariates from these
+  summaries in O(nbins) per point instead of iterating every buffer cell
+  on each optimizer evaluation. The per-evaluation cost becomes
+  independent of `max_D`, making optimization roughly 10-80x faster in
+  benchmarks (the speedup grows with the number of points and the buffer
+  size), while recovering sigma to within ~1e-5 (relative) of the exact
+  per-cell result. Set `bin = FALSE` to force the exact path.
+- Added a “lean” storage mode (`kernel_prep(store_cell_data = FALSE)`)
+  that drops the per-cell `d_list`/`raw_cov` data when every covariate
+  is kernel-type, retaining only the binned summaries. This reduces the
+  `multiScaleR_data` memory footprint by roughly 30-40x in benchmarks
+  and is sufficient to optimize, profile, and refit. Cell-level data are
+  retained automatically when landscape-metric covariates are present.
+- [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  and
+  [`print.multiScaleR_data()`](https://wpeterman.github.io/multiScaleR/reference/print.multiScaleR_data.md)
+  now report binned summary sizes and handle lean inputs.
+- [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  now stores each point’s extracted cell values as a dense or sparse
+  matrix, whichever is smaller (continuous and categorical layers store
+  dense; low-prevalence binary layers stay sparse), so `raw_cov` memory
+  is never worse than before and is ~1.5x smaller for continuous
+  rasters.
+  [`scale_type()`](https://ggplot2.tidyverse.org/reference/scale_type.html)
+  evaluates dense values in vectorized R, matching the compiled sparse
+  path to machine precision while avoiding per-cell sparse random
+  access; this speeds up the exact (`bin = FALSE`) per-cell weighting
+  and removes the repeated sparse-to-dense conversion in the
+  landscape-metric path. (One-time
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  and landscape optimization wall-clock change little, as those are
+  dominated by raster extraction and the C++ metric computation
+  respectively.)
+- Landscape-metric optimization is ~3.4-4.2x faster: the source raster’s
+  categorical encoding is validated once in
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  instead of being re-scanned (with a per-call
+  [`unique()`](https://rspatial.github.io/terra/reference/unique.html)
+  class detection) on every optimizer evaluation. Optimized radii are
+  unchanged. Direct calls to the landscape metric helpers still validate
+  by default.
+- Hardware detection (physical/logical cores and total system RAM) is
+  now memoized, so
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  no longer spawns a PowerShell process to query RAM on every call when
+  populating its parallel-worker recommendation.
+
+## multiScaleR 0.6.30
+
+- Added
+  [`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md)
+  to report
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  memory use, conservative parallel RAM budgets, and recommended worker
+  counts based on available RAM and physical CPU cores while reserving
+  two cores
+- Added a preflight warning in
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  when requested parallel workers exceed the RAM-based budget estimated
+  for the current
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  payload
+
+## multiScaleR 0.6.29
+
+- Added aggregation index (`ai`) as a supported
+  [`landscape_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  metric, including fixed-buffer, optimized-radius, and FFT raster
+  projection paths with accuracy checks against `landscapemetrics`
+- Hardened
+  [`summary.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md)
+  argument handling so optional arguments such as `prob` and `profile`
+  are validated consistently
+- Clarified screened-start documentation for `n_cores` and Windows PSOCK
+  behavior, and added real-worker regression coverage
+
+## multiScaleR 0.6.28
+
+- Parallelized short screened-start optimization attempts in
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  using the same `n_cores` allocation as the main optimization when
+  `start_strategy = "screen"`
+- Added a serial fallback path if parallel screening fails, and added
+  regression coverage for core allocation behavior in screening
+
+## multiScaleR 0.6.27
+
+- Expanded the landscape metric vignette workflow with release-ready
+  examples, including fixed-radius metric projection guidance
+- Added optional parallel covariate profiling in
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+  via `n_cores` and documented practical core-selection guidance in
+  vignettes
+- Added regression coverage for standalone fixed-radius landscape metric
+  projection and serial-versus-parallel sigma profile parity
+
+## multiScaleR 0.6.26
+
+- Refined optimization diagnostics and next-run restart messaging in
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  documentation and tests
+- Updated vignette guidance for iterative optimization workflows
+
+## multiScaleR 0.6.25
+
+- Added `next_run` recommendations to
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  output with follow-up starting values and a diagnostic-informed
+  `max_D` suggestion
+- Suppressed benign package attach warnings in marginal-effect and PSOCK
+  helper fallback loads so local checks do not fail on R patch-version
+  mismatches alone
+
+## multiScaleR 0.6.24
+
+- Corrected
+  [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md)
+  roxygen registration so package checks generate the proper help alias
+  and no longer warn about missing documentation entries
+
+## multiScaleR 0.6.23
+
+- Added a regression test that asserts the package’s expected public
+  exports remain available in the installed namespace
+
+## multiScaleR 0.6.22
+
+- Restored missing exports for model-selection and simulation helpers
+  used in package vignettes, including
+  [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md),
+  [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md),
+  [`sim_rast()`](https://wpeterman.github.io/multiScaleR/reference/sim_rast.md),
+  [`sim_dat()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat.md),
+  and
+  [`sim_dat_unmarked()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_unmarked.md)
+
+## multiScaleR 0.6.21
+
+- Added an opt-in screened start strategy for
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  that scouts sigma values with log-spaced prescreening and short serial
+  screening runs before a single full optimization
+
+## multiScaleR 0.6.20
+
+- Hardened
+  [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+  for wrapped/nested fitted models such as
+  [`amt::fit_clogit()`](https://rdrr.io/pkg/amt/man/fit_clogit.html)-style
+  objects
+- Added regression coverage for marginal effect plots built from nested
+  `clogit` analysis models
+
+## multiScaleR 0.6.19
+
+- Counted one optimized parameter per fitted `sigma`/shape term in
+  [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md),
+  [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md),
+  and
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+  AICc calculations
+- Rejected AIC/BIC comparisons when models use different observation
+  sets, even if the sample sizes match
+- Propagated [`.libPaths()`](https://rdrr.io/r/base/libPaths.html) and
+  `R_LIBS*` settings to PSOCK workers for more reliable project-local
+  parallel optimization on Windows
+- Added an `opt_distance` summary alias alongside the existing
+  `opt_dist`
+
+## multiScaleR 0.6.18
+
+- Reconciled the merged landscape metric branch with a projection fix
+  for fitted models that use only a subset of cached raster covariates
+- Added regression coverage for
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  when stored `scale_vars` include unused source layers
+
+## multiScaleR 0.6.17
+
+- Added a landscape metric covariates vignette demonstrating explicit
+  [`msr_vars()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  specifications with 100 spatial sample points
+- Linked the quick-start guide to the landscape metric covariate
+  workflow
+
+## multiScaleR 0.6.16
+
+- Added
+  [`msr_vars()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md),
+  [`kernel_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md),
+  and
+  [`landscape_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
+  specifications for explicit derived raster covariates
+- Allowed multiple covariate transformations, such as kernel means and
+  fixed landscape metrics, to be derived from the same source raster
+  layer
+- Added exploratory raster projection support for specified landscape
+  metric covariates
+
+## multiScaleR 0.6.15
+
+- Added internal fixed-buffer SHDI helpers for exploratory landscape
+  metric support
+- Added FFT-based SHDI raster projection prototype and reference tests
+- Added internal fixed-buffer and FFT projection prototypes for edge
+  density
+- Expanded exploratory landscape metric helpers to
+  composition/diversity, total edge, landscape shape,
+  percentage-like-adjacency, and contagion metrics
+- Added compiled fixed-buffer metric primitives to improve repeated
+  point-level landscape metric calculations
+- Added FFT raster projection support for exploratory landscape shape
+  index calculations
+
+## multiScaleR 0.6.14
+
+- Improved model-data, predictor, and log-likelihood handling for
+  wrapped model objects
+- Added regression coverage for nested `clogit` wrappers in serial and
+  PSOCK optimization
+- Avoided recoverable model-data warnings in marginal effect plots
+
+## multiScaleR 0.6.13
+
+CRAN release: 2026-04-18
+
+- Added a Windows R-devel compatibility shim for Rcpp header compilation
+
+## multiScaleR 0.6.12
+
+- Forced C++17 compilation for compatibility with CRAN Windows R-devel
+  checks
+
+## multiScaleR 0.6.11
+
+- Fixed PSOCK optimization for unqualified model calls such as
+  `glm.nb()` after
+  [`library(MASS)`](http://www.stats.ox.ac.uk/pub/MASS4/)
+
+## multiScaleR 0.6.10
+
+- Preserved original sparse kernel dot-product behavior for complete
+  raster layers
+- Preserved point row identities across
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  outputs used during optimization
+- Ensured PSOCK workers use the same multiScaleR code as the main R
+  session
+- Fixed complete-case row alignment when fitted model frames retain
+  original row names
+
+## multiScaleR 0.6.8
+
+- Added linear and user-specified sigma grids to
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+
+## multiScaleR 0.6.7
+
+- Fixed singular-Hessian fallback SE values to remain numeric
+- Excluded missing raster cells from sparse kernel weighted averages
+
+## multiScaleR 0.6.6
+
+CRAN release: 2026-04-13
+
+- Added an optional custom refit hook for model classes that cannot use
+  default model updates
+- Improved internal model refitting and log-likelihood dispatch for
+  broader model support
+
+## multiScaleR 0.6.5
+
+- Added structured optimization diagnostics and a
+  [`diagnostics()`](https://wpeterman.github.io/multiScaleR/reference/diagnostics.md)
+  accessor
+- Fixed complete-case alignment in multiscale optimization inputs
+- Updated vignettes and restored
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  export handling
+
+## multiScaleR 0.6.4
+
+- Added sigma profiling and plot methods
+- Expanded plotting tests and updated vignettes
+- Streamlined GitHub Actions checks on direct pushes
+
+## multiScaleR 0.6.3
+
+- Made profile-likelihood CIs optional in `summary`
+- Updated vignettes and compressed example data
+
+## multiScaleR 0.6.2
+
+- Expanded test coverage
+- Improved error messaging
+
+## multiScaleR 0.6.1
+
+- Fixed test error
+
+## multiScaleR 0.6.0
+
+- Added unit testing
+
+## multiScaleR 0.5.0
+
+CRAN release: 2026-03-26
+
+- Updated handling of edge and NA values in `kernel_scale.raster`
+- Updated `kernel_scale.raster` to create ‘dummy’ layers for site effect
+  variables
+- Added vignette on spatial projections
+- Submitted to CRAN
+
+## multiScaleR 0.4.6
+
+- Updated handling of mixed effects models
+- Updated error handling
+
+## multiScaleR 0.4.5
+
+CRAN release: 2025-09-02
+
+- Added `verbose` argument to functions to optionally supress console
+  printing
+- Made updates for CRAN checks
+
+## multiScaleR 0.4.4
+
+- Updated `kernel_scale.raster` documentation and clamping defaults
+
+## multiScaleR 0.4.3
+
+- Updated handling of zero-infalted models in `plot_marginal_effects`
+
+## multiScaleR 0.4.2
+
+- Update dependencies to pass CRAN checks
+- Added hex sticker
+- Added `rhub.yaml`
+- Updated to pass CRAN checks
+
+## multiScaleR 0.4.1-2
+
+- Updated vignette to demonstrate fitting of zero-inflated model
+
+## multiScaleR 0.4.1-1
+
+- Updated `aic_tab` and `bic_tab` to properly check model types.
+- Fixed bug in `kernel_scale.raster`
+
+## multiScaleR 0.4.1-0
+
+- Updated calculation of cumulative distance
+- Added marginal effects plot function `plot_marginal_effect`
+- Updated `kernel_scale.raster`
+
+## multiScaleR 0.4.0-1
+
+- Updated `sim_rast` for efficiency. Uses custom fft
+
+## multiScaleR 0.4.0-0
+
+- Incorporated scaling & centering `kernel_scale.raster`
+- `scale_opt` is now deprecated in `kernel_scale.raster`; replaced with
+  `multiScaleR` argument.
+- Updated package data file structure
+- Passes CRAN checks
+
+## multiScaleR 0.3.1-4
+
+- Updates to better generalize across model classes
+
+## multiScaleR 0.3.1-3
+
+- Updated parallel processing handling to generalize use across model
+  classes
+
+## multiScaleR 0.3.1-2
+
+- Updated default `pct_wt` from 0.95 to 0.975 when smoothing raster
+  layers
+- Fixed kernel_scale.raster error handling
+
+## multiScaleR 0.3.1-1
+
+- Fixed bug in raster smoothing
+- Added na.rm argument
+
+## multiScaleR 0.3.1-0
+
+- Implemented fft smoothing of rasters
+- Removed NLMR and RandomFields dependencies
+
+## multiScaleR 0.3.0-5
+
+- Fixed bug causing optimization failure if only a single spatial
+  covariate was used.
+
+## multiScaleR 0.3.0-4
+
+- Updated documentation and created a PSOCK variable to force PSOCK
+  cluster when using unix
+
+## multiScaleR 0.3.0-3
+
+- Updated variable checks of `multiScale_optim`
+- Removed use of `method` and `opt_parallel` variables. Method is always
+  ’L-BFGS-B\` and if cores \> 1 is specified, parallelization is
+  implicit.
+
+## multiScaleR 0.3.0-2
+
+- Uses sparse matrices for reduced memory demands
+
+## multiScaleR 0.3.0-1
+
+- Updated kernel density functions to c++ for speed
+
+## multiScaleR 0.2.0-8
+
+- Updated parallelization to use forking when operating on a Unix OS
+- Updated DESCRIPTION file to reflect necessary dependencies
+
+## multiScaleR 0.2.0-7
+
+- Updated simulation function to create repeat sampling data
+- Updated vignette to demonstrate use of `multiScaleR` with `unmarked`.
+
+## multiScaleR 0.2.0-6
+
+- Bug fixes
+- Added ‘join_by’ command when optimizing `unmarked` models with stacked
+  data formats
+
+## multiScaleR 0.2.0-3
+
+- Updated error handling across core functions
+
+## multiScaleR 0.2.0-2
+
+- Fixed bug preventing optimization using unmarked models
+
+## multiScaleR 0.2.0-1
+
+- Modified formatting of vignette document
+
+## multiScaleR 0.2.0
+
+- Modified `multiScaleR_optim` to reduce size of final optimized object.
+- Completed vignette: use ‘build_vignettes = TRUE’ when installing
+- Updated code to accomodate lme4 and other model classes supported by
+  `insight` package.
+
+## multiScaleR 0.1.5
+
+- Updated plot function to show 95% confidence interval of scale of
+  effect distance
+- Updated summary function to report mean and 95% scale of effect
+  distance
+- Updated example data included with package to demonstrate more
+  extensive use of package
+- Future addition – A vignette demonstrating the use of the package
+
+## multiScaleR 0.1.4
+
+- Cleaned code
+- Added documentation and examples to `multiScale_optim`
+
+## multiScaleR 0.1.3
+
+- Corrected issue with distance weighting function
+- Updated how parameters are scaled
+
+## multiScaleR 0.1.2
+
+- Fixed bug in optimization function
+
+## multiScaleR 0.1.1
+
+- Fixed trap that was causing optimization with ‘fixed’ and ‘expow’ to
+  fail
+- Updated plot and kernel_dist functions
+
+## multiScaleR 0.1.0
+
+- Initial commit. Bugs and issues present, needed for class

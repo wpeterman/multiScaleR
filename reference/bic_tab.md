@@ -1,8 +1,11 @@
-# multiScaleR model selection
+# Rank models by BIC
 
-Creates a model selection table ranked by BIC for a list of fitted
-models. Mixed lists containing both `multiScaleR` objects and plain
-model objects are supported.
+Build a model-selection table ranked by BIC (the Bayesian information
+criterion) for a list of fitted models. As in
+[`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md),
+each estimated scale of effect (sigma) and kernel shape counts as a
+parameter, and lists can mix `multiScaleR` objects with plain fitted
+models.
 
 ## Usage
 
@@ -17,72 +20,87 @@ bic_tab(mod_list,
 
 - mod_list:
 
-  List containing fitted `multiScaleR` objects (from
-  [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md))
-  and/or plain fitted model objects. All models must have been fit to
-  the same number of observations.
+  A list of fitted models: `multiScaleR` objects from
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+  plain fitted models, or both. Every model must be fitted to the same
+  observations with a comparable likelihood, including matching
+  responses, weights, and likelihood measure. Bayesian fits,
+  cross-validation results, and private spatial prototypes are rejected.
 
 - mod_names:
 
-  Optional character vector of model names. Length must equal
-  `length(mod_list)`. By default, names are constructed as
-  `[kernel]right-hand-side-formula` for `multiScaleR` objects.
+  Optional character vector of model names, one per model in `mod_list`.
+  By default, `multiScaleR` objects are labeled
+  `[kernel=...; family=...]` followed by the right-hand side of the
+  model formula.
 
 - verbose:
 
-  Logical. If `TRUE`, the table is also printed to the console. Default:
+  Logical. If `TRUE`, the table is also printed to the console. Default
   `FALSE`.
 
 - ...:
 
-  Additional arguments (not used).
+  Not used.
 
 ## Value
 
-A data frame of class `"bictab"` (from the `AICcmodavg` package) sorted
-by ascending BIC, containing:
+A data frame of class `"bictab"` (from the AICcmodavg package), sorted
+from the best (smallest) BIC, with one row per model:
 
-- `Modnames`:
+- `Modnames`: model name.
 
-  Model name.
+- `K`: number of estimated parameters, counted as in
+  [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md):
+  the fitted likelihood parameters (including ancillary ones such as
+  negative binomial dispersion, or native effective degrees of freedom
+  for GAMs) plus each estimated scale and shape of a `multiScaleR`
+  model.
 
-- `K`:
+- `BIC`: the Bayesian information criterion. Smaller is better.
 
-  Number of fitted likelihood parameters, including ancillary parameters
-  such as negative-binomial dispersion, plus optimized scale and shape
-  parameters for `multiScaleR` models.
+- `Delta_BIC`: difference from the best model.
 
-- `BIC`:
+- `BICWt`: BIC weight, the relative support for each model within this
+  set. Weights sum to 1.
 
-  Bayesian information criterion value.
+- `Cum.Wt`: cumulative BIC weight.
 
-- `Delta_BIC`:
+- `LL`: maximized log-likelihood.
 
-  Difference from the top model.
-
-- `BICWt`:
-
-  BIC weight.
-
-- `Cum.Wt`:
-
-  Cumulative BIC weight.
-
-- `LL`:
-
-  Log-likelihood.
+A `likelihood_adjustments` attribute is added when a likelihood was
+adjusted, as described in
+[`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md).
 
 ## Details
 
-The table is constructed using
-[`bictabCustom`](https://rdrr.io/pkg/AICcmodavg/man/bictabCustom.html)
-from the `AICcmodavg` package. BIC penalizes model complexity more
-heavily than AIC as sample size grows, and is often preferred when the
-goal is identifying the single best-supported model rather than model
-averaging. Sigma (and shape for `"expow"`) is counted in K. Fitted
-parameter counts and log-likelihood validation follow
-[`aic_tab`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md),
-including all estimated components of unmarked models.
+BIC penalizes each parameter by the log of the sample size rather than
+by 2, so it penalizes complexity more heavily than AIC once there are
+more than about 7 observations. It is often preferred when the goal is
+the single best-supported model rather than model averaging.
+
+Every rule in
+[`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md)
+applies here: the parameter count (including all estimated components of
+`unmarked` models, spaMM degrees of freedom, and the checked negative
+binomial BAM adjustment), the comparability checks (responses, rows,
+weights, binomial outcomes, ML and REML, partial likelihoods, used
+`pcount()` visits, and distance-removal protocols), the sample-size
+conventions (retained site rows for `unmarked` models and native event
+counts for Cox and conditional logistic models), and the rejected
+models. Inapplicable hard-radius shape positions are excluded from `K`.
+Calling the criterion BIC does not make a posterior target a sampling
+likelihood, so Bayesian fits are rejected here too.
+
+The table itself is built with
+[`AICcmodavg::bictabCustom()`](https://rdrr.io/pkg/AICcmodavg/man/bictabCustom.html).
+
+## See also
+
+[`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md),
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+and
+[`vignette("v02-user-guide", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.md).
 
 ## Author
 
@@ -91,116 +109,26 @@ Bill Peterman
 ## Examples
 
 ``` r
-## Simulate data
-set.seed(555)
+## Bundled counts simulated with a habitat scale of 75 map units
+data("pts")
+data("count_data")
+hab <- terra::rast(system.file("extdata", "hab.tif", package = "multiScaleR"))
+prepared <- kernel_prep(pts, hab, max_D = 300, sigma = 75, verbose = FALSE)
+dat <- data.frame(y = count_data$y, prepared$kernel_dat)
+fixed_model <- glm(y ~ hab, family = poisson(), data = dat)
+null_model <- glm(y ~ 1, family = poisson(), data = dat)
+spatial_model <- multiScale_optim(fixed_model, prepared, par = 75 / 300,
+                                  n_cores = 1, verbose = FALSE)
 
-points <- vect(cbind(c(5,7,9,11,13),
-                     c(13,11,9,7,5)))
-
-mat_list <- list(r1 = rast(matrix(rnorm(20^2),
-                                  nrow = 20)),
-                 r2 = rast(matrix(rnorm(20^2),
-                                  nrow = 20)))
-rast_stack <- rast(mat_list)
-kernel_inputs <- kernel_prep(pts = points,
-                             raster_stack = rast_stack,
-                             max_D = 5,
-                             kernel = 'gaussian',
-                             sigma = NULL)
-#> 
-#> No sigma values provided...
-#> Creating necessary elements to optimize sigma
-#> 
-#> Extracting values from raster layers...
-## Example response data
-y <- rnorm(5)
-
-## Create data frame with raster variables
-dat <- data.frame(y = y,
-                  kernel_inputs$kernel_dat)
-mod1 <- glm(y ~ r1,
-            data = dat)
-mod2 <- glm(y ~ r2,
-            data = dat)
-mod3 <- glm(y ~ r1 + r2,
-            data = dat)
-
-## NOTE: This code is only for demonstration
-## Optimization results will have no meaning
-
-opt_mod1 <- multiScale_optim(fitted_mod = mod1,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-#> 
-#> 
-#> Optimization complete
-#> 
-#>  WARNING!!!
-#>  The estimated scale of effect approaches or exceeds the current search extent.
-#>  Consider increasing max_D in `kernel_prep` to >=11.9 to ensure accurate estimation of scale.
-#> 
-#> 
-#>  WARNING!!!
-#>  The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
-#>  Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
-#> 
-#> 
-
-opt_mod2 <- multiScale_optim(fitted_mod = mod2,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-#> 
-#> 
-#> Optimization complete
-#> 
-#>  WARNING!!!
-#>  The estimated scale of effect approaches or exceeds the current search extent.
-#>  Consider increasing max_D in `kernel_prep` to >=16.44 to ensure accurate estimation of scale.
-#> 
-#> 
-#>  WARNING!!!
-#>  The standard error of one or more `sigma` estimates is >= 50% of the estimated mean value.
-#>  Carefully assess whether or not this variable is meaningful in your analysis and interpret with caution.
-#> 
-#> 
-opt_mod3 <- multiScale_optim(fitted_mod = mod3,
-                             kernel_inputs = kernel_inputs,
-                             par = NULL,
-                             n_cores = NULL)
-#> 
-#> 
-#> Optimization complete
-#> 
-#>  WARNING!!!
-#>  The estimated scale of effect approaches or exceeds the current search extent.
-#>  Consider increasing max_D in `kernel_prep` to >=16.44 to ensure accurate estimation of scale.
-#> 
-#> 
-
- ## BIC table
- mod_list <- list(opt_mod1, opt_mod2, opt_mod3)
-
- bic_tab(mod_list = mod_list)
+## BIC charges log(75), about 4.3, for the estimated sigma, versus 2 in AIC
+bic_tab(list(spatial_model, fixed_model, null_model),
+        mod_names = c("spatial", "fixed", "null"))
 #> 
 #> Model selection based on BIC:
 #> 
-#>                     K   BIC Delta_BIC BICWt Cum.Wt    LL
-#> [gaussian]~ r1 + r2 6  3.26      0.00  0.98   0.98  3.20
-#> [gaussian]~ r2      4 11.56      8.30  0.02   0.99 -2.56
-#> [gaussian]~ r1      4 13.41     10.15  0.01   1.00 -3.49
-#> 
-
- ## BIC table with specified names
- bic_tab(mod_list = mod_list,
-         mod_names = c('mod1', 'mod2', 'mod3'))
-#> 
-#> Model selection based on BIC:
-#> 
-#>      K   BIC Delta_BIC BICWt Cum.Wt    LL
-#> mod3 6  3.26      0.00  0.98   0.98  3.20
-#> mod2 4 11.56      8.30  0.02   0.99 -2.56
-#> mod1 4 13.41     10.15  0.01   1.00 -3.49
+#>         K    BIC Delta_BIC BICWt Cum.Wt      LL
+#> fixed   2 236.98      0.00   0.9    0.9 -114.17
+#> spatial 3 241.29      4.31   0.1    1.0 -114.17
+#> null    1 349.01    112.03   0.0    1.0 -172.34
 #> 
 ```

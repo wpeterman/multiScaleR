@@ -1,10 +1,12 @@
-# Kernel Scale Preparation
+# Prepare Kernel Inputs for Scale Optimization
 
-Prepares the data inputs required for multiscale kernel optimization.
-Extracts raster values within a buffer around each point, computes
-pairwise distances, and calculates initial kernel-weighted covariate
-values. The result is passed directly to
-[`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
+Extracts the raster cells around each survey point, records the distance
+from the point to each cell, and computes a first set of kernel-weighted
+covariates. Fit your starting model to those covariates, then pass the
+model and the returned object to
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
+This is the first step of every `multiScaleR` workflow, shown in
+[`vignette("v01-quickstart", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v01-quickstart.md).
 
 ## Usage
 
@@ -30,256 +32,231 @@ kernel_prep(
 
 - pts:
 
-  Spatial point locations as a `SpatVector` (terra) or `sf` object.
-  Points must be in a projected coordinate system that shares units with
-  `max_D`.
+  Survey point locations as a `SpatVector` (terra) or `sf` object, in a
+  projected coordinate system whose units match `max_D`. Row names are
+  kept as point IDs.
 
 - raster_stack:
 
-  One or more raster layers of class `SpatRaster` (terra). Layer names
-  must match the variable names in the model formula used with
-  [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
-  unless `scale_vars` is provided to define derived covariates. Layer
+  A `SpatRaster` (terra) with one or more layers, on the same projection
+  as `pts`. Without `scale_vars`, each layer becomes a covariate with
+  the layer's name, so the names must match the model formula. Layer
   names cannot be `"x"`, which is reserved for internal coordinate data.
+  The raster must cover a buffer of `max_D` around every point.
 
 - max_D:
 
-  Positive numeric. The maximum radius (in the same units as the
-  projection of `pts` and `raster_stack`) around each point to sample
-  from the raster. Should be at least 2–3 times the largest expected
-  sigma value. Raster layers must extend far enough beyond the points to
-  fully cover buffers of this radius.
+  Positive numeric scalar. Radius, in map units, of the circle around
+  each point within which raster cells are extracted. It is also the
+  upper bound of the sigma search, and kernels are cut off at this
+  distance. Set it above the largest plausible scale of effect, at least
+  about 3.3 times the largest plausible sigma for a Gaussian kernel. If
+  an estimate comes back near `max_D`, increase it and run
+  `kernel_prep()` again. See the section on choosing `max_D` in
+  [multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
 - kernel:
 
-  Kernel function to be used for weighting raster values by distance.
-  One of:
-
-  `"gaussian"`
-
-  :   (Default) Gaussian (normal) decay: weights fall off as a normal
-      distribution with standard deviation `sigma`.
-
-  `"exp"`
-
-  :   Negative exponential decay: weights fall off as `exp(-d / sigma)`.
-
-  `"fixed"`
-
-  :   Fixed-radius (step) buffer: all cells within `sigma` receive equal
-      weight; cells beyond receive zero.
-
-  `"expow"`
-
-  :   Exponential power kernel parameterized by both `sigma` (scale) and
-      `shape` (shape). Requires `shape` to be specified.
+  Character. Distance-weighting function used for every covariate:
+  `"gaussian"` (default), `"exp"` (negative exponential), `"expow"`
+  (exponential power, which also estimates a shape), or `"fixed"` (equal
+  weight within a radius). The weight functions are given in
+  [multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
+  To compare kernels, run `kernel_prep()` once per kernel.
 
 - scale_vars:
 
-  Optional variable specifications created with
-  [`msr_vars`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md).
-  When omitted, each raster layer becomes one kernel-weighted covariate
-  with the same name, preserving historical behavior. Provide
-  `scale_vars` to define derived model covariates, for example,
-  combining a kernel-weighted mean with landscape composition or edge
-  metrics from the same source layer. See
-  [`kernel_var`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
-  and
-  [`landscape_var`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md).
+  Optional covariate specifications created with
+  [`msr_vars()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md).
+  Omit it to make each raster layer one kernel-weighted mean. Supply it
+  to define derived covariates, such as a kernel mean and a landscape or
+  surface metric from the same layer.
 
 - sigma:
 
-  Optional numeric vector of initial sigma values for optimization.
-  Length must equal the number of covariates with `optimize = TRUE` in
-  `scale_vars` (or the number of raster layers when `scale_vars` is not
-  provided). Values must be in the same units as the projection.
-  Default: `NULL`; initial values are generated automatically as
-  `max_D / 2`, which is recommended.
+  Optional numeric vector of starting sigma values, in map units, one
+  per covariate whose scale is estimated (one per raster layer when
+  `scale_vars` is omitted). Default: `NULL`, which starts every sigma at
+  `max_D / 2`. The default is recommended. These values set the
+  covariates in `kernel_dat` and are not the starting values of
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+  which chooses its own.
 
 - shape:
 
-  Optional numeric vector of initial shape values when
-  `kernel = "expow"`. Length requirements same as `sigma`. Default:
-  `NULL`; starting values of 2 are generated automatically.
+  Optional numeric vector of starting shape values for
+  `kernel = "expow"`, with the same length as `sigma`. Default: `NULL`,
+  which starts every shape at 2 (the Gaussian form). Ignored for other
+  kernels.
 
 - projected:
 
-  Logical. Whether `pts` and `raster_stack` are in a projected (planar)
-  coordinate system. Currently only projected coordinates are supported.
-  Default: `TRUE`.
+  Logical. Whether `pts` and `raster_stack` use projected (planar)
+  coordinates. Only projected coordinates are supported, so `FALSE` is
+  an error. Default: `TRUE`.
 
 - progress:
 
-  Logical. Print progress bars to the console during extraction and
-  distance calculations. Default: `FALSE`.
+  Logical. Show progress bars during extraction and weighting. Default:
+  `FALSE`.
 
 - verbose:
 
-  Logical. Print status messages during preparation. Default: `TRUE`.
+  Logical. Print status messages. Default: `TRUE`.
 
 - bin:
 
-  Logical. If `TRUE` (default), precompute distance-binned summaries of
-  the kernel-type covariates so that
-  [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
-  can evaluate kernel-weighted means in `O(nbins)` per point instead of
-  iterating every buffer cell on each optimizer evaluation. This makes
-  optimization substantially faster (and independent of `max_D`) at the
-  cost of a negligible binning approximation. Landscape-metric
-  covariates are never binned and always use the exact per-cell path.
+  Logical. If `TRUE` (default), summarize each kernel mean's cell values
+  into distance bins.
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  then evaluates kernel means from the bins instead of every cell, which
+  is much faster and no longer depends on `max_D`, at the cost of a
+  negligible approximation. The analytic backends and
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  require it for kernel means. Landscape and surface metrics are never
+  binned. `FALSE` forces exact cell-by-cell evaluation.
 
 - nbins:
 
-  Positive integer. Number of equal-width distance bins used when
-  `bin = TRUE`. More bins increase accuracy and memory; the default
+  Integer, at least 2. Number of equal-width distance bins when
+  `bin = TRUE`. More bins increase accuracy and memory. The default
   (`256`) reproduces exact optimization results to several significant
   figures. Ignored when `bin = FALSE`.
 
 - store_cell_data:
 
-  Logical. If `TRUE` (default), the full per-cell `d_list`/`raw_cov`
-  data are retained. If `FALSE` and every covariate is kernel-type (no
-  landscape metrics) and `bin = TRUE`, the cell-level data are dropped
-  after binning, dramatically reducing the object's memory footprint
-  (often by 1–2 orders of magnitude). The binned summaries are
-  sufficient to drive optimization,
-  [`profile_sigma`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md),
-  and the final refit. Ignored (with a message) when landscape metrics
-  are present or `bin = FALSE`.
+  Logical. If `TRUE` (default), the per-cell distances (`d_list`) and
+  values (`raw_cov`) are kept. If `FALSE`, they are dropped after
+  binning, often shrinking the object by one to two orders of magnitude.
+  This lean mode needs `bin = TRUE` and only kernel means. With
+  landscape or surface metrics, or `bin = FALSE`, the cell data are kept
+  and a message says so. The bins suffice for optimization,
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md),
+  and the final refit.
 
 ## Value
 
-A list of class `"multiScaleR_data"` containing:
+An object of class `multiScaleR_data`, a list. Its full structure is
+described in
+[multiScaleR_data](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_data-class.md).
+The parts you use directly:
 
-- `kernel_dat`:
+- `kernel_dat`: data frame with one row per point and one column per
+  covariate. Values are centered and scaled (mean 0, standard
+  deviation 1) at the starting sigma. Combine it with your response data
+  to fit the starting model.
 
-  Data frame of scaled (mean-centered, unit-variance) initial
-  kernel-weighted covariate values, one row per point and one column per
-  covariate. Row names match `pts` row names or sequential integers. Use
-  this directly to fit the initial model passed to
-  [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
+- `scl_params`: list with the `mean` and `sd` used for that scaling, in
+  the covariates' own units.
 
-- `d_list`:
+- `kernel`, `max_D`, `min_D`, and `scale_vars`: the settings passed on
+  to
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  and
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md).
 
-  Named list (one element per point) of numeric distance vectors from
-  the point to every raster cell within the buffer.
+Printing the object reports the number of points and covariates, the
+kernel, the number of cells extracted around the first point ("Number of
+elements"), whether binning is on, the minimum distance (`min_D`, about
+one cell width and the lower bound of the sigma search), the maximum
+distance (`max_D`), and the unit conversion (distances are stored
+divided by `max_D`).
 
-- `raw_cov`:
+## Prepare the points and rasters
 
-  Named list (one element per point) of matrices containing raw raster
-  cell values within the buffer, aligned with `d_list`. Each point is
-  stored as a dense or sparse matrix, whichever is smaller. `NULL` in
-  lean mode.
+Points and rasters must share a defined, projected CRS. Every distance,
+including `max_D` and any `sigma` you supply, is in the linear unit of
+that projection, usually meters. Landscape and surface metrics also need
+square cells. Row names of `pts` are kept throughout, so model data can
+be joined back to the points.
 
-- `kernel`:
+Each point's buffer is the circle of radius `max_D`, and every cell it
+intersects is extracted, including partly covered boundary cells, which
+keep their full kernel weight. Missing cells drop out of each weighted
+mean, and the remaining weights renormalize. Extraction runs in batches
+of 25 points to limit the peak memory of temporary tables. Point order,
+returned values, and distances are not affected.
 
-  Character string identifying the kernel used.
+## Manage memory
 
-- `sigma`:
+A larger `max_D` extracts more cells per point. Check the size of the
+object and the memory needed for parallel optimization with
+[`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md).
+When every covariate is a kernel mean, `store_cell_data = FALSE` keeps
+only the bins.
 
-  Numeric vector of initial sigma values on the internal (scaled)
-  parameter space.
+## Related preparation functions
 
-- `shape`:
+To assign each observation to a different annual raster while estimating
+one pooled landscape relationship, use
+[`kernel_prep_by_group()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep_by_group.md).
+To prepare inputs for `unmarked` models, see
+[`prepare_unmarked_data()`](https://wpeterman.github.io/multiScaleR/reference/prepare_unmarked_data.md).
 
-  Numeric vector of initial shape values, or `NULL`.
+## See also
 
-- `min_D`:
-
-  Numeric. Approximate minimum inter-cell distance, used as the lower
-  bound for sigma during optimization.
-
-- `max_D`:
-
-  Numeric. The `max_D` value supplied by the user.
-
-- `n_covs`:
-
-  Integer. Number of covariates with scale being optimized.
-
-- `unit_conv`:
-
-  Numeric. Internal distance scaling factor (equals `max_D`).
-
-- `scale_vars`:
-
-  Data frame of class `"multiScaleR_vars"` describing all covariate
-  specifications.
-
-- `resolution`:
-
-  Numeric. Raster cell resolution.
-
-- `n_cols`:
-
-  Integer. Number of raster columns (used for adjacency landscape
-  metrics).
-
-- `scl_params`:
-
-  Named list with elements `mean` and `sd` the centering and scaling
-  parameters applied to `kernel_dat`. Stored for use by
-  [`kernel_scale.raster`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
-  when `scale_center = TRUE`.
-
-- `binned`:
-
-  When `bin = TRUE`, a list of precomputed distance-binned summaries
-  (representative bin distances and per-covariate value/count matrices)
-  used to accelerate optimization. `NULL` when `bin = FALSE`.
-
-- `cell_data_stored`:
-
-  Logical flag indicating whether the per-cell `d_list`/`raw_cov` data
-  were retained. `FALSE` only in lean mode (`store_cell_data = FALSE`).
-
-## Details
-
-Point locations and raster layers must share a defined CRS and both must
-be projected. All units (including `max_D` and any user-supplied
-`sigma`) must be in the same linear unit as the projection (typically
-meters or feet).
-
-The `max_D` buffer should be large enough to encompass the plausible
-range of the true scale of effect. A common rule of thumb is to set
-`max_D` to at least 2–3 times the largest expected sigma. After running
-[`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
-the `max_distance` diagnostic will warn if the estimated scale
-approaches `max_D`.
-
-Initial `sigma` values do not need to be precise. The optimizer will
-refine them. Provide explicit starting values only if the default
-(`max_D / 2`) leads to convergence problems.
-
-Row names from `pts` are preserved throughout the returned object so
-that downstream model data frames can be joined back to the original
-point order. Raster extraction is processed in batches of 25 points to
-limit the peak memory used by temporary extraction tables. Point order,
-returned values, and distance calculations are unchanged. To assign each
-observation to a different annual raster while estimating one pooled
-landscape relationship, use
-[`kernel_prep_by_group`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep_by_group.md).
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+[`msr_vars()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md),
+[multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md),
+[multiScaleR_data](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_data-class.md),
+[`estimate_multiscale_ram()`](https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.md).
+[`vignette("v02-user-guide", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.md)
+explains each argument on a worked example.
 
 ## Examples
 
 ``` r
-library(terra)
-pts <- vect(cbind(c(3,5,7),
-                  c(7,5,3)))
+## Survey points and a binary habitat raster bundled with the package
+data("pts")
+data("count_data")
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
 
-mat_list <- list(r1 = rast(matrix(rnorm(100),
-                                  nrow = 10)),
-                 r2 = rast(matrix(rnorm(100),
-                                  nrow = 10)))
-rast_stack <- rast(mat_list)
 kernel_inputs <- kernel_prep(pts = pts,
-                             raster_stack = rast_stack,
-                             max_D = 2,
-                             kernel = 'gaussian',
-                             sigma = NULL)
+                             raster_stack = hab,
+                             max_D = 250,          # map units (meters)
+                             kernel = "gaussian",
+                             verbose = FALSE)
+# 75 points, one covariate, cells within 250 m of each point
+kernel_inputs
 #> 
-#> No sigma values provided...
-#> Creating necessary elements to optimize sigma
+#> There are 75 observations at 1 spatial covariate(s): 
+#> hab
 #> 
-#> Extracting values from raster layers...
+#> The specified kernel is:
+#> gaussian
+#> 
+#> Number of elements: 
+#> 2052
+#> Distance binning:
+#> enabled (256 distance bins per covariate)
+#> Minimum Distance:
+#> 10
+#> Maximum Distance:
+#> 250
+#> Unit Conversion:
+#> 250
+
+# Standardized kernel-weighted habitat at the starting sigma (125 m)
+head(kernel_inputs$kernel_dat)
+#>          hab
+#> 1 -0.4206979
+#> 2  1.7520402
+#> 3  0.5073754
+#> 4 -0.8959421
+#> 5 -0.1734359
+#> 6  0.8108489
+
+# Fit the starting model that multiScale_optim() will optimize
+df <- data.frame(count_data["y"], kernel_inputs$kernel_dat)
+mod <- glm(y ~ hab, family = poisson, data = df)
+
+## Lean mode keeps only the distance bins
+lean_inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
+                           store_cell_data = FALSE, verbose = FALSE)
+# Object sizes in megabytes
+c(full = as.numeric(object.size(kernel_inputs)),
+  lean = as.numeric(object.size(lean_inputs))) / 1e6
+#>     full     lean 
+#> 2.547640 0.328192 
 ```

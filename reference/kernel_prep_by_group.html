@@ -11,7 +11,7 @@ across years but the model estimates shared landscape effects and scales."><meta
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -19,23 +19,37 @@ across years but the model estimates shared landscape effects and scales."><meta
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/quickstart.html">Get started</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/v01-quickstart.html">Get started</a></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/quickstart.html">multiScaleR Quick-Start Guide</a></li>
-    <li><a class="dropdown-item" href="../articles/multiScaleR_Guide.html">multiScaleR User Guide</a></li>
+    <li><a class="dropdown-item" href="../articles/v01-quickstart.html">01. Quick start</a></li>
+    <li><a class="dropdown-item" href="../articles/v02-user-guide.html">02. User guide</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Covariate types</h6></li>
-    <li><a class="dropdown-item" href="../articles/landscape_metric_covariates.html">Landscape Metric Covariates</a></li>
-    <li><a class="dropdown-item" href="../articles/surface_metric_covariates.html">Surface Texture Covariates</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Covariates and maps</h6></li>
+    <li><a class="dropdown-item" href="../articles/v03-map-predictions.html">03. Mapping Predictions and Limiting Extrapolation</a></li>
+    <li><a class="dropdown-item" href="../articles/v04-landscape-metrics.html">04. Landscape Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v05-surface-metrics.html">05. Surface Texture Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v06-year-specific-rasters.html">06. Using Year-Specific Rasters in One Model</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/year-specific-rasters.html">Using Year-Specific Rasters in One Model</a></li>
-    <li><a class="dropdown-item" href="../articles/spatial_projection_clamping.html">Spatial Projection and Clamping</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Fitting and evaluation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v07-fitting-methods.html">07. Choose a Fitting Method for Your Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v08-cross-validation.html">08. Cross-Validate Scale-of-Effect Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v09-estimates-and-intervals.html">09. What Your Estimates and Intervals Mean</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Specialized models</h6></li>
+    <li><a class="dropdown-item" href="../articles/v10-step-selection.html">10. Estimate Scales of Effect in Step-Selection Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v11-spatial-fields.html">11. Account for Spatial Autocorrelation with a Spatial Field</a></li>
+    <li><a class="dropdown-item" href="../articles/v12-distance-removal.html">12. Fit Distance-Removal Models with Scales of Effect</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Bayesian scale estimation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/wpeterman/multiScaleR/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -105,11 +119,14 @@ immediate location.</p></dd>
 
 
 <dt id="arg-max-d">max_D<a class="anchor" aria-label="anchor" href="#arg-max-d"></a></dt>
-<dd><p>Maximum extraction radius in the projected map units.</p></dd>
+<dd><p>Positive numeric scalar. Maximum extraction radius, in the
+projected map units, and the upper bound of the sigma search. See the
+section on choosing <code>max_D</code> in <a href="multiScaleR-kernels.html">multiScaleR-kernels</a>.</p></dd>
 
 
 <dt id="arg-kernel">kernel<a class="anchor" aria-label="anchor" href="#arg-kernel"></a></dt>
-<dd><p>Kernel weighting function; see <code><a href="kernel_prep.html">kernel_prep</a></code>.</p></dd>
+<dd><p>Kernel weighting function: <code>"gaussian"</code> (default), <code>"exp"</code>,
+<code>"expow"</code>, or <code>"fixed"</code>. See <code><a href="kernel_prep.html">kernel_prep()</a></code> and <a href="multiScaleR-kernels.html">multiScaleR-kernels</a>.</p></dd>
 
 
 <dt id="arg-scale-vars">scale_vars<a class="anchor" aria-label="anchor" href="#arg-scale-vars"></a></dt>
@@ -152,50 +169,57 @@ requiring cell detail retain it regardless.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <code>multiScaleR_data</code> list containing:</p><dl><dt><code>kernel_dat</code></dt>
+    <p>A <code>multiScaleR_data</code> list with the same structure as the
+output of <code><a href="kernel_prep.html">kernel_prep()</a></code> (see <a href="multiScaleR_data-class.html">multiScaleR_data</a>), plus
+<code>raster_group</code>. It contains:</p><dl><dt><code>kernel_dat</code></dt>
 <dd><p>Initial covariate data frame, with one row per
-    point. Columns are centered and divided by their pooled standard
-    deviations. Use this in the starting model.</p></dd>
+point. Columns are centered and divided by their pooled standard
+deviations. Use this in the starting model.</p></dd>
 
-  <dt><code>d_list</code>, <code>raw_cov</code></dt>
+<dt><code>d_list</code>, <code>raw_cov</code></dt>
 <dd><p>Named per-point distance vectors
-    (divided by <code>unit_conv</code>) and raster-value matrices. Both are
-    <code>NULL</code> in lean mode.</p></dd>
+(divided by <code>unit_conv</code>) and raster-value matrices. Both are
+<code>NULL</code> in lean mode.</p></dd>
 
-  <dt><code>binned</code></dt>
+<dt><code>binned</code></dt>
 <dd><p>Pooled distance-bin summaries for kernel covariates,
-    or <code>NULL</code> when <code>bin = FALSE</code>. Each covariate has finite-value
-    sums and counts by point and distance bin.</p></dd>
+or <code>NULL</code> when <code>bin = FALSE</code>. Each covariate has finite-value
+sums and counts by point and distance bin.</p></dd>
 
-  <dt><code>raster_group</code></dt>
+<dt><code>cell_size</code></dt>
+<dd><p>Fixed x/y cell dimensions in map units, shared
+by every map. CV derives its intersecting-cell center envelope from this
+declared geometry, independently of assessment data.</p></dd>
+
+<dt><code>raster_group</code></dt>
 <dd><p>Named character vector recording the map
-    assigned to each point, in input order.</p></dd>
+assigned to each point, in input order.</p></dd>
 
-  <dt><code>scl_params</code></dt>
+<dt><code>scl_params</code></dt>
 <dd><p>Pooled means and standard deviations used to
-    create <code>kernel_dat</code>; the fitted model replaces these with scaling
-    parameters at the optimized scales.</p></dd>
+create <code>kernel_dat</code>; the fitted model replaces these with scaling
+parameters at the optimized scales.</p></dd>
 
-  <dt><code>kernel</code>, <code>sigma</code>, <code>shape</code></dt>
+<dt><code>kernel</code>, <code>sigma</code>, <code>shape</code></dt>
 <dd><p>Kernel name, initial
-    scales divided by <code>unit_conv</code>, and optional initial shape values.</p></dd>
+scales divided by <code>unit_conv</code>, and optional initial shape values.</p></dd>
 
-  <dt><code>min_D</code>, <code>max_D</code>, <code>unit_conv</code></dt>
+<dt><code>min_D</code>, <code>max_D</code>, <code>unit_conv</code></dt>
 <dd><p>Lower scale bound,
-    maximum extraction radius, and internal distance scaling factor. These
-    are in map units except the internally scaled <code>sigma</code>.</p></dd>
+maximum extraction radius, and internal distance scaling factor. These
+are in map units except the internally scaled <code>sigma</code>.</p></dd>
 
-  <dt><code>n_covs</code>, <code>scale_vars</code></dt>
+<dt><code>n_covs</code>, <code>scale_vars</code></dt>
 <dd><p>Number of optimized covariates and
-    the validated covariate definitions.</p></dd>
+the validated covariate definitions.</p></dd>
 
-  <dt><code>resolution</code>, <code>n_cols</code></dt>
+<dt><code>resolution</code>, <code>n_cols</code></dt>
 <dd><p>Raster cell size and column count,
-    used to calculate landscape configuration metrics.</p></dd>
+used to calculate landscape configuration metrics.</p></dd>
 
-  <dt><code>cell_data_stored</code></dt>
+<dt><code>cell_data_stored</code></dt>
 <dd><p>Whether per-cell values and distances are
-    retained.</p></dd>
+retained.</p></dd>
 
 
 </dl><p>Pass the full object to <code><a href="multiScale_optim.html">multiScale_optim</a></code>.</p>
@@ -203,17 +227,20 @@ requiring cell detail retain it regardless.</p></dd>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Raster maps must be aligned because landscape configuration metrics
-  use cell adjacency and the resulting model assumes common map units.
-  Group-specific maps may contain different missing cells. For kernel
-  covariates, pooled bins track both finite-cell value sums and counts.
-  The fitted model has common slopes and scales unless its formula explicitly
-  includes group interactions. Choose the response likelihood and any group
-  effect according to the sampling design. A pooled model does not establish
-  that effects are stable across years.</p>
+use cell adjacency and the resulting model assumes common map units.
+Group-specific maps may contain different missing cells. For kernel
+covariates, pooled bins track both finite-cell value sums and counts.
+The fitted model has common slopes and scales unless its formula explicitly
+includes group interactions. Choose the response likelihood and any group
+effect according to the sampling design. A pooled model does not establish
+that effects are stable across years.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="kernel_prep.html">kernel_prep</a></code>, <code><a href="multiScale_optim.html">multiScale_optim</a></code></p></div>
+    <div class="dont-index"><p><code><a href="kernel_prep.html">kernel_prep</a></code>, <code><a href="multiScale_optim.html">multiScale_optim</a></code>,
+<a href="multiScaleR_data-class.html">multiScaleR_data</a>.
+<code><a href="../articles/v06-year-specific-rasters.html">vignette("v06-year-specific-rasters", package = "multiScaleR")</a></code> fits
+one pooled model to observations from two annual maps.</p></div>
     </div>
 
     <div class="section level2">
@@ -231,6 +258,7 @@ requiring cell detail retain it regardless.</p></dd>
 <span class="r-in"><span><span class="va">prep</span> <span class="op">&lt;-</span> <span class="fu">kernel_prep_by_group</span><span class="op">(</span><span class="va">pts</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>y1 <span class="op">=</span> <span class="va">r1</span>, y2 <span class="op">=</span> <span class="va">r2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                             group <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"y1"</span>, <span class="st">"y2"</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                             max_D <span class="op">=</span> <span class="fl">25</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Standardized habitat covariate, pooled across both maps</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rspatial.github.io/terra/reference/headtail.html" class="external-link">head</a></span><span class="op">(</span><span class="va">prep</span><span class="op">$</span><span class="va">kernel_dat</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>       habitat</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1.14516205</span>
@@ -239,6 +267,10 @@ requiring cell detail retain it regardless.</p></dd>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4 -1.43564218</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5 -0.06144772</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6  0.97757736</span>
+<span class="r-in"><span><span class="co"># The map assigned to each point</span></span></span>
+<span class="r-in"><span><span class="va">prep</span><span class="op">$</span><span class="va">raster_group</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    1    2    3    4    5    6 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> "y1" "y2" "y1" "y2" "y1" "y2" </span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

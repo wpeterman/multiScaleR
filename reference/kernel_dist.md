@@ -1,12 +1,12 @@
-# Scale Distance
+# Convert Sigma into an Effective Distance
 
-Converts a kernel scale parameter (`sigma`) into a distance in map
-units: the distance within which a specified proportion of the kernel
-weight falls. Distances can be measured along a line through the point
-(one-dimensional) or as the radius of a circle around it
-(two-dimensional). Can be used with a fitted `multiScaleR` object to
-report optimized scale distances, or with manually supplied kernel
-parameters to explore kernel behavior.
+Converts a kernel scale parameter (sigma) into an *effective distance*
+in map units, the distance that holds a stated proportion of the kernel
+weight. Use it with a fitted `multiScaleR` object to report the
+estimated scales of effect as distances, or with kernel parameters you
+supply to explore how far a kernel reaches before fitting. The kernels,
+the two distance definitions, and their formulas are described in
+[multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
 ## Usage
 
@@ -19,213 +19,223 @@ kernel_dist(model, prob = 0.9, dimension = c("2d", "1d"), ...)
 - model:
 
   A fitted `multiScaleR` object from
-  [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
-  When provided, scale distances and 95% confidence intervals are
-  returned for all optimized covariates. When omitted, `sigma`,
-  `kernel`, and (for `expow`) `beta` must be supplied via `...`.
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
+  When supplied, distances and 95% confidence limits are returned for
+  every optimized covariate, and any `sigma`, `kernel`, or `shape`
+  passed through `...` is ignored with a warning. When omitted, supply
+  `sigma` and `kernel` (and `shape` for `"expow"`) through `...`.
 
 - prob:
 
-  Numeric between 0 and 1 (exclusive). Cumulative proportion used to
-  define the distance. Default: `0.9`. The proportion refers to weight
-  along a line for `dimension = "1d"` and weight on a plane for
-  `dimension = "2d"`.
+  Numeric between 0 and 1 (exclusive). Proportion of the kernel weight
+  that the reported distance must hold. Default: `0.9`. Larger values
+  give longer distances. Under `dimension = "1d"` the proportion is of
+  the weight along a line through the point. Under `"2d"` it is of the
+  weight on a plane.
 
 - dimension:
 
   Character. How the distance is measured. `"2d"` (default) returns the
-  radius of the circle around the point that holds `prob` of the total
-  weight the ideal kernel gives to locations on an unbounded plane.
-  Because raster cells lie across a plane, the `"2d"` radius answers
-  "within what distance does the ideal kernel assign 90% of its total
-  weight?". For distance-weighted kernels it is larger than the `"1d"`
-  distance; hard-radius covariates report the same radius for both.
-  `"1d"` restores the original line-based distance, enclosing `prob` of
-  the area under the kernel curve along a transect through the point.
-  See Details.
+  radius of the circle around the point that holds `prob` of the ideal
+  kernel weight on an unbounded plane. `"1d"` returns the original
+  line-based distance, which encloses `prob` of the area under the
+  kernel curve along a transect through the point. For distance-weighted
+  kernels the `"2d"` radius is longer than the `"1d"` distance.
+  Hard-radius covariates in a fitted model report the same radius under
+  both. See Details.
 
 - ...:
 
-  Additional parameters used when `model` is not supplied:
+  Kernel parameters used when `model` is not supplied:
 
-  `sigma`
+  - `sigma`: positive numeric scalar. The kernel scale parameter, in the
+    map units of the points and rasters passed to
+    [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md).
+    For the Gaussian kernel it is the standard deviation, for the
+    negative exponential kernel the decay length, and for the fixed
+    kernel the buffer radius.
 
-  :   Numeric (positive). The kernel scale parameter in the same units
-      as the projection of `pts` and `raster_stack` passed to
-      [`kernel_prep`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md).
-      For Gaussian kernels this is the standard deviation; for negative
-      exponential kernels this is the decay length.
+  - `kernel`: character. One of `"gaussian"`, `"exp"` (negative
+    exponential), `"expow"` (exponential power), or `"fixed"`
+    (fixed-radius buffer). Required.
 
-  `kernel`
+  - `shape`: positive numeric scalar. Shape of the exponential power
+    kernel. Required when `kernel = "expow"` and ignored otherwise.
 
-  :   Character. The kernel function to use. One of `"gaussian"`,
-      `"exp"` (negative exponential), `"fixed"` (fixed-radius buffer),
-      or `"expow"` (exponential power). Required when `model` is not
-      provided.
-
-  `beta`
-
-  :   Numeric (positive). Shape parameter for the exponential power
-      kernel. Required when `kernel = "expow"` and `model` is not
-      provided. Ignored for all other kernels.
+  - `beta`: deprecated former name of `shape`. It is still accepted,
+    with a warning, and will be removed in a future release. Supplying
+    both `shape` and `beta` with different values is an error.
 
 ## Value
 
-When `model` is provided: a data frame with one row per optimized
-covariate and three columns, all in map units: `Mean` (distance at the
-estimated sigma), `2.5%` (distance at the lower 95% limit of sigma), and
-`97.5%` (distance at the upper 95% limit of sigma). Values are rounded
-to two decimal places. For hard-radius covariates (landscape metrics and
-unweighted surface metrics) the row reports the radius itself, whichever
-`dimension` is requested.
+When `model` is supplied, a data frame with one row per optimized
+covariate (row names are the covariate names) and three columns, all in
+map units and rounded to two decimal places:
 
-When kernel parameters are supplied directly via `...`: a single numeric
-value giving the distance, in map units, at which the cumulative kernel
-weight under the requested dimensional definition reaches `prob`.
+- `Mean`: the effective distance at the estimated sigma.
 
-## Details
+- `2.5%`: the distance at the lower 95% limit of sigma.
 
-**Default change.** Version 0.7.4 and later use `dimension = "2d"` for
-distances, summaries, and kernel plots. Earlier versions used `"1d"`.
-Set `dimension = "1d"` explicitly to reproduce earlier reported
-distances. This changes reporting, not fitted sigma values, kernel
-weights, or likelihoods. Existing simulation extents, projection
-cutoffs, and optimization diagnostics retain their explicit 1D
-definitions.
+- `97.5%`: the distance at the upper 95% limit of sigma.
 
-**One or two dimensions.** A kernel assigns each raster cell a weight
-that declines with the cell's distance from the point. Two distances can
-summarize how far that weight reaches:
+For a hard-radius covariate (a landscape metric, an unweighted surface
+metric, or any covariate fitted with `kernel = "fixed"`), the row
+reports the radius itself under either `dimension`. Limits are `NA` when
+no interval is available (see Details). A covariate whose sigma estimate
+is not finite returns `NaN`.
 
-- `dimension = "1d"` treats the kernel as a curve along a single line (a
-  transect) through the point and returns the distance on either side
-  that encloses `prob` of the area under that curve. For a Gaussian
-  kernel the 90% distance is about 1.65 sigma.
+When kernel parameters are supplied through `...`, a single numeric
+value, the distance in map units that holds `prob` of the kernel weight
+under the chosen `dimension`, rounded to two decimal places.
 
-- `dimension = "2d"` accounts for locations lying on a plane, so the
-  number of locations at distance *d* grows with the circumference 2 pi
-  *d*. It returns the radius of the circle that holds `prob` of the
-  ideal kernel weight. For a Gaussian kernel the 90% radius is about
-  2.15 sigma.
+## Read the distances
 
-With sigma = 300 m, a Gaussian kernel gives a 90% distance of about 493
-m in one dimension and 644 m in two. On an unbounded plane, locations
-within 493 m carry only about 74% of the total weight. When you describe
-the area associated with kernel weighting, or compare with values
-defined on the plane (for example, a radius holding 90% of the kernel
-weight), use `"2d"`. Always state which definition you report.
-
-**Kernel formulas.** In one dimension:
-
-- **Gaussian**: the inverse normal CDF, `qnorm((1 + prob) / 2) * sigma`.
-
-- **Negative exponential**: `-sigma * log(1 - prob)`.
-
-- **Fixed buffer**: `sigma * prob` (the fraction of the buffer radius).
-
-- **Exponential power**:
-  `sigma * qgamma(prob, shape = 1 / beta)^(1 / beta)`; both `sigma` and
-  `beta` (shape) must be specified.
-
-In two dimensions:
-
-- **Gaussian**: `sigma * sqrt(-2 * log(1 - prob))`.
-
-- **Negative exponential**: `sigma * qgamma(prob, shape = 2)`, about
-  3.89 sigma at 90%.
-
-- **Fixed buffer**: `sigma * sqrt(prob)`, the radius of the circle
-  holding `prob` of the buffer's area.
-
-- **Exponential power**:
-  `sigma * qgamma(prob, shape = 2 / beta)^(1 / beta)`.
+Sigma is a kernel parameter, not a radius. An effective distance puts
+the estimate in map units you can compare across kernels and studies.
+With sigma = 300 m, a Gaussian kernel holds 90% of its planar weight
+within about 644 m (`dimension = "2d"`), while the line-based 90%
+distance is about 493 m (`dimension = "1d"`). Use `"2d"` when you
+describe the area a kernel draws on, and always state the definition and
+the value of `prob` you report. The formulas for each kernel are
+tabulated in
+[multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
 Both definitions describe the ideal continuous kernel. They do not
-account for truncation at `max_D`, raster boundaries, missing cells, or
-cell geometry. The realized share of weight among extracted raster cells
-can therefore differ. If the two-dimensional radius approaches or
-exceeds `max_D`, consider increasing `max_D` in
-[`kernel_prep`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
-and refitting the model.
+account for truncation at `max_D`, raster edges, missing cells, or cell
+geometry, so the share of weight among the cells actually extracted
+around a point can differ. If the `"2d"` radius approaches or exceeds
+`max_D`, increase `max_D` in
+[`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+and refit the model.
 
-Confidence intervals for the fitted `model` case are derived from the
-Hessian-based standard errors (or profile-likelihood intervals when
-[`profile_sigma`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
-has been run and stored on the object). Each limit of sigma is converted
-to a distance with the same formula. For exponential-power kernels, beta
-is held at its fitted estimate during this conversion; the limits do not
-include uncertainty in beta or in site-specific retained weight.
+## Reproduce distances from earlier versions
 
-[`summary()`](https://rspatial.github.io/terra/reference/summary.html)
-of a fitted model reports both distances; see
-[`summary.multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md).
+Versions 0.7.4 and later report `dimension = "2d"` distances by default
+in `kernel_dist()`,
+[`summary()`](https://rspatial.github.io/terra/reference/summary.html),
+[`print()`](https://rdrr.io/r/base/print.html), and kernel plots.
+Earlier versions reported the line-based distance. The switch changes
+reporting only. It does not change fitted sigma values, kernel weights,
+or likelihoods. To reproduce distances reported by earlier versions, set
+the dimension explicitly:
+
+    kernel_dist(fit, dimension = "1d")
+    summary(fit, dimension = "1d")
+    print(fit, dimension = "1d")
+    plot(fit, dimension = "1d")
+    plot_kernel(sigma = 300, kernel = "gaussian", dimension = "1d")
+
+Simulation extents in
+[`sim_dat()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat.md),
+the `pct_wt` window in
+[`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md),
+and the `max_D` warning of
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+keep their line-based definitions.
+
+## Confidence limits from a fitted model
+
+Each limit of sigma is converted to a distance with the same formula as
+the estimate. By default the sigma limits are Wald limits from the
+Hessian-based standard errors. When the fitted object stores its own
+interval table in `profile_scale_est` (see the [fitted-object help
+page](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-class.md)),
+those limits are used instead. `summary(fit, profile = TRUE)` converts
+profile-likelihood limits to distances in its own output, as described
+in
+[`summary.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md).
+For exponential-power kernels, the shape is held at its estimate during
+this conversion, so the limits do not include uncertainty in the shape.
+These rules depend on the fitting route:
+
+- With `backend = "profile_glm"` or `"joint_nb2"` and an estimated
+  exponential-power shape, distance limits use joint log-scale
+  delta-method uncertainty for both sigma and shape. They remain Wald
+  limits even when sigma limits are profiled in
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html),
+  and they are missing when the fit fails the joint identifiability
+  checks. Point distances remain available.
+
+- With `backend = "conditional_logit"`, point distances are available
+  but scale uncertainty has not been calibrated, so distance limits are
+  missing.
+
+- With the default refit backend, point distances remain available when
+  a sigma standard error is not finite, but its Wald limits are missing.
+  When a smooth parameter sits at a search bound, the whole Wald block
+  is withheld, while explicitly marked profile limits remain available.
+
+- A hard-radius covariate reports its radius directly and has no kernel
+  shape, including in an exponential-power fit. It has no Hessian-based
+  interval, but stored profile limits are kept. See the section on
+  smooth kernels and hard radii in
+  [multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
+
+Native coefficient standard errors remain conditional on the selected
+scales. Manually supplied fixed-kernel parameters still return the
+requested weight quantile under the chosen `dimension`.
 
 ## See also
 
-[`summary.multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md),
-[`plot.multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.md),
-[`plot_kernel`](https://wpeterman.github.io/multiScaleR/reference/plot_kernel.md)
+[multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md)
+for the kernel formulas and both distance definitions.
+[`summary.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md),
+[`plot.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.md),
+and
+[`plot_kernel()`](https://wpeterman.github.io/multiScaleR/reference/plot_kernel.md)
+report and draw the same distances.
+[`vignette("v02-user-guide", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.md)
+converts sigma to effective distances on a worked example.
 
 ## Examples
 
 ``` r
+## Distances from kernel parameters, without a fitted model
+# A Gaussian kernel with sigma = 300 m: planar radius holding 90% of the weight
+kernel_dist(sigma = 300, kernel = "gaussian")                     # about 644
+#> [1] 643.79
+# The original line-based definition gives a shorter distance
+kernel_dist(sigma = 300, kernel = "gaussian", dimension = "1d")   # about 493
+#> [1] 493.46
+# Other kernels and proportions
+kernel_dist(sigma = 500, kernel = "gaussian", prob = 0.95)
+#> [1] 1223.87
+kernel_dist(sigma = 100, kernel = "exp", prob = 0.975)
+#> [1] 557.16
+kernel_dist(sigma = 100, kernel = "expow", shape = 1.5, prob = 0.95)
+#> [1] 235.51
+kernel_dist(sigma = 100, kernel = "fixed")   # radius holding 90% of the buffer area
+#> [1] 94.87
+
 # \donttest{
-## Using package data
-data('pts')
-data('count_data')
-hab <- terra::rast(system.file('extdata',
-                   'hab.tif', package = 'multiScaleR'))
+## Distances from a fitted model
+data("pts")
+data("count_data")
+hab <- terra::rast(system.file("extdata", "hab.tif",
+                               package = "multiScaleR"))
 
 kernel_inputs <- kernel_prep(pts = pts,
                              raster_stack = hab,
                              max_D = 250,
-                             kernel = 'gaussian')
-#> 
-#> No sigma values provided...
-#> Creating necessary elements to optimize sigma
-#> 
-#> Extracting values from raster layers...
-
-mod <- glm(y ~ hab,
-           family = poisson,
-           data = count_data)
-
-## Optimize scale
+                             kernel = "gaussian",
+                             verbose = FALSE)
+mod <- glm(y ~ hab, family = poisson, data = count_data)
 opt <- multiScale_optim(fitted_mod = mod,
-                        kernel_inputs = kernel_inputs)
-#> 
-#> 
-#> Optimization complete
-#> 
-#>  WARNING!!!
-#>  The estimated scale of effect approaches or exceeds the current search extent.
-#>  Consider increasing max_D in `kernel_prep` to >=250.56 to ensure accurate estimation of scale.
-#> 
-#> 
+                        kernel_inputs = kernel_inputs,
+                        verbose = FALSE)
 
-## Uses of `kernel_dist`
-kernel_dist(model = opt)                     # radius of a circle (2D)
+# Planar radius (m) holding 90% of the weight, with limits from the
+# 95% interval of sigma
+kernel_dist(model = opt)
 #>       Mean   2.5%  97.5%
 #> hab 163.45 122.53 204.37
-kernel_dist(model = opt, dimension = "1d")   # original distance along a line
+# Line-based distances, as reported before version 0.7.4
+kernel_dist(model = opt, dimension = "1d")
 #>       Mean  2.5%  97.5%
 #> hab 125.28 93.92 156.65
+# Radius holding 95% of the weight
 kernel_dist(model = opt, prob = 0.95)
 #>       Mean   2.5%  97.5%
 #> hab 186.44 139.76 233.11
-kernel_dist(sigma = 500, kernel = 'gaussian', prob = 0.95)
-#> [1] 1223.87
-kernel_dist(sigma = 100, prob = 0.975, kernel = "exp")
-#> [1] 557.16
-kernel_dist(sigma = 100, prob = 0.95, kernel = "expow", beta = 1.5)
-#> [1] 235.51
-kernel_dist(sigma = 100, kernel = "fixed")
-#> [1] 94.87
 # }
-
-## The two definitions for a Gaussian kernel with sigma = 300
-kernel_dist(sigma = 300, kernel = "gaussian")                     # about 644
-#> [1] 643.79
-kernel_dist(sigma = 300, kernel = "gaussian", dimension = "1d")   # about 493
-#> [1] 493.46
 ```

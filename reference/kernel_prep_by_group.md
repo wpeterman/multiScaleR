@@ -48,12 +48,18 @@ kernel_prep_by_group(
 
 - max_D:
 
-  Maximum extraction radius in the projected map units.
+  Positive numeric scalar. Maximum extraction radius, in the projected
+  map units, and the upper bound of the sigma search. See the section on
+  choosing `max_D` in
+  [multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
 - kernel:
 
-  Kernel weighting function; see
-  [`kernel_prep`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md).
+  Kernel weighting function: `"gaussian"` (default), `"exp"`, `"expow"`,
+  or `"fixed"`. See
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  and
+  [multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
 - scale_vars:
 
@@ -97,7 +103,11 @@ kernel_prep_by_group(
 
 ## Value
 
-A `multiScaleR_data` list containing:
+A `multiScaleR_data` list with the same structure as the output of
+[`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+(see
+[multiScaleR_data](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_data-class.md)),
+plus `raster_group`. It contains:
 
 - `kernel_dat`:
 
@@ -115,6 +125,12 @@ A `multiScaleR_data` list containing:
   Pooled distance-bin summaries for kernel covariates, or `NULL` when
   `bin = FALSE`. Each covariate has finite-value sums and counts by
   point and distance bin.
+
+- `cell_size`:
+
+  Fixed x/y cell dimensions in map units, shared by every map. CV
+  derives its intersecting-cell center envelope from this declared
+  geometry, independently of assessment data.
 
 - `raster_group`:
 
@@ -169,7 +185,10 @@ does not establish that effects are stable across years.
 ## See also
 
 [`kernel_prep`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md),
-[`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+[`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+[multiScaleR_data](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_data-class.md).
+[`vignette("v06-year-specific-rasters", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v06-year-specific-rasters.md)
+fits one pooled model to observations from two annual maps.
 
 ## Examples
 
@@ -187,6 +206,7 @@ pts <- vect(cbind(c(50, 70, 90, 110, 130, 150),
 prep <- kernel_prep_by_group(pts, list(y1 = r1, y2 = r2),
                              group = rep(c("y1", "y2"), 3),
                              max_D = 25, verbose = FALSE)
+# Standardized habitat covariate, pooled across both maps
 head(prep$kernel_dat)
 #>       habitat
 #> 1  1.14516205
@@ -195,4 +215,8 @@ head(prep$kernel_dat)
 #> 4 -1.43564218
 #> 5 -0.06144772
 #> 6  0.97757736
+# The map assigned to each point
+prep$raster_group
+#>    1    2    3    4    5    6 
+#> "y1" "y2" "y1" "y2" "y1" "y2" 
 ```

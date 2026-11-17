@@ -27,13 +27,13 @@ Ecology*, **41**(1), 8.
     }
 
 Peterman W (2026). *multiScaleR: Methods for Optimizing Scales of
-Effect*. R package version 0.7.4,
+Effect*. R package version 1.0.0,
 <https://github.com/wpeterman/multiScaleR>.
 
     @Manual{multiScaleR,
       title = {multiScaleR: Methods for Optimizing Scales of Effect},
       author = {William E. Peterman},
       year = {2026},
-      note = {R package version 0.7.4},
+      note = {R package version 1.0.0},
       url = {https://github.com/wpeterman/multiScaleR},
     }

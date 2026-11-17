@@ -11,7 +11,7 @@ effective scale of effect and its 95% confidence interval."><meta property="og:i
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -19,23 +19,37 @@ effective scale of effect and its 95% confidence interval."><meta property="og:i
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/quickstart.html">Get started</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/v01-quickstart.html">Get started</a></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/quickstart.html">multiScaleR Quick-Start Guide</a></li>
-    <li><a class="dropdown-item" href="../articles/multiScaleR_Guide.html">multiScaleR User Guide</a></li>
+    <li><a class="dropdown-item" href="../articles/v01-quickstart.html">01. Quick start</a></li>
+    <li><a class="dropdown-item" href="../articles/v02-user-guide.html">02. User guide</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Covariate types</h6></li>
-    <li><a class="dropdown-item" href="../articles/landscape_metric_covariates.html">Landscape Metric Covariates</a></li>
-    <li><a class="dropdown-item" href="../articles/surface_metric_covariates.html">Surface Texture Covariates</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Covariates and maps</h6></li>
+    <li><a class="dropdown-item" href="../articles/v03-map-predictions.html">03. Mapping Predictions and Limiting Extrapolation</a></li>
+    <li><a class="dropdown-item" href="../articles/v04-landscape-metrics.html">04. Landscape Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v05-surface-metrics.html">05. Surface Texture Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v06-year-specific-rasters.html">06. Using Year-Specific Rasters in One Model</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/year-specific-rasters.html">Using Year-Specific Rasters in One Model</a></li>
-    <li><a class="dropdown-item" href="../articles/spatial_projection_clamping.html">Spatial Projection and Clamping</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Fitting and evaluation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v07-fitting-methods.html">07. Choose a Fitting Method for Your Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v08-cross-validation.html">08. Cross-Validate Scale-of-Effect Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v09-estimates-and-intervals.html">09. What Your Estimates and Intervals Mean</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Specialized models</h6></li>
+    <li><a class="dropdown-item" href="../articles/v10-step-selection.html">10. Estimate Scales of Effect in Step-Selection Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v11-spatial-fields.html">11. Account for Spatial Autocorrelation with a Spatial Field</a></li>
+    <li><a class="dropdown-item" href="../articles/v12-distance-removal.html">12. Fit Distance-Removal Models with Scales of Effect</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Bayesian scale estimation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/wpeterman/multiScaleR/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -123,7 +137,8 @@ marker accounts for the increasing area of concentric rings, so the area
 under the displayed curve to its left is not the stated proportion.
 Distances refer to an ideal untruncated kernel. Actual retained weight can
 differ with <code>max_D</code>, raster edges, missing cells, and cell geometry.</p>
-<p>Hard-radius covariates show a uniform buffer and mark its full radius,
+<p>Hard-radius covariates, including every fitted fixed-kernel scale, show
+a uniform buffer and mark its full radius,
 regardless of <code>prob</code> or <code>dimension</code>. A shaded interval is drawn
 only when finite limits are available.</p>
     </div>

@@ -13,7 +13,7 @@ optimization result."><meta property="og:image" content="https://wpeterman.githu
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,23 +21,37 @@ optimization result."><meta property="og:image" content="https://wpeterman.githu
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/quickstart.html">Get started</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/v01-quickstart.html">Get started</a></li>
 <li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Getting started</h6></li>
-    <li><a class="dropdown-item" href="../articles/quickstart.html">multiScaleR Quick-Start Guide</a></li>
-    <li><a class="dropdown-item" href="../articles/multiScaleR_Guide.html">multiScaleR User Guide</a></li>
+    <li><a class="dropdown-item" href="../articles/v01-quickstart.html">01. Quick start</a></li>
+    <li><a class="dropdown-item" href="../articles/v02-user-guide.html">02. User guide</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Covariate types</h6></li>
-    <li><a class="dropdown-item" href="../articles/landscape_metric_covariates.html">Landscape Metric Covariates</a></li>
-    <li><a class="dropdown-item" href="../articles/surface_metric_covariates.html">Surface Texture Covariates</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Covariates and maps</h6></li>
+    <li><a class="dropdown-item" href="../articles/v03-map-predictions.html">03. Mapping Predictions and Limiting Extrapolation</a></li>
+    <li><a class="dropdown-item" href="../articles/v04-landscape-metrics.html">04. Landscape Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v05-surface-metrics.html">05. Surface Texture Metrics as Covariates</a></li>
+    <li><a class="dropdown-item" href="../articles/v06-year-specific-rasters.html">06. Using Year-Specific Rasters in One Model</a></li>
     <li><hr class="dropdown-divider"></li>
-    <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/year-specific-rasters.html">Using Year-Specific Rasters in One Model</a></li>
-    <li><a class="dropdown-item" href="../articles/spatial_projection_clamping.html">Spatial Projection and Clamping</a></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Fitting and evaluation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v07-fitting-methods.html">07. Choose a Fitting Method for Your Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v08-cross-validation.html">08. Cross-Validate Scale-of-Effect Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v09-estimates-and-intervals.html">09. What Your Estimates and Intervals Mean</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Specialized models</h6></li>
+    <li><a class="dropdown-item" href="../articles/v10-step-selection.html">10. Estimate Scales of Effect in Step-Selection Models</a></li>
+    <li><a class="dropdown-item" href="../articles/v11-spatial-fields.html">11. Account for Spatial Autocorrelation with a Spatial Field</a></li>
+    <li><a class="dropdown-item" href="../articles/v12-distance-removal.html">12. Fit Distance-Removal Models with Scales of Effect</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Bayesian scale estimation</h6></li>
+    <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
+    <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/wpeterman/multiScaleR/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -88,7 +102,7 @@ optimization result.</p>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A named list with four elements:</p><dl><dt><code>max_distance</code></dt>
+    <p>A named list with the following elements:</p><dl><dt><code>max_distance</code></dt>
 <dd><p>A list describing whether the estimated scale of
     effect approaches or exceeds <code>max_D</code>. Fields include:
     <code>triggered</code> (logical), <code>variables</code> (names of affected
@@ -122,13 +136,70 @@ optimization result.</p>
     when the fitted model uses fewer observations. Candidate scales that
     change the initial model's sample are rejected during optimization.</p></dd>
 
+  <dt><code>start_stall</code></dt>
+<dd><p>For the default refit backend, present only when
+    the optimizer returned its starting values, so the reported scales are
+    those starts. A search from the default start is flagged whenever it
+    returns that start. A user-supplied or screened start is flagged only
+    when the search stopped after one evaluation, because such a start may
+    already be an optimum. Fields include <code>reason</code>, <code>screened</code>
+    (whether the start came from <code>start_strategy = "screen"</code>),
+    <code>start</code> (starting sigma values in map units),
+    <code>function_evaluations</code>, and <code>message</code>, which names the remedy.
+    <code>reason</code> is <code>"hard_radius"</code> when every optimized scale is a
+    hard radius, as under <code>kernel = "fixed"</code>. Its likelihood changes in
+    steps, so the gradient is zero almost everywhere. <code>reason</code> is
+    <code>"refit_failed"</code> when no refitted model gave a finite
+    log-likelihood at the start. A glmmTMB model with a
+    non-positive-definite Hessian reports none. <code>reason</code> is
+    <code>"no_progress"</code> otherwise. A warning gives the same message when
+    the fit is made, and <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> and <code><a href="https://rspatial.github.io/terra/reference/summary.html" class="external-link">summary()</a></code> repeat it.</p></dd>
+
+  <dt><code>refit_hessian</code></dt>
+<dd><p>For the default refit backend, retains
+    the outer curvature status and active smooth-parameter mask. A bound table
+    records estimates, lower/upper bounds in reporting units, and bound flags.
+    If any active parameter is within <code>1e-5</code> log units of a positive
+    bound, joint outer Wald SEs are withheld. A zero lower bound is flagged
+    only when reached. The original curvature status is retained separately.
+    A status of <code>"hessian_includes_failed_refit"</code> means a refit failed
+    at one of the finite-difference points used for the Hessian, so its
+    curvature reflects the failure penalty; Wald SEs are withheld and a
+    warning is given.
+    This is a numerical support flag, not a test of identification or a
+    calibrated confidence limit. Native coefficient covariance and parameter
+    counts are unchanged.</p></dd>
+
+  <dt><code>radius_profile</code></dt>
+<dd><p>For a declared radius grid, one row per
+    combination. <code>radius</code>, or one <code>radius:&lt;predictor&gt;</code> column per
+    hard radius, uses map units. Any <code>sigma:&lt;predictor&gt;</code> and
+    <code>shape:&lt;predictor&gt;</code> columns hold the reoptimized smooth bandwidths
+    in map units and unitless shapes, respectively. The table also reports
+    native <code>log_likelihood</code>, <code>status</code> (scored or failed), any
+    failure <code>message</code>, and a logical <code>selected</code> flag. With smooth
+    predictors, <code>smooth_starts</code> holds a table of optimizer and
+    convergence diagnostics for each combination that reached the
+    smooth search. An all-failed search carries the profile table on the
+    error condition.</p></dd>
+
+  <dt><code>profile_glm</code></dt>
+<dd><p>Present for both opt-in analytic GLM backends.
+    Includes <code>uncertainty_available</code>, explanatory <code>reasons</code>,
+    <code>weak_identifiability</code>, <code>boundary</code>, <code>condition_number</code>,
+    log-kernel standard errors, competing-mode flags, and attempted/eligible
+    start counts. <code>poisson_limit</code> marks negligible fitted NB2 extra
+    variance; <code>poisson_compatible</code> and <code>poisson_deviance</code> compare
+    the NB2 fit with a Poisson fit at the selected kernel scales. See
+    <code><a href="multiScale_optim.html">multiScale_optim</a></code> for thresholds and limitations.</p></dd>
+
 
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>These diagnostics are evaluated automatically at the end of
 <code><a href="multiScale_optim.html">multiScale_optim</a></code>. Console warnings are printed when any
-diagnostic is triggered. <code>diagnostics()</code> provides programmatic access
+diagnostic is triggered and <code>verbose = TRUE</code>. <code>diagnostics()</code> provides programmatic access
 to the same information without re-running the model.
 These stored diagnostics retain the historical 1D 90% distance and
 threshold, independently of the new 2D reporting default in plots and

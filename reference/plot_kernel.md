@@ -1,11 +1,16 @@
-# Plot kernel densities
+# Plot a Kernel Weight Curve
 
-Visualizes the weight (density) of a kernel function as a function of
-distance, without requiring a fitted `multiScaleR` object. Useful for
-exploring how different kernel types and sigma values translate into
-spatial influence zones before running
-[`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
-To plot the kernel from a fitted model, use `plot(opt)` instead.
+Draws the weight a kernel gives to a raster cell as a function of its
+distance from a survey point, and marks the effective distance that
+holds a chosen share of the kernel weight. No fitted model is needed, so
+use it to explore how kernel type, sigma, and shape translate into
+spatial reach before you run
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
+To plot the kernels of a fitted model, with their confidence intervals,
+use
+[`plot.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.md).
+The kernels are defined in
+[multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
 ## Usage
 
@@ -13,12 +18,13 @@ To plot the kernel from a fitted model, use `plot(opt)` instead.
 plot_kernel(
   prob = 0.9,
   sigma,
-  beta = NULL,
+  shape = NULL,
   kernel,
   scale_dist = TRUE,
   add_label = TRUE,
   dimension = c("2d", "1d"),
-  ...
+  ...,
+  beta = NULL
 )
 ```
 
@@ -26,128 +32,121 @@ plot_kernel(
 
 - prob:
 
-  Numeric between 0 and 1 (exclusive). Proportion of ideal kernel weight
-  enclosed by the marked distance under the selected `dimension`.
+  Numeric between 0 and 1 (exclusive). Share of the ideal kernel weight
+  held within the marked distance, under the selected `dimension`.
   Default: `0.9`.
 
 - sigma:
 
-  Positive numeric. The scale parameter of the kernel, in the same units
-  as the projection used with
-  [`kernel_prep`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
-  (e.g., meters when using a metric CRS). Controls the width of the
-  kernel: larger values spread influence over greater distances.
+  Positive numeric scalar. The kernel scale parameter, in the map units
+  of the projection used with
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  (for example, meters). Larger values spread the weight over greater
+  distances. For `kernel = "fixed"` it is the buffer radius. Required.
 
-- beta:
+- shape:
 
-  Positive numeric. Shape parameter for the exponential power kernel
-  (`kernel = "expow"`). Controls kernel shape: values near 1 approximate
-  a Laplace (double-exponential) shape; values near 2 approximate
-  Gaussian; larger values approach a flat-top (platykurtic) shape.
-  Typical range is 1–50. Ignored for all other kernel types. Default:
-  `NULL`.
+  Positive numeric scalar. Shape of the exponential power kernel
+  (`kernel = "expow"`), required for that kernel and ignored for the
+  others. `shape = 1` gives the negative exponential curve, `shape = 2`
+  the Gaussian form (with standard deviation sigma / sqrt(2)), and
+  larger values a flat top with a steep edge that approaches a fixed
+  buffer. The default refit search of
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  keeps the shape between 0.75 and 50. Default: `NULL`.
 
 - kernel:
 
-  Character. The kernel function to visualize. One of:
-
-  `"gaussian"`
-
-  :   Gaussian (normal) decay; weights follow a half-normal density with
-      standard deviation `sigma`.
-
-  `"exp"`
-
-  :   Negative exponential decay; weights follow `exp(-d / sigma)`.
-
-  `"fixed"`
-
-  :   Fixed-radius step function; all distances up to `sigma` receive
-      equal weight.
-
-  `"expow"`
-
-  :   Exponential power kernel parameterized by `sigma` and `beta`.
+  Character. The kernel to draw: `"gaussian"`, `"exp"` (negative
+  exponential), `"expow"` (exponential power), or `"fixed"`
+  (fixed-radius buffer). Required. The weight functions are tabulated in
+  [multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
 - scale_dist:
 
-  Logical. If `TRUE` (default), a vertical dashed line marks the
-  distance enclosing `prob` of kernel weight under the selected
-  dimensional definition.
+  Logical. If `TRUE` (default), a dashed red vertical line marks the
+  distance that holds `prob` of the kernel weight under the selected
+  `dimension`.
 
 - add_label:
 
-  Logical. If `TRUE` (default), a caption reports the cumulative
-  percentage, dimension, sigma, and effective distance below the plot.
-  Requires `scale_dist = TRUE`.
+  Logical. If `TRUE` (default), a caption below the plot reports the
+  percentage of weight, the dimensional definition, sigma, and the
+  marked distance. Shown only when `scale_dist = TRUE`.
 
 - dimension:
 
-  Character. `"2d"` (default) marks the radius enclosing `prob` of ideal
-  kernel weight on a plane. `"1d"` restores the original distance
-  enclosing that proportion along a line through the point.
+  Character. `"2d"` (default) marks the radius of the circle that holds
+  `prob` of the ideal kernel weight on a plane. `"1d"` marks the
+  original line-based distance, which holds that share along a transect
+  through the point. See
+  [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md).
 
 - ...:
 
   Not used.
 
+- beta:
+
+  Deprecated former name of `shape`. It is still accepted, with a
+  warning, and will be removed in a future release. Supplying both
+  `shape` and `beta` with different values is an error.
+
 ## Value
 
-A `ggplot2` object showing kernel weight (y-axis) as a function of
-distance in map units (x-axis), returned for display or customization.
+A `ggplot2` object with distance in map units on the x-axis and relative
+kernel weight on the y-axis. It prints when returned at the console. Add
+layers or themes to customize it.
 
 ## Details
 
-The curve shows relative weight assigned to a cell at each distance,
-normalized over the plotted sample distances. It is not the distribution
-of total weight in concentric rings. Under the default `"2d"`
-definition, the marker accounts for ring area (proportional to
-distance), so the area under the displayed curve to its left is not
-`prob`.
+**How to read the plot.** The curve shows the relative weight given to a
+single cell at each distance. Weights are normalized to sum to one over
+the 200 plotted distances, so only the shape of the curve and its
+relative height matter. The curve is not the distribution of total
+weight in concentric rings. Under the default `"2d"` definition the
+marker accounts for the area of each ring, which grows with distance, so
+the area under the plotted curve to the left of the marker is not
+`prob`. Sigma remains a kernel parameter, not the marked radius. For a
+Gaussian kernel with sigma = 300 m, the 90% marker sits at about 644 m
+under `"2d"` and 493 m under `"1d"`.
 
-The x-axis covers at least 99.9% of weight under the selected
-definition, or `prob` when larger. Marker positions use the unrounded
-distance; labels round to two decimal places. Sigma remains a kernel
-parameter, not the marked radius. For a Gaussian kernel with sigma = 300
-m, the 90% marker is about 644 m in 2D and 493 m in 1D.
+The x-axis extends to the distance holding at least 99.9% of the weight
+under the selected definition (or `prob`, if larger). For the fixed
+kernel it extends to 1.1 times sigma. Marker positions use the unrounded
+distance, and the caption rounds it to two decimal places.
 
-Development versions after 0.7.3 default to 2D; use `dimension = "1d"`
-to reproduce the original distance definition. These are ideal
-continuous-kernel distances, not site-specific retained weight after
-`max_D`, raster boundaries, missing cells, or cell geometry limit the
-extraction. See
-[`kernel_dist`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md)
-for both definitions.
-
-For fitted-model kernel plots (with confidence intervals), use
-`plot(multiScaleR_object)` instead.
+Versions 0.7.4 and later mark the `"2d"` radius by default. Set
+`dimension = "1d"` to reproduce plots from earlier versions. Both are
+ideal continuous-kernel distances. They do not reflect truncation at
+`max_D`, raster edges, missing cells, or cell geometry at a particular
+site.
 
 ## See also
 
-[`kernel_dist`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md),
-[`plot.multiScaleR`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.md)
+[multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md),
+[`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md),
+[`plot.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.md).
+[`vignette("v02-user-guide", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v02-user-guide.md)
+compares the four kernels side by side.
 
 ## Examples
 
 ``` r
-## Default: radius containing 95% of ideal planar weight
-plot_kernel(prob = 0.95,
-            sigma = 100,
-            kernel = 'gaussian')
+## Radius holding 95% of the ideal planar weight, sigma = 100 map units
+plot_kernel(prob = 0.95, sigma = 100, kernel = "gaussian")
 
-plot_kernel(prob = 0.95,
-            sigma = 100,
-            kernel = 'exp')
+# The negative exponential reaches farther for the same sigma
+plot_kernel(prob = 0.95, sigma = 100, kernel = "exp")
 
-plot_kernel(prob = 0.95,
-            sigma = 100,
-            kernel = 'fixed')
+# Equal weight out to sigma, then zero
+plot_kernel(prob = 0.95, sigma = 100, kernel = "fixed")
 
-plot_kernel(prob = 0.95,
-            sigma = 100,
-            beta = 2.5,
-            kernel = 'expow')
+# A flatter top and steeper edge than the Gaussian
+plot_kernel(prob = 0.95, sigma = 100, shape = 5, kernel = "expow")
 
-## Original line-based definition
-plot_kernel(sigma = 100, kernel = 'gaussian', dimension = '1d')
+
+## The original line-based definition marks a shorter distance
+plot_kernel(sigma = 100, kernel = "gaussian", dimension = "1d")
+
 ```

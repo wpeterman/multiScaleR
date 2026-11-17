@@ -26,7 +26,7 @@ diagnostics(object, ...)
 
 ## Value
 
-A named list with four elements:
+A named list with the following elements:
 
 - `max_distance`:
 
@@ -63,17 +63,79 @@ A named list with four elements:
   model uses fewer observations. Candidate scales that change the
   initial model's sample are rejected during optimization.
 
+- `start_stall`:
+
+  For the default refit backend, present only when the optimizer
+  returned its starting values, so the reported scales are those starts.
+  A search from the default start is flagged whenever it returns that
+  start. A user-supplied or screened start is flagged only when the
+  search stopped after one evaluation, because such a start may already
+  be an optimum. Fields include `reason`, `screened` (whether the start
+  came from `start_strategy = "screen"`), `start` (starting sigma values
+  in map units), `function_evaluations`, and `message`, which names the
+  remedy. `reason` is `"hard_radius"` when every optimized scale is a
+  hard radius, as under `kernel = "fixed"`. Its likelihood changes in
+  steps, so the gradient is zero almost everywhere. `reason` is
+  `"refit_failed"` when no refitted model gave a finite log-likelihood
+  at the start. A glmmTMB model with a non-positive-definite Hessian
+  reports none. `reason` is `"no_progress"` otherwise. A warning gives
+  the same message when the fit is made, and
+  [`print()`](https://rdrr.io/r/base/print.html) and
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html)
+  repeat it.
+
+- `refit_hessian`:
+
+  For the default refit backend, retains the outer curvature status and
+  active smooth-parameter mask. A bound table records estimates,
+  lower/upper bounds in reporting units, and bound flags. If any active
+  parameter is within `1e-5` log units of a positive bound, joint outer
+  Wald SEs are withheld. A zero lower bound is flagged only when
+  reached. The original curvature status is retained separately. A
+  status of `"hessian_includes_failed_refit"` means a refit failed at
+  one of the finite-difference points used for the Hessian, so its
+  curvature reflects the failure penalty; Wald SEs are withheld and a
+  warning is given. This is a numerical support flag, not a test of
+  identification or a calibrated confidence limit. Native coefficient
+  covariance and parameter counts are unchanged.
+
+- `radius_profile`:
+
+  For a declared radius grid, one row per combination. `radius`, or one
+  `radius:<predictor>` column per hard radius, uses map units. Any
+  `sigma:<predictor>` and `shape:<predictor>` columns hold the
+  reoptimized smooth bandwidths in map units and unitless shapes,
+  respectively. The table also reports native `log_likelihood`, `status`
+  (scored or failed), any failure `message`, and a logical `selected`
+  flag. With smooth predictors, `smooth_starts` holds a table of
+  optimizer and convergence diagnostics for each combination that
+  reached the smooth search. An all-failed search carries the profile
+  table on the error condition.
+
+- `profile_glm`:
+
+  Present for both opt-in analytic GLM backends. Includes
+  `uncertainty_available`, explanatory `reasons`,
+  `weak_identifiability`, `boundary`, `condition_number`, log-kernel
+  standard errors, competing-mode flags, and attempted/eligible start
+  counts. `poisson_limit` marks negligible fitted NB2 extra variance;
+  `poisson_compatible` and `poisson_deviance` compare the NB2 fit with a
+  Poisson fit at the selected kernel scales. See
+  [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  for thresholds and limitations.
+
 ## Details
 
 These diagnostics are evaluated automatically at the end of
 [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
-Console warnings are printed when any diagnostic is triggered.
-`diagnostics()` provides programmatic access to the same information
-without re-running the model. These stored diagnostics retain the
-historical 1D 90% distance and threshold, independently of the new 2D
-reporting default in plots and summaries. Changing `dimension` when
-reporting a fit does not recompute its stored diagnostics. Use
-`kernel_dist(object)` to inspect the ideal planar radius separately.
+Console warnings are printed when any diagnostic is triggered and
+`verbose = TRUE`. `diagnostics()` provides programmatic access to the
+same information without re-running the model. These stored diagnostics
+retain the historical 1D 90% distance and threshold, independently of
+the new 2D reporting default in plots and summaries. Changing
+`dimension` when reporting a fit does not recompute its stored
+diagnostics. Use `kernel_dist(object)` to inspect the ideal planar
+radius separately.
 
 When `max_distance` is triggered, consider re-running
 [`kernel_prep`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)

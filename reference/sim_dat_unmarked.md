@@ -1,4 +1,4 @@
-# Simulate data for optimizing scales of effect with \`unmarked\`
+# Simulate data for optimizing scales of effect with `unmarked`
 
 Generates simulated replicated detection/non-detection or count data
 formatted for use with the `unmarked` package, with known
@@ -176,10 +176,20 @@ s_dat <- sim_dat_unmarked(alpha = 1,
                           raster_stack = rs,
                           max_D = 220,
                           user_seed = 123)
+# True abundance rises with bin1 (beta = 0.75) and falls with cont1 (-0.75)
 plot(s_dat$df$y ~ s_dat$df$bin1)
 
 plot(s_dat$df$y ~ s_dat$df$cont1)
 
+# Observed counts: one row per site, one column per repeated survey
+head(s_dat$y)
+#>      [,1] [,2] [,3]
+#> [1,]    1    1    0
+#> [2,]    0    2    1
+#> [3,]    0    0    0
+#> [4,]    0    0    0
+#> [5,]    3    3    2
+#> [6,]    2    3    5
 ## unmarked analysis
 kernel_inputs <- kernel_prep(pts = s_dat$pts,
                              raster_stack = rs,
