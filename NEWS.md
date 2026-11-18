@@ -1,6 +1,12 @@
 multiScaleR (development version)
 ---------------------------------
 
+* Fits that check memory before automatic differentiation, including some
+  `multiScale_bayes()` fits, no longer stop with "Cannot detect RAM" on
+  Windows machines where PowerShell is slow or blocked. multiScaleR now reads
+  total RAM directly from the operating system and runs outside commands only
+  as a fallback.
+
 multiScaleR 1.0.0
 -----------------
 

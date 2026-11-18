@@ -427,10 +427,11 @@ estimate_multiscale_ram <- function(kernel_inputs,
 
 
 # Hardware (physical/logical cores, total RAM) does not change during an R
-# session, but detecting it can be costly -- on Windows `.msr_total_ram_bytes()`
-# spawns a PowerShell process. `multiScale_optim()` queries these on every call
-# to populate its `next_run` recommendation, so the results are memoized to
-# avoid repeated process spawns / system calls.
+# session, but detecting it can be costly when the native query fails and
+# `.msr_total_ram_bytes()` falls back to an outside process (PowerShell on
+# Windows). `multiScale_optim()` queries these on every call to populate its
+# `next_run` recommendation, so the results are memoized to avoid repeated
+# process spawns / system calls.
 .msr_hw_cache <- new.env(parent = emptyenv())
 
 .msr_detect_cores <- function(logical = FALSE) {
@@ -465,6 +466,13 @@ estimate_multiscale_ram <- function(kernel_inputs,
 
 
 .msr_total_ram_bytes_uncached <- function() {
+  # Ask the operating system directly first. The outside commands below remain
+  # as fallbacks for platforms where the compiled query reports nothing.
+  ram <- .msr_native_total_ram_bytes()
+  if (is.finite(ram)) {
+    return(ram)
+  }
+
   sysname <- Sys.info()[["sysname"]]
 
   if (identical(.Platform$OS.type, "windows")) {
@@ -495,8 +503,20 @@ estimate_multiscale_ram <- function(kernel_inputs,
 }
 
 
-# The direct .NET query avoids depending on a responsive CIM provider. Both
-# queries are bounded by .msr_system_stdout(); neither supplies a guessed total.
+# Total physical memory from the package's compiled code (src/msr_os_ram.c):
+# GlobalMemoryStatusEx() on Windows, sysctl hw.memsize on macOS, and sysconf()
+# elsewhere. No outside process is started, so a slow or blocked PowerShell
+# cannot make RAM unknown. Returns NA when the query reports nothing usable.
+.msr_native_total_ram_bytes <- function() {
+  ram <- tryCatch(.Call(`_multiScaleR_msr_total_ram_native`),
+                  error = function(e) NA_real_)
+  if (is.numeric(ram) && length(ram) == 1L && is.finite(ram) && ram > 0) ram else NA_real_
+}
+
+
+# Windows fallback when the native query fails. The direct .NET query avoids
+# depending on a responsive CIM provider. Both queries are bounded by
+# .msr_system_stdout(); neither supplies a guessed total.
 .msr_windows_total_ram_bytes <- function() {
   queries <- c(
     paste("Add-Type -AssemblyName Microsoft.VisualBasic;",

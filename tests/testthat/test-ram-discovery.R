@@ -63,6 +63,49 @@ test_that("old invalid RAM cache entries cannot prevent a later valid reading", 
   }
 })
 
+test_that("native RAM discovery reports a total without an outside process", {
+  skip_if_not(.Platform$OS.type == "windows" ||
+    Sys.info()[["sysname"]] %in% c("Linux", "Darwin"))
+  calls <- 0L
+  local_mocked_bindings(.msr_system_stdout = function(...) {
+    calls <<- calls + 1L
+    character()
+  }, .package = "multiScaleR")
+  native <- .msr_native_total_ram_bytes()
+  expect_true(is.finite(native))
+  expect_gt(native, 2^28)
+  expect_equal(.msr_total_ram_bytes_uncached(), native)
+  expect_equal(calls, 0L)
+})
+
+test_that("an unavailable native RAM query falls back to the system commands", {
+  local_mocked_bindings(
+    .msr_native_total_ram_bytes = function() NA_real_,
+    .msr_windows_total_ram_bytes = function() 8 * 1024^3,
+    .msr_system_stdout = function(...) "8589934592",
+    .package = "multiScaleR")
+  out <- .msr_total_ram_bytes_uncached()
+  if (identical(Sys.info()[["sysname"]], "Linux")) {
+    # Linux reads /proc/meminfo directly rather than through a command.
+    expect_true(is.finite(out) && out > 0)
+  } else {
+    expect_equal(out, 8 * 1024^3)
+  }
+})
+
+test_that("differentiation admission does not depend on PowerShell", {
+  # Regression for the r-universe Windows builds of 1.0.0, where the PowerShell
+  # query failed and every RAM-guarded tape stopped with "Cannot detect RAM".
+  skip_if_not(.Platform$OS.type == "windows" ||
+    Sys.info()[["sysname"]] %in% c("Linux", "Darwin"))
+  spec <- list(response_design = NULL,
+    surface = list(buffers = list(habitat = list(list(v = 1, d = 1)))))
+  local_mocked_bindings(.msr_hw_cache = new.env(parent = emptyenv()),
+    .msr_system_stdout = function(...) character(),
+    .package = "multiScaleR")
+  expect_gt(.msr_scale_surface_ram(spec), 1024^3)
+})
+
 test_that("unknown and insufficient memory still stop differentiation admission", {
   spec <- list(response_design = NULL,
     surface = list(buffers = list(habitat = list(list(v = 1, d = 1)))))
