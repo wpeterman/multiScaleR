@@ -1,5 +1,5 @@
-multiScaleR (development version)
----------------------------------
+multiScaleR 1.0.1
+-----------------
 
 * Fits that check memory before automatic differentiation, including some
   `multiScale_bayes()` fits, no longer stop with "Cannot detect RAM" on

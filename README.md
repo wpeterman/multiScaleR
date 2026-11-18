@@ -3,7 +3,7 @@
 
 # multiScaleR <img src="man/figures/logo.png" alt="multiScaleR package logo" align="right" height="150"/>
 
-README last updated: 2026-11-14
+README last updated: 2026-11-18
 
 <!-- Status badges. Kept in a table (not a "badges: start/end" block) so that
      pkgdown shows them on the home page instead of moving them to the sidebar. -->
@@ -13,6 +13,10 @@ README last updated: 2026-11-14
 | [![R-CMD-check](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml/badge.svg)](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml) | [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) | [![CRAN status](https://www.r-pkg.org/badges/version/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
 | [![codecov](https://codecov.io/gh/wpeterman/multiScaleR/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/multiScaleR) | [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![DOI](https://img.shields.io/badge/DOI-10.1007/s10980--025--02267--x-yellow.svg)](https://doi.org/10.1007/s10980-025-02267-x) |
 | [![r-universe checks](https://wpeterman.r-universe.dev/multiScaleR/badges/checks)](https://wpeterman.r-universe.dev/multiScaleR) | [![r-universe version](https://wpeterman.r-universe.dev/multiScaleR/badges/version)](https://wpeterman.r-universe.dev/multiScaleR) |  |  |
+
+**Documentation:** the package website,
+<https://wpeterman.github.io/multiScaleR/>, has every vignette, the
+function reference, and the changelog.
 
 ## Overview
 
