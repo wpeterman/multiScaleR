@@ -1,3 +1,6 @@
+multiScaleR (development version)
+---------------------------------
+
 multiScaleR 1.0.1
 -----------------
 
