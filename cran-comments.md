@@ -1,3 +1,24 @@
+## Resubmission
+
+This is a resubmission of 1.0.1. The incoming checks of the first upload
+reported "Overall checktime 24 min > 10 min" on r-devel-windows-x86_64. The
+tests (332 s) and the vignette rebuild (340 s) took 11 of those minutes. In
+this version:
+
+* The 77 slowest test files call `skip_on_cran()`. Locally, the tests now take
+  75 s in CRAN mode instead of 224 s.
+* Vignettes 2 to 15 open with a chunk that calls `knitr::knit_exit()` when
+  R CMD check rebuilds them without NOT_CRAN=true, so the check neither loads
+  the package nor runs their code. The vignettes in the tarball are built in
+  full, and our GitHub Actions checks still run all of them. The quick-start
+  vignette still runs in full during the check. Locally, the vignette rebuild
+  step now takes 45 s instead of 249 s.
+* The slow examples were already in `\donttest{}`. The remaining examples run
+  in about 15 s.
+
+Most of the remaining check time goes to installation, the package load
+checks, and the R code checks of a large package (about 47,000 lines of R).
+
 ## Submission
 
 This updates multiScaleR from 0.7.2, the current CRAN version, to 1.0.1.
@@ -24,12 +45,12 @@ fallback.
 ## Test environments
 
 * Local: Windows 11 x64, R 4.6.2, `R CMD check --as-cran` on the submitted
-  tarball, with OMP_THREAD_LIMIT=2. Examples, tests, vignette rebuilds, and
-  the PDF and HTML manuals passed. A second run with pandoc on the PATH
-  checked README.md, NEWS.md, and their URLs.
-* GitHub Actions on the same package code (only the version, NEWS.md, and
-  README differ): macOS (R release), Windows (R release and R-devel), and
-  Ubuntu (R release and R-devel).
+  tarball, with OMP_THREAD_LIMIT=2 and pandoc on the PATH. Examples
+  (including `\donttest{}`), tests, vignette rebuilds, and the PDF and HTML
+  manuals passed.
+* GitHub Actions on the same R and C code: macOS (R release), Windows
+  (R release and R-devel), and Ubuntu (R release and R-devel). These runs set
+  NOT_CRAN=true, so they run every test and vignette.
 
 ## R CMD check results
 
