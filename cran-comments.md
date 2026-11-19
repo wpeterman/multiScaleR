@@ -1,29 +1,45 @@
+## Submission
+
+This updates multiScaleR from 0.7.2, the current CRAN version, to 1.0.1.
+Versions 0.7.3, 0.7.4, and 1.0.0 were released on GitHub and R-universe but
+not published on CRAN, so this submission includes their changes. NEWS.md
+lists them in full.
+
+Main changes since 0.7.2:
+
+* Bayesian estimation of scales of effect (`multiScale_bayes()`). Its slice
+  sampler needs no Stan toolchain.
+* New opt-in fitting backends for `multiScale_optim()`, cross-validation that
+  re-estimates the scales in every fold, and prediction at new points and
+  rasters.
+* Reorganized documentation: fifteen vignettes and expanded help pages.
+* Some results change for existing scripts. NEWS.md lists each case under
+  "Changes that can affect existing scripts".
+
+1.0.1 fixes a failure in the R-universe Windows builds of 1.0.0. Total RAM is
+now read from the operating system in compiled code (src/msr_os_ram.c), and
+the earlier PowerShell, /proc/meminfo, and sysctl queries run only as a
+fallback.
+
 ## Test environments
 
-Windows 11 x64, R 4.6.1: the final 0.7.3 source archive passed
-`R CMD check --as-cran --no-manual` with 0 errors, 0 warnings, and 1 note.
-All examples, installed tests, and six vignette rebuilds passed.
-The only note was "Days since last update: 4"; the reason for this
-corrective release is explained below. Full development tests also passed.
-Other platforms and the PDF manual have not been rechecked for this update.
+* Local: Windows 11 x64, R 4.6.2, `R CMD check --as-cran` on the submitted
+  tarball, with OMP_THREAD_LIMIT=2. Examples, tests, vignette rebuilds, and
+  the PDF and HTML manuals passed. A second run with pandoc on the PATH
+  checked README.md, NEWS.md, and their URLs.
+* GitHub Actions on the same package code (only the version, NEWS.md, and
+  README differ): macOS (R release), Windows (R release and R-devel), and
+  Ubuntu (R release and R-devel).
 
-## Changes since the previous CRAN release
+## R CMD check results
 
-Version 0.7.3 corrects parameter counts used in AIC, AICc, BIC, and sigma
-profiles for unmarked models. The previous fallback could count predictor
-names rather than all fitted parameters. For a reproduced random-intercept
-count model, the base count was incorrectly 3 rather than 8, and the total
-including one estimated scale was 4 rather than 9. This changes information
-criteria and can affect model rankings, but does not change fitted
-likelihoods, coefficients, or scale estimates.
+0 errors | 0 warnings | 0 notes
 
-Native unmarked likelihood and parameter metadata are now validated, with
-focused tests for multiple model families, mixtures, fixed parameters, and
-random effects. Undefined AICc values remain NA in profiles; model-selection
-tables provide an explicit error for insufficient sample sizes.
+The installed size is about 10 MB: R code 2.8 MB, vignettes 2.8 MB, example
+data in inst/extdata 1.9 MB, and compiled code 1.4 MB. The example data are
+the rasters and fitted objects that the examples and vignettes use, so they
+run without network access.
 
-This corrective release is needed shortly after 0.7.2 because the previous
-parameter counts can give misleading model-selection results.
+## Reverse dependencies
 
-Examples and vignettes use bundled data and cached fitted examples without
-network access. Private data used to confirm the repair are not included.
+There are no reverse dependencies on CRAN.
