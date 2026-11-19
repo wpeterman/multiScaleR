@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 smooth_kernel_fixture <- function(n = 60L, p = 2L, nb = 24L, seed = 19L) {
   set.seed(seed)
   d <- seq(0, 1, length.out = nb)

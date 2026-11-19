@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Reuse the known conditional-logit covariate fixture. Repeated bin means are
 # explicit raw cells; no new seed, response simulation or passing-seed search.
 choice_spatial_cache <- new.env(parent = emptyenv())

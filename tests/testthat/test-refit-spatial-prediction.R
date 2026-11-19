@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("native refit prediction supports weighted surfaces and all kernels", {
   skip_on_cran()
   for (kernel in c("gaussian", "exp", "expow")) {

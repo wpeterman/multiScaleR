@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("prior simulation uses the prepared design without conditioning on responses", {
   f <- bayesian_scale_fixture(n_site = 3, n_year = 3)
   p <- prepare_bayesian_fixture(f)

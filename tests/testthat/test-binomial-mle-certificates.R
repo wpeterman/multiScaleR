@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("finite geometry certificates are exact and bound to the represented target", {
   skip_if_not_installed("gmp")
   skip_if_not_installed("lpSolve")

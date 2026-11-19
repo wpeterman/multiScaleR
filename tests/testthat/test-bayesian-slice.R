@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("slice sampling fits nonannual scale formulas and reuses posterior methods", {
   f <- bayesian_scale_fixture(n_site = 8L, n_year = 3L, kernel = "exp")
   d <- f$data

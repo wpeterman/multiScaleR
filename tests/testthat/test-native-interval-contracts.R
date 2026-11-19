@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Provider parity checks hold selected scales and reference normalization fixed.
 # Mean intervals and future-observation intervals retain different targets.
 contains_snapshot_environment <- function(x) {

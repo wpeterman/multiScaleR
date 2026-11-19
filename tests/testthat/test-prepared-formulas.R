@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("prepared products preserve native designs, fixed references and normalized priors", {
   skip_on_cran()
   skip_if_not_installed("RTMB")

@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 diagnostic_chain_fixture <- function(fit, iterations = 1500L, chains = 4L) {
   set.seed(61591)
   columns <- unlist(lapply(names(fit$parameters), function(nm) {

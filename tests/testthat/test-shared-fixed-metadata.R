@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("prepared fixed formulas freeze qualified scaling and shield fixed logic", {
   dat <- data.frame(y = seq_len(12), z = c(-2, -1, -.5, 0, .2, .7, 1, 1.3, 2, 3, 4, 5),
     a = rep(c(TRUE, FALSE, FALSE), 4), b = rep(c(FALSE, TRUE), 6),

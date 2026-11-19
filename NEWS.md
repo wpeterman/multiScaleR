@@ -1,6 +1,11 @@
 multiScaleR (development version)
 ---------------------------------
 
+* CRAN's package check no longer runs the code in vignettes 2 to 15 or the
+  77 slowest test files, so the check fits within CRAN's time limit. The
+  built vignettes still show their full results, and GitHub Actions and
+  `devtools::check()` still run every vignette and test.
+
 multiScaleR 1.0.1
 -----------------
 

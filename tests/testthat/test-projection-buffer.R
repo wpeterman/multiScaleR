@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Established raster fixture and its cell centers only. These are numerical
 # transform checks, not a new ecological dataset or optimizer assessment.
 projection_buffer_fixture <- local({

@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("kernel means retain a constant surface at raster edges in either engine", {
   r <- terra::rast(nrows = 18, ncols = 23, xmin = 0, xmax = 230,
                    ymin = 0, ymax = 180, crs = "EPSG:3857")

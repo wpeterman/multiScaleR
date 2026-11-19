@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 kernel_plot_layer <- function(plot, geom) {
   which(vapply(plot$layers, function(layer) inherits(layer$geom, geom), logical(1)))
 }

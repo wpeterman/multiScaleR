@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("native LMM and GLMM point/raster adapters retain their prediction target", {
   skip_if_not_installed("lme4")
   f <- refit_spatial_fixture()

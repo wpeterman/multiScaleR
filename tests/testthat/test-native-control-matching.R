@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("native lm abbreviations retain conditional interval guards and levels", {
   f <- refit_spatial_fixture()
   model <- f$object$opt_mod <- lm(y ~ mean + rough + fixed + z, data = f$data)

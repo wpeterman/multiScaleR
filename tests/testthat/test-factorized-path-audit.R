@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("unrestricted annual-SD paths retain native densities and selected zero faces", {
   cases <- 0L; maximum <- 0
   for (kernel in c("gaussian", "exp"))

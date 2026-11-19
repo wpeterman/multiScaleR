@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Response-field maps and new-position predictions from a real glmmTMB field
 # fit made by multiScale_optim(). The default refit backend stores no
 # `backend` element, so fixtures that set one by hand hid a rejection of

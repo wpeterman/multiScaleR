@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("kernel_scale.raster supports both fft and focal smoothing", {
   r <- terra::rast(matrix(runif(20 * 20), 20, 20))
   names(r) <- "x"

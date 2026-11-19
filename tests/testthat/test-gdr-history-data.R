@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 gdr_history_fixture <- function() {
   map <- expand.grid(interval = 1:5, distance_bin = 1:3)
   map$column <- paste0("source ", seq_len(15), " (mark)")

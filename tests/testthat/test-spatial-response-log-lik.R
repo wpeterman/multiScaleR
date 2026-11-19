@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 spatial_density_oracle <- function(x, p = x$parameters) {
   eta <- spatial_response_oracle(x, x$object$specification$data, p)
   s <- x$object$specification

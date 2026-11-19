@@ -11,6 +11,17 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+```{r cran-check, include = FALSE}
+# CRAN limits the whole package check to about 10 minutes, so R CMD check
+# stops this vignette here, before the package loads, instead of running its
+# code. R CMD build, pkgdown, r-universe, and CI checks with NOT_CRAN=true run
+# the full vignette, and the installed vignette always shows the full results.
+if (nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) &&
+    !identical(Sys.getenv("NOT_CRAN"), "true")) {
+  knitr::knit_exit()
+}
+```
+
 ```{r setup, include = FALSE}
 # Draw raster maps with 32 colors rather than terra's default 100. The maps
 # look the same, and their stored images are about 40% smaller.

@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("NB2 continuation resets and audits cold independently", {
   f <- profile_glm_fixture()
   original <- .msr_profile_contract(f$model, f$inputs)$objective

@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that('custom refitters distinguish objectives from returned models', {
   f <- make_unmarked_fixture()
   flags <- logical()

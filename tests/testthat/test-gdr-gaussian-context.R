@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("one observation context refreshes independent abundance designs", {
   skip_on_cran()
   gdr_gaussian_require_RTMB()
