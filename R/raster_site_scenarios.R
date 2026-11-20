@@ -24,6 +24,25 @@
   values
 }
 
+# Choice-set IDs of a Cox or conditional-logit fit. A single bare
+# strata(id) term returns the ID name and its fitted IDs, recovered from the
+# "id=value" labels that survival stores in `xlevels`. Other models, or
+# compound strata terms, return NULL and keep the generic site handling.
+.msr_strata_ids <- function(mod) {
+  if (!inherits(mod, "coxph")) return(NULL)
+  tt <- tryCatch(stats::terms(mod), error = function(e) NULL)
+  idx <- if (is.null(tt)) NULL else attr(tt, "specials")$strata
+  if (length(idx) != 1L) return(NULL)
+  ex <- attr(tt, "variables")[[idx + 1L]]
+  if (length(ex) != 2L || !is.symbol(ex[[2L]])) return(NULL)
+  v <- as.character(ex[[2L]])
+  labels <- mod$xlevels[[deparse(ex)]]
+  if (!length(labels)) return(NULL)
+  ids <- sub(paste0("^", v, "="), "", labels)
+  num <- suppressWarnings(as.numeric(ids))
+  list(name = v, ids = if (!anyNA(num)) num else ids)
+}
+
 # Append explicit nonspatial scenarios while retaining historical numeric-zero
 # defaults. Categorical rasters retain all fitted labels, not arbitrary codes.
 .add_site_covariate_rasters <- function(smooth_stack, multiScaleR, raster_covs,
@@ -88,9 +107,23 @@
   if (any(names(offset_values) %in% raster_covs))
     stop("offset_values cannot overwrite a computed spatial layer.", call. = FALSE)
   template <- smooth_stack[[1L]]
+  strata <- if (unmarked) NULL else .msr_strata_ids(mod)
   for (v in site_vars) {
     x <- if (!is.null(mf) && v %in% names(mf)) mf[[v]] else raw[[v]]
-    if (v %in% names(site_values)) {
+    if (!is.null(strata) && v == strata$name) {
+      # predict.coxph() needs a fitted choice-set ID, but the ID does not
+      # change link or relative-score maps (reference = "zero"). Default to the
+      # first fitted ID; site_values may name any other fitted ID.
+      value <- if (v %in% names(site_values)) site_values[[v]] else strata$ids[[1L]]
+      if (!as.character(value) %in% as.character(strata$ids))
+        stop("site_values must select a fitted choice-set ID for '", v, "'.", call. = FALSE)
+      if (is.numeric(strata$ids)) {
+        rr <- template * 0 + as.numeric(value)
+      } else {
+        rr <- terra::as.factor(template * 0 + 1)
+        levels(rr) <- data.frame(ID = 1L, label = as.character(value))
+      }
+    } else if (v %in% names(site_values)) {
       value <- site_values[[v]]
       if (is.factor(x) || is.character(x) || is.character(value) || is.factor(value)) {
         fitted_levels <- if (is.list(mod)) mod$xlevels[[v]] else NULL

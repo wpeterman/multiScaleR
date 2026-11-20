@@ -1,6 +1,15 @@
 multiScaleR (development version)
 ---------------------------------
 
+* `kernel_scale.raster()` now adds the `strata()` choice-set ID of a
+  `conditional_logit` fit as a constant layer holding a fitted ID. As a
+  result, `terra::predict()` on the native model maps relative selection
+  scores without `const` and without a warning about a categorical
+  covariate. `site_values` can select any other fitted ID.
+
+* The step-selection vignette shows how to map relative selection scores,
+  including fits that started from `amt::fit_clogit()`.
+
 multiScaleR 1.0.1
 -----------------
 
