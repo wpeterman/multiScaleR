@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("large profile payloads have bounded keys and data-specific caches", {
   object <- structure(list(scale_est = data.frame(Mean = 2, SE = .2, row.names = "x"),
     min_D = .1, max_D = 10, kernel_inputs = list(kernel = "gaussian", unit_conv = 1),

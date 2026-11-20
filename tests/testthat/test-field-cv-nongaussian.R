@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("Poisson Laplace block scores approximate independent quadrature", {
   skip_if_not_installed("glmmTMB")
   yt <- c(0, 2); ya <- c(0, 1)

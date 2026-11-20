@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("posterior contracts separate means, replicates and zeroed effects", {
   f <- bayesian_scale_fixture(n_site = 4, n_year = 3)
   fit <- fake_bayesian_draws(prepare_bayesian_fixture(f, "gaussian"))

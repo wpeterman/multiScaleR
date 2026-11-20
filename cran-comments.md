@@ -1,29 +1,66 @@
+## Resubmission
+
+This is a resubmission of 1.0.1. The incoming checks of the first upload
+reported "Overall checktime 24 min > 10 min" on r-devel-windows-x86_64. The
+tests (332 s) and the vignette rebuild (340 s) took 11 of those minutes. In
+this version:
+
+* The 77 slowest test files call `skip_on_cran()`. Locally, the tests now take
+  75 s in CRAN mode instead of 224 s.
+* Vignettes 2 to 15 open with a chunk that calls `knitr::knit_exit()` when
+  R CMD check rebuilds them without NOT_CRAN=true, so the check neither loads
+  the package nor runs their code. The vignettes in the tarball are built in
+  full, and our GitHub Actions checks still run all of them. The quick-start
+  vignette still runs in full during the check. Locally, the vignette rebuild
+  step now takes 45 s instead of 249 s.
+* The slow examples were already in `\donttest{}`. The remaining examples run
+  in about 15 s.
+
+Most of the remaining check time goes to installation, the package load
+checks, and the R code checks of a large package (about 47,000 lines of R).
+
+## Submission
+
+This updates multiScaleR from 0.7.2, the current CRAN version, to 1.0.1.
+Versions 0.7.3, 0.7.4, and 1.0.0 were released on GitHub and R-universe but
+not published on CRAN, so this submission includes their changes. NEWS.md
+lists them in full.
+
+Main changes since 0.7.2:
+
+* Bayesian estimation of scales of effect (`multiScale_bayes()`). Its slice
+  sampler needs no Stan toolchain.
+* New opt-in fitting backends for `multiScale_optim()`, cross-validation that
+  re-estimates the scales in every fold, and prediction at new points and
+  rasters.
+* Reorganized documentation: fifteen vignettes and expanded help pages.
+* Some results change for existing scripts. NEWS.md lists each case under
+  "Changes that can affect existing scripts".
+
+1.0.1 fixes a failure in the R-universe Windows builds of 1.0.0. Total RAM is
+now read from the operating system in compiled code (src/msr_os_ram.c), and
+the earlier PowerShell, /proc/meminfo, and sysctl queries run only as a
+fallback.
+
 ## Test environments
 
-Windows 11 x64, R 4.6.1: the final 0.7.3 source archive passed
-`R CMD check --as-cran --no-manual` with 0 errors, 0 warnings, and 1 note.
-All examples, installed tests, and six vignette rebuilds passed.
-The only note was "Days since last update: 4"; the reason for this
-corrective release is explained below. Full development tests also passed.
-Other platforms and the PDF manual have not been rechecked for this update.
+* Local: Windows 11 x64, R 4.6.2, `R CMD check --as-cran` on the submitted
+  tarball, with OMP_THREAD_LIMIT=2 and pandoc on the PATH. Examples
+  (including `\donttest{}`), tests, vignette rebuilds, and the PDF and HTML
+  manuals passed.
+* GitHub Actions on the same R and C code: macOS (R release), Windows
+  (R release and R-devel), and Ubuntu (R release and R-devel). These runs set
+  NOT_CRAN=true, so they run every test and vignette.
 
-## Changes since the previous CRAN release
+## R CMD check results
 
-Version 0.7.3 corrects parameter counts used in AIC, AICc, BIC, and sigma
-profiles for unmarked models. The previous fallback could count predictor
-names rather than all fitted parameters. For a reproduced random-intercept
-count model, the base count was incorrectly 3 rather than 8, and the total
-including one estimated scale was 4 rather than 9. This changes information
-criteria and can affect model rankings, but does not change fitted
-likelihoods, coefficients, or scale estimates.
+0 errors | 0 warnings | 0 notes
 
-Native unmarked likelihood and parameter metadata are now validated, with
-focused tests for multiple model families, mixtures, fixed parameters, and
-random effects. Undefined AICc values remain NA in profiles; model-selection
-tables provide an explicit error for insufficient sample sizes.
+The installed size is about 10 MB: R code 2.8 MB, vignettes 2.8 MB, example
+data in inst/extdata 1.9 MB, and compiled code 1.4 MB. The example data are
+the rasters and fitted objects that the examples and vignettes use, so they
+run without network access.
 
-This corrective release is needed shortly after 0.7.2 because the previous
-parameter counts can give misleading model-selection results.
+## Reverse dependencies
 
-Examples and vignettes use bundled data and cached fitted examples without
-network access. Private data used to confirm the repair are not included.
+There are no reverse dependencies on CRAN.

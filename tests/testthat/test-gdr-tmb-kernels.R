@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("native TMB S4 results work with all four kernel refit paths", {
   skip_on_cran()
   f <- gdr_tmb_refit_fixture("P")

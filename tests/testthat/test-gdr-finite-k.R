@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("finite Poisson bin scores retain the native cutoff without renormalization", {
   cases <- data.frame(lambda = c(0, 8, 8, 8, 100, 400, 800, 4, 30, 5, 12, 50, 0, 40),
     q = c(0, .2, .2, .9, .1, .7, .01, 1, .95, 1e-8, .5, .99, .5, .01),

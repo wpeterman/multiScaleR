@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("native refit snapshots freeze mixed-metric outputs without native fits", {
   f <- refit_spatial_fixture("expow")
   nd <- f$data[c(3, 25, 11), , drop = FALSE]

@@ -25,6 +25,15 @@ extern SEXP _multiScaleR_msr_surface_sq_prefix_cpp(SEXP);
 
 extern SEXP _multiScaleR_msr_choice_softmax_cpp(SEXP, SEXP);
 
+// Total physical memory from the operating system (msr_os_ram.c). That file
+// has no R headers, so the .Call wrapper is defined here.
+extern double msr_os_total_ram(void);
+
+static SEXP _multiScaleR_msr_total_ram_native(void) {
+  double ram = msr_os_total_ram();
+  return ScalarReal(ram > 0 ? ram : NA_REAL);
+}
+
 // Register native routines
 static const R_CallMethodDef CallEntries[] = {
   {"_multiScaleR_msr_choice_softmax_cpp", (DL_FUNC) &_multiScaleR_msr_choice_softmax_cpp, 2},
@@ -45,6 +54,7 @@ static const R_CallMethodDef CallEntries[] = {
   {"_multiScaleR_msr_surface_weighted_sq_cpp", (DL_FUNC) &_multiScaleR_msr_surface_weighted_sq_cpp, 5},
   {"_multiScaleR_msr_surface_sq_prefix_cpp", (DL_FUNC) &_multiScaleR_msr_surface_sq_prefix_cpp, 1},
   {"_multiScaleR_msr_surface_sq_derivative_cpp", (DL_FUNC) &_multiScaleR_msr_surface_sq_derivative_cpp, 3},
+  {"_multiScaleR_msr_total_ram_native", (DL_FUNC) &_multiScaleR_msr_total_ram_native, 0},
   {NULL, NULL, 0}  // Sentinel to mark the end
 };
 

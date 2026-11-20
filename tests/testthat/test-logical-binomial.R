@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # One failure-retaining fixed-scale cache. No draws, bandwidth search or refits
 # are triggered by repeated extraction/comparison assertions.
 logical_binomial_cases <- local({

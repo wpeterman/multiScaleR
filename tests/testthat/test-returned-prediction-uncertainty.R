@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("native returned point and SE contracts describe actual uncertainty", {
   f <- refit_spatial_fixture()
   point <- predict(f$object, f$data, f$inputs, include_fixed = TRUE)

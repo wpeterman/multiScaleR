@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("setup checks describe method-specific requirements without fitting", {
   p <- check_bayes_setup("prepare")
   expect_s3_class(p, "multiScaleR_bayes_setup")

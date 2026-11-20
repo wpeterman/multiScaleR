@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 testthat::skip_if_not_installed("MASS")
 
 test_that("NB2 backend returns a compatible conditional model and joint information", {

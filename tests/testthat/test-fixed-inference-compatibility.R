@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Fixed metrics must reproduce an ordinary, already standardized numeric column.
 # These bounded fixtures assess implementation contracts, not scale recovery.
 fixed_inference_fixture <- function(kernel = "gaussian", bin = FALSE) {

@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # One deterministic software fixture; at most24 planned scale fits per lifecycle.
 # Native fixed-scale GLMs are score/design oracles, not a recovery study.
 cv_stage1_cache <- new.env(parent = emptyenv())

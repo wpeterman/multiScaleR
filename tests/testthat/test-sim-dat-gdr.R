@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 sim_gdr_fixture <- function(...) {
   args <- list(density = c(100, 200, 0), distance_scale = 40, removal = 0.3,
     dist_breaks = c(0, 25, 75), interval_lengths = c(1, 2, 1),

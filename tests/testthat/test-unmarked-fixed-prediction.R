@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 unmarked_fixed_prediction_fixture <- local({
   cache <- NULL
   function() {
@@ -230,15 +234,17 @@ test_that("conditional-logistic fixed rasters retain native relative-score meani
   expect_gt(min(eigen(stats::vcov(object$opt_mod), symmetric = TRUE,
                       only.values = TRUE)$values), 0)
   rs <- make_unmarked_fixture()$rs_two
-  expect_warning(layers <- kernel_scale.raster(rs, multiScaleR = object,
-    scale_center = TRUE, include_fixed = TRUE, verbose = FALSE), "categorical")
-  expect_identical(names(layers), c("bin1", "rough"))
-  # This placeholder supplies native formula structure. reference='zero' avoids
-  # arbitrary choice-set centering; the score is not a choice probability.
+  # The strata() choice-set ID is added as a constant layer holding the first
+  # fitted ID, so the native model predicts without `const` or a warning.
+  expect_no_warning(layers <- kernel_scale.raster(rs, multiScaleR = object,
+    scale_center = TRUE, include_fixed = TRUE, verbose = FALSE))
+  expect_identical(names(layers), c("bin1", "rough", "choice"))
+  expect_equal(unname(unlist(terra::global(layers$choice, "max"))), dat$choice[1L])
+  # reference='zero' avoids arbitrary choice-set centering; the score is not a
+  # choice probability.
   mapped <- terra::predict(layers, object$opt_mod, type = "risk", reference = "zero",
-    const = data.frame(choice = dat$choice[1L]), na.rm = TRUE)
+    na.rm = TRUE)
   nd <- as.data.frame(terra::values(layers))
-  nd$choice <- dat$choice[1L]
   good <- stats::complete.cases(nd)
   expected <- stats::predict(object$opt_mod, nd[good, , drop = FALSE],
                              type = "risk", reference = "zero")

@@ -1,3 +1,29 @@
+multiScaleR (development version)
+---------------------------------
+
+* `kernel_scale.raster()` now adds the `strata()` choice-set ID of a
+  `conditional_logit` fit as a constant layer holding a fitted ID. As a
+  result, `terra::predict()` on the native model maps relative selection
+  scores without `const` and without a warning about a categorical
+  covariate. `site_values` can select any other fitted ID.
+
+* The step-selection vignette shows how to map relative selection scores,
+  including fits that started from `amt::fit_clogit()`.
+
+multiScaleR 1.0.1
+-----------------
+
+* Fits that check memory before automatic differentiation, including some
+  `multiScale_bayes()` fits, no longer stop with "Cannot detect RAM" on
+  Windows machines where PowerShell is slow or blocked. multiScaleR now reads
+  total RAM directly from the operating system and runs outside commands only
+  as a fallback.
+
+* CRAN's package check no longer runs the code in vignettes 2 to 15 or the
+  77 slowest test files, so the check fits within CRAN's time limit. The
+  built vignettes still show their full results, and GitHub Actions and
+  `devtools::check()` still run every vignette and test.
+
 multiScaleR 1.0.0
 -----------------
 

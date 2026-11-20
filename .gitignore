@@ -38,3 +38,7 @@ docs/
 /tools/benchmarks/mixed_cv_replicated/row-results.csv
 /tools/benchmarks/bayesian_scales/qualification_20261112/results/replicated/ranks.csv
 /tools/benchmarks/mixed_cv_replicated/group-results.csv
+
+# Internal checkpoint log from the automated inference work, kept locally
+# and no longer published.
+/tools/benchmarks/tmb_marginal_likelihood/unified_development_20261028/DEVELOPMENT.md

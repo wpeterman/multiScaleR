@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Bounded native/AD software checks on existing inputs. No sampling study.
 test_that("kernel expression leaves retain native algebra and zero derivatives", {
   skip_on_cran()

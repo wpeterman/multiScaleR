@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Deterministic native-GLM oracles; no scale fits or random-number generation.
 cv_record_data <- function() {
   i <- 1:24

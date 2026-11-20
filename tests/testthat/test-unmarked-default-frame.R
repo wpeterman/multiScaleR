@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Two native fits are cached once; failures remain visible without refitting.
 default_unmarked_cache <- new.env(parent = emptyenv())
 default_unmarked_fixture <- function() {

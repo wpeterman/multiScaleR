@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("group mixtures retain exact endpoints and stable zero-density arithmetic", {
   fn <- .msr_factorized_mixture_nll
   a <- c(.5, 700, Inf); b <- c(900, .2, 3)

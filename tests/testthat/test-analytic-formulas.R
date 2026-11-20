@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 test_that("profile products preserve native family likelihoods and full joint scores", {
   for (family in c("poisson", "gaussian", "binomial", "nbinom2")) {
     f <- formula_integration_fixture(family, two = TRUE)

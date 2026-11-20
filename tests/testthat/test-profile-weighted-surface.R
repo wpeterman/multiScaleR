@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 weighted_glm_fixture <- function(kernel = "gaussian", surface_only = FALSE) {
   f <- profile_glm_fixture(n = 120, kernel = kernel)
   b <- f$inputs$binned

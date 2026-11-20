@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Bounded software tests using existing fixtures, not a calibration study.
 inference_product_object <- function(boundary = FALSE, warm = FALSE, weighted = FALSE) {
   f <- if (weighted) formula_weighted_fixture(surface_only = TRUE) else

@@ -1,3 +1,7 @@
+# Skipped on CRAN to keep the package check within CRAN's time limit. CI sets
+# NOT_CRAN and runs this file.
+skip_on_cran()
+
 # Deterministic adapter conformance on established software fixtures. These
 # tests assess numerical contracts, not scale recovery or interval calibration.
 test_that("prepared standard splines retain native knots with factors and logic", {

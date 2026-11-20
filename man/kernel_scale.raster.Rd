@@ -124,7 +124,11 @@ predictors, in their native units, for example
 \code{list(season = "spring", effort = 2, surveyed = TRUE)}. Requires a
 fitted object. Factor and character values must be fitted levels.
 Omitted numeric predictors default to zero, and categorical predictors
-need an explicit value. Unknown names and attempts to overwrite a
+need an explicit value. For a \code{conditional_logit} fit, the \code{strata()}
+choice-set ID defaults to the first fitted ID, and any other fitted ID
+may be supplied. The ID does not change link or relative-score maps
+from \code{terra::predict(..., reference = "zero")}. Unknown names and
+attempts to overwrite a
 spatial layer are errors. Use \code{offset_values} for variables that occur
 only inside offsets.}
 

@@ -90,7 +90,11 @@
 #'   `list(season = "spring", effort = 2, surveyed = TRUE)`. Requires a
 #'   fitted object. Factor and character values must be fitted levels.
 #'   Omitted numeric predictors default to zero, and categorical predictors
-#'   need an explicit value. Unknown names and attempts to overwrite a
+#'   need an explicit value. For a `conditional_logit` fit, the `strata()`
+#'   choice-set ID defaults to the first fitted ID, and any other fitted ID
+#'   may be supplied. The ID does not change link or relative-score maps
+#'   from `terra::predict(..., reference = "zero")`. Unknown names and
+#'   attempts to overwrite a
 #'   spatial layer are errors. Use `offset_values` for variables that occur
 #'   only inside offsets.
 #' @param ... Reserved for deprecated arguments. Only `scale_opt`, a
