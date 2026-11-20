@@ -117,7 +117,15 @@
       value <- if (v %in% names(site_values)) site_values[[v]] else strata$ids[[1L]]
       if (!as.character(value) %in% as.character(strata$ids))
         stop("site_values must select a fitted choice-set ID for '", v, "'.", call. = FALSE)
-      if (is.numeric(strata$ids)) {
+      if (is.numeric(strata$ids) && is.factor(x) &&
+          as.character(value) %in% levels(x)) {
+        # Numeric-looking IDs stored as a factor in the training data (not
+        # survival's "id=value" strata labels) keep every fitted level, as
+        # other categorical site rasters do. A numeric layer would not match
+        # the fitted factor coding.
+        rr <- terra::as.factor(template * 0 + match(as.character(value), levels(x)))
+        levels(rr) <- data.frame(ID = seq_along(levels(x)), label = levels(x))
+      } else if (is.numeric(strata$ids)) {
         rr <- template * 0 + as.numeric(value)
       } else {
         rr <- terra::as.factor(template * 0 + 1)
