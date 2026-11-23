@@ -1,6 +1,11 @@
 multiScaleR (development version)
 ---------------------------------
 
+* `summary(fit, profile = TRUE)` on a `conditional_logit` fit now warns and
+  returns the ordinary summary with scale limits as `NA`, instead of stopping.
+  Printed summaries of `conditional_logit` fits with a hard-radius covariate
+  now point to `profile_sigma()` rather than to `summary(x, profile = TRUE)`.
+
 * `kernel_scale.raster()` now adds the `strata()` choice-set ID of a
   `conditional_logit` fit as a constant layer holding a fitted ID. As a
   result, `terra::predict()` on the native model maps relative selection

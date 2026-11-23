@@ -136,7 +136,11 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
   if (length(hard_radius)) {
     cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ".\n", sep = "")
     cat("Hard-radius effects change in steps as cells enter the buffer. ")
-    if (is.null(x$diagnostics$radius_profile)) {
+    if (identical(x$backend, "conditional_logit")) {
+      # Step-selection fits have no calibrated scale intervals to profile.
+      cat("Scale intervals are unavailable for conditional_logit fits; ")
+      cat("use `profile_sigma(x)` to view the log-likelihood across radii.\n")
+    } else if (is.null(x$diagnostics$radius_profile)) {
       cat("Hessian standard errors are omitted; use `summary(x, profile = TRUE)` ")
       cat("for profile-likelihood limits.\n")
     } else {
@@ -515,7 +519,9 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
   .msr_print_refit_bounds(display_fit$diagnostics)
   if (length(hard_radius)) {
     cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ". ", sep = "")
-    if (is.null(x$diagnostics$radius_profile)) {
+    if (identical(x$backend, "conditional_logit")) {
+      cat("Use `profile_sigma(x)` to view the log-likelihood across radii.\n")
+    } else if (is.null(x$diagnostics$radius_profile)) {
       cat("Use `summary(x, profile = TRUE)` for radius intervals.\n")
     } else {
       cat("Use `diagnostics(x)$radius_profile` for candidate likelihoods.\n")

@@ -364,7 +364,7 @@ when a model falls outside the cases below.
 | Kernels | `"gaussian"` and `"exp"`, prepared with `bin = TRUE` (the default) |
 | Spline terms | `ns()` or `bs()` with literal `knots` and `Boundary.knots` only. Adaptive `df` is not supported |
 | Parallel fitting, `join_by`, `refit_fn` | Not supported. Use `n_cores = 1` |
-| Standard error and interval for sigma | Not available. `summary(opt, profile = TRUE)` stops with an error. `profile_sigma(opt)` draws the log-likelihood across sigma |
+| Standard error and interval for sigma | Not available. `summary(opt, profile = TRUE)` warns and reports the limits as `NA`. `profile_sigma(opt)` draws the log-likelihood across sigma |
 | Prediction intervals | Not available. Standard errors are conditional on sigma |
 | Raster prediction | `type = "link"` or `type = "risk"` only |
 

@@ -98,7 +98,7 @@ test_that("profile_sigma() profiles a conditional_logit fit with native refits",
                "within the fitted bounds")
 })
 
-test_that("summary(profile = TRUE) on a conditional_logit fit stops with one clear message", {
+test_that("summary(profile = TRUE) on a conditional_logit fit warns and returns the summary", {
   skip_on_cran()
   skip_if_not_installed("survival")
   fx <- ssf_fixture()
@@ -107,8 +107,10 @@ test_that("summary(profile = TRUE) on a conditional_logit fit stops with one cle
                         data = fx$df, model = TRUE)
   fit <- multiScale_optim(m, fx$inputs, backend = "conditional_logit",
                           n_cores = 1, verbose = FALSE)
-  expect_error(summary(fit, profile = TRUE),
-               "not available for conditional_logit fits.*profile_sigma\\(\\)")
-  # The ordinary summary still works.
+  expect_warning(s <- summary(fit, profile = TRUE),
+                 "not available for conditional_logit fits.*profile_sigma\\(\\)")
+  # The summary is still returned, with scale limits withheld.
+  expect_s3_class(s, "summary_multiScaleR")
+  expect_true(all(is.na(s$opt_scale[, c("2.5%", "97.5%")])))
   expect_s3_class(summary(fit), "summary_multiScaleR")
 })
