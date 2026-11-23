@@ -54,8 +54,14 @@
 #'   means from the bins instead of every cell, which is much faster and no
 #'   longer depends on `max_D`, at the cost of a negligible approximation.
 #'   The analytic backends and [multiScale_bayes()] require it for kernel
-#'   means. Landscape and surface metrics are never binned. `FALSE` forces exact cell-by-cell
-#'   evaluation.
+#'   means. With the default `refit` backend it also bins kernel-weighted
+#'   surface metrics (`surface_var(weighted = TRUE)` with `"sq"`, `"ssk"`, or
+#'   `"sku"`): each cell's centered value powers are split between the two
+#'   nearest distance nodes, which keeps their approximation as small as that
+#'   of a binned kernel mean. Weighted `"sa"`, `kernel = "fixed"`, landscape
+#'   metrics, and hard-radius surface metrics are never binned, and the
+#'   analytic backends and [multiScale_bayes()] evaluate weighted surface
+#'   metrics from every cell. `FALSE` forces exact cell-by-cell evaluation.
 #' @param nbins Integer, at least 2. Number of equal-width distance bins when
 #'   `bin = TRUE`. More bins increase accuracy and memory. The default
 #'   (`256`) reproduces exact optimization results to several significant
@@ -443,6 +449,20 @@ kernel_prep <- function(pts,
     )
   }
 
+  # Kernel-weighted surface moments (sq, ssk, sku) are linearly binned power
+  # sums, so the optimizer evaluates them in O(nbins) as well. The cell data
+  # stay stored for these covariates. See R/kernel_bins.R.
+  surface_binned <- NULL
+  if (isTRUE(bin)) {
+    surface_binned <- .msr_build_surface_bins(
+      d_list = D,
+      value_list = cell_list,
+      specs = .msr_surface_bin_specs(scale_vars, kernel),
+      nbins = nbins,
+      point_ids = point_ids
+    )
+  }
+
   # Cell-level data (`d_list`/`raw_cov`) can be dropped only when every
   # covariate is kernel-type (landscape metrics need the full per-cell spatial
   # detail) and binned summaries are available to drive the optimizer.
@@ -469,6 +489,7 @@ kernel_prep <- function(pts,
               cell_size = terra::res(raster_stack),
               n_cols = terra::ncol(raster_stack),
               binned = binned,
+              surface_binned = surface_binned,
               cell_data_stored = !drop_cells,
               scl_params = list(mean = attr(scl_df, "scaled:center"),
                                 sd = attr(scl_df, "scaled:scale")))

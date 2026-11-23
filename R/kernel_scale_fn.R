@@ -346,9 +346,33 @@
   opt_vars <- .msr_optimized_scale_vars(scale_vars)
   param_covariates <- if (is.null(opt_vars)) covs else covs[covs %in% opt_vars$covariate]
 
-  if (length(binned_covs) == length(target_covs) && length(target_covs) > 0) {
+  # Weighted surface moments with linearly binned power sums also skip the
+  # per-cell loop (see `.msr_build_surface_bins()`). Their rows are matched by
+  # point ID, so subsets and reorderings stay aligned; points that cannot be
+  # matched fall back to the exact per-cell evaluation.
+  surface_binned <- opt_context$surface_binned
+  surface_covs <- character(0)
+  surface_rows <- NULL
+  if (!is.null(surface_binned) && !is.null(scale_vars)) {
+    candidates <- intersect(setdiff(target_covs, binned_covs),
+                            intersect(surface_binned$covariates, param_covariates))
+    if (length(candidates)) {
+      ids <- if (!is.null(d_list)) names(d_list) else NULL
+      surface_rows <- if (is.null(ids) && !is.null(eval_idx)) {
+        if (all(eval_idx <= surface_binned$n_points)) eval_idx else NULL
+      } else {
+        .msr_surface_bin_rows(surface_binned, ids, n_ind)
+      }
+      if (!is.null(surface_rows)) surface_covs <- candidates
+    }
+  }
+  fill_surface <- function() .msr_binned_surface_metrics(surface_binned,
+    surface_covs, param_covariates, sigma, shape, kernel, surface_rows)
+  fast_covs <- c(binned_covs, surface_covs)
+
+  if (length(fast_covs) == length(target_covs) && length(target_covs) > 0) {
     # Every requested covariate has a binned summary: pure fast path.
-    cov.w[, binned_covs] <- .msr_binned_kernel_means(
+    if (length(binned_covs)) cov.w[, binned_covs] <- .msr_binned_kernel_means(
       binned = binned,
       covs = binned_covs,
       param_covariates = param_covariates,
@@ -357,6 +381,7 @@
       kernel = kernel,
       eval_idx = eval_idx
     )
+    if (length(surface_covs)) cov.w[, surface_covs] <- fill_surface()
   } else {
     if (is.null(d_list) || is.null(cov_df)) {
       stop(
@@ -369,7 +394,7 @@
     # transforms here, retaining their requested order and parameter mapping.
     # Legacy inputs without scale_vars keep their existing exact path.
     exact_covs <- if (is.null(scale_vars)) target_covs else
-      setdiff(target_covs, binned_covs)
+      setdiff(target_covs, fast_covs)
     exact_params <- if (is.null(scale_vars)) exact_covs else
       exact_covs[exact_covs %in% param_covariates]
     sig_idx <- match(exact_params, covs)
@@ -424,6 +449,7 @@
         eval_idx = eval_idx
       )
     }
+    if (length(surface_covs)) cov.w[, surface_covs] <- fill_surface()
   }
 
   cov.w
@@ -668,7 +694,8 @@ build_opt_context <- function(fitted_mod,
                               resolution = NULL,
                               n_cols = NULL,
                               binned = NULL,
-                              d_list = NULL) {
+                              d_list = NULL,
+                              surface_binned = NULL) {
   mod <- fitted_mod
   analysis_mod <- .analysis_model(mod)
   .msr_gdr_native_guard(analysis_mod)
@@ -725,7 +752,8 @@ build_opt_context <- function(fitted_mod,
               unit_conv = unit_conv,
               resolution = resolution,
               n_cols = n_cols,
-              binned = .msr_subset_binned(binned, covs))
+              binned = .msr_subset_binned(binned, covs),
+              surface_binned = .msr_subset_surface_bins(surface_binned, covs))
   out$surface_neighbors <- .msr_prepare_surface_neighbors(
     d_list, cov_df, if (is.null(scale_vars)) NULL else
       scale_vars[scale_vars$covariate %in% covs, , drop = FALSE],

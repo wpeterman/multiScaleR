@@ -618,8 +618,12 @@ print.multiScaleR_data <- function(x, ...){
     cat("cell-level data not stored (lean mode; `store_cell_data = FALSE`)")
   }
   cat("\nDistance binning:\n")
-  if (!is.null(x$binned)) {
-    cat(paste0("enabled (", x$binned$nbins, " distance bins per covariate)"))
+  if (!is.null(x$binned) || !is.null(x$surface_binned)) {
+    nb <- if (!is.null(x$binned)) x$binned$nbins else x$surface_binned$nbins
+    cat(paste0("enabled (", nb, " distance bins per covariate)"))
+    if (!is.null(x$surface_binned))
+      cat(paste0("\nBinned weighted surface metrics: ",
+                 paste(x$surface_binned$covariates, collapse = ", ")))
   } else {
     cat("disabled (exact per-cell evaluation)")
   }

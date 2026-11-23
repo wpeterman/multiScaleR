@@ -1067,7 +1067,8 @@ multiScale_optim <- function(fitted_mod,
                                    resolution = kernel_inputs$resolution,
                                    n_cols = kernel_inputs$n_cols,
                                    binned = kernel_inputs$binned,
-                                   d_list = kernel_inputs$d_list)
+                                   d_list = kernel_inputs$d_list,
+                                   surface_binned = kernel_inputs$surface_binned)
   if (covariate_transform == "raw") opt_context$covariate_transform <- "raw"
 
   if(kernel_inputs$kernel == 'expow'){

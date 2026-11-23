@@ -78,8 +78,14 @@ values into distance bins. \code{\link[=multiScale_optim]{multiScale_optim()}} t
 means from the bins instead of every cell, which is much faster and no
 longer depends on \code{max_D}, at the cost of a negligible approximation.
 The analytic backends and \code{\link[=multiScale_bayes]{multiScale_bayes()}} require it for kernel
-means. Landscape and surface metrics are never binned. \code{FALSE} forces exact cell-by-cell
-evaluation.}
+means. With the default \code{refit} backend it also bins kernel-weighted
+surface metrics (\code{surface_var(weighted = TRUE)} with \code{"sq"}, \code{"ssk"}, or
+\code{"sku"}): each cell's centered value powers are split between the two
+nearest distance nodes, which keeps their approximation as small as that
+of a binned kernel mean. Weighted \code{"sa"}, \code{kernel = "fixed"}, landscape
+metrics, and hard-radius surface metrics are never binned, and the
+analytic backends and \code{\link[=multiScale_bayes]{multiScale_bayes()}} evaluate weighted surface
+metrics from every cell. \code{FALSE} forces exact cell-by-cell evaluation.}
 
 \item{nbins}{Integer, at least 2. Number of equal-width distance bins when
 \code{bin = TRUE}. More bins increase accuracy and memory. The default

@@ -214,7 +214,8 @@ estimate_multiscale_ram <- function(kernel_inputs,
         resolution = kernel_inputs$resolution,
         n_cols = kernel_inputs$n_cols,
         binned = binned,
-        d_list = d_list
+        d_list = d_list,
+        surface_binned = kernel_inputs$surface_binned
       ),
       error = function(e) {
         opt_context_error <<- conditionMessage(e)

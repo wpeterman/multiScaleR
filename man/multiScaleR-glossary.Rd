@@ -20,7 +20,8 @@ over scales, chosen with its \code{backend} argument. See
 \link{multiScaleR-fitting-methods}.
 \item \strong{Binned inputs}: distance-binned summaries that \code{\link[=kernel_prep]{kernel_prep()}} stores
 when \code{bin = TRUE} (the default). They let the search compute
-kernel-weighted means without visiting every cell, which is much faster.
+kernel-weighted means, and kernel-weighted surface metrics other than
+\code{"sa"}, without visiting every cell, which is much faster.
 \item \strong{Buffer}: the set of raster cells within \code{max_D} of a survey point. Only
 these cells contribute to the point's kernel-weighted covariates.
 \item \strong{Choice set}: in a step-selection model, one used step together with

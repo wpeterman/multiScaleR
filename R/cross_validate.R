@@ -122,6 +122,14 @@
   out$shape <- if (is.null(inputs$shape)) NULL else inputs$shape[selected]
   out$n_covs <- length(selected)
   out$binned <- .msr_cv_bins(out, reference)
+  # Surface power sums use only each point's own cells on the prepared node
+  # grid, so a fold rebuilds them from its cells without learning anything.
+  if (!is.null(inputs$surface_binned)) {
+    specs <- out$scale_vars[out$scale_vars$covariate %in% inputs$surface_binned$covariates, ,
+                            drop = FALSE]
+    out$surface_binned <- if (nrow(specs)) .msr_build_surface_bins(out$d_list, out$raw_cov,
+      specs, point_ids = ids, nodes = inputs$surface_binned$nodes) else NULL
+  }
   out
 }
 

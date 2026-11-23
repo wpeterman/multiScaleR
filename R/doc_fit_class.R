@@ -185,6 +185,12 @@ NULL
 #'   (representative bin distances and value and count matrices for each
 #'   covariate) that speed up the search. `NULL` when `bin = FALSE` or when no
 #'   covariate is a kernel-weighted mean.
+#' * `surface_binned`: when `bin = TRUE`, linearly binned power sums for
+#'   kernel-weighted surface metrics (`surface_var(weighted = TRUE)` with
+#'   `"sq"`, `"ssk"`, or `"sku"`) that speed up the refit search. Each cell's
+#'   centered value powers are split between the two nearest distance nodes.
+#'   `NULL` when `bin = FALSE`, when `kernel = "fixed"`, or when no covariate is
+#'   such a metric. The cell-level data stay stored.
 #' * `cell_data_stored`: `FALSE` only in lean mode
 #'   (`store_cell_data = FALSE`), when `d_list` and `raw_cov` were dropped.
 #' * `scl_params`: named list with `mean` and `sd`, the centering and scaling

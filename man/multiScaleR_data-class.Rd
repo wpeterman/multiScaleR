@@ -45,6 +45,12 @@ metrics.
 (representative bin distances and value and count matrices for each
 covariate) that speed up the search. \code{NULL} when \code{bin = FALSE} or when no
 covariate is a kernel-weighted mean.
+\item \code{surface_binned}: when \code{bin = TRUE}, linearly binned power sums for
+kernel-weighted surface metrics (\code{surface_var(weighted = TRUE)} with
+\code{"sq"}, \code{"ssk"}, or \code{"sku"}) that speed up the refit search. Each cell's
+centered value powers are split between the two nearest distance nodes.
+\code{NULL} when \code{bin = FALSE}, when \code{kernel = "fixed"}, or when no covariate is
+such a metric. The cell-level data stay stored.
 \item \code{cell_data_stored}: \code{FALSE} only in lean mode
 (\code{store_cell_data = FALSE}), when \code{d_list} and \code{raw_cov} were dropped.
 \item \code{scl_params}: named list with \code{mean} and \code{sd}, the centering and scaling

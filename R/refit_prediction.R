@@ -155,14 +155,16 @@
       par <- c(par, shape)
     }
   }
-  binned_covs <- function(x) intersect(covs, x$binned$covariates)
+  binned_covs <- function(x) c(intersect(covs, x$binned$covariates),
+                                intersect(covs, x$surface_binned$covariates))
   if (!setequal(binned_covs(inputs), binned_covs(train)))
     stop("Prediction binned versus exact kernel evaluation must match the fit.", call. = FALSE)
   # Use the same transform evaluator as refitting, with no model-row filtering.
   # Each site is evaluated once before repeated native scenario rows are joined.
   context <- list(covs = covs, n_covs = length(optimized), scale_vars = specs,
     unit_conv = inputs$unit_conv, resolution = inputs$resolution,
-    n_cols = inputs$n_cols, binned = inputs$binned)
+    n_cols = inputs$n_cols, binned = inputs$binned,
+    surface_binned = .msr_subset_surface_bins(inputs$surface_binned, covs))
   raw <- .msr_kernel_cov_w(par, inputs$d_list, inputs$raw_cov, inputs$kernel, context)
   if (any(is.infinite(raw))) stop("Spatial prediction values cannot be infinite.", call. = FALSE)
   scaled <- sweep(sweep(raw, 2L, center), 2L, spread, "/")

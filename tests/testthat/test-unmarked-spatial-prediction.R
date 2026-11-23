@@ -145,10 +145,13 @@ test_that("weighted SQ spatial prediction retains its fitted metric definition",
     kernel = "gaussian", scale_vars = specs, verbose = FALSE)
   object <- f$object
   object$kernel_inputs <- x
-  # Fixed known scales test the same metric evaluator used by the refit backend.
+  # Fixed known scales test the same metric evaluator used by the refit backend,
+  # including its binned weighted-SQ power sums.
+  expect_false(is.null(x$surface_binned))
   context <- list(covs = c("bin1", "cont1"), n_covs = 2L,
     scale_vars = x$scale_vars, unit_conv = x$unit_conv,
-    resolution = x$resolution, n_cols = x$n_cols, binned = x$binned)
+    resolution = x$resolution, n_cols = x$n_cols, binned = x$binned,
+    surface_binned = x$surface_binned)
   raw <- multiScaleR:::.msr_kernel_cov_w(c(40, 60) / x$unit_conv,
     x$d_list, x$raw_cov, x$kernel, context)
   object$scl_params <- list(mean = colMeans(raw), sd = apply(raw, 2, sd))
@@ -159,9 +162,17 @@ test_that("weighted SQ spatial prediction retains its fitted metric definition",
   bad <- x
   bad$scale_vars$weighted[2] <- FALSE
   expect_error(prepare_unmarked_data(object, nd, bad, nd), "source and metric")
+  # Binned kernel means and surface moments need no cell data; exact
+  # evaluation does.
   bad <- x
   bad$d_list <- bad$raw_cov <- NULL
-  expect_error(prepare_unmarked_data(object, nd, bad, nd), "Cell-level data")
+  expect_equal(as.matrix(prepare_unmarked_data(object, nd, bad, nd)[c("bin1", "cont1")]),
+               unname(expected), ignore_attr = TRUE)
+  exact <- object
+  exact$kernel_inputs$surface_binned <- NULL
+  bad$surface_binned <- NULL
+  expect_error(prepare_unmarked_data(exact, nd, bad, nd), "Cell-level data")
+  expect_error(prepare_unmarked_data(exact, nd, x, nd), "binned versus exact")
 })
 
 test_that("exponential and exponential-power data use fitted scales and shapes", {

@@ -27,6 +27,17 @@ multiScaleR (development version)
   bound, its log-scale SE exceeds one, or competing starts move it. Joint
   prediction uncertainty is still all or nothing.
 
+* Kernel-weighted surface metrics (`surface_var(weighted = TRUE)` with
+  `"sq"`, `"ssk"`, or `"sku"`) are now distance-binned when `kernel_prep()`
+  uses `bin = TRUE`, the default, as kernel means are. Each cell's centered
+  value powers are split between the two nearest distance nodes, so the
+  approximation stays as small as that of a binned kernel mean. In a
+  100-point example, refit searches ran in under a second instead of 53 to 91
+  seconds. Estimated scales and likelihoods change slightly from the exact
+  per-cell values. Set `bin = FALSE` to keep the exact evaluation. Weighted
+  `"sa"`, `kernel = "fixed"`, the analytic backends, and `multiScale_bayes()`
+  still evaluate weighted surface metrics from every cell.
+
 multiScaleR 1.0.1
 -----------------
 

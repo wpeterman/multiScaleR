@@ -16,7 +16,8 @@
 #'   [multiScaleR-fitting-methods].
 #' * **Binned inputs**: distance-binned summaries that [kernel_prep()] stores
 #'   when `bin = TRUE` (the default). They let the search compute
-#'   kernel-weighted means without visiting every cell, which is much faster.
+#'   kernel-weighted means, and kernel-weighted surface metrics other than
+#'   `"sa"`, without visiting every cell, which is much faster.
 #' * **Buffer**: the set of raster cells within `max_D` of a survey point. Only
 #'   these cells contribute to the point's kernel-weighted covariates.
 #' * **Choice set**: in a step-selection model, one used step together with
