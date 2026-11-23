@@ -111,6 +111,8 @@
     }
   }
   weak <- weak || poisson_compatible
+  scale <- .msr_profile_scale_se(H, nk, par, lower, upper, fits,
+    global = poisson_compatible)
   reasons <- c(if (boundary) "parameter at an optimization bound",
     if (is.null(inv$vcov)) "nonpositive or ill-conditioned observed information",
     if (any(logse > 1, na.rm = TRUE)) "log-kernel standard error exceeds one",
@@ -127,20 +129,52 @@
        poisson_limit = poisson, poisson_compatible = poisson_compatible,
        poisson_deviance = poisson_deviance, condition_number = inv$condition,
        log_scale_se = stats::setNames(logse, obj$engine$parameter_names),
+       scale_log_se = stats::setNames(scale$log_se, obj$engine$parameter_names),
+       scale_conditional_on = sub("^log_shape:", "shape:", sub("^log_scale:", "sigma:",
+         obj$engine$parameter_names[scale$conditional_on])),
        reasons = reasons)
 }
 
+# Per-parameter Wald SEs for the reported scale table. The joint gate above
+# withholds every SE, and joint prediction uncertainty, when any check fails.
+# Here a kernel parameter loses only its own SE when it sits at a search bound,
+# its log-scale SE exceeds one, or competing modes within the 95 percent
+# likelihood threshold move it by more than 0.5 log units. Bounded kernel
+# parameters are dropped from the observed information, so the remaining SEs
+# hold them fixed at their bounds. A dispersion bound, a Poisson-compatible NB2
+# fit, or unusable information still withholds every scale SE.
+.msr_profile_scale_se <- function(H, nk, par, lower, upper, fits, global = FALSE) {
+  at_bound <- par - lower < 1e-5 | upper - par < 1e-5
+  kernel_bound <- at_bound[seq_len(nk)]
+  # `conditional_on` flags the bounded parameters held fixed, only when some
+  # other parameter keeps an SE.
+  out <- list(log_se = rep(NA_real_, nk), conditional_on = rep(FALSE, nk))
+  if (global || any(at_bound[-seq_len(nk)]) || all(kernel_bound)) return(out)
+  keep <- c(which(!kernel_bound), seq.int(nk + 1L, length.out = nrow(H) - nk))
+  vcov <- .msr_information_inverse(H[keep, keep, drop = FALSE])$vcov
+  if (is.null(vcov)) return(out)
+  free <- which(!kernel_bound)
+  log_se <- rep(NA_real_, nk)
+  log_se[free] <- sqrt(diag(vcov)[seq_along(free)])
+  good <- which(fits$records$eligible &
+                  fits$records$value <= fits$best$objective + stats::qchisq(.95, 1) / 2)
+  moved <- vapply(seq_len(nk), function(k) any(vapply(good, function(i)
+    abs(fits$fits[[i]]$par[k] - par[k]) > 0.5, logical(1))), logical(1))
+  log_se[!is.finite(log_se) | log_se > 1 | moved] <- NA_real_
+  out$log_se <- log_se
+  if (any(is.finite(log_se))) out$conditional_on <- kernel_bound
+  out
+}
+
 .msr_profile_wald_table <- function(object, shape = FALSE) {
-  p <- nrow(object$scale_est)
-  idx <- if (shape) p + seq_len(p) else seq_len(p)
   tab <- if (shape) object$shape_est else object$scale_est
-  se <- sqrt(diag(object$uncertainty$vcov)[idx])
-  tab[["2.5%"]] <- if (object$uncertainty$available)
-    tab$Mean * exp(-stats::qnorm(.975) * se) else NA_real_
-  tab[["97.5%"]] <- if (object$uncertainty$available)
-    tab$Mean * exp(stats::qnorm(.975) * se) else NA_real_
-  attr(tab, "interval_method") <- rep(if (object$uncertainty$available)
-    "log_wald" else "unavailable", p)
+  # Limits follow the reported per-parameter SE (SE / Mean is the log-scale
+  # SE), so a withheld SE gives missing limits for that parameter only.
+  se <- tab$SE / tab$Mean
+  ok <- is.finite(se)
+  tab[["2.5%"]] <- ifelse(ok, tab$Mean * exp(-stats::qnorm(.975) * se), NA_real_)
+  tab[["97.5%"]] <- ifelse(ok, tab$Mean * exp(stats::qnorm(.975) * se), NA_real_)
+  attr(tab, "interval_method") <- ifelse(ok, "log_wald", "unavailable")
   tab
 }
 

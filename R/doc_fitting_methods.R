@@ -53,8 +53,12 @@
 #' it means the model is hard to refit near the estimate.
 #'
 #' A smooth kernel or shape parameter within `1e-5` of a search bound, on the
-#' log scale, invalidates the Wald approximation. Its standard errors and Wald
-#' limits are withheld. The raw Hessian, the original curvature status, and a
+#' log scale, invalidates the Wald approximation for that parameter. Its
+#' standard error and Wald limits are withheld. The other smooth parameters keep
+#' Wald standard errors from their own block of the Hessian, which holds the
+#' bounded parameters fixed at their bounds;
+#' `diagnostics(fit)$refit_hessian$conditional_on` names those bounded
+#' parameters. The raw Hessian, the original curvature status, and a
 #' table of parameter bounds stay in `diagnostics(fit)$refit_hessian`. A lower
 #' bound of zero is flagged only when it is reached. This flag is numerical. It
 #' does not establish that a scale is identified or give a calibrated interval.
@@ -255,6 +259,16 @@
 #' bound does not establish a finite dispersion maximum. The marginal
 #' covariance and Hessian are missing whenever joint uncertainty is
 #' unavailable.
+#'
+#' The scale table applies the kernel-specific rules one parameter at a time.
+#' A kernel parameter loses its standard error and Wald limits only when it sits
+#' at a search bound, its own log-scale standard error exceeds one, or competing
+#' starts move it by more than 0.5 log units. Bounded kernel parameters are
+#' dropped from the observed information, so the remaining standard errors hold
+#' them fixed at their bounds, and `diagnostics(fit)$profile_glm` names them in
+#' `scale_se_conditional_on`. Unusable information, a dispersion bound, a
+#' Poisson-compatible NB2 fit, or the exact Poisson boundary still withholds
+#' every scale standard error.
 #'
 #' Predictions with `uncertainty = "conditional"` at the Poisson boundary
 #' condition on both the kernel parameters and the boundary dispersion. They

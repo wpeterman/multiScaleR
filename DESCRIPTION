@@ -1,7 +1,7 @@
 Package: multiScaleR
 Type: Package
 Title: Estimate Scales of Effect for Spatial Ecological Models
-Version: 1.0.1.9007
+Version: 1.0.1.9008
 Description: Estimates the scale of effect, the distance over which a landscape
     variable influences an ecological response. Raster values around each
     sample location are weighted with a distance kernel, and the kernel scale

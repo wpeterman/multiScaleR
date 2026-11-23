@@ -61,10 +61,17 @@
 
 .msr_radius_profile_hessian <- function(par, smooth, lower, upper, evaluate) {
   hessian <- matrix(NA_real_, length(par), length(par))
-  theta <- log(par[smooth])
   # Match the refit Wald boundary threshold and stay inside the fitted bounds.
-  room <- pmin(theta - lower, upper - theta)
-  if (!length(theta) || any(room <= 1e-5))
+  # Smooth parameters at a bound keep missing rows; the interior block holds
+  # them fixed, as the refit bound rule expects.
+  room <- pmin(log(par[smooth]) - lower, upper - log(par[smooth]))
+  interior <- room > 1e-5
+  lower <- lower[interior]
+  upper <- upper[interior]
+  room <- room[interior]
+  smooth <- smooth[interior]
+  theta <- log(par[smooth])
+  if (!length(theta))
     return(hessian)
   step <- pmin(2e-4, room / 4)
   objective <- function(log_par) {

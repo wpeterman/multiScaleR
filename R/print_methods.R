@@ -154,6 +154,12 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
       cat("Some profile limits reach search bounds; those limits are not fully resolved.\n")
   } else if (!is.null(scale_ci_method) && any(scale_ci_method == "log_wald")) {
     cat("\nScale confidence limits use joint observed information on the log scale.\n")
+    if (any(scale_ci_method == "unavailable"))
+      cat("Scale SEs failing their own checks are withheld; see diagnostics(x)$profile_glm.\n")
+    bounded <- x$diagnostics$profile_glm$scale_se_conditional_on
+    if (length(bounded))
+      cat("Other scale SEs hold ", paste(bounded, collapse = ", "),
+          " fixed at the search bound.\n", sep = "")
   }
   cat("\n\n  ==================================== ")
 
@@ -638,9 +644,15 @@ print.multiScaleR_data <- function(x, ...){
 
 # Print only on explicit reporting, or when the fit's verbose switch permits it.
 .msr_print_refit_bounds <- function(diagnostics) {
-  if (isTRUE(diagnostics$refit_hessian$bounds$active_boundary)) {
-    cat("\nA smooth kernel parameter reaches an optimization bound. ")
-    cat("Outer Wald SEs and limits are withheld.\n")
+  rh <- diagnostics$refit_hessian
+  if (isTRUE(rh$bounds$active_boundary)) {
+    p <- rh$bounds$parameters
+    hit <- p$parameter[p$smooth & (p$at_lower | p$at_upper)]
+    cat("\nAt an optimization bound: ", paste(hit, collapse = ", "),
+        ". Wald SEs and limits are withheld for ",
+        if (length(hit) > 1L) "these parameters" else "this parameter", ".\n", sep = "")
+    if (length(rh$conditional_on))
+      cat("Wald SEs for the other smooth parameters hold the bounded ones fixed.\n")
     cat("Coefficient uncertainty still conditions on the selected kernels.\n")
   }
   invisible(NULL)

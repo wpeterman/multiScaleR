@@ -131,8 +131,10 @@ test_that("spatial NB/Gamma folds preserve frozen mean/SQ predictions, native de
     if (.msr_analytic_backend(m)) {
       expect_gte(nrow(m$profile_fit$start_results), 3L)
       expect_true(any(m$profile_fit$start_results$eligible))
+      # Scale SEs are judged one parameter at a time; a passing joint gate
+      # implies every SE is reported.
       if (isTRUE(m$uncertainty$available)) expect_true(all(is.finite(m$scale_est$SE) & m$scale_est$SE > 0)) else
-        expect_true(all(is.na(m$scale_est$SE)))
+        expect_true(all(is.na(m$scale_est$SE) | m$scale_est$SE > 0))
     }
   }
 })

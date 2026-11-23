@@ -318,13 +318,17 @@ summary.msr_conditional_glm <- function(object, ...) {
   info <- .msr_profile_information(obj, best$par, bounds$lower, bounds$upper, fits)
   p <- obj$engine$p
   scale <- exp(kp[seq_len(p)]) * inputs$unit_conv
-  scale_se <- if (info$available) scale * sqrt(diag(info$vcov)[seq_len(p)]) else rep(NA_real_, p)
+  # Scale SEs are reported per parameter (see .msr_profile_scale_se()); the
+  # joint gate in `info$available` still governs joint covariance and
+  # prediction uncertainty.
+  log_se <- if (info$available) sqrt(diag(info$vcov)[seq_len(nk)]) else
+    if (is.null(info$scale_log_se)) rep(NA_real_, nk) else unname(info$scale_log_se)
+  scale_se <- scale * log_se[seq_len(p)]
   scale_est <- data.frame(Mean = scale, SE = scale_se, row.names = contract$covariates)
   shape_est <- NULL
   if (inputs$kernel == "expow") {
     shape <- exp(kp[p + seq_len(p)])
-    shape_est <- data.frame(Mean = shape,
-      SE = if (info$available) shape * sqrt(diag(info$vcov)[p + seq_len(p)]) else NA_real_,
+    shape_est <- data.frame(Mean = shape, SE = shape * log_se[p + seq_len(p)],
       row.names = contract$covariates)
   }
   opt_mod <- .msr_profile_conditional_model(contract, fitted, model, kp)
@@ -397,6 +401,7 @@ summary.msr_conditional_glm <- function(object, ...) {
     poisson_limit = info$poisson_limit, condition_number = info$condition_number,
     poisson_compatible = info$poisson_compatible, poisson_deviance = info$poisson_deviance,
     log_scale_se = info$log_scale_se, multiple_modes = info$multiple_modes,
+    scale_se_conditional_on = info$scale_conditional_on,
     eligible_starts = sum(fits$records$eligible), attempted_starts = nrow(fits$records))
   out$diagnostics$max_distance <- .max_distance_diagnostic(
     kernel_dist(out, dimension = "1d"), inputs$max_D)
@@ -406,9 +411,14 @@ summary.msr_conditional_glm <- function(object, ...) {
     triggered = obj$engine$n < prepared_n,
     fitted_n = obj$engine$n, prepared_n = prepared_n)
   out$next_run <- .next_run_recommendation(scale_est, shape_est, inputs$max_D, out$diagnostics)
-  if (!info$available)
+  if (!info$available) {
+    withheld <- c(rownames(scale_est)[is.na(scale_est$SE)],
+      if (!is.null(shape_est)) paste0("shape:", rownames(shape_est)[is.na(shape_est$SE)]))
     warning("Joint Wald uncertainty unavailable: ", paste(info$reasons, collapse = "; "),
+            if (length(withheld)) paste0(". Scale SEs are withheld for: ",
+              paste(withheld, collapse = ", ")),
             ". Inspect diagnostics and likelihood profiles.", call. = FALSE)
+  }
   if (verbose) cat(if (joint_nb2) "Analytic joint NB2 fit: " else "Analytic-profile GLM fit: ", sum(fits$records$eligible), "/",
                    nrow(fits$records), " starts passed; family ", obj$family, ".\n", sep = "")
   out

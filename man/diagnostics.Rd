@@ -63,8 +63,11 @@ A named list with the following elements:
   \item{\code{refit_hessian}}{For the default refit backend, retains
     the outer curvature status and active smooth-parameter mask. A bound table
     records estimates, lower/upper bounds in reporting units, and bound flags.
-    If any active parameter is within \code{1e-5} log units of a positive
-    bound, joint outer Wald SEs are withheld. A zero lower bound is flagged
+    An active parameter within \code{1e-5} log units of a positive bound
+    loses its outer Wald SE. The other active parameters keep Wald SEs from
+    their own Hessian block, holding the bounded parameters fixed;
+    \code{conditional_on} names the bounded parameters when that happens.
+    A zero lower bound is flagged
     only when reached. The original curvature status is retained separately.
     A status of \code{"hessian_includes_failed_refit"} means a refit failed
     at one of the finite-difference points used for the Hessian, so its
@@ -88,8 +91,9 @@ A named list with the following elements:
     Includes \code{uncertainty_available}, explanatory \code{reasons},
     \code{weak_identifiability}, \code{boundary}, \code{condition_number},
     log-kernel standard errors, competing-mode flags, and attempted/eligible
-    start counts. \code{poisson_limit} marks negligible fitted NB2 extra
-    variance; \code{poisson_compatible} and \code{poisson_deviance} compare
+    start counts. \code{scale_se_conditional_on} names kernel parameters at
+    a search bound that the reported scale SEs hold fixed.
+    \code{poisson_limit} marks negligible fitted NB2 extra variance; \code{poisson_compatible} and \code{poisson_deviance} compare
     the NB2 fit with a Poisson fit at the selected kernel scales. See
     \code{\link{multiScale_optim}} for thresholds and limitations.}
 }

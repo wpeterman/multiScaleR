@@ -27,21 +27,43 @@ test_that("refit bound flags use a unit-invariant declared log tolerance", {
   expect_error(bounds(1, lower = 10, upper = 1), "aligned refit")
 })
 
-test_that("active bounds withhold the joint outer Wald block and retain curvature", {
+test_that("a bound withholds only the bounded parameter's outer Wald SE", {
   hessian <- matrix(c(4, 1, 1, 9), 2)
   raw <- .msr_refit_hessian_se(hessian, c(TRUE, TRUE), c(10, 1))
   bounds <- .msr_refit_bounds(c(1, 5), c(1, 1), c(10, 10), c(TRUE, TRUE),
     c(10, 1), c("sigma:a", "sigma:b"))
-  actual <- .msr_refit_bound_uncertainty(raw, bounds)
-  expect_true(all(is.na(actual$SE)))
+  # `a` sits at its lower bound. `b` keeps the SE of its own Hessian block,
+  # which holds `a` fixed: sqrt(1 / 9) * 1, not the joint sqrt(4 / 35).
+  actual <- .msr_refit_bound_uncertainty(raw, bounds, hessian, c(10, 1))
+  expect_true(is.na(actual$SE[1]))
+  expect_equal(actual$SE[2], 1 / 3)
+  expect_false(isTRUE(all.equal(actual$SE[2], raw$SE[2])))
+  expect_identical(actual$diagnostic$conditional_on, "sigma:a")
   expect_identical(actual$diagnostic$status, "parameter_at_optimization_bound")
   expect_identical(actual$diagnostic$curvature_status, "available")
   expect_true(actual$diagnostic$triggered)
   expect_true(all(is.finite(raw$SE)))
-  expect_identical(.msr_refit_bound_uncertainty(actual, bounds), actual)
+  expect_identical(.msr_refit_bound_uncertainty(actual, bounds, hessian, c(10, 1)), actual)
+  # Without a Hessian, every smooth SE is withheld.
+  bare <- .msr_refit_bound_uncertainty(raw, bounds)
+  expect_true(all(is.na(bare$SE)))
+  expect_identical(bare$diagnostic$conditional_on, character())
+  # Curvature that fails only in the bounded direction leaves `b` usable.
   invalid <- .msr_refit_hessian_se(diag(c(Inf, 9)), c(TRUE, TRUE), c(10, 1))
-  expect_identical(.msr_refit_bound_uncertainty(invalid, bounds)$diagnostic$curvature_status,
-    "invalid_hessian")
+  rescued <- .msr_refit_bound_uncertainty(invalid, bounds, diag(c(Inf, 9)), c(10, 1))
+  expect_identical(rescued$diagnostic$curvature_status, "invalid_hessian")
+  expect_equal(rescued$SE, c(NA_real_, 1 / 3))
+  # A failed refit anywhere in the Hessian still withholds every smooth SE.
+  failed <- .msr_refit_hessian_se(diag(c(1e40, 9)), c(TRUE, TRUE), c(10, 1))
+  expect_identical(failed$diagnostic$status, "hessian_includes_failed_refit")
+  expect_true(all(is.na(.msr_refit_bound_uncertainty(failed, bounds,
+    diag(c(1e40, 9)), c(10, 1))$SE)))
+  # An interior parameter outside the smooth mask stays missing.
+  hard <- .msr_refit_hessian_se(hessian, c(TRUE, FALSE), c(10, 1))
+  hard_bounds <- .msr_refit_bounds(c(1, 5), c(1, 1), c(10, 10), c(TRUE, FALSE),
+    c(10, 1), c("sigma:a", "sigma:b"))
+  expect_true(all(is.na(.msr_refit_bound_uncertainty(hard, hard_bounds,
+    hessian, c(10, 1))$SE)))
   expect_identical(hessian, matrix(c(4, 1, 1, 9), 2))
 })
 
@@ -84,6 +106,22 @@ test_that("legacy reporting copies suppress bound Wald uncertainty without chang
   expect_true(all(is.na(c(actual$scale_est$SE, actual$shape_est$SE))))
   expect_identical(actual$diagnostics$refit_hessian$bounds$parameters$at_lower,
     c(FALSE, TRUE))
+  # A saved two-scale fit stored joint SEs. The view keeps the interior scale,
+  # recomputed from its own block of the stored Hessian, and withholds only the
+  # bounded scale and its Wald limits.
+  pair <- object
+  pair$scale_est <- data.frame(Mean = c(10, 40), SE = c(2, 3), row.names = c("x", "z"))
+  pair$optim_results <- list(par = c(1, 4), hessian = matrix(c(4, 1, 1, 9), 2))
+  pair$profile_scale_est <- structure(data.frame(Mean = c(10, 40), SE = c(2, 3),
+    `2.5%` = c(6, 34), `97.5%` = c(14, 46), row.names = c("x", "z"), check.names = FALSE),
+    interval_method = c(x = "wald", z = "wald"))
+  viewed <- .msr_refit_bound_view(pair)
+  expect_equal(viewed$scale_est$SE, c(NA, 10 / 3))
+  expect_identical(viewed$diagnostics$refit_hessian$conditional_on, "sigma:x")
+  expect_true(all(is.na(viewed$profile_scale_est["x", c("SE", "2.5%", "97.5%")])))
+  expect_equal(unlist(viewed$profile_scale_est["z", c("SE", "2.5%", "97.5%")]),
+    c(SE = 3, `2.5%` = 34, `97.5%` = 46))
+  expect_identical(.msr_refit_bound_view(viewed), viewed)
 })
 
 test_that("bound refits retain native covariance, penalties, profiles and prediction support", {
@@ -151,4 +189,48 @@ test_that("bound refits retain native covariance, penalties, profiles and predic
     predict(snapshot, se.fit = TRUE, uncertainty = "conditional"))
   expect_identical(stats::vcov(fit$opt_mod), covariance)
   expect_identical(fit, original)
+})
+
+test_that("one scale at a bound keeps SEs for the other scales in real fits", {
+  skip_on_cran()
+  # land2 has a true sigma of 500 m, so a 400 m search extent pins it at the
+  # upper bound while land1 (true sigma 250 m) stays interior.
+  data("landscape_counts", package = "multiScaleR", envir = environment())
+  data("surv_pts", package = "multiScaleR", envir = environment())
+  land <- terra::rast(system.file("extdata", "landscape.tif", package = "multiScaleR"))
+  inputs <- kernel_prep(pts = terra::vect(surv_pts), raster_stack = land,
+                        max_D = 400, kernel = "gaussian", verbose = FALSE)
+  df <- data.frame(landscape_counts, inputs$kernel_dat)
+  model <- glm(counts ~ site + land1 + land2, family = poisson(), data = df)
+
+  fit <- suppressWarnings(multiScale_optim(model, inputs, n_cores = 1L, verbose = FALSE))
+  h <- fit$diagnostics$refit_hessian
+  expect_identical(h$status, "parameter_at_optimization_bound")
+  expect_identical(h$conditional_on, "sigma:land2")
+  expect_true(is.na(fit$scale_est["land2", "SE"]))
+  # The interior SE is the Wald SE of land1's own Hessian entry.
+  expected <- sqrt(1 / fit$optim_results$hessian_unscale[1, 1]) * inputs$unit_conv
+  expect_equal(fit$scale_est["land1", "SE"], expected)
+  report <- summary(fit)
+  expect_true(all(is.finite(unlist(report$opt_scale["land1", c("SE", "2.5%", "97.5%")]))))
+  expect_true(all(is.na(report$opt_scale["land2", c("SE", "2.5%", "97.5%")])))
+  printed <- capture.output(print(report))
+  expect_true(any(grepl("At an optimization bound: sigma:land2", printed, fixed = TRUE)))
+  expect_true(any(grepl("hold the bounded ones fixed", printed, fixed = TRUE)))
+  expect_true(all(is.finite(unlist(kernel_dist(fit)["land1", c("2.5%", "97.5%")]))))
+
+  # profile_glm applies the same rule from joint observed information.
+  expect_warning(analytic <- multiScale_optim(model, inputs, backend = "profile_glm",
+    n_cores = 1L, verbose = FALSE), "Scale SEs are withheld for: land2")
+  expect_false(analytic$uncertainty$available)
+  expect_true(is.na(analytic$scale_est["land2", "SE"]))
+  expect_equal(analytic$scale_est["land1", "SE"], fit$scale_est["land1", "SE"],
+               tolerance = 1e-3)
+  expect_identical(analytic$diagnostics$profile_glm$scale_se_conditional_on, "sigma:land2")
+  tab <- summary(analytic)$opt_scale
+  expect_identical(unname(attr(tab, "interval_method")), c("log_wald", "unavailable"))
+  expect_true(any(grepl("hold sigma:land2 fixed", capture.output(print(summary(analytic))),
+                        fixed = TRUE)))
+  # Joint covariance and joint prediction uncertainty stay withheld.
+  expect_error(predict(analytic, se.fit = TRUE), "Joint Wald uncertainty unavailable")
 })

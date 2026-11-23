@@ -1258,7 +1258,10 @@ multiScale_optim <- function(fitted_mod,
         if (kernel_inputs$kernel == "expow") rep(1, n_covs)),
       c(paste0("sigma:", r_vars),
         if (kernel_inputs$kernel == "expow") paste0("shape:", r_vars)))
-    uncertainty <- .msr_refit_bound_uncertainty(uncertainty, bounds)
+    uncertainty <- .msr_refit_bound_uncertainty(uncertainty, bounds,
+      opt_results$hessian_unscale,
+      c(rep(kernel_inputs$unit_conv, n_covs),
+        if (kernel_inputs$kernel == "expow") rep(1, n_covs)))
     res <- uncertainty$SE
 
     scale_est <- data.frame(Mean = opt_results$par_unscale[1:n_covs],

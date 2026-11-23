@@ -17,6 +17,16 @@ multiScaleR (development version)
 * The step-selection vignette shows how to map relative selection scores,
   including fits that started from `amt::fit_clogit()`.
 
+* Scale standard errors are withheld one scale at a time. In 1.0.0 and 1.0.1,
+  one scale at a search bound removed the standard errors and Wald limits of
+  every scale. Under the default `refit` backend this also affected older
+  saved fits when printed. Now only the bounded scale loses them. The other
+  scales report Wald standard errors that hold the bounded scale fixed at its
+  bound, and `summary()` says so. `profile_glm` and `joint_nb2` fits now drop
+  a scale's standard error only when that scale fails a check: it sits at a
+  bound, its log-scale SE exceeds one, or competing starts move it. Joint
+  prediction uncertainty is still all or nothing.
+
 multiScaleR 1.0.1
 -----------------
 

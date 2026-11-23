@@ -63,14 +63,33 @@
       smooth = active, row.names = parameter_names))
 }
 
-# Preserve the original curvature result separately. A bound invalidates the
-# unconstrained joint outer Wald block, including correlated interior scales.
-.msr_refit_bound_uncertainty <- function(uncertainty, bounds) {
+# Preserve the original curvature result separately. A parameter at a bound has
+# no two-sided curvature, so its Wald SE is withheld. Interior smooth parameters
+# keep Wald SEs from their own block of the outer Hessian, which holds the
+# bounded parameters fixed at their bounds; `conditional_on` names those
+# bounded parameters. Every smooth SE is withheld when no Hessian is supplied,
+# when the interior block is unusable, or when a failed refit touched the
+# Hessian.
+.msr_refit_bound_uncertainty <- function(uncertainty, bounds, hessian = NULL,
+                                         multiplier = NULL) {
   if (is.null(uncertainty$diagnostic$curvature_status))
     uncertainty$diagnostic$curvature_status <- uncertainty$diagnostic$status
   uncertainty$diagnostic$bounds <- bounds
   if (isTRUE(bounds$active_boundary)) {
-    uncertainty$SE[uncertainty$diagnostic$active] <- NA_real_
+    active <- uncertainty$diagnostic$active
+    at_bound <- bounds$parameters$at_lower | bounds$parameters$at_upper
+    interior <- active & !at_bound
+    uncertainty$SE[active] <- NA_real_
+    uncertainty$diagnostic$conditional_on <- character()
+    if (any(interior) && !is.null(hessian) && !is.null(multiplier) &&
+        !identical(uncertainty$diagnostic$curvature_status, "hessian_includes_failed_refit")) {
+      block <- .msr_refit_hessian_se(hessian, interior, multiplier)
+      if (identical(block$diagnostic$status, "available")) {
+        uncertainty$SE[interior] <- block$SE[interior]
+        uncertainty$diagnostic$conditional_on <-
+          bounds$parameters$parameter[active & at_bound]
+      }
+    }
     uncertainty$diagnostic$status <- "parameter_at_optimization_bound"
     uncertainty$diagnostic$triggered <- TRUE
   }
@@ -109,13 +128,19 @@
   diagnostic <- object$diagnostics$refit_hessian
   if (is.null(diagnostic)) diagnostic <- list(code = "refit_hessian", triggered = FALSE,
     status = "legacy_stored_uncertainty", active = active, uncertainty = "outer_refit_wald")
-  result <- .msr_refit_bound_uncertainty(list(SE = se, diagnostic = diagnostic), bounds)
+  # Interior SEs come from the stored outer Hessian, as they do in a new fit.
+  hessian <- object$optim_results$hessian_unscale
+  if (is.null(hessian)) hessian <- object$optim_results$hessian
+  result <- .msr_refit_bound_uncertainty(list(SE = se, diagnostic = diagnostic),
+    bounds, hessian, multiplier)
   object$scale_est$SE <- result$SE[seq_len(n)]
   if (kernel == "expow") object$shape_est$SE <- result$SE[n + seq_len(n)]
   object$diagnostics$refit_hessian <- result$diagnostic
   if (!is.null(object$profile_scale_est)) {
     tab <- object$profile_scale_est
-    smooth <- intersect(covariates[active[seq_len(n)]], rownames(tab))
+    # Only scales whose SE is withheld lose their Wald limits.
+    withheld_scale <- active[seq_len(n)] & is.na(result$SE[seq_len(n)])
+    smooth <- intersect(covariates[withheld_scale], rownames(tab))
     methods <- attr(tab, "interval_method")
     keep <- if (is.null(methods)) character() else smooth[
       !is.na(methods[smooth]) & grepl("^profile", methods[smooth])]
