@@ -7,6 +7,13 @@ multiScaleR (development version)
   scores without `const` and without a warning about a categorical
   covariate. `site_values` can select any other fitted ID.
 
+* `plot_marginal_effects()` no longer fails with "factor strata(...) has new
+  level" for `conditional_logit` fits that combine optimized predictors with
+  a transformed fixed predictor, such as `scale(dist_to_road)`. Effect curves
+  and `kernel_scale.raster()` now take the choice-set ID from the fitted
+  strata labels, so numeric IDs stay numeric and factor or character IDs keep
+  every fitted level.
+
 * The step-selection vignette shows how to map relative selection scores,
   including fits that started from `amt::fit_clogit()`.
 

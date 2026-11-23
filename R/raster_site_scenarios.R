@@ -25,9 +25,13 @@
 }
 
 # Choice-set IDs of a Cox or conditional-logit fit. A single bare
-# strata(id) term returns the ID name and its fitted IDs, recovered from the
-# "id=value" labels that survival stores in `xlevels`. Other models, or
-# compound strata terms, return NULL and keep the generic site handling.
+# strata(id) term returns the ID name and its fitted IDs from `xlevels`.
+# survival::strata() labels a numeric ID "id=value" but a factor or character
+# ID by its bare level, so the labels record the type the fit used. That type
+# can differ from recovered training data: a retained model frame returns
+# numeric IDs as a factor. `ids` is numeric for prefixed labels and a factor
+# with every fitted level otherwise, so ids[1L] reproduces a fitted label in
+# prediction newdata. Other models, or compound strata terms, return NULL.
 .msr_strata_ids <- function(mod) {
   if (!inherits(mod, "coxph")) return(NULL)
   tt <- tryCatch(stats::terms(mod), error = function(e) NULL)
@@ -38,9 +42,12 @@
   v <- as.character(ex[[2L]])
   labels <- mod$xlevels[[deparse(ex)]]
   if (!length(labels)) return(NULL)
-  ids <- sub(paste0("^", v, "="), "", labels)
-  num <- suppressWarnings(as.numeric(ids))
-  list(name = v, ids = if (!anyNA(num)) num else ids)
+  prefix <- paste0(v, "=")
+  if (all(startsWith(labels, prefix))) {
+    num <- suppressWarnings(as.numeric(substring(labels, nchar(prefix) + 1L)))
+    if (!anyNA(num)) return(list(name = v, ids = num))
+  }
+  list(name = v, ids = factor(labels, levels = labels))
 }
 
 # Append explicit nonspatial scenarios while retaining historical numeric-zero
@@ -117,19 +124,14 @@
       value <- if (v %in% names(site_values)) site_values[[v]] else strata$ids[[1L]]
       if (!as.character(value) %in% as.character(strata$ids))
         stop("site_values must select a fitted choice-set ID for '", v, "'.", call. = FALSE)
-      if (is.numeric(strata$ids) && is.factor(x) &&
-          as.character(value) %in% levels(x)) {
-        # Numeric-looking IDs stored as a factor in the training data (not
-        # survival's "id=value" strata labels) keep every fitted level, as
-        # other categorical site rasters do. A numeric layer would not match
-        # the fitted factor coding.
-        rr <- terra::as.factor(template * 0 + match(as.character(value), levels(x)))
-        levels(rr) <- data.frame(ID = seq_along(levels(x)), label = levels(x))
-      } else if (is.numeric(strata$ids)) {
+      if (is.numeric(strata$ids)) {
         rr <- template * 0 + as.numeric(value)
       } else {
-        rr <- terra::as.factor(template * 0 + 1)
-        levels(rr) <- data.frame(ID = 1L, label = as.character(value))
+        # Factor or character IDs keep every fitted level, as other
+        # categorical site rasters do.
+        fitted_levels <- levels(strata$ids)
+        rr <- terra::as.factor(template * 0 + match(as.character(value), fitted_levels))
+        levels(rr) <- data.frame(ID = seq_along(fitted_levels), label = fitted_levels)
       }
     } else if (v %in% names(site_values)) {
       value <- site_values[[v]]

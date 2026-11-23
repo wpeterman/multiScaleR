@@ -618,7 +618,16 @@ plot_marginal_effects <- function(x,
     # non-missing observed value so special terms like strata() can still be
     # evaluated during prediction.
     pred_defaults <- stats::setNames(vector("list", length(vars)), vars)
+    # A bare strata(id) input is held at the first fitted ID, taken from the
+    # fitted strata labels. Recovered training data can store numeric IDs as
+    # a factor (retained model frames), which survival reads as a new level.
+    strata_ids <- .msr_strata_ids(analysis_mod)
     for (var in vars) {
+      if (!is.null(strata_ids) && var == strata_ids$name &&
+          var %in% setdiff(cox_groups$inputs, c_vars)) {
+        pred_defaults[[var]] <- strata_ids$ids[1L]
+        next
+      }
       if (!var %in% names(dat_all)) {
         pred_defaults[[var]] <- 0
         next

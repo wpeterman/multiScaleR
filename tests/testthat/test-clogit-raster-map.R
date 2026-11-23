@@ -38,7 +38,8 @@ test_that("kernel_scale.raster() supplies a fitted choice-set ID for clogit maps
                                    site_values = list(step_id = 9999)),
                "fitted choice-set ID")
 
-  # Character IDs become a one-level categorical layer with a fitted label.
+  # Character IDs become a categorical layer carrying every fitted label,
+  # set to the first one.
   df <- fx$df
   df$step_id <- paste0("s", df$step_id)
   mc <- survival::clogit(case_ ~ forest + sl_km + strata(step_id),
@@ -48,7 +49,10 @@ test_that("kernel_scale.raster() supplies a fitted choice-set ID for clogit maps
                          profile_control = list(starts = matrix(0.3, ncol = 1)))
   rc <- kernel_scale.raster(fx$forest, multiScaleR = fc, scale_center = TRUE,
                             verbose = FALSE)
-  expect_equal(terra::levels(rc$step_id)[[1]]$label, "s1")
+  expect_identical(terra::levels(rc$step_id)[[1]]$label,
+                   levels(factor(df$step_id)))
+  expect_identical(unique(as.character(terra::as.data.frame(rc$step_id)$step_id)),
+                   levels(factor(df$step_id))[1L])
   pc <- terra::predict(rc, fc$opt_mod, type = "lp", reference = "zero",
                        na.rm = TRUE)
   expect_equal(terra::values(pc)[, 1],
@@ -111,4 +115,46 @@ test_that("factor choice-set IDs keep every fitted level in clogit maps", {
   expect_no_warning(re <- kernel_scale.raster(fx$forest, multiScaleR = expired,
                                               scale_center = TRUE, verbose = FALSE))
   check_map(re, mod, "1")
+})
+
+test_that("numeric choice-set IDs stay numeric beside transformed fixed terms", {
+  skip_on_cran()
+  skip_if_not_installed("survival")
+  skip_if_not_installed("amt")
+  fx <- ssf_fixture()
+  coxph <- survival::coxph; Surv <- survival::Surv; strata <- survival::strata
+  # A fixed, non-optimized predictor transformed in the formula, fitted with
+  # amt::fit_clogit(). The fit keeps a retained model frame, whose recovered
+  # data hold step_id as a factor, while survival's fitted strata labels
+  # ("step_id=3") are numeric. IDs start at 3 so the first fitted ID is not 1.
+  df <- fx$df
+  df$step_id <- df$step_id + 2
+  df$river_m <- abs(fx$steps$x - 600)
+  m <- amt::fit_clogit(df, case_ ~ forest + scale(river_m) + sl_km + strata(step_id),
+                       model = TRUE, na.action = stats::na.fail)
+  fit <- multiScale_optim(m, fx$inputs, backend = "conditional_logit",
+                          n_cores = 1, verbose = FALSE,
+                          profile_control = list(starts = matrix(0.3, ncol = 1)))
+  expect_identical(fit$profile_fit$contract$native_data_mode, "retained_model_frame")
+  expect_identical(.msr_strata_ids(fit$opt_mod$model)$ids[1:2], c(3, 4))
+
+  # Effect curves hold the ID at a fitted value (previously "new level 3").
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  curves <- plot_marginal_effects(fit, link = TRUE)
+  expect_setequal(names(curves), c("forest", "river_m", "sl_km"))
+  expect_equal(range(curves$river_m$data[[1]]), range(df$river_m))
+
+  # The map uses a numeric ID layer and the native model predicts from it.
+  r <- kernel_scale.raster(fx$forest, multiScaleR = fit, scale_center = TRUE,
+                           site_values = list(river_m = 100), verbose = FALSE)
+  expect_false(terra::is.factor(r$step_id))
+  expect_equal(unname(unlist(terra::global(r$step_id, "max"))), 3)
+  native <- fit$opt_mod$model
+  b <- stats::coef(native)
+  p <- terra::predict(r, native, type = "lp", reference = "zero", na.rm = TRUE)
+  z100 <- (100 - mean(df$river_m)) / stats::sd(df$river_m)
+  expect_equal(terra::values(p)[, 1],
+               b[["forest"]] * terra::values(r$forest)[, 1] +
+                 b[["scale(river_m)"]] * z100, tolerance = 1e-10)
 })
