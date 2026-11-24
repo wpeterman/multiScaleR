@@ -99,7 +99,7 @@ inspect the likelihood across the search range. Unlike the GLM backends,
 `joint_mixed` has no profile route yet (`profile_sigma()` and
 `summary(fit, profile = TRUE)` reject it). The likelihood-ratio decisions here
 (842 of 900 covered) suggest that a profile interval for `joint_mixed` would be
-worth adding.
+worth adding. That route was added afterward; see the addendum below.
 
 ## Scope
 
@@ -115,4 +115,63 @@ To reproduce, from the source root:
 ```
 Rscript tools/benchmarks/joint_mixed_wald/run.R <output_dir> 10
 Rscript tools/benchmarks/joint_mixed_wald/summarize.R <output_dir>
+```
+
+## Addendum: profile-likelihood intervals (2026-11-23)
+
+`summary(fit, profile = TRUE)` now returns profile-likelihood limits for
+`joint_mixed` fits. For a one-scale model, each profile point is the same cold
+native `glmmTMB` refit that checks each start, with sigma held fixed. The
+limits bound the connected region around the estimate where the
+likelihood-ratio statistic stays below `qchisq(0.95, 1)`, found with the same
+grid and root search as the analytic GLM backends.
+
+[profile_run.R](profile_run.R) refit all 900 datasets with the default
+settings and called `summary(fit, profile = TRUE)`.
+[profile_summarize.R](profile_summarize.R) joined the records with the Wald
+metrics. Every refit reproduced the original estimate (largest log difference
+4e-15), and every profile returned without an error or a warning.
+
+| Response | Sigma | Profile covered | Profile coverage | LR covered | Wald covered |
+|:---|---:|---:|:---|---:|---:|
+| Poisson | 120 | 141/150 | 0.940 [0.890, 0.968] | 141 | 141/150 |
+| Poisson | 240 | 140/150 | 0.933 [0.882, 0.963] | 140 | 132/150 |
+| Poisson | 450 | 142/150 | 0.947 [0.898, 0.973] | 142 | 144/150 |
+| NB2 | 120 | 144/150 | 0.960 [0.915, 0.982] | 144 | 145/150 |
+| NB2 | 240 | 133/150 | 0.887 [0.826, 0.928] | 133 | 115/149 |
+| NB2 | 450 | 142/150 | 0.947 [0.898, 0.973] | 142 | 144/150 |
+| All | | 842/900 | 0.936 [0.918, 0.950] | 842 | 821/899 |
+
+Wald counts are the reported intervals from the table above. The profile
+interval and the likelihood-ratio decision at the true sigma agreed in all
+900 datasets. The root search therefore located the cutoff accurately, and no
+true sigma fell in a likelihood region separate from the one around the
+estimate. Misses were split
+between the two sides (34 with the truth above the interval, 24 below). One
+NB2 interval at sigma 450 reached the upper search bound and was labeled
+`"profile-bound-limited"`. Its estimate was 587 and its lower limit 473, so
+it missed the truth.
+
+Across all datasets the profile and Wald intervals had similar median widths
+on the log scale (ratio 1.02). The profile intervals were often asymmetric:
+the ratio of the upper to the lower log half-width ranged from 0.74 to 1.36
+between the 10th and 90th percentiles for NB2. The gain was concentrated at
+sigma 240. There, 17 NB2 datasets were covered by the profile but missed by
+the Wald interval, and none the reverse. Over all scenarios the counts were
+25 and 5.
+
+Profiling took a median of 3.7 seconds per dataset (2.0 for Poisson and 5.1
+for NB2; maximum 12.8). Profile coverage at NB2 sigma 240 remains below
+nominal, because the likelihood-ratio decision itself fell short there. Use
+profile limits for `joint_mixed` scale inference in preference to the Wald
+limits, and still treat them as approximate. The study used one kernel.
+Profiles with several scales, which also reoptimize the other scales on the
+joint likelihood, were checked only by the unit tests.
+
+To reproduce, after the Wald study's `summarize.R` has written
+`results/metrics.csv`:
+
+```
+Rscript tools/benchmarks/joint_mixed_wald/profile_run.R <output_dir> 10
+Rscript tools/benchmarks/joint_mixed_wald/profile_summarize.R <output_dir>
 ```

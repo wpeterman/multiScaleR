@@ -135,6 +135,8 @@ missing.
 \item With \code{backend = "joint_mixed"}, distance limits convert the log-scale
 Wald limits of sigma and are missing for a scale whose standard error is
 withheld. See \link{multiScaleR-fitting-methods} for their coverage caution.
+In \code{summary(fit, profile = TRUE)}, they convert the profile limits
+instead, which are reported even when the standard error is withheld.
 \item With the default refit backend, point distances remain available when a
 sigma standard error is not finite, but its Wald limits are missing. When
 a smooth parameter sits at a search bound, the whole Wald block is

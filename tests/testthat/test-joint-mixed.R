@@ -25,8 +25,13 @@ test_that("joint mixed models retain native predictions and independent starts",
     expect_equal(fit$scale_est$SE, fit$scale_est$Mean * unname(jm$log_scale_se))
     expect_identical(is.na(fit$scale_est$SE), unname(jm$scale_se_reasons != "available"))
     expect_true(is.finite(kernel_dist(fit)[1, 1]))
-    expect_error(summary(fit, profile = TRUE), "not validated")
-    expect_error(profile_sigma(fit), "not validated")
+    # Profile limits from native refits; see test-joint-mixed-profile.R.
+    prof_tab <- summary(fit, profile = TRUE)$opt_scale
+    expect_true(all(attr(prof_tab, "interval_method") %in%
+      c("profile", "profile-bound-limited")))
+    expect_true(prof_tab[1, "2.5%"] <= fit$scale_est$Mean &&
+      fit$scale_est$Mean <= prof_tab[1, "97.5%"])
+    expect_s3_class(profile_sigma(fit, n_pts = 3, verbose = FALSE), "sigma_profile")
     expect_error(vcov(fit), "unavailable")
     expect_equal(vcov(fit, type = "conditional"), vcov(fit$opt_mod))
     expect_equal(predict(fit), predict(fit$opt_mod, type = "response"))

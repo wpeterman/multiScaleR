@@ -56,15 +56,7 @@
   # call that intentionally omits starts, maps, priors, weights and subsets.
   .msr_native_mixed_design(model, engine, covs, bounds$starts[1L, ],
                            rownames(mf), check_kernel = FALSE)
-  native_refit <- function(kp) {
-    nd <- dat
-    kd <- .msr_eval_kernel_engine(engine, unname(kp))
-    for (nm in covs) nd[[nm]] <- kd$value[, nm]
-    glmmTMB::glmmTMB(formula = stats::formula(model), data = nd,
-      family = stats::family(model), ziformula = model$modelInfo$allForm$ziformula,
-      dispformula = model$modelInfo$allForm$dispformula,
-      contrasts = model$modelInfo$contrasts, na.action = stats::na.fail)
-  }
+  native_refit <- .msr_mixed_refit_fn(model, engine, covs, dat)
   fits <- .msr_native_joint(engine, covs, rownames(mf), bounds$starts,
                             bounds$lower, bounds$upper, native_refit)
   if (is.na(fits$selected)) {

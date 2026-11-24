@@ -16,8 +16,7 @@ profile_sigma(
 )
 }
 \arguments{
-\item{x}{A fitted \code{multiScaleR} object returned by \code{\link[=multiScale_optim]{multiScale_optim()}}.
-Fits from \code{backend = "joint_mixed"} are not supported.}
+\item{x}{A fitted \code{multiScaleR} object returned by \code{\link[=multiScale_optim]{multiScale_optim()}}.}
 
 \item{n_pts}{Positive integer, at least 3. Number of sigma values in the
 generated grid for each covariate. More values give a smoother curve at
@@ -34,8 +33,8 @@ Default: \code{TRUE}.}
 
 \item{n_cores}{Optional positive integer. Number of CPU cores used to
 profile covariates in parallel, one covariate per worker (a PSOCK
-cluster). Default: \code{NULL} (serial). The analytic and
-conditional-logistic backends always profile serially.}
+cluster). Default: \code{NULL} (serial). The analytic, conditional-logistic,
+and joint mixed backends always profile serially.}
 
 \item{spacing}{Character. Spacing of the generated grid. \code{"log"} (default)
 places more values at small sigma, where the likelihood usually changes
@@ -119,15 +118,23 @@ shape positions do not affect the profile or the parameter count. See
 \link{multiScaleR-kernels}.
 }
 
-\section{Analytic and conditional-logistic fits}{
-Fits from \code{backend = "profile_glm"}, \code{"joint_nb2"}, and
-\code{"conditional_logit"} profile serially, and every sigma value must lie
+\section{Analytic, conditional-logistic, and joint mixed fits}{
+Fits from \code{backend = "profile_glm"}, \code{"joint_nb2"}, \code{"conditional_logit"},
+and \code{"joint_mixed"} profile serially, and every sigma value must lie
 within the fitted bounds (\code{min_D} to \code{max_D}). For a \code{"conditional_logit"}
 fit, each grid value is the log-likelihood of a native
 \code{survival::coxph()} refit at that sigma, with the coefficients refit and
 every other scale held at its estimate. That backend withholds scale
 uncertainty, so \code{summary(fit, profile = TRUE)} returns no profile interval
 for it. The grid describes the likelihood surface only.
+
+For a \code{"joint_mixed"} fit, each grid value is the log-likelihood of a new
+native \code{glmmTMB} fit at that sigma, the same refit the backend uses to
+check each start. The coefficients, the random-intercept standard
+deviation, and any NB2 dispersion are re-estimated, the random intercept is
+integrated out with the Laplace approximation, and every other scale stays
+at its estimate. A refit that fails gives \code{NA} at that value, and
+profiling stops if every refit for a covariate fails.
 }
 
 \examples{

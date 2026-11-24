@@ -7,7 +7,6 @@
 #' result with [plot.sigma_profile()].
 #'
 #' @param x A fitted `multiScaleR` object returned by [multiScale_optim()].
-#'   Fits from `backend = "joint_mixed"` are not supported.
 #' @param n_pts Positive integer, at least 3. Number of sigma values in the
 #'   generated grid for each covariate. More values give a smoother curve at
 #'   the cost of more model refits. Ignored when `sigma_values` is supplied.
@@ -20,8 +19,8 @@
 #'   Default: `TRUE`.
 #' @param n_cores Optional positive integer. Number of CPU cores used to
 #'   profile covariates in parallel, one covariate per worker (a PSOCK
-#'   cluster). Default: `NULL` (serial). The analytic and
-#'   conditional-logistic backends always profile serially.
+#'   cluster). Default: `NULL` (serial). The analytic, conditional-logistic,
+#'   and joint mixed backends always profile serially.
 #' @param spacing Character. Spacing of the generated grid. `"log"` (default)
 #'   places more values at small sigma, where the likelihood usually changes
 #'   fastest. `"linear"` spaces them evenly. Ignored when `sigma_values` is
@@ -93,16 +92,24 @@
 #' shape positions do not affect the profile or the parameter count. See
 #' [multiScaleR-kernels].
 #'
-#' # Analytic and conditional-logistic fits
+#' # Analytic, conditional-logistic, and joint mixed fits
 #'
-#' Fits from `backend = "profile_glm"`, `"joint_nb2"`, and
-#' `"conditional_logit"` profile serially, and every sigma value must lie
+#' Fits from `backend = "profile_glm"`, `"joint_nb2"`, `"conditional_logit"`,
+#' and `"joint_mixed"` profile serially, and every sigma value must lie
 #' within the fitted bounds (`min_D` to `max_D`). For a `"conditional_logit"`
 #' fit, each grid value is the log-likelihood of a native
 #' `survival::coxph()` refit at that sigma, with the coefficients refit and
 #' every other scale held at its estimate. That backend withholds scale
 #' uncertainty, so `summary(fit, profile = TRUE)` returns no profile interval
 #' for it. The grid describes the likelihood surface only.
+#'
+#' For a `"joint_mixed"` fit, each grid value is the log-likelihood of a new
+#' native `glmmTMB` fit at that sigma, the same refit the backend uses to
+#' check each start. The coefficients, the random-intercept standard
+#' deviation, and any NB2 dispersion are re-estimated, the random intercept is
+#' integrated out with the Laplace approximation, and every other scale stays
+#' at its estimate. A refit that fails gives `NA` at that value, and
+#' profiling stops if every refit for a covariate fails.
 #'
 #' @seealso [plot.sigma_profile()], [multiScale_optim()],
 #'   [summary.multiScaleR()], [multiScaleR-kernels].
@@ -156,8 +163,6 @@ profile_sigma <- function(x,
   if (!inherits(x, "multiScaleR")) {
     stop("`x` must be a fitted `multiScaleR` object.", call. = FALSE)
   }
-  if (identical(x$backend, "joint_mixed"))
-    stop("Scale profiling is not validated for joint_mixed.", call. = FALSE)
   validate_scalar_logical(verbose, "verbose")
   if (!is.null(n_cores)) {
     validate_scalar_numeric(n_cores, "n_cores", integerish = TRUE, positive = TRUE)
@@ -241,7 +246,8 @@ profile_sigma <- function(x,
   n_grid <- length(sigma_seq)
 
   clogit <- identical(x$backend, "conditional_logit")
-  if (.msr_analytic_backend(x) || clogit) {
+  mixed <- identical(x$backend, "joint_mixed")
+  if (.msr_analytic_backend(x) || clogit || mixed) {
     if (!is.null(n_cores) && n_cores > 1L)
       stop(x$backend, " likelihood profiling is serial.", call. = FALSE)
     if (any(sigma_seq < min_D | sigma_seq > max_D))
@@ -252,12 +258,21 @@ profile_sigma <- function(x,
         x$backend, format(min_D), format(max_D)), call. = FALSE)
     # A conditional_logit fit has no refit context. Each grid value is a
     # native clogit refit, with the other scales held at their estimates.
-    profile_ll <- if (clogit) .msr_clogit_profile_loglik(x) else
+    # A joint_mixed grid value is a cold native glmmTMB refit, again with the
+    # other scales at their estimates. A refit that fails gives NA there.
+    profile_ll <- if (clogit) .msr_clogit_profile_loglik(x) else if (mixed) {
+      mixed_profile <- .msr_mixed_profiler(x)
+      function(j, z) tryCatch(-mixed_profile$at(j, z, reoptimize = FALSE),
+                              error = function(e) NA_real_)
+    } else
       function(j, z) -.msr_profile_at(x, j, z, reoptimize = FALSE)
     profiles <- do.call(rbind, lapply(seq_len(n_covs), function(j) {
-      if (verbose && clogit) cat("Profiling sigma for", covs[j], "\n")
+      if (verbose && (clogit || mixed)) cat("Profiling sigma for", covs[j], "\n")
       ll <- vapply(log(sigma_seq / unit_conv), function(z) profile_ll(j, z),
         numeric(1))
+      if (mixed && !any(is.finite(ll)))
+        stop(sprintf("Could not profile `%s`: every native refit failed.", covs[j]),
+             call. = FALSE)
       data.frame(variable = covs[j], sigma = sigma_seq, LL = ll,
         AICc = if (n > k_total + 1) -2 * ll + 2 * k_total +
           2 * k_total * (k_total + 1) / (n - k_total - 1) else NA_real_)

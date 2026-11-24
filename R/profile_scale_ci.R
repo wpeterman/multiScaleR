@@ -24,10 +24,17 @@ scale_ci_table <- function(object,
                            profile = FALSE) {
 
   if (identical(object$backend, "joint_mixed")) {
-    if (isTRUE(profile)) stop("Scale profiling is not validated for joint_mixed.", call. = FALSE)
     # Log-scale Wald limits from the per-scale SEs of the joint sdreport.
     # Fits saved before those SEs existed carry NA SEs and so NA limits.
     tab <- .msr_profile_wald_table(object)
+    if (isTRUE(profile)) {
+      # Connected profile region from native refits, as for the analytic
+      # backends. Every scale gets limits, including one whose SE is withheld.
+      pr <- .msr_profile_likelihood_intervals(object)
+      tab[, c("2.5%", "97.5%")] <- pr$intervals
+      attr(tab, "interval_method") <- pr$method
+      attr(tab, "bound_limited") <- pr$bound_limited
+    }
     attr(tab, "interval_method") <- stats::setNames(attr(tab, "interval_method"), rownames(tab))
     return(tab)
   }

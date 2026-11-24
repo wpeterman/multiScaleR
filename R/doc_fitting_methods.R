@@ -19,7 +19,7 @@
 #' | `"refit"` (default) | Any model that `stats::update()`, the `unmarked` equivalent, or a `refit_fn` can refit | Kernel scales and shapes. The model's own parameters are refit at every candidate | Hessian (Wald) standard errors for smooth kernels. Profile likelihood with `summary(fit, profile = TRUE)` |
 #' | `"profile_glm"` | Gaussian identity, Poisson log, and binomial logit `glm()` fits, and NB2 log-link fits | Kernel scales and NB2 theta. Coefficients are solved at every candidate | Joint Wald limits when the checks below pass |
 #' | `"joint_nb2"` | NB2 log-link fits, including the exact Poisson boundary | Kernel scales, coefficients, and dispersion | Joint Wald limits when the checks pass. None at the Poisson boundary |
-#' | `"joint_mixed"` | Poisson and NB2 `glmmTMB` fits with one random intercept | Kernel scales and all model parameters, with the random intercept integrated out | Wald limits for each scale that passes its checks. Coefficient uncertainty is conditional on the scales |
+#' | `"joint_mixed"` | Poisson and NB2 `glmmTMB` fits with one random intercept | Kernel scales and all model parameters, with the random intercept integrated out | Wald limits for each scale that passes its checks. Profile likelihood with `summary(fit, profile = TRUE)`. Coefficient uncertainty is conditional on the scales |
 #' | `"conditional_logit"` | Step-selection models from `survival::clogit()` or `amt::fit_clogit()` | Smooth kernel scales and conditional-logistic coefficients | None. Coefficient uncertainty is conditional on the scales |
 #'
 #' A *conditional* standard error treats the estimated scales as known. A
@@ -356,8 +356,7 @@
 #' than 0.5 log units. A Hessian that is not positive definite, or unusable
 #' covariance, withholds every scale standard error.
 #' `diagnostics(fit)$joint_mixed` gives the status, the reason for each scale,
-#' and the bounded scales held fixed. Legacy scale Hessians stay `NA`, and
-#' profile intervals are not available for this backend.
+#' and the bounded scales held fixed. Legacy scale Hessians stay `NA`.
 #'
 #' Treat these limits with caution. In a simulation with one Gaussian kernel
 #' mean and 200 points in 40 sites, 95 percent Wald intervals held the true
@@ -370,6 +369,32 @@
 #' `predict(fit, se.fit = TRUE, uncertainty = "conditional")` or
 #' `predict(fit$opt_mod, ...)`. This backend does not extend the
 #' single-predictor NB2 contract of [scale_inference()].
+#'
+#' `summary(fit, profile = TRUE)` reports profile-likelihood limits instead.
+#' For each scale in turn, it holds sigma at candidate values and refits the
+#' native `glmmTMB` model, the same new fit that checks each start. The
+#' coefficients, the random-intercept standard deviation, and any NB2
+#' dispersion are re-estimated, and the random intercept is integrated out
+#' as in the fit. With several scales, the other scales are re-estimated too,
+#' on the joint likelihood from the optimum of each eligible start, and a
+#' native refit checks that value. As for the analytic GLM backends, the
+#' limits bound the connected region around the estimate where the
+#' likelihood-ratio statistic stays below the 95 percent chi-square quantile
+#' with one degree of freedom. A limit that reaches a search bound is labeled
+#' `"profile-bound-limited"` and is not a fully resolved confidence limit.
+#' Every scale gets profile limits, including one whose standard error is
+#' withheld, for example at a search bound. Profiling stops with an error when
+#' a refit fails or finds a better optimum than the fit, and it needs the
+#' optional packages and the refit data stored in `mixed_fit`. In the same
+#' simulation, profile intervals held the true sigma in 842 of 900 data sets
+#' (89 percent to 96 percent by scale and family), against 821 of 899 for the
+#' Wald intervals. Where Wald coverage was lowest, NB2 at a true sigma of 240,
+#' the profile intervals held it in 133 of 150 data sets and the Wald
+#' intervals in 115 of 149. Profile limits therefore describe scale
+#' uncertainty better than the Wald limits, but they can still fall short of
+#' nominal coverage, as they did in that scenario. Each profile took a median
+#' of 2 to 5 seconds there. [profile_sigma()] instead holds the other scales
+#' at their estimates.
 #'
 #' # Conditional-logistic backend
 #'

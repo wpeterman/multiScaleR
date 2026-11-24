@@ -85,9 +85,9 @@
 #'   uncertainty is not available.
 #' * `mixed_fit` for `"joint_mixed"`: the kernel engine, log-scale estimates
 #'   and bounds in internal distance units, the independent starts, every start
-#'   outcome and warning, the selected start, and the variables prediction
-#'   needs. `scale_est$SE` and the log-scale Wald limits in
-#'   `profile_scale_est` come from the selected start's joint Hessian, one
+#'   outcome and warning, the selected start, and the variables that
+#'   prediction and profile refits need. `scale_est$SE` and the log-scale
+#'   Wald limits in `profile_scale_est` come from the selected start's joint Hessian, one
 #'   scale at a time. `uncertainty$available` is `FALSE` because coefficient
 #'   and prediction uncertainty still condition on the scales. `next_run` and
 #'   the `max_D` warning follow the analytic GLM backends, and `opt_context` is

@@ -20,7 +20,7 @@ them on one data set.
    \code{"refit"} (default) \tab Any model that \code{stats::update()}, the \code{unmarked} equivalent, or a \code{refit_fn} can refit \tab Kernel scales and shapes. The model's own parameters are refit at every candidate \tab Hessian (Wald) standard errors for smooth kernels. Profile likelihood with \code{summary(fit, profile = TRUE)} \cr
    \code{"profile_glm"} \tab Gaussian identity, Poisson log, and binomial logit \code{glm()} fits, and NB2 log-link fits \tab Kernel scales and NB2 theta. Coefficients are solved at every candidate \tab Joint Wald limits when the checks below pass \cr
    \code{"joint_nb2"} \tab NB2 log-link fits, including the exact Poisson boundary \tab Kernel scales, coefficients, and dispersion \tab Joint Wald limits when the checks pass. None at the Poisson boundary \cr
-   \code{"joint_mixed"} \tab Poisson and NB2 \code{glmmTMB} fits with one random intercept \tab Kernel scales and all model parameters, with the random intercept integrated out \tab Wald limits for each scale that passes its checks. Coefficient uncertainty is conditional on the scales \cr
+   \code{"joint_mixed"} \tab Poisson and NB2 \code{glmmTMB} fits with one random intercept \tab Kernel scales and all model parameters, with the random intercept integrated out \tab Wald limits for each scale that passes its checks. Profile likelihood with \code{summary(fit, profile = TRUE)}. Coefficient uncertainty is conditional on the scales \cr
    \code{"conditional_logit"} \tab Step-selection models from \code{survival::clogit()} or \code{amt::fit_clogit()} \tab Smooth kernel scales and conditional-logistic coefficients \tab None. Coefficient uncertainty is conditional on the scales \cr
 }
 
@@ -369,8 +369,7 @@ another start within the 95 percent likelihood threshold moves it by more
 than 0.5 log units. A Hessian that is not positive definite, or unusable
 covariance, withholds every scale standard error.
 \code{diagnostics(fit)$joint_mixed} gives the status, the reason for each scale,
-and the bounded scales held fixed. Legacy scale Hessians stay \code{NA}, and
-profile intervals are not available for this backend.
+and the bounded scales held fixed. Legacy scale Hessians stay \code{NA}.
 
 Treat these limits with caution. In a simulation with one Gaussian kernel
 mean and 200 points in 40 sites, 95 percent Wald intervals held the true
@@ -383,6 +382,32 @@ covariance still condition on the selected scales. Use
 \code{predict(fit, se.fit = TRUE, uncertainty = "conditional")} or
 \code{predict(fit$opt_mod, ...)}. This backend does not extend the
 single-predictor NB2 contract of \code{\link[=scale_inference]{scale_inference()}}.
+
+\code{summary(fit, profile = TRUE)} reports profile-likelihood limits instead.
+For each scale in turn, it holds sigma at candidate values and refits the
+native \code{glmmTMB} model, the same new fit that checks each start. The
+coefficients, the random-intercept standard deviation, and any NB2
+dispersion are re-estimated, and the random intercept is integrated out
+as in the fit. With several scales, the other scales are re-estimated too,
+on the joint likelihood from the optimum of each eligible start, and a
+native refit checks that value. As for the analytic GLM backends, the
+limits bound the connected region around the estimate where the
+likelihood-ratio statistic stays below the 95 percent chi-square quantile
+with one degree of freedom. A limit that reaches a search bound is labeled
+\code{"profile-bound-limited"} and is not a fully resolved confidence limit.
+Every scale gets profile limits, including one whose standard error is
+withheld, for example at a search bound. Profiling stops with an error when
+a refit fails or finds a better optimum than the fit, and it needs the
+optional packages and the refit data stored in \code{mixed_fit}. In the same
+simulation, profile intervals held the true sigma in 842 of 900 data sets
+(89 percent to 96 percent by scale and family), against 821 of 899 for the
+Wald intervals. Where Wald coverage was lowest, NB2 at a true sigma of 240,
+the profile intervals held it in 133 of 150 data sets and the Wald
+intervals in 115 of 149. Profile limits therefore describe scale
+uncertainty better than the Wald limits, but they can still fall short of
+nominal coverage, as they did in that scenario. Each profile took a median
+of 2 to 5 seconds there. \code{\link[=profile_sigma]{profile_sigma()}} instead holds the other scales
+at their estimates.
 }
 
 \section{Conditional-logistic backend}{

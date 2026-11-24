@@ -55,6 +55,17 @@ multiScaleR (development version)
   `diagnostics(fit)$joint_mixed$triggered` is `TRUE` only when a scale SE is
   withheld.
 
+* `summary(fit, profile = TRUE)` and `profile_sigma()` now work for
+  `joint_mixed` fits instead of stopping with "Scale profiling is not
+  validated for joint_mixed". Each profile point refits the native `glmmTMB`
+  model with sigma held fixed, and with several scales the other scales are
+  re-estimated as well. Limits follow the connected likelihood region around
+  the estimate, and a limit at a search bound is labeled
+  `"profile-bound-limited"`, as for `profile_glm` and `joint_nb2`. Every scale
+  gets profile limits, even when its SE is withheld. In the same simulation,
+  95% profile intervals held the true sigma in 842 of 900 data sets (89% to
+  96% by scale and family), against 821 of 899 for Wald intervals.
+
 * Kernel-weighted surface metrics (`surface_var(weighted = TRUE)` with
   `"sq"`, `"ssk"`, or `"sku"`) are now distance-binned when `kernel_prep()`
   uses `bin = TRUE`, the default, as kernel means are. Each cell's centered

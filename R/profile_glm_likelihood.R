@@ -29,13 +29,19 @@
 .msr_profile_likelihood_intervals <- function(object, level = .95) {
   validate_scalar_numeric(level, "level", lower = 0, upper = 1,
                           inclusive_lower = FALSE, inclusive_upper = FALSE)
-  pf <- object$profile_fit
+  # The analytic backends profile their stored objective. joint_mixed profiles
+  # through native refits (see .msr_mixed_profiler()). Both supply log scales,
+  # their bounds, and the profiled negative log-likelihood at one log scale.
+  pf <- if (identical(object$backend, "joint_mixed")) .msr_mixed_profiler(object) else
+    list(par = object$profile_fit$par, lower = object$profile_fit$lower,
+         upper = object$profile_fit$upper,
+         at = function(j, z) .msr_profile_at(object, j, z))
   p <- nrow(object$scale_est)
   target <- object$optim_results$value + stats::qchisq(level, 1) / 2
   limits <- matrix(NA_real_, p, 2L)
   bounded <- matrix(FALSE, p, 2L)
   for (j in seq_len(p)) {
-    fn <- function(z) .msr_profile_at(object, j, z) - target
+    fn <- function(z) pf$at(j, z) - target
     for (side in 1:2) {
       bound <- if (side == 1L) pf$lower[j] else pf$upper[j]
       grid <- seq(pf$par[j], bound, length.out = 17L)

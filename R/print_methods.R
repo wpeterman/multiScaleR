@@ -265,8 +265,11 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #'   report. Its elements:
 #'   * `opt_scale`: data frame with one row per optimized covariate and columns
 #'     `Mean` (estimated sigma, map units), `SE`, `2.5%`, and `97.5%`. Its
-#'     `interval_method` attribute records `"wald"` or `"profile"` for each
-#'     row.
+#'     `interval_method` attribute records how each row's limits were found,
+#'     such as `"wald"`, `"log_wald"`, `"profile"`, or `"unavailable"`.
+#'     Profile limits that reach a search bound are labeled `"profile_bound"`
+#'     by the default refit backend and `"profile-bound-limited"` by the
+#'     analytic and joint mixed backends.
 #'   * `opt_shape`: the same table for the shape parameter under
 #'     `kernel = "expow"`, otherwise `NULL`.
 #'   * `opt_dist_1d`: distances in map units, with columns `Mean`, `2.5%`, and
@@ -316,7 +319,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #' # Profile-likelihood intervals
 #'
 #' The default refit backend caches profile results during the current R
-#' session; the analytic backends recompute them. Set
+#' session; the analytic and joint mixed backends recompute them. Set
 #' `options(multiScaleR.profile_cache_max_bytes = 64 * 1024^2)` to bound the
 #' retained cache entries (64 MiB by default), or set it to zero to disable
 #' caching and clear retained entries at the next profile request. Oversized
@@ -333,15 +336,18 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #' joint information on the log scale and are omitted when the
 #' identifiability checks fail (see [multiScaleR-fitting-methods]).
 #' `backend = "joint_mixed"` reports the same log-scale Wald limits from its
-#' joint Hessian, one scale at a time, but has no profile intervals. A returned
+#' joint Hessian, one scale at a time. A returned
 #' Wald interval describes the local curvature around the selected optimum
 #' and can extend beyond the searched scale range. Coverage can fall below the
 #' nominal level even for an interior fit, so inspect the likelihood over the
 #' admissible range when scale inference matters.
 #'
-#' With `profile = TRUE`, the analytic summary follows the connected
-#' likelihood region around the fitted scale, and an endpoint at a search
-#' bound is labeled bound-limited. For a supported one-scale NB2 fit,
+#' With `profile = TRUE`, the analytic and `"joint_mixed"` summaries follow
+#' the connected likelihood region around the fitted scale, and an endpoint
+#' at a search bound is labeled bound-limited. A `"joint_mixed"` profile
+#' refits the native `glmmTMB` model at each candidate sigma and reports
+#' limits for every scale, including one whose standard error is withheld
+#' (see [multiScaleR-fitting-methods]). For a supported one-scale NB2 fit,
 #' [scale_inference()] checks the full range and reports the regions it
 #' detects. If a full-range profile suggests a competing optimum, compare
 #' additional starts, including both bounds. The printed coefficient summary

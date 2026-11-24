@@ -77,6 +77,10 @@ test_that("mixed factor products retain all cold starts and native uncertainty b
   jm <- fit$diagnostics$joint_mixed
   expect_equal(fit$scale_est$SE, fit$scale_est$Mean * unname(jm$log_scale_se))
   expect_identical(is.na(fit$scale_est$SE), unname(jm$scale_se_reasons != "available"))
+  # Profile limits refit the native product and poly() formula.
+  prof <- summary(fit, profile = TRUE)$opt_scale
+  expect_true(all(attr(prof, "interval_method") %in% c("profile", "profile-bound-limited")))
+  expect_true(prof[1, "2.5%"] <= fit$scale_est$Mean && fit$scale_est$Mean <= prof[1, "97.5%"])
   expect_error(predict(fit, se.fit = TRUE), "conditional")
   expect_equal(predict(fit), predict(fit$opt_mod, type = "response"))
   expected <- predict(fit$opt_mod, type = "link", se.fit = TRUE)
@@ -118,6 +122,12 @@ test_that("weighted mixed products retain native predictions and fixed-input sna
   expect_equal(fit$scale_est$SE, fit$scale_est$Mean * unname(jm$log_scale_se))
   expect_identical(is.na(fit$scale_est$SE), unname(jm$scale_se_reasons != "available"))
   expect_error(predict(fit, se.fit = TRUE), "conditional")
+  # Profile limits refit the native model with the weighted surface SQ.
+  prof <- summary(fit, profile = TRUE)$opt_scale
+  expect_true(all(attr(prof, "interval_method") %in% c("profile", "profile-bound-limited")))
+  expect_true(prof[1, "2.5%"] <= fit$scale_est$Mean && fit$scale_est$Mean <= prof[1, "97.5%"])
+  ps <- profile_sigma(fit, n_pts = 3, verbose = FALSE)
+  expect_true(all(is.finite(ps$profiles$LL)))
 })
 
 test_that("expanded mixed designs keep target and additional-memory guards", {
