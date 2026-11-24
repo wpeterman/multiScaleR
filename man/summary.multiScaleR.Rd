@@ -98,7 +98,9 @@ memory used by the numerical profile.
 \section{Analytic backends}{
 For \code{backend = "profile_glm"} or \code{"joint_nb2"}, default scale limits use
 joint information on the log scale and are omitted when the
-identifiability checks fail (see \link{multiScaleR-fitting-methods}). A returned
+identifiability checks fail (see \link{multiScaleR-fitting-methods}).
+\code{backend = "joint_mixed"} reports the same log-scale Wald limits from its
+joint Hessian, one scale at a time, but has no profile intervals. A returned
 Wald interval describes the local curvature around the selected optimum
 and can extend beyond the searched scale range. Coverage can fall below the
 nominal level even for an interior fit, so inspect the likelihood over the

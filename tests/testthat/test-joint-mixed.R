@@ -20,7 +20,10 @@ test_that("joint mixed models retain native predictions and independent starts",
     expect_s3_class(fit$opt_mod, "glmmTMB")
     expect_s3_class(summary(fit), "summary_multiScaleR")
     expect_equal(fit$diagnostics$joint_mixed$eligible_starts, 3L)
-    expect_true(all(is.na(fit$scale_est$SE)))
+    # Scale SEs follow the per-scale sdreport rule; see test-joint-mixed-scale-se.R.
+    jm <- fit$diagnostics$joint_mixed
+    expect_equal(fit$scale_est$SE, fit$scale_est$Mean * unname(jm$log_scale_se))
+    expect_identical(is.na(fit$scale_est$SE), unname(jm$scale_se_reasons != "available"))
     expect_true(is.finite(kernel_dist(fit)[1, 1]))
     expect_error(summary(fit, profile = TRUE), "not validated")
     expect_error(profile_sigma(fit), "not validated")

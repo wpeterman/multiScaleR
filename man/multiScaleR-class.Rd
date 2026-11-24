@@ -87,8 +87,12 @@ uncertainty is not available.
 \item \code{mixed_fit} for \code{"joint_mixed"}: the kernel engine, log-scale estimates
 and bounds in internal distance units, the independent starts, every start
 outcome and warning, the selected start, and the variables prediction
-needs. \code{uncertainty$available} is \code{FALSE}, and \code{next_run} and
-\code{opt_context} are \code{NULL}.
+needs. \code{scale_est$SE} and the log-scale Wald limits in
+\code{profile_scale_est} come from the selected start's joint Hessian, one
+scale at a time. \code{uncertainty$available} is \code{FALSE} because coefficient
+and prediction uncertainty still condition on the scales. \code{next_run} and
+the \code{max_D} warning follow the analytic GLM backends, and \code{opt_context} is
+\code{NULL}.
 }
 
 \link{multiScaleR-fitting-methods} explains what each backend records and why

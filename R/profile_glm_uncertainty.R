@@ -191,7 +191,8 @@
 #'
 #' @param object A `multiScaleR` fit from `backend = "profile_glm"` or
 #'   `backend = "joint_nb2"`. A `backend = "joint_mixed"` fit returns only
-#'   native conditional covariance. Other backends raise an error. Use
+#'   native conditional covariance; its scale standard errors are in
+#'   `object$scale_est`. Other backends raise an error. Use
 #'   `vcov(object$opt_mod)` for their coefficient covariance conditional on the
 #'   selected scales.
 #' @param type `"joint"` (the default) or `"conditional"`.
@@ -284,7 +285,8 @@ vcov.multiScaleR <- function(object, type = c("joint", "conditional"), ...) {
   type <- match.arg(type)
   if (identical(object$backend, "joint_mixed")) {
     if (type != "conditional")
-      stop("joint_mixed scale covariance is unavailable; use type = 'conditional'.", call. = FALSE)
+      stop("Joint covariance is unavailable for joint_mixed. Scale SEs are in ",
+           "object$scale_est; use type = 'conditional' for coefficient covariance.", call. = FALSE)
     return(stats::vcov(object$opt_mod, ...))
   }
   if (!.msr_analytic_backend(object))

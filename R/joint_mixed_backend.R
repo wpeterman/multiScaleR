@@ -76,13 +76,19 @@
   kp <- best$log_scale
   kd <- .msr_eval_kernel_engine(engine, kp)
   scale <- exp(kp) * inputs$unit_conv
+  # Scale SEs come from the selected start's joint sdreport, one scale at a
+  # time (see .msr_mixed_scale_se()). The legacy natural-unit Hessian slots
+  # stay missing, and coefficient covariance still conditions on the scales.
+  scale_info <- .msr_mixed_scale_se(best$joint_sdreport, kp, bounds$lower,
+    bounds$upper, fits$outcomes, covs)
   missing_hessian <- matrix(NA_real_, length(kp), length(kp))
   # Keep only modeled raw columns, with fitted kernel values, so transformed
   # effect curves do not depend on a cold refit's temporary data environment.
   prediction_data <- dat[, required, drop = FALSE]
   for (nm in covs) prediction_data[[nm]] <- kd$value[, nm]
   out <- list(backend = "joint_mixed",
-    scale_est = data.frame(Mean = scale, SE = NA_real_, row.names = covs), shape_est = NULL,
+    scale_est = data.frame(Mean = scale, SE = scale * unname(scale_info$log_se),
+      row.names = covs), shape_est = NULL,
     optim_results = list(par = exp(kp), par_unscale = scale, value = best$objective,
       convergence = best$optim$convergence, message = best$optim$message,
       hessian = missing_hessian, hessian_unscale = missing_hessian),
@@ -94,18 +100,36 @@
       starts = bounds$starts,
       lower = bounds$lower, upper = bounds$upper, start_results = fits$outcomes,
       selected = fits$selected, required = setdiff(required, c(all.vars(stats::formula(model)[[2L]]), covs))),
-    uncertainty = list(available = FALSE, reasons = "Mixed-model scale uncertainty is not calibrated."),
+    # `available` refers to joint coefficient and prediction uncertainty,
+    # which this backend does not provide. Scale SEs are reported separately.
+    uncertainty = list(available = FALSE,
+      reasons = "Coefficient and prediction uncertainty condition on the selected scales."),
     diagnostics = .empty_diagnostics(), next_run = NULL, warn_message = 0, call = call)
   class(out) <- "multiScaleR"
   out <- .msr_attach_fixed_reference(out)
-  out$diagnostics$joint_mixed <- list(triggered = TRUE, uncertainty_available = FALSE,
+  # Log-scale Wald limits from the reported per-scale SEs, as for the analytic
+  # GLM backends, so print(), summary() and kernel_dist() agree.
+  out$profile_scale_est <- .msr_profile_wald_table(out)
+  # `triggered` flags a withheld scale SE, so next_run names it as a check to
+  # address.
+  out$diagnostics$joint_mixed <- list(
+    triggered = !identical(scale_info$status, "available"), uncertainty_available = FALSE,
     reasons = out$uncertainty$reasons, attempted_starts = length(fits$outcomes),
     eligible_starts = sum(vapply(fits$outcomes, function(x) x$eligible, TRUE)),
-    boundary = any(kp - bounds$lower < 1e-5 | bounds$upper - kp < 1e-5))
-  # Scale intervals are deliberately unavailable; do not run an interval-based
-  # search-extent recommendation on missing uncertainty estimates.
+    boundary = any(scale_info$at_bound),
+    scale_se_status = scale_info$status, pd_hessian = scale_info$pd_hessian,
+    log_scale_se = scale_info$log_se, scale_se_reasons = scale_info$reasons,
+    scale_se_conditional_on = scale_info$conditional_on)
+  # Search-extent check and follow-up starts, as for the analytic GLM
+  # backends. Both use the point estimates only, not the scale intervals.
+  out$diagnostics$max_distance <- .max_distance_diagnostic(
+    kernel_dist(out, dimension = "1d"), inputs$max_D)
+  if (isTRUE(out$diagnostics$max_distance$triggered)) out$warn_message <- 1L
+  out$next_run <- .next_run_recommendation(out$scale_est, NULL, inputs$max_D, out$diagnostics)
   if (verbose) message("Joint mixed fit: ", out$diagnostics$joint_mixed$eligible_starts,
-    "/", length(fits$outcomes), " starts passed. Scale uncertainty is unavailable.")
+    "/", length(fits$outcomes), " starts passed. Scale SEs reported for ",
+    sum(is.finite(scale_info$log_se)), " of ", length(kp),
+    " scales; coefficient uncertainty conditions on the scales.")
   out
 }
 

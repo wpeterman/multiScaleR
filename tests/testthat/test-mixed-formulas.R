@@ -73,7 +73,10 @@ test_that("mixed factor products retain all cold starts and native uncertainty b
   expect_gte(length(eligible), 1)
   expect_true(all(vapply(eligible, function(x) x$native_delta < 1e-5 &&
     x$design_unchanged && isTRUE(x$joint_sdreport$pdHess), logical(1))))
-  expect_true(all(is.na(fit$scale_est$SE)))
+  # Scale SEs follow the per-scale sdreport rule; coefficients stay conditional.
+  jm <- fit$diagnostics$joint_mixed
+  expect_equal(fit$scale_est$SE, fit$scale_est$Mean * unname(jm$log_scale_se))
+  expect_identical(is.na(fit$scale_est$SE), unname(jm$scale_se_reasons != "available"))
   expect_error(predict(fit, se.fit = TRUE), "conditional")
   expect_equal(predict(fit), predict(fit$opt_mod, type = "response"))
   expected <- predict(fit$opt_mod, type = "link", se.fit = TRUE)
@@ -111,7 +114,9 @@ test_that("weighted mixed products retain native predictions and fixed-input sna
   expect_equal(predict(prepare_prediction(fit)), predict(fit))
   ids <- c(20, 1, 19)
   expect_equal(unname(predict(fit, f$data[ids, ], f$inputs)), unname(predict(fit)[ids]), tolerance = 1e-10)
-  expect_true(all(is.na(fit$scale_est$SE)))
+  jm <- fit$diagnostics$joint_mixed
+  expect_equal(fit$scale_est$SE, fit$scale_est$Mean * unname(jm$log_scale_se))
+  expect_identical(is.na(fit$scale_est$SE), unname(jm$scale_se_reasons != "available"))
   expect_error(predict(fit, se.fit = TRUE), "conditional")
 })
 

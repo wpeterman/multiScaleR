@@ -32,6 +32,19 @@ multiScaleR (development version)
   bound, its log-scale SE exceeds one, or competing starts move it. Joint
   prediction uncertainty is still all or nothing.
 
+* `joint_mixed` fits now report a Wald standard error and log-scale Wald
+  limits for each kernel scale, from the joint Hessian of the selected start.
+  Before, every scale SE was `NA`. A scale loses its SE under the same
+  per-scale checks as `profile_glm`, and every scale SE is withheld when the
+  Hessian is not positive definite. `diagnostics(fit)$joint_mixed` gives the
+  reason for each scale. In a simulation, 95% intervals held the true sigma in
+  77% to 97% of interior fits, so treat them with caution. Coefficient and
+  prediction uncertainty still condition on the selected scales.
+  `joint_mixed` fits also now warn when an estimate approaches `max_D` and
+  fill `next_run`, as the analytic GLM backends do, and
+  `diagnostics(fit)$joint_mixed$triggered` is `TRUE` only when a scale SE is
+  withheld.
+
 * Kernel-weighted surface metrics (`surface_var(weighted = TRUE)` with
   `"sq"`, `"ssk"`, or `"sku"`) are now distance-binned when `kernel_prep()`
   uses `bin = TRUE`, the default, as kernel means are. Each cell's centered

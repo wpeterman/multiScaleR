@@ -158,13 +158,18 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
       cat("Some profile limits reach search bounds; those limits are not fully resolved.\n")
   } else if (!is.null(scale_ci_method) && any(scale_ci_method == "log_wald")) {
     cat("\nScale confidence limits use joint observed information on the log scale.\n")
-    if (any(scale_ci_method == "unavailable"))
-      cat("Scale SEs failing their own checks are withheld; see diagnostics(x)$profile_glm.\n")
-    bounded <- x$diagnostics$profile_glm$scale_se_conditional_on
-    if (length(bounded))
-      cat("Other scale SEs hold ", paste(bounded, collapse = ", "),
-          " fixed at the search bound.\n", sep = "")
+    # joint_mixed reports withheld scales below, even when none has a limit.
+    if (!identical(x$backend, "joint_mixed")) {
+      if (any(scale_ci_method == "unavailable"))
+        cat("Scale SEs failing their own checks are withheld; see diagnostics(x)$profile_glm.\n")
+      bounded <- x$diagnostics$profile_glm$scale_se_conditional_on
+      if (length(bounded))
+        cat("Other scale SEs hold ", paste(bounded, collapse = ", "),
+            " fixed at the search bound.\n", sep = "")
+    }
   }
+  if (identical(x$backend, "joint_mixed"))
+    .msr_print_mixed_scale_se(x$diagnostics$joint_mixed)
   cat("\n\n  ==================================== ")
 
   if(!is.null(x$opt_shape)){
@@ -322,7 +327,9 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #'
 #' For `backend = "profile_glm"` or `"joint_nb2"`, default scale limits use
 #' joint information on the log scale and are omitted when the
-#' identifiability checks fail (see [multiScaleR-fitting-methods]). A returned
+#' identifiability checks fail (see [multiScaleR-fitting-methods]).
+#' `backend = "joint_mixed"` reports the same log-scale Wald limits from its
+#' joint Hessian, one scale at a time, but has no profile intervals. A returned
 #' Wald interval describes the local curvature around the selected optimum
 #' and can extend beyond the searched scale range. Coverage can fall below the
 #' nominal level even for an interior fit, so inspect the likelihood over the
@@ -517,6 +524,7 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
   cat("\n\n***** Optimized Scale of Effect *****\n\n")
   print(display_scale)
   .msr_print_refit_bounds(display_fit$diagnostics)
+  .msr_print_mixed_scale_se(x$diagnostics$joint_mixed)
   if (length(hard_radius)) {
     cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ". ", sep = "")
     if (identical(x$backend, "conditional_logit")) {
@@ -649,6 +657,22 @@ print.multiScaleR_data <- function(x, ...){
   if (isTRUE(stall$triggered)) {
     cat(red("\n WARNING!!!\n", stall$message, "\n\n"))
   }
+  invisible(NULL)
+}
+
+# joint_mixed scale SEs: name any withheld scale and its reason. Fits saved
+# before per-scale SEs existed have no `scale_se_reasons` and print nothing.
+.msr_print_mixed_scale_se <- function(jm) {
+  reasons <- jm$scale_se_reasons
+  if (is.null(reasons)) return(invisible(NULL))
+  withheld <- reasons[!is.na(reasons) & reasons != "available"]
+  if (length(withheld))
+    cat("\nScale SE withheld for ", paste0(names(withheld), " (", withheld, ")",
+        collapse = ", "), ". See diagnostics(x)$joint_mixed.\n", sep = "")
+  if (length(jm$scale_se_conditional_on))
+    cat("Other scale SEs hold ", paste(jm$scale_se_conditional_on, collapse = ", "),
+        " fixed at the search bound.\n", sep = "")
+  cat("Coefficient and prediction uncertainty condition on the selected scales.\n")
   invisible(NULL)
 }
 

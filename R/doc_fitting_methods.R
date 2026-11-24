@@ -19,7 +19,7 @@
 #' | `"refit"` (default) | Any model that `stats::update()`, the `unmarked` equivalent, or a `refit_fn` can refit | Kernel scales and shapes. The model's own parameters are refit at every candidate | Hessian (Wald) standard errors for smooth kernels. Profile likelihood with `summary(fit, profile = TRUE)` |
 #' | `"profile_glm"` | Gaussian identity, Poisson log, and binomial logit `glm()` fits, and NB2 log-link fits | Kernel scales and NB2 theta. Coefficients are solved at every candidate | Joint Wald limits when the checks below pass |
 #' | `"joint_nb2"` | NB2 log-link fits, including the exact Poisson boundary | Kernel scales, coefficients, and dispersion | Joint Wald limits when the checks pass. None at the Poisson boundary |
-#' | `"joint_mixed"` | Poisson and NB2 `glmmTMB` fits with one random intercept | Kernel scales and all model parameters, with the random intercept integrated out | None. Coefficient uncertainty is conditional on the scales |
+#' | `"joint_mixed"` | Poisson and NB2 `glmmTMB` fits with one random intercept | Kernel scales and all model parameters, with the random intercept integrated out | Wald limits for each scale that passes its checks. Coefficient uncertainty is conditional on the scales |
 #' | `"conditional_logit"` | Step-selection models from `survival::clogit()` or `amt::fit_clogit()` | Smooth kernel scales and conditional-logistic coefficients | None. Coefficient uncertainty is conditional on the scales |
 #'
 #' A *conditional* standard error treats the estimated scales as known. A
@@ -326,10 +326,34 @@
 #' records the log scales, bounds, starts, every outcome, and the selected
 #' start. Narrow raw prediction data keep fixed-transform inputs for effect
 #' curves once the temporary refit data are gone. `diagnostics(fit)$joint_mixed`
-#' reports eligibility and scale-boundary flags. Scale uncertainty has not been
-#' calibrated: scale standard errors and legacy scale Hessians are `NA`, and
-#' joint intervals are unavailable. Coefficient and prediction covariance
-#' condition on the selected scales. Use
+#' reports eligibility and scale-boundary flags. As with the analytic GLM
+#' backends, an estimate whose distance approaches `max_D` records the
+#' `max_distance` diagnostic and warning code, and `fit$next_run` suggests a
+#' follow-up `max_D` and starts.
+#'
+#' Scale standard errors come from the joint Hessian of the selected start,
+#' which TMB computes for the Laplace-approximated likelihood with every model
+#' parameter free. `fit$scale_est$SE` is sigma times the standard error of
+#' log(sigma), and `summary(fit)` reports Wald limits on the log scale, as for
+#' `"profile_glm"`. The checks match that backend, one scale at a time. A scale
+#' within `1e-5` of a search bound on the log scale loses its standard error,
+#' and the other scales hold it fixed at its bound. A scale also loses its
+#' standard error when its log-scale standard error exceeds one, or when
+#' another start within the 95 percent likelihood threshold moves it by more
+#' than 0.5 log units. A Hessian that is not positive definite, or unusable
+#' covariance, withholds every scale standard error.
+#' `diagnostics(fit)$joint_mixed` gives the status, the reason for each scale,
+#' and the bounded scales held fixed. Legacy scale Hessians stay `NA`, and
+#' profile intervals are not available for this backend.
+#'
+#' Treat these limits with caution. In a simulation with one Gaussian kernel
+#' mean and 200 points in 40 sites, 95 percent Wald intervals held the true
+#' sigma in 77 percent to 97 percent of interior fits, depending on the scale
+#' and response family. They fell short where the likelihood was sharply
+#' peaked near the estimate but stayed close to its maximum over a wider range
+#' of scales. The
+#' limits describe local curvature only, and coefficient and prediction
+#' covariance still condition on the selected scales. Use
 #' `predict(fit, se.fit = TRUE, uncertainty = "conditional")` or
 #' `predict(fit$opt_mod, ...)`. This backend does not extend the
 #' single-predictor NB2 contract of [scale_inference()].

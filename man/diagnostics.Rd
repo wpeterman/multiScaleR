@@ -96,6 +96,19 @@ A named list with the following elements:
     \code{poisson_limit} marks negligible fitted NB2 extra variance; \code{poisson_compatible} and \code{poisson_deviance} compare
     the NB2 fit with a Poisson fit at the selected kernel scales. See
     \code{\link{multiScale_optim}} for thresholds and limitations.}
+  \item{\code{joint_mixed}}{Present for \code{backend = "joint_mixed"}.
+    \code{triggered} is \code{TRUE} when any scale SE is withheld.
+    Includes attempted and eligible start counts and a \code{boundary} flag.
+    \code{scale_se_status} is \code{"available"}, \code{"partial"},
+    \code{"withheld"}, or the reason every scale SE is missing, such as
+    \code{"hessian_not_positive_definite"} or \code{"all_scales_at_bound"}.
+    \code{pd_hessian} records whether the selected start's joint Hessian was
+    positive definite. \code{log_scale_se} holds the reported log-scale
+    SEs, \code{scale_se_reasons} gives \code{"available"} or the reason for
+    each scale, and \code{scale_se_conditional_on} names scales at a search
+    bound that the other SEs hold fixed. \code{uncertainty_available} is
+    \code{FALSE} because coefficient and prediction uncertainty condition on
+    the selected scales.}
 }
 }
 \description{

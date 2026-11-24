@@ -25,8 +25,10 @@ scale_ci_table <- function(object,
 
   if (identical(object$backend, "joint_mixed")) {
     if (isTRUE(profile)) stop("Scale profiling is not validated for joint_mixed.", call. = FALSE)
-    tab <- ci_func(object$scale_est, df = df, min_D = min_D, names = names)
-    attr(tab, "interval_method") <- stats::setNames(rep("unavailable", nrow(tab)), rownames(tab))
+    # Log-scale Wald limits from the per-scale SEs of the joint sdreport.
+    # Fits saved before those SEs existed carry NA SEs and so NA limits.
+    tab <- .msr_profile_wald_table(object)
+    attr(tab, "interval_method") <- stats::setNames(attr(tab, "interval_method"), rownames(tab))
     return(tab)
   }
 

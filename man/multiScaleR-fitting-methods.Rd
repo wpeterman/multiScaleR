@@ -20,7 +20,7 @@ them on one data set.
    \code{"refit"} (default) \tab Any model that \code{stats::update()}, the \code{unmarked} equivalent, or a \code{refit_fn} can refit \tab Kernel scales and shapes. The model's own parameters are refit at every candidate \tab Hessian (Wald) standard errors for smooth kernels. Profile likelihood with \code{summary(fit, profile = TRUE)} \cr
    \code{"profile_glm"} \tab Gaussian identity, Poisson log, and binomial logit \code{glm()} fits, and NB2 log-link fits \tab Kernel scales and NB2 theta. Coefficients are solved at every candidate \tab Joint Wald limits when the checks below pass \cr
    \code{"joint_nb2"} \tab NB2 log-link fits, including the exact Poisson boundary \tab Kernel scales, coefficients, and dispersion \tab Joint Wald limits when the checks pass. None at the Poisson boundary \cr
-   \code{"joint_mixed"} \tab Poisson and NB2 \code{glmmTMB} fits with one random intercept \tab Kernel scales and all model parameters, with the random intercept integrated out \tab None. Coefficient uncertainty is conditional on the scales \cr
+   \code{"joint_mixed"} \tab Poisson and NB2 \code{glmmTMB} fits with one random intercept \tab Kernel scales and all model parameters, with the random intercept integrated out \tab Wald limits for each scale that passes its checks. Coefficient uncertainty is conditional on the scales \cr
    \code{"conditional_logit"} \tab Step-selection models from \code{survival::clogit()} or \code{amt::fit_clogit()} \tab Smooth kernel scales and conditional-logistic coefficients \tab None. Coefficient uncertainty is conditional on the scales \cr
 }
 
@@ -339,10 +339,34 @@ The result's \code{opt_mod} is the final native \code{glmmTMB} fit, and \code{mi
 records the log scales, bounds, starts, every outcome, and the selected
 start. Narrow raw prediction data keep fixed-transform inputs for effect
 curves once the temporary refit data are gone. \code{diagnostics(fit)$joint_mixed}
-reports eligibility and scale-boundary flags. Scale uncertainty has not been
-calibrated: scale standard errors and legacy scale Hessians are \code{NA}, and
-joint intervals are unavailable. Coefficient and prediction covariance
-condition on the selected scales. Use
+reports eligibility and scale-boundary flags. As with the analytic GLM
+backends, an estimate whose distance approaches \code{max_D} records the
+\code{max_distance} diagnostic and warning code, and \code{fit$next_run} suggests a
+follow-up \code{max_D} and starts.
+
+Scale standard errors come from the joint Hessian of the selected start,
+which TMB computes for the Laplace-approximated likelihood with every model
+parameter free. \code{fit$scale_est$SE} is sigma times the standard error of
+log(sigma), and \code{summary(fit)} reports Wald limits on the log scale, as for
+\code{"profile_glm"}. The checks match that backend, one scale at a time. A scale
+within \code{1e-5} of a search bound on the log scale loses its standard error,
+and the other scales hold it fixed at its bound. A scale also loses its
+standard error when its log-scale standard error exceeds one, or when
+another start within the 95 percent likelihood threshold moves it by more
+than 0.5 log units. A Hessian that is not positive definite, or unusable
+covariance, withholds every scale standard error.
+\code{diagnostics(fit)$joint_mixed} gives the status, the reason for each scale,
+and the bounded scales held fixed. Legacy scale Hessians stay \code{NA}, and
+profile intervals are not available for this backend.
+
+Treat these limits with caution. In a simulation with one Gaussian kernel
+mean and 200 points in 40 sites, 95 percent Wald intervals held the true
+sigma in 77 percent to 97 percent of interior fits, depending on the scale
+and response family. They fell short where the likelihood was sharply
+peaked near the estimate but stayed close to its maximum over a wider range
+of scales. The
+limits describe local curvature only, and coefficient and prediction
+covariance still condition on the selected scales. Use
 \code{predict(fit, se.fit = TRUE, uncertainty = "conditional")} or
 \code{predict(fit$opt_mod, ...)}. This backend does not extend the
 single-predictor NB2 contract of \code{\link[=scale_inference]{scale_inference()}}.

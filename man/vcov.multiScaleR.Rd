@@ -9,7 +9,8 @@
 \arguments{
 \item{object}{A \code{multiScaleR} fit from \code{backend = "profile_glm"} or
 \code{backend = "joint_nb2"}. A \code{backend = "joint_mixed"} fit returns only
-native conditional covariance. Other backends raise an error. Use
+native conditional covariance; its scale standard errors are in
+\code{object$scale_est}. Other backends raise an error. Use
 \code{vcov(object$opt_mod)} for their coefficient covariance conditional on the
 selected scales.}
 
