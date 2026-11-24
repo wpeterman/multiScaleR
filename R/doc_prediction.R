@@ -107,7 +107,7 @@
 #'
 #' | Fitting route | Joint uncertainty | Conditional uncertainty |
 #' |:--------------|:------------------|:------------------------|
-#' | `backend = "profile_glm"` or `"joint_nb2"` | Yes, from `predict()` at points and from `vcov()`, when `fit$uncertainty$available` is `TRUE` | Yes, at points and on rasters |
+#' | `backend = "profile_glm"` or `"joint_nb2"` | Yes, from `predict()` at points and from `vcov()`, when `fit$uncertainty$available` is `TRUE`, or when `fit$uncertainty$joint_conditional_on` names scales held fixed at a search bound | Yes, at points and on rasters |
 #' | `backend = "conditional_logit"` | No | Yes |
 #' | `backend = "joint_mixed"` | No | Yes, from native glmmTMB |
 #' | Default `backend = "refit"` | No | Yes, from the native provider |
@@ -119,7 +119,11 @@
 #' returning a conditional one. For the analytic backends, joint uncertainty
 #' is refused when the fit sits at a parameter bound or fails its
 #' identifiability checks. `fit$uncertainty$reasons` says why. Point
-#' predictions remain available in that case. At the exact Poisson boundary
+#' predictions remain available in that case. The one exception is a fit
+#' whose only failed check is a kernel parameter at a search bound. Its joint uncertainty holds that parameter fixed at the bound
+#' and lets the other parameters vary, so it sits between conditional and
+#' fully joint uncertainty. Report it as conditional on the bounded scale, and
+#' consider widening the search. At the exact Poisson boundary
 #' of a `"joint_nb2"` fit, conditional standard errors and intervals also hold
 #' the dispersion at that boundary.
 #'

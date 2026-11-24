@@ -271,6 +271,19 @@ bound does not establish a finite dispersion maximum. The marginal
 covariance and Hessian are missing whenever joint uncertainty is
 unavailable.
 
+A kernel parameter at a search bound does not withhold
+joint uncertainty when every other rule passes for the remaining
+parameters. Joint covariance and joint prediction uncertainty then hold the
+bounded kernel parameters fixed at their bounds. They come from the observed
+information with those parameters removed, which must be positive and well
+conditioned, with every remaining log-kernel standard error at most one.
+Competing modes, a dispersion bound, a Poisson-compatible NB2 fit, or every
+kernel parameter at a bound still withholds them. \code{vcov(fit)} returns zero
+rows and columns for the held parameters, the marginal Hessian is missing
+for them, and \code{diagnostics(fit)$profile_glm$joint_conditional_on} names
+them. \code{uncertainty_available} stays \code{FALSE}. The rule is the same for
+\code{"profile_glm"} and \code{"joint_nb2"}.
+
 The scale table applies the kernel-specific rules one parameter at a time.
 A kernel parameter loses its standard error and Wald limits only when it sits
 at a search bound, its own log-scale standard error exceeds one, or competing

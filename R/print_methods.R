@@ -192,7 +192,11 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
   if (.msr_analytic_backend(x)) {
     cat("Coefficient summary below is conditional on fitted kernel parameters.\n")
     cat("Use vcov(fit) and predict(fit, se.fit = TRUE) for joint uncertainty.\n")
-    if (length(x$diagnostics$profile_glm$reasons))
+    held <- x$diagnostics$profile_glm$joint_conditional_on
+    if (length(held))
+      cat("Joint Wald uncertainty holds ", paste(held, collapse = ", "),
+          " fixed at the search bound.\n", sep = "")
+    else if (length(x$diagnostics$profile_glm$reasons))
       cat("Joint Wald uncertainty unavailable: ",
           paste(x$diagnostics$profile_glm$reasons, collapse = "; "), ".\n", sep = "")
   }
@@ -557,7 +561,11 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
   cat("\n\n ***** Fitted Model *****\n")
   if (.msr_analytic_backend(x)) {
     cat("Conditional GLM at the optimized kernel parameters.\n")
-    if (length(x$uncertainty$reasons))
+    held <- if (isTRUE(x$uncertainty$available)) NULL else x$uncertainty$joint_conditional_on
+    if (length(held))
+      cat("Joint Wald uncertainty holds ", paste(held, collapse = ", "),
+          " fixed at the search bound.\n", sep = "")
+    else if (length(x$uncertainty$reasons))
       cat("Joint Wald uncertainty unavailable: ",
           paste(x$uncertainty$reasons, collapse = "; "), ".\n", sep = "")
   }

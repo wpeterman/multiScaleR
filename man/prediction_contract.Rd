@@ -54,8 +54,10 @@ marked as unrecorded rather than inferred.
 whether observation noise is included (\code{observation_noise}), what the
 intervals mean, what is omitted (\code{omitted}), and \code{calibration}, which is
 always \code{"not_established"}. Analytic snapshots also record whether joint
-covariance was available at preparation (\code{joint_available}). This does
-not bypass the covariance checks in \code{\link[=predict.multiScaleR]{predict.multiScaleR()}}.
+covariance was available at preparation (\code{joint_available}), and
+\code{joint_conditional_on} names any kernel parameters at a search bound that
+it holds fixed. This does not bypass the covariance checks in
+\code{\link[=predict.multiScaleR]{predict.multiScaleR()}}.
 \item \code{original_coordinates}, \code{joint_parameter_map_complete}: the parameter
 representation used by the adapter. For Bayesian predictions,
 completeness checks the stored block dimensions against the original

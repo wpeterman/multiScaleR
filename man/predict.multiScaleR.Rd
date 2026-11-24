@@ -106,7 +106,9 @@ of predictions on the scale of \code{type}, named by row ID.
 a list with \code{fit} (the predictions), \code{se.fit} (standard errors on the
 scale of \code{type}), \code{type}, and \code{uncertainty} (\code{"joint"} or
 \code{"conditional"}). Confidence intervals add \code{lower} and \code{upper}, on the
-scale of \code{type}, and \code{level}.
+scale of \code{type}, and \code{level}. Joint uncertainty from a fit with kernel
+parameters at a search bound adds \code{conditional_on}, which names the
+parameters held fixed.
 \item \strong{\code{"conditional_logit"}:} a named numeric vector, or with
 \code{se.fit = TRUE} a list with \code{fit}, \code{se.fit}, \code{type}, and
 \code{uncertainty = "conditional"}.
@@ -206,7 +208,15 @@ error. Binomial response predictions are probabilities.
 
 Joint uncertainty is refused for fits at a parameter bound or with weak
 identifiability. \code{fit$uncertainty$reasons} says why, and point predictions
-and conditional uncertainty remain available. At the exact Poisson
+and conditional uncertainty remain available. Kernel parameters at a
+search bound do not block joint uncertainty when they are the only failed
+check. Joint standard errors and limits then hold those
+parameters fixed at their bounds and let the other kernel parameters vary.
+The result names them in \code{conditional_on}, and
+\code{fit$uncertainty$joint_conditional_on} records them. These limits are
+narrower than limits that also let the bounded scale vary, and the true
+scale may lie beyond the bound. Widen the search, for example with a larger
+\code{max_D} in \code{\link[=kernel_prep]{kernel_prep()}}, before you rely on them. At the exact Poisson
 boundary of a \code{"joint_nb2"} fit, point predictions and explicitly
 conditional intervals hold both the scales and the Poisson dispersion
 boundary fixed. Use \code{\link[=vcov.multiScaleR]{vcov.multiScaleR()}} for the covariance matrices.

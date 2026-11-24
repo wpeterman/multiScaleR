@@ -51,8 +51,10 @@
 #'   whether observation noise is included (`observation_noise`), what the
 #'   intervals mean, what is omitted (`omitted`), and `calibration`, which is
 #'   always `"not_established"`. Analytic snapshots also record whether joint
-#'   covariance was available at preparation (`joint_available`). This does
-#'   not bypass the covariance checks in [predict.multiScaleR()].
+#'   covariance was available at preparation (`joint_available`), and
+#'   `joint_conditional_on` names any kernel parameters at a search bound that
+#'   it holds fixed. This does not bypass the covariance checks in
+#'   [predict.multiScaleR()].
 #' * `original_coordinates`, `joint_parameter_map_complete`: the parameter
 #'   representation used by the adapter. For Bayesian predictions,
 #'   completeness checks the stored block dimensions against the original
@@ -309,7 +311,11 @@ NULL
     out$component <- "relative_selection_score"
     out$uncertainty$risk_standard_errors <- "delta_method_risk_times_link_SE"
   }
-  out$uncertainty$joint_available <- !conditional && isTRUE(object$uncertainty$available)
+  u <- object$uncertainty
+  held <- !isTRUE(u$available) && isTRUE(u$joint_available) && length(u$joint_conditional_on) > 0L
+  out$uncertainty$joint_available <- !conditional && (isTRUE(u$available) || held)
+  # Record bounded kernel parameters that joint uncertainty holds fixed.
+  if (!conditional && held) out$uncertainty$joint_conditional_on <- u$joint_conditional_on
   out
 }
 

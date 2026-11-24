@@ -74,7 +74,10 @@
 #'   estimates, the starts and their convergence scores, the profile and joint
 #'   information matrices, identifiability diagnostics, and NB2 theta.
 #'   `uncertainty$available` says whether joint uncertainty passed its checks,
-#'   and `uncertainty$reasons` says why not. `opt_mod` and its coefficient
+#'   and `uncertainty$reasons` says why not.
+#'   `uncertainty$joint_available` is also `TRUE` when joint uncertainty holds
+#'   bounded kernel parameters fixed, and `uncertainty$joint_conditional_on`
+#'   names them. `opt_mod` and its coefficient
 #'   summary condition on the estimated kernel parameters. Use
 #'   [vcov.multiScaleR()] and [predict.multiScaleR()] for joint uncertainty.
 #' * `profile_fit` and `uncertainty` for `"conditional_logit"`, which keep

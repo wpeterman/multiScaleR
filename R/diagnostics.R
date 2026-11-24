@@ -86,6 +86,11 @@
 #'     log-kernel standard errors, competing-mode flags, and attempted/eligible
 #'     start counts. \code{scale_se_conditional_on} names kernel parameters at
 #'     a search bound that the reported scale SEs hold fixed.
+#'     \code{joint_conditional_on} names the bounded kernel parameters that
+#'     joint covariance and joint prediction uncertainty hold fixed. When it
+#'     is not empty, \code{vcov()} and
+#'     \code{predict(uncertainty = "joint")} are available even though
+#'     \code{uncertainty_available} is \code{FALSE}.
 #'     \code{poisson_limit} marks negligible fitted NB2 extra variance; \code{poisson_compatible} and \code{poisson_deviance} compare
 #'     the NB2 fit with a Poisson fit at the selected kernel scales. See
 #'     \code{\link{multiScale_optim}} for thresholds and limitations.}

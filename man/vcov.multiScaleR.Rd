@@ -70,6 +70,20 @@ Joint covariance is unavailable for fits at a parameter bound or when the
 identifiability checks fail. In that case \code{type = "joint"} raises an error
 that lists \code{object$uncertainty$reasons}, rather than reporting a misleading
 Wald result. The conditional matrix remains available.
+
+One exception applies to both backends. When kernel parameters
+at a search bound are the only failed check, the joint matrix holds those
+parameters fixed at their bounds. Their rows and columns are zero, and the
+other rows and columns come from the observed information with the bounded
+parameters removed. That reduced information must pass the remaining
+checks. The matrix then carries a \code{conditional_on} attribute that names the
+bounded parameters, as does \code{object$uncertainty$joint_conditional_on}. A
+zero there means the parameter was held fixed, not that it is known
+exactly, and its standard error is missing in \code{object$scale_est}. The other
+standard errors are no wider than they would be if the bounded scale were
+free to vary, so treat them as conditional on that scale. A dispersion
+bound, every kernel parameter at a bound, or any other failed check still
+withholds joint covariance.
 }
 
 \section{Read the conditional matrix}{

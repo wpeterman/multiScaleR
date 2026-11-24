@@ -193,6 +193,7 @@ test_that("bound refits retain native covariance, penalties, profiles and predic
 
 test_that("one scale at a bound keeps SEs for the other scales in real fits", {
   skip_on_cran()
+  skip_if_not_installed("MASS")
   # land2 has a true sigma of 500 m, so a 400 m search extent pins it at the
   # upper bound while land1 (true sigma 250 m) stays interior.
   data("landscape_counts", package = "multiScaleR", envir = environment())
@@ -221,7 +222,8 @@ test_that("one scale at a bound keeps SEs for the other scales in real fits", {
 
   # profile_glm applies the same rule from joint observed information.
   expect_warning(analytic <- multiScale_optim(model, inputs, backend = "profile_glm",
-    n_cores = 1L, verbose = FALSE), "Scale SEs are withheld for: land2")
+    n_cores = 1L, verbose = FALSE),
+    "holds sigma:land2 fixed at the search bound. Scale SEs are withheld for: land2")
   expect_false(analytic$uncertainty$available)
   expect_true(is.na(analytic$scale_est["land2", "SE"]))
   expect_equal(analytic$scale_est["land1", "SE"], fit$scale_est["land1", "SE"],
@@ -231,6 +233,158 @@ test_that("one scale at a bound keeps SEs for the other scales in real fits", {
   expect_identical(unname(attr(tab, "interval_method")), c("log_wald", "unavailable"))
   expect_true(any(grepl("hold sigma:land2 fixed", capture.output(print(summary(analytic))),
                         fixed = TRUE)))
-  # Joint covariance and joint prediction uncertainty stay withheld.
-  expect_error(predict(analytic, se.fit = TRUE), "Joint Wald uncertainty unavailable")
+
+  # Joint covariance and joint prediction uncertainty hold land2 fixed at the
+  # bound and let land1 and the coefficients vary.
+  u <- analytic$uncertainty
+  expect_true(u$joint_available)
+  expect_identical(u$joint_conditional_on, "sigma:land2")
+  expect_identical(analytic$diagnostics$profile_glm$joint_conditional_on, "sigma:land2")
+  V <- vcov(analytic)
+  expect_identical(attr(V, "conditional_on"), "sigma:land2")
+  held <- "log_scale:land2"
+  free <- setdiff(rownames(V), held)
+  expect_true(all(V[held, ] == 0) && all(V[, held] == 0))
+  # The free block is the inverse of the observed information without land2,
+  # the same block that gives land1's reported SE.
+  expect_equal(unclass(V)[free, free], solve(u$hessian[free, free]), tolerance = 1e-10)
+  expect_equal(sqrt(V["log_scale:land1", "log_scale:land1"]) * analytic$scale_est["land1", "Mean"],
+               analytic$scale_est["land1", "SE"])
+  # The legacy Hessian slot inverts only the free block; profile_fit keeps the
+  # matching rows of the conditional covariance.
+  expect_true(all(is.na(analytic$optim_results$hessian[2, ])))
+  expect_true(all(is.na(analytic$optim_results$hessian[, 2])))
+  expect_equal(analytic$optim_results$hessian[1, 1],
+               1 / (V[1, 1] * exp(2 * analytic$profile_fit$par[1])))
+  expect_equal(unname(analytic$profile_fit$vcov), unname(unclass(V)[1:2, 1:2]))
+
+  joint <- predict(analytic, type = "link", interval = "confidence")
+  conditional <- predict(analytic, type = "link", se.fit = TRUE, uncertainty = "conditional")
+  expect_identical(joint$conditional_on, "sigma:land2")
+  expect_null(conditional$conditional_on)
+  expect_true(all(is.finite(c(joint$se.fit, joint$lower, joint$upper))))
+  expect_true(all(joint$se.fit >= conditional$se.fit - 1e-10))
+  expect_true(any(joint$se.fit > 1.01 * conditional$se.fit))
+  # Finite differences of the prediction map over the free parameters only
+  # reproduce the joint SEs: the bounded scale contributes nothing.
+  base <- u$par
+  link_at <- function(par) {
+    shifted <- analytic
+    shifted$uncertainty$par <- par
+    shifted$profile_fit$par[1:2] <- par[1:2]
+    unname(predict(shifted, type = "link"))
+  }
+  J <- sapply(match(free, names(base)), function(j) {
+    a <- b <- base
+    a[j] <- a[j] + 1e-5
+    b[j] <- b[j] - 1e-5
+    (link_at(a) - link_at(b)) / 2e-5
+  })
+  expect_equal(unname(joint$se.fit),
+               sqrt(rowSums((J %*% solve(u$hessian[free, free])) * J)), tolerance = 1e-6)
+  response <- predict(analytic, interval = "confidence")
+  expect_equal(unname(response$lower), exp(unname(joint$lower)))
+  snapshot <- prepare_prediction(analytic)
+  expect_true(snapshot$prediction_contract$response$uncertainty$joint_available)
+  expect_identical(snapshot$prediction_contract$response$uncertainty$joint_conditional_on,
+                   "sigma:land2")
+  expect_equal(predict(snapshot, interval = "confidence"), response)
+
+  # Reports say what joint uncertainty conditions on, not that it is missing.
+  printed <- c(capture.output(print(summary(analytic))), capture.output(print(analytic)))
+  expect_equal(sum(grepl("Joint Wald uncertainty holds sigma:land2 fixed at the search bound.",
+                         printed, fixed = TRUE)), 2L)
+  expect_false(any(grepl("Joint Wald uncertainty unavailable", printed, fixed = TRUE)))
+
+  # Recomputing the information from the stored objective reproduces the
+  # conditional joint covariance.
+  pf <- analytic$profile_fit
+  one_start <- list(records = data.frame(eligible = TRUE, value = analytic$optim_results$value),
+                    best = list(objective = analytic$optim_results$value),
+                    fits = list(list(par = pf$par)))
+  again <- .msr_profile_information(pf$contract$objective, pf$par, pf$lower, pf$upper, one_start)
+  expect_identical(again$joint_conditional_on, "sigma:land2")
+  expect_equal(again$vcov, u$vcov)
+
+  # joint_nb2 applies the same rule. land2 stays at the bound and the NB2 fit
+  # is not Poisson compatible, so only the bound fails.
+  nb <- MASS::glm.nb(counts ~ site + land1 + land2, data = df)
+  expect_warning(nb_fit <- multiScale_optim(nb, inputs, backend = "joint_nb2",
+    n_cores = 1L, verbose = FALSE), "holds sigma:land2 fixed at the search bound")
+  nu <- nb_fit$uncertainty
+  expect_false(nu$available)
+  expect_false(nu$poisson_compatible)
+  expect_true(nu$joint_available)
+  expect_identical(nu$joint_conditional_on, "sigma:land2")
+  nV <- vcov(nb_fit)
+  expect_identical(attr(nV, "conditional_on"), "sigma:land2")
+  expect_true(all(nV[held, ] == 0) && all(nV[, held] == 0))
+  nfree <- setdiff(rownames(nV), held)
+  expect_equal(unclass(nV)[nfree, nfree], solve(nu$hessian[nfree, nfree]), tolerance = 1e-10)
+  expect_equal(sqrt(nV["log_scale:land1", "log_scale:land1"]) * nb_fit$scale_est["land1", "Mean"],
+               nb_fit$scale_est["land1", "SE"])
+  # The outer-parameter slot keeps zero rows for land2 and inverts only the
+  # free block; no singular matrix is inverted.
+  expect_true(all(nb_fit$profile_fit$vcov[2, ] == 0))
+  expect_true(all(is.na(nb_fit$profile_fit$hessian[2, ])))
+  expect_true(all(is.finite(nb_fit$profile_fit$hessian[-2, -2])))
+  nb_joint <- predict(nb_fit, type = "link", se.fit = TRUE)
+  nb_cond <- predict(nb_fit, type = "link", se.fit = TRUE, uncertainty = "conditional")
+  expect_identical(nb_joint$conditional_on, "sigma:land2")
+  expect_true(all(is.finite(nb_joint$se.fit)))
+  expect_true(all(nb_joint$se.fit >= nb_cond$se.fit - 1e-10))
+
+  # Older saved fits without `joint_available` keep joint uncertainty withheld.
+  legacy <- analytic
+  legacy$uncertainty[c("joint_available", "joint_conditional_on")] <- NULL
+  expect_error(predict(legacy, se.fit = TRUE), "Joint Wald uncertainty unavailable")
+  expect_true(all(is.finite(predict(legacy, se.fit = TRUE, uncertainty = "conditional")$se.fit)))
+})
+
+test_that("bounded scales enter joint covariance only when the bound is the sole failure", {
+  nm <- c("log_scale:a", "log_scale:b", "beta:(Intercept)", "beta:x")
+  H <- diag(c(4, 9, 6, 5))
+  H[1, 3] <- H[3, 1] <- 1
+  H[2, 4] <- H[4, 2] <- 1
+  H[3, 4] <- H[4, 3] <- .5
+  dimnames(H) <- list(nm, nm)
+  lower <- log(c(1, 1))
+  upper <- log(c(10, 10))
+  par <- log(c(2, 10))  # b sits at its upper bound
+  one_start <- function(par) list(records = data.frame(eligible = TRUE, value = 0),
+    best = list(objective = 0), fits = list(list(par = par)))
+  scale <- .msr_profile_scale_se(H, 2L, par, lower, upper, one_start(par))
+  ok <- .msr_profile_bound_joint(H, scale, TRUE, FALSE, FALSE)
+  expect_identical(ok$held, c(FALSE, TRUE))
+  expect_true(all(ok$vcov[2, ] == 0) && all(ok$vcov[, 2] == 0))
+  expect_equal(ok$vcov[-2, -2], solve(H[-2, -2]))
+  expect_equal(sqrt(ok$vcov[1, 1]), scale$log_se[1])
+  expect_identical(dimnames(ok$vcov), dimnames(H))
+  # The bound alone is required, and every other failed check still withholds.
+  expect_null(.msr_profile_bound_joint(H, scale, FALSE, FALSE, FALSE))
+  expect_null(.msr_profile_bound_joint(H, scale, TRUE, TRUE, FALSE))  # competing modes
+  expect_null(.msr_profile_bound_joint(H, scale, TRUE, FALSE, TRUE))  # Poisson compatible
+  weak <- H
+  weak[1, 1] <- .5
+  weak[1, 3] <- weak[3, 1] <- .1
+  weak_scale <- .msr_profile_scale_se(weak, 2L, par, lower, upper, one_start(par))
+  expect_true(is.na(weak_scale$log_se[1]))  # free log-scale SE above one
+  expect_null(.msr_profile_bound_joint(weak, weak_scale, TRUE, FALSE, FALSE))
+  singular <- H
+  singular[1, 1] <- singular[3, 3] <- singular[1, 3] <- singular[3, 1] <- 1
+  singular_scale <- .msr_profile_scale_se(singular, 2L, par, lower, upper, one_start(par))
+  expect_null(singular_scale$vcov)
+  expect_null(.msr_profile_bound_joint(singular, singular_scale, TRUE, FALSE, FALSE))
+  both <- log(c(1, 10))
+  expect_null(.msr_profile_bound_joint(H, .msr_profile_scale_se(H, 2L, both, lower, upper,
+    one_start(both)), TRUE, FALSE, FALSE))  # no free kernel parameter
+  # A dispersion bound withholds everything, even with a free scale.
+  nd <- c(nm, "log_theta")
+  Hd <- rbind(cbind(H, 0), 0)
+  Hd[5, 5] <- 3
+  dimnames(Hd) <- list(nd, nd)
+  pd <- c(par, log(1e5))
+  dispersion <- .msr_profile_scale_se(Hd, 2L, pd, c(lower, log(1e-4)), c(upper, log(1e5)),
+                                      one_start(pd))
+  expect_null(.msr_profile_bound_joint(Hd, dispersion, TRUE, FALSE, FALSE))
 })

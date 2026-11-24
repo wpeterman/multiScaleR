@@ -29,8 +29,18 @@ multiScaleR (development version)
   scales report Wald standard errors that hold the bounded scale fixed at its
   bound, and `summary()` says so. `profile_glm` and `joint_nb2` fits now drop
   a scale's standard error only when that scale fails a check: it sits at a
-  bound, its log-scale SE exceeds one, or competing starts move it. Joint
-  prediction uncertainty is still all or nothing.
+  bound, its log-scale SE exceeds one, or competing starts move it.
+
+* `profile_glm` and `joint_nb2` joint uncertainty no longer stops at a scale
+  on a search bound when the bound is the only failed check. `vcov(fit)` and
+  `predict(fit, uncertainty = "joint")` now hold the bounded kernel
+  parameters fixed at their bounds and let the other parameters vary. The
+  bounded rows and columns of `vcov(fit)` are zero, and predictions name the
+  held parameters in `conditional_on`. `summary()`, `print()`, and
+  `diagnostics(fit)$profile_glm$joint_conditional_on` report them. These
+  intervals are narrower than fully joint ones, so widen the search before
+  relying on them. Fits with no bounded scale give the same results as
+  before.
 
 * `joint_mixed` fits now report a Wald standard error and log-scale Wald
   limits for each kernel scale, from the joint Hessian of the selected start.

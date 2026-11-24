@@ -77,6 +77,8 @@
        condition = condition)
 }
 
+# Joint covariance may condition on kernel parameters at a search bound when
+# the bound is the only failed check (see .msr_profile_bound_joint()).
 .msr_profile_information <- function(obj, par, lower, upper, fits) {
   if (isTRUE(obj$boundary_nb2) && utils::tail(par, 1L) == 0)
     return(.msr_poisson_boundary_information(obj, par, fits))
@@ -118,9 +120,21 @@
     if (any(logse > 1, na.rm = TRUE)) "log-kernel standard error exceeds one",
     if (multiple) "competing scale modes within the 95% likelihood threshold",
     if (poisson_compatible) "Poisson limit within the diagnostic likelihood threshold")
+  available <- !boundary && !weak
   V <- inv$vcov
+  held <- rep(FALSE, nk)
+  if (!available) {
+    conditional <- .msr_profile_bound_joint(H, scale, boundary, multiple, poisson_compatible)
+    if (!is.null(conditional)) {
+      V <- conditional$vcov
+      held <- conditional$held
+    }
+  }
   if (is.null(V)) V <- matrix(NA_real_, nrow(H), ncol(H), dimnames = dimnames(H))
-  list(available = !boundary && !weak, vcov = V, hessian = H,
+  reporting_names <- sub("^log_shape:", "shape:", sub("^log_scale:", "sigma:",
+    obj$engine$parameter_names))
+  list(available = available, joint_available = available || any(held),
+       joint_conditional_on = reporting_names[held], vcov = V, hessian = H,
        par = joint$par, beta_index = joint$beta_index,
        profile_index = joint$profile_index, nuisance_vcov = nuisance,
        conditional_vcov = if (!is.null(nuisance))
@@ -130,29 +144,34 @@
        poisson_deviance = poisson_deviance, condition_number = inv$condition,
        log_scale_se = stats::setNames(logse, obj$engine$parameter_names),
        scale_log_se = stats::setNames(scale$log_se, obj$engine$parameter_names),
-       scale_conditional_on = sub("^log_shape:", "shape:", sub("^log_scale:", "sigma:",
-         obj$engine$parameter_names[scale$conditional_on])),
+       scale_conditional_on = reporting_names[scale$conditional_on],
        reasons = reasons)
 }
 
 # Per-parameter Wald SEs for the reported scale table. The joint gate above
-# withholds every SE, and joint prediction uncertainty, when any check fails.
+# withholds every SE when any check fails, and joint prediction uncertainty
+# unless the bound is the only failure (see .msr_profile_bound_joint()).
 # Here a kernel parameter loses only its own SE when it sits at a search bound,
 # its log-scale SE exceeds one, or competing modes within the 95 percent
 # likelihood threshold move it by more than 0.5 log units. Bounded kernel
 # parameters are dropped from the observed information, so the remaining SEs
 # hold them fixed at their bounds. A dispersion bound, a Poisson-compatible NB2
-# fit, or unusable information still withholds every scale SE.
+# fit, or unusable information still withholds every scale SE. `vcov` is the
+# inverse of the reduced information over the rows in `keep` (free kernel
+# parameters, then every coefficient and dispersion row), or NULL.
 .msr_profile_scale_se <- function(H, nk, par, lower, upper, fits, global = FALSE) {
   at_bound <- par - lower < 1e-5 | upper - par < 1e-5
   kernel_bound <- at_bound[seq_len(nk)]
   # `conditional_on` flags the bounded parameters held fixed, only when some
   # other parameter keeps an SE.
-  out <- list(log_se = rep(NA_real_, nk), conditional_on = rep(FALSE, nk))
+  out <- list(log_se = rep(NA_real_, nk), conditional_on = rep(FALSE, nk),
+              vcov = NULL, keep = integer())
   if (global || any(at_bound[-seq_len(nk)]) || all(kernel_bound)) return(out)
   keep <- c(which(!kernel_bound), seq.int(nk + 1L, length.out = nrow(H) - nk))
   vcov <- .msr_information_inverse(H[keep, keep, drop = FALSE])$vcov
   if (is.null(vcov)) return(out)
+  out$vcov <- vcov
+  out$keep <- keep
   free <- which(!kernel_bound)
   log_se <- rep(NA_real_, nk)
   log_se[free] <- sqrt(diag(vcov)[seq_along(free)])
@@ -164,6 +183,28 @@
   out$log_se <- log_se
   if (any(is.finite(log_se))) out$conditional_on <- kernel_bound
   out
+}
+
+# Joint covariance conditional on kernel parameters at a search bound
+# (profile_glm and joint_nb2). `scale` is the result of
+# .msr_profile_scale_se(). It replaces the all-or-nothing joint gate only
+# when the bound is the sole failure: the
+# fit is at a bound, no dispersion parameter is bounded, at least one kernel
+# parameter is free, the reduced information is usable, every free log-kernel
+# SE is at most one, no competing modes lie within the 95 percent likelihood
+# threshold, and no Poisson fit is compatible with the NB2 fit. Otherwise NULL.
+# The full-size matrix keeps exact zeros in the bounded kernel rows and
+# columns, so positional delta-method predictions hold those parameters fixed,
+# as conditional predictions hold every kernel parameter fixed. Its free block
+# is the same reduced inverse that gives the per-parameter scale SEs.
+.msr_profile_bound_joint <- function(H, scale, boundary, multiple, poisson_compatible) {
+  held <- scale$conditional_on
+  if (!boundary || multiple || poisson_compatible || !any(held) ||
+      is.null(scale$vcov) || !all(is.finite(scale$log_se[!held])))
+    return(NULL)
+  V <- matrix(0, nrow(H), ncol(H), dimnames = dimnames(H))
+  V[scale$keep, scale$keep] <- scale$vcov
+  list(vcov = V, held = held)
 }
 
 .msr_profile_wald_table <- function(object, shape = FALSE) {
@@ -234,6 +275,20 @@
 #' that lists `object$uncertainty$reasons`, rather than reporting a misleading
 #' Wald result. The conditional matrix remains available.
 #'
+#' One exception applies to both backends. When kernel parameters
+#' at a search bound are the only failed check, the joint matrix holds those
+#' parameters fixed at their bounds. Their rows and columns are zero, and the
+#' other rows and columns come from the observed information with the bounded
+#' parameters removed. That reduced information must pass the remaining
+#' checks. The matrix then carries a `conditional_on` attribute that names the
+#' bounded parameters, as does `object$uncertainty$joint_conditional_on`. A
+#' zero there means the parameter was held fixed, not that it is known
+#' exactly, and its standard error is missing in `object$scale_est`. The other
+#' standard errors are no wider than they would be if the bounded scale were
+#' free to vary, so treat them as conditional on that scale. A dispersion
+#' bound, every kernel parameter at a bound, or any other failed check still
+#' withholds joint covariance.
+#'
 #' # Read the conditional matrix
 #'
 #' The conditional matrix holds only the `beta:` rows. It answers how
@@ -293,10 +348,18 @@ vcov.multiScaleR <- function(object, type = c("joint", "conditional"), ...) {
     stop("This method requires backend = 'profile_glm' or 'joint_nb2'; use vcov(object$opt_mod) for conditional model covariance.",
          call. = FALSE)
   if (type == "joint") {
-    if (!object$uncertainty$available)
-      stop("Joint Wald uncertainty unavailable: ", paste(object$uncertainty$reasons, collapse = "; "),
+    u <- object$uncertainty
+    # Older saved fits have no `joint_available`; their gate is `available`.
+    # Without `available`, joint covariance needs named held parameters.
+    if (!isTRUE(u$available) &&
+        !(isTRUE(u$joint_available) && length(u$joint_conditional_on)))
+      stop("Joint Wald uncertainty unavailable: ", paste(u$reasons, collapse = "; "),
            call. = FALSE)
-    return(object$uncertainty$vcov)
+    V <- u$vcov
+    # Name the bounded parameters whose zero rows and columns hold them fixed.
+    if (!isTRUE(u$available) && length(u$joint_conditional_on))
+      attr(V, "conditional_on") <- u$joint_conditional_on
+    return(V)
   }
   V <- object$uncertainty$conditional_vcov
   if (is.null(V)) stop("Conditional coefficient covariance is unavailable.", call. = FALSE)

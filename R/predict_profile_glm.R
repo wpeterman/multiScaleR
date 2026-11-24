@@ -256,7 +256,15 @@
 #'
 #' Joint uncertainty is refused for fits at a parameter bound or with weak
 #' identifiability. `fit$uncertainty$reasons` says why, and point predictions
-#' and conditional uncertainty remain available. At the exact Poisson
+#' and conditional uncertainty remain available. Kernel parameters at a
+#' search bound do not block joint uncertainty when they are the only failed
+#' check. Joint standard errors and limits then hold those
+#' parameters fixed at their bounds and let the other kernel parameters vary.
+#' The result names them in `conditional_on`, and
+#' `fit$uncertainty$joint_conditional_on` records them. These limits are
+#' narrower than limits that also let the bounded scale vary, and the true
+#' scale may lie beyond the bound. Widen the search, for example with a larger
+#' `max_D` in [kernel_prep()], before you rely on them. At the exact Poisson
 #' boundary of a `"joint_nb2"` fit, point predictions and explicitly
 #' conditional intervals hold both the scales and the Poisson dispersion
 #' boundary fixed. Use [vcov.multiScaleR()] for the covariance matrices.
@@ -507,7 +515,9 @@
 #'   a list with `fit` (the predictions), `se.fit` (standard errors on the
 #'   scale of `type`), `type`, and `uncertainty` (`"joint"` or
 #'   `"conditional"`). Confidence intervals add `lower` and `upper`, on the
-#'   scale of `type`, and `level`.
+#'   scale of `type`, and `level`. Joint uncertainty from a fit with kernel
+#'   parameters at a search bound adds `conditional_on`, which names the
+#'   parameters held fixed.
 #' * **`"conditional_logit"`:** a named numeric vector, or with
 #'   `se.fit = TRUE` a list with `fit`, `se.fit`, `type`, and
 #'   `uncertainty = "conditional"`.
@@ -666,5 +676,9 @@ predict.multiScaleR <- function(object, newdata = NULL, kernel_inputs = NULL,
       fam$linkinv(eta + z * se_link), design$rows)
     out$level <- level
   }
+  # Joint uncertainty from a profile_glm fit at a search bound holds the
+  # bounded kernel parameters fixed; name them with the result.
+  held <- attr(V, "conditional_on")
+  if (length(held)) out$conditional_on <- held
   out
 }

@@ -26,6 +26,24 @@ test_that("NB2 backend returns a compatible conditional model and joint informat
   expect_true(all(eigen(V, symmetric = TRUE)$values > 0))
   expect_equal(unname(V[x$uncertainty$profile_index, x$uncertainty$profile_index]),
                unname(solve(x$profile_fit$hessian)), tolerance = 2e-4)
+  # With no bounded scale, joint uncertainty is the full observed-information
+  # inverse, exactly as before bounded scales could be held fixed, and the
+  # legacy slots, predictions, and contracts carry no conditioning record.
+  expect_true(x$uncertainty$joint_available)
+  expect_identical(x$uncertainty$joint_conditional_on, character())
+  expect_identical(x$diagnostics$profile_glm$joint_conditional_on, character())
+  expect_identical(V, solve(x$uncertainty$hessian))
+  expect_identical(x$profile_fit$vcov,
+                   V[x$uncertainty$profile_index, x$uncertainty$profile_index, drop = FALSE])
+  kp <- x$profile_fit$par[1]
+  expect_identical(x$optim_results$hessian,
+                   solve(diag(exp(kp), 1L) %*% V[1, 1, drop = FALSE] %*% diag(exp(kp), 1L)))
+  joint <- predict(x, interval = "confidence")
+  expect_identical(names(joint), c("fit", "se.fit", "type", "uncertainty", "lower", "upper", "level"))
+  contract <- prepare_prediction(x)$prediction_contract$response$uncertainty
+  expect_true(contract$joint_available)
+  expect_null(contract$joint_conditional_on)
+  expect_false(any(grepl("Joint Wald uncertainty", capture.output(print(summary(x))))))
   s <- summary(x)
   expect_identical(unname(attr(s$opt_scale, "interval_method")), "log_wald")
   expect_true(s$opt_scale[1, "2.5%"] < x$scale_est$Mean)
@@ -164,6 +182,9 @@ test_that("Poisson-limit scores and predictions are stable and uncertainty is wi
   expect_true(x$uncertainty$poisson_limit)
   expect_true(x$uncertainty$boundary)
   expect_false(x$uncertainty$available)
+  # A dispersion bound is not a kernel bound: joint uncertainty stays withheld.
+  expect_false(x$uncertainty$joint_available)
+  expect_identical(x$uncertainty$joint_conditional_on, character())
   expect_true(is.na(x$opt_mod$SE.theta))
   expect_true(all(is.finite(predict(x))))
   expect_error(predict(x, se.fit = TRUE), "unavailable")

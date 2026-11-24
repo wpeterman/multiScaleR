@@ -78,7 +78,10 @@ is at least half its estimate. See "Read the warnings" in
 estimates, the starts and their convergence scores, the profile and joint
 information matrices, identifiability diagnostics, and NB2 theta.
 \code{uncertainty$available} says whether joint uncertainty passed its checks,
-and \code{uncertainty$reasons} says why not. \code{opt_mod} and its coefficient
+and \code{uncertainty$reasons} says why not.
+\code{uncertainty$joint_available} is also \code{TRUE} when joint uncertainty holds
+bounded kernel parameters fixed, and \code{uncertainty$joint_conditional_on}
+names them. \code{opt_mod} and its coefficient
 summary condition on the estimated kernel parameters. Use
 \code{\link[=vcov.multiScaleR]{vcov.multiScaleR()}} and \code{\link[=predict.multiScaleR]{predict.multiScaleR()}} for joint uncertainty.
 \item \code{profile_fit} and \code{uncertainty} for \code{"conditional_logit"}, which keep

@@ -315,12 +315,14 @@ summary.msr_conditional_glm <- function(object, ...) {
   nk <- length(obj$engine$parameter_names)
   kp <- unname(best$par[seq_len(nk)])
   kd <- .msr_eval_kernel_engine(obj$engine, kp)
+  # Joint uncertainty may condition on bounded kernel parameters when the bound
+  # is the only failed check (see .msr_profile_bound_joint()).
   info <- .msr_profile_information(obj, best$par, bounds$lower, bounds$upper, fits)
   p <- obj$engine$p
   scale <- exp(kp[seq_len(p)]) * inputs$unit_conv
-  # Scale SEs are reported per parameter (see .msr_profile_scale_se()); the
-  # joint gate in `info$available` still governs joint covariance and
-  # prediction uncertainty.
+  # Scale SEs are reported per parameter (see .msr_profile_scale_se()). Joint
+  # covariance and prediction uncertainty follow `info$joint_available`, which
+  # equals `info$available` unless bounded kernel parameters are held fixed.
   log_se <- if (info$available) sqrt(diag(info$vcov)[seq_len(nk)]) else
     if (is.null(info$scale_log_se)) rep(NA_real_, nk) else unname(info$scale_log_se)
   scale_se <- scale * log_se[seq_len(p)]
@@ -341,14 +343,22 @@ summary.msr_conditional_glm <- function(object, ...) {
   }
   profile_hessian <- if (!joint_nb2) stats::optimHess(unname(best$par), obj$fn, obj$gr) else
     matrix(NA_real_, length(best$par), length(best$par))
-  profile_vcov <- if (info$available) info$vcov[info$profile_index, info$profile_index, drop = FALSE] else
+  joint_ok <- isTRUE(info$joint_available)
+  profile_vcov <- if (joint_ok) info$vcov[info$profile_index, info$profile_index, drop = FALSE] else
     matrix(NA_real_, length(best$par), length(best$par))
   # Legacy optimizer slots retain natural kernel units only. Dispersion and
   # all log-parameter information live in the explicitly named profile_fit.
-  natural_cov <- if (info$available) diag(exp(kp), nk) %*%
+  natural_cov <- if (joint_ok) diag(exp(kp), nk) %*%
     profile_vcov[seq_len(nk), seq_len(nk), drop = FALSE] %*% diag(exp(kp), nk) else
     matrix(NA_real_, nk, nk)
-  natural_hess <- if (info$available) solve(natural_cov) else natural_cov
+  natural_hess <- if (info$available) solve(natural_cov) else matrix(NA_real_, nk, nk)
+  if (joint_ok && !info$available) {
+    # Bounded kernel parameters held fixed have exact zero rows and columns, so
+    # the full matrix is singular. Invert only the free block and leave NA for
+    # the held parameters, as the radius-grid Hessian does for hard radii.
+    free <- diag(natural_cov) > 0
+    natural_hess[free, free] <- solve(natural_cov[free, free, drop = FALSE])
+  }
   to_map <- c(rep(1 / inputs$unit_conv, p),
               if (inputs$kernel == "expow") rep(1, p))
   out <- list(
@@ -387,10 +397,15 @@ summary.msr_conditional_glm <- function(object, ...) {
     out$profile_fit$joint_par <- fitted$joint_par
     # Joint information uses log(theta) for positive alpha. Convert its marginal
     # dispersion covariance to rho for the explicitly named outer-parameter slot.
-    if (info$available) {
+    if (joint_ok) {
       jac <- c(rep(1, nk), -fitted$alpha / (1 + fitted$alpha))
       out$profile_fit$vcov <- profile_vcov * outer(jac, jac)
-      out$profile_fit$hessian <- solve(out$profile_fit$vcov)
+      if (info$available) out$profile_fit$hessian <- solve(out$profile_fit$vcov) else {
+        # Held kernel parameters keep exact zero rows and columns. Invert only
+        # the free block and leave NA for the held parameters.
+        free <- diag(out$profile_fit$vcov) > 0
+        out$profile_fit$hessian[free, free] <- solve(out$profile_fit$vcov[free, free, drop = FALSE])
+      }
     }
   }
   out$profile_scale_est <- .msr_profile_wald_table(out)
@@ -402,6 +417,7 @@ summary.msr_conditional_glm <- function(object, ...) {
     poisson_compatible = info$poisson_compatible, poisson_deviance = info$poisson_deviance,
     log_scale_se = info$log_scale_se, multiple_modes = info$multiple_modes,
     scale_se_conditional_on = info$scale_conditional_on,
+    joint_conditional_on = info$joint_conditional_on,
     eligible_starts = sum(fits$records$eligible), attempted_starts = nrow(fits$records))
   out$diagnostics$max_distance <- .max_distance_diagnostic(
     kernel_dist(out, dimension = "1d"), inputs$max_D)
@@ -414,7 +430,10 @@ summary.msr_conditional_glm <- function(object, ...) {
   if (!info$available) {
     withheld <- c(rownames(scale_est)[is.na(scale_est$SE)],
       if (!is.null(shape_est)) paste0("shape:", rownames(shape_est)[is.na(shape_est$SE)]))
-    warning("Joint Wald uncertainty unavailable: ", paste(info$reasons, collapse = "; "),
+    held <- info$joint_conditional_on
+    warning(if (length(held)) paste0("Joint Wald uncertainty holds ",
+              paste(held, collapse = ", "), " fixed at the search bound") else
+              paste0("Joint Wald uncertainty unavailable: ", paste(info$reasons, collapse = "; ")),
             if (length(withheld)) paste0(". Scale SEs are withheld for: ",
               paste(withheld, collapse = ", ")),
             ". Inspect diagnostics and likelihood profiles.", call. = FALSE)
