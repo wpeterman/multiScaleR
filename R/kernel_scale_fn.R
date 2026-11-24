@@ -224,6 +224,24 @@
 }
 
 
+# TRUE when an unmarked fit came from an unmarked fitting function that has an
+# `se` argument (occu(), pcount(), gdistremoval(), and most others). A fit
+# from a user wrapper or a function without `se` returns FALSE.
+.msr_unmarked_accepts_se <- function(model) {
+  fun <- tryCatch(model@call[[1L]], error = function(e) NULL)
+  # Accept both `pcount(...)` and `unmarked::pcount(...)` calls.
+  if (is.call(fun) && length(fun) == 3L &&
+      as.character(fun[[1L]]) %in% c("::", ":::") &&
+      identical(as.character(fun[[2L]]), "unmarked"))
+    fun <- fun[[3L]]
+  if (!is.name(fun)) return(FALSE)
+  ns <- asNamespace("unmarked")
+  name <- as.character(fun)
+  if (!exists(name, envir = ns, inherits = FALSE)) return(FALSE)
+  fitter <- get(name, envir = ns, inherits = FALSE)
+  is.function(fitter) && "se" %in% names(formals(fitter))
+}
+
 .refit_model <- function(model, data, opt_context) {
   if (!is.null(opt_context$refit_fn)) {
     refit <- opt_context$refit_fn(model = model,
@@ -236,6 +254,14 @@
   }
 
   if (identical(opt_context$mod_class, "unmarked")) {
+    # A scalar objective evaluation needs only the log-likelihood. unmarked
+    # computes its coefficient Hessian after the optimizer has converged, so
+    # se = FALSE returns the same estimates and log-likelihood and skips that
+    # step (about a quarter of the refit time for N-mixture and
+    # distance-removal fits). A returned model, including the final refit at
+    # the selected scales, keeps the original model's se setting.
+    if (isFALSE(opt_context$return_model) && .msr_unmarked_accepts_se(model))
+      return(unmarked::update(model, data = data, se = FALSE))
     return(unmarked::update(model, data = data))
   }
 

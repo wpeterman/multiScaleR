@@ -1,6 +1,15 @@
 multiScaleR (development version)
 ---------------------------------
 
+* `multiScale_optim()` fits of `unmarked` models are faster. Objective
+  refits during the scale search now pass `se = FALSE` when the fitting
+  function accepts it, which skips the coefficient Hessian that `unmarked`
+  computes after its optimizer converges. Estimates and log-likelihoods are
+  unchanged, and the final model keeps its original `se` setting. The
+  `pcount()` example in the user guide and the `gdistremoval()` example in
+  the distance-removal vignette now fit about 30% faster, with identical
+  results. A custom `refit_fn` is unaffected.
+
 * `summary(fit, profile = TRUE)` on a `conditional_logit` fit now warns and
   returns the ordinary summary with scale limits as `NA`, instead of stopping.
   Printed summaries of `conditional_logit` fits with a hard-radius covariate

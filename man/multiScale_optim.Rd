@@ -310,22 +310,18 @@ large local objects.
 
 The function receives \code{context$return_model = FALSE} for scalar objective
 evaluations and \code{TRUE} when a fitted model is wanted, including the final
-refit at the selected scales. For supported \code{unmarked} models, you can skip
-the intermediate Hessian calculations while keeping the original model's
-uncertainty settings whenever a fitted model is returned:
+refit at the selected scales. Use the flag to skip work that only a
+returned model needs, such as coefficient standard errors.
 
-\if{html}{\out{<div class="sourceCode r">}}\preformatted{refit_unmarked <- function(model, data, context) \{
-  if (identical(context$return_model, FALSE))
-    unmarked::update(model, data = data, se = FALSE)
-  else
-    unmarked::update(model, data = data)
-\}
-}\if{html}{\out{</div>}}
-
-This changes neither the coefficient starts nor the model's likelihood. It
-does not add uncertainty for the kernel scales or override an original
-\code{se = FALSE} setting. Verify this behavior for your model class before you
-rely on a custom refit function.
+The default \code{unmarked} refit already does this. When the fitting function
+has an \code{se} argument, as \code{occu()}, \code{pcount()}, and \code{gdistremoval()} do,
+objective evaluations refit with \code{se = FALSE}, so \code{unmarked} skips the
+Hessian it computes after its optimizer converges. The estimates and
+log-likelihood are unchanged, and each objective refit of an N-mixture or
+distance-removal model takes about a quarter less time. Returned models,
+including the final one, keep the original model's \code{se} setting. A
+custom \code{refit_fn} replaces this default, so apply the same rule there if
+you want the saving.
 }
 
 \section{Fit wrapper model objects}{
