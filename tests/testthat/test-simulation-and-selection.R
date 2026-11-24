@@ -51,6 +51,7 @@ test_that("expected public helpers remain exported", {
     "plot_kernel",
     "plot_marginal_effects",
     "posterior_scales",
+    "predict_gdistremoval",
     "predict_scales",
     "prepare_gdr_histories",
     "prepare_gdr_intervals",
@@ -68,6 +69,7 @@ test_that("expected public helpers remain exported", {
     "sim_dat_unmarked",
     "sim_rast",
     "simulate_bayes_prior",
+    "simulate_gdistremoval",
     "surface_var",
     "validate_unmarked_data"
   )
