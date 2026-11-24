@@ -62,7 +62,9 @@ covariate on bird density inside such a model, fitted with
 
 You will simulate a survey with known values, prepare the data, fit the model,
 estimate the scale of effect, and read the abundance, availability, and
-detection results. The last section lists what is not supported yet. Read
+detection results. You will also predict what a whole survey records and
+simulate new surveys from the fitted model. The last section lists what is not
+supported yet. Read
 `vignette("v01-quickstart", package = "multiScaleR")` first, because this vignette
 builds on its four steps. Experience with `unmarked` helps but is not required.
 
@@ -383,6 +385,79 @@ intervals are reliable in general.
 > `vignette("v09-estimates-and-intervals", package = "multiScaleR")` explains what that
 > leaves out.
 
+## Predict detection and expected counts for a whole survey
+
+The calculation above combined the two detection components by hand for one
+point. `predict_gdistremoval()` does the same for every point and visit,
+combining the components as the model's likelihood does, and adds the number of
+birds an observer would be expected to record. The function is experimental.
+
+```{r survey-means}
+surv <- predict_gdistremoval(opt)     # one row per survey point and visit
+head(surv[, c("density", "availability", "perceptibility",
+              "detection", "expected_count")], 3)
+```
+
+**How to read the output:** `density` is in birds per square kilometer, as in
+the fitted model. `availability` is the chance that a bird present gives a cue
+during at least one interval of the 10-minute count, and `perceptibility` is the
+chance that the observer detects a bird giving a cue somewhere in the 75 m
+circle. `detection` is their product, `r round(100 * surv$detection[1])`% at the
+first point, the same value as the hand calculation above. With repeat visits it
+also includes the availability between visits, `phi`. `expected_count` is the
+expected number of birds in the circle times `detection`, so it is the count an
+observer would record on average, about `r round(surv$expected_count[1], 1)`
+birds at the first point.
+
+Change the protocol in the survey frame to ask what a different survey would
+record.
+
+```{r survey-protocol}
+planned <- fit@data                   # fitted covariates, distance bands, and intervals
+planned@period.lengths <- c(1, 2, 2)  # a 5-minute count in three intervals
+short <- predict_gdistremoval(opt, newdata = planned)
+round(c(ten_minutes  = mean(surv$detection),
+        five_minutes = mean(short$detection)), 2)
+```
+
+**How to read the output:** Shortening the count from ten to five minutes lowers
+the average detection probability from `r round(mean(surv$detection), 2)` to
+`r round(mean(short$detection), 2)`, so a 5-minute count would record about
+`r round(100 * mean(short$expected_count) / mean(surv$expected_count))`% as many
+birds. Density does not change, because the protocol affects only detection.
+The removal intervals may change, but the distance bands must match the fitted
+ones. For points that were not surveyed, supply a frame of zero counts with
+their covariates, together with `kernel_inputs` and `join_by` to compute the
+landscape covariate at the fitted scale.
+
+`simulate_gdistremoval()` draws new surveys from the fitted model. Each
+replicate is a complete `unmarkedFrameGDR` whose distance and removal tables
+count the same simulated birds, so you can summarize the replicates as you
+would the real data.
+
+```{r survey-simulate}
+set.seed(4)
+reps <- simulate_gdistremoval(opt, nsim = 200)     # 200 simulated surveys
+sim_total <- vapply(reps, function(x) sum(x@yRemoval), numeric(1))
+obs_total <- sum(fit@data@yRemoval)                # birds recorded in the real survey
+round(c(observed = obs_total, simulated_mean = mean(sim_total),
+        quantile(sim_total, c(0.025, 0.975))))
+```
+
+**How to read the output:** The real survey recorded `r obs_total` birds. The
+simulated surveys recorded `r round(mean(sim_total))` on average, and 95% of
+them recorded between `r round(quantile(sim_total, 0.025))` and
+`r round(quantile(sim_total, 0.975))`. A real total far outside that range
+would suggest that the model misses something about abundance or detection.
+Compare other summaries, such as counts by distance band or by interval, the
+same way. The replicates hold the coefficients and the scale of effect at their
+estimates, so they check the fitted model, not the uncertainty in its estimates.
+
+> **What this means for your study.** For models with repeat visits, use these
+> two functions rather than `unmarked::getP()`, `fitted()`, or `simulate()`.
+> In `unmarked` 1.5.2, those apply the first visit's distance scale to every
+> visit. This vignette's survey has one visit, so the results agree here.
+
 ## Plot the kernel and the density response
 
 ```{r plot-kernel, fig.cap = "***Kernel weight against distance for `land1`.***"}
@@ -530,6 +605,7 @@ on data like these. `?fit_gdr_response_field` gives the full requirements.
 | `cross_validate()` for `unmarked` fits | Compare models fitted to the same surveys with `aic_tab()` |
 | `sim_dat_gdr()` for negative binomial or zero-inflated abundance, detection functions other than half-normal, or repeat visits | Simulate those designs with your own code |
 | `make_gdr_refitter()` and `fit_gdr_response_field()` with other package versions. They require `unmarked` 1.5.2, and TMB 1.9.25 for models fitted with `engine = "TMB"` | Use the default refit in `multiScale_optim()`, which has no version requirement |
+| Standard errors or intervals from `predict_gdistremoval()`, and `predict_gdistremoval()` or `simulate_gdistremoval()` for models from `fit_gdr_response_field()` | Report whole-survey predictions as point estimates. Use `predict()` on a response field fit |
 | `fit_gdr_response_field()` beyond Poisson abundance, a half-normal detection function, density per square kilometer, one visit per point, a 75 m survey radius, and one random intercept for abundance. The range is not estimated | Fit independent random intercepts with `engine = "TMB"` |
 
 # Quick reference
@@ -579,6 +655,8 @@ fit <- opt$opt_mod
 unmarked::predict(fit, type = "lambda")       # density, birds per square km
 unmarked::predict(fit, type = "dist")         # distance scale, m
 unmarked::predict(fit, type = "rem")          # removal probability per minute
+predict_gdistremoval(opt)                     # detection and expected counts
+simulate_gdistremoval(opt, nsim = 200)        # new surveys from the fitted model
 plot(opt)                                     # kernel weight against distance
 plot_marginal_effects(opt, type = "lambda")   # density across the covariate
 
@@ -598,6 +676,8 @@ dens_map <- terra::predict(r_scaled, fit, type = "lambda")
 | `expand_gdr_intervals()` | Copy site or visit covariates into the interval table |
 | `prepare_gdr_intervals()` | Add covariates that differ among time intervals |
 | `multiScale_optim()` | Estimate the scale of effect together with the model coefficients |
+| `predict_gdistremoval()` | Predict whole-survey detection, abundance, density, and expected counts |
+| `simulate_gdistremoval()` | Simulate new surveys from the fitted model |
 | `plot_marginal_effects()` | Plot a covariate's effect in one component with `type` |
 | `make_gdr_refitter()` | Refit from several starting values at each candidate scale |
 | `fit_gdr_response_field()` | Replace independent block effects with a spatially correlated field |

@@ -144,14 +144,17 @@ reference:
       - prediction_contract
   - title: Distance-removal models
     desc: >
-      Data preparation, fitting helpers, and audits for generalized
-      distance-removal (GDR) models, including spatial response fields.
+      Data preparation, fitting helpers, whole-survey predictions and
+      simulations, and audits for generalized distance-removal (GDR) models,
+      including spatial response fields.
     contents:
       - prepare_gdr_histories
       - prepare_gdr_intervals
       - expand_gdr_intervals
       - gdr_start_values
       - make_gdr_refitter
+      - predict_gdistremoval
+      - simulate_gdistremoval
       - fit_gdr_response_field
       - response_field_geometry
       - "`unmarkedFitGDRField-class`"

@@ -1,6 +1,19 @@
 multiScaleR (development version)
 ---------------------------------
 
+* New experimental `predict_gdistremoval()` and `simulate_gdistremoval()`
+  for `unmarked::gdistremoval()` models, alone or inside a `multiScaleR`
+  fit. `predict_gdistremoval()` combines the fitted components into
+  whole-survey detection, abundance and density (including structural zeros
+  for zero-inflated models), and the expected count, for the fitted surveys
+  or for a new frame or survey protocol. `simulate_gdistremoval()` draws new
+  paired distance and removal histories. Both give each visit its own
+  distance scale and use closed-form distance integrals for half-normal and
+  exponential keys. In `unmarked` 1.5.2, `getP()`, `fitted()`, and
+  `simulate()` apply the first visit's distance scale to every visit, and
+  `simulate()` back-transforms the zero-inflation parameter with `exp()`.
+  The distance-removal vignette shows both functions.
+
 * `multiScale_optim()` fits of `unmarked` models are faster. Objective
   refits during the scale search now pass `se = FALSE` when the fitting
   function accepts it, which skips the coefficient Hessian that `unmarked`
