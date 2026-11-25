@@ -336,7 +336,12 @@ kernel_prep <- function(pts,
     single_layer <- nlyr(raster_stack) == 1
     cell_list <- vector("list", n_pts_all)
     D <- vector("list", n_pts_all)
-    min_D <- NULL
+    # The lower bound of the sigma search is one cell width, as in
+    # kernel_prep_by_group(). It used to be the distance between the first two
+    # cells extracted for the first point. Those are neighbors in one row
+    # unless the top row of that buffer holds a single cell, when the second
+    # cell lies on the next row and min_D became several cells wide.
+    min_D <- floor(terra::res(raster_stack)[1])
 
     if(isTRUE(progress)){
       pb = txtProgressBar(min = 0,
@@ -361,9 +366,6 @@ kernel_prep <- function(pts,
           colnames(df) <- c_names
         }
         xy <- df[, c("x", "y")]
-        if (is.null(min_D)) {
-          min_D <- floor(rdist(xy[1:2, ])[1, 2])
-        }
         cell_list[[i]] <- df_to_values(df)
         D[[i]] <- rdist(st_coordinates(pts[i,]), xy)[1,] / unit_conv
         r_ext[j] <- list(NULL)

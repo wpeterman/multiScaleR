@@ -124,6 +124,15 @@ multiScaleR (development version)
 * `sim_dat_unmarked()` points now carry the raster's CRS, so `kernel_prep()`
   no longer warns about a missing CRS. Simulated values are unchanged.
 
+* `kernel_prep()` now sets `min_D`, the lower bound of the sigma search in
+  `multiScale_optim()`, to one cell width, as `kernel_prep_by_group()`
+  already did. It used to take the distance between the first two cells
+  extracted around the first point. When the top row of that buffer held a
+  single cell, the second cell lay on the next row and `min_D` became several
+  cells wide (for example 41 m with 10 m cells), so a fit could stop at a
+  spurious lower bound with its standard error withheld. Inputs whose first
+  two cells were neighbors in one row are unchanged.
+
 * New experimental `predict_gdistremoval()` and `simulate_gdistremoval()`
   for `unmarked::gdistremoval()` models, alone or inside a `multiScaleR`
   fit. `predict_gdistremoval()` combines the fitted components into
