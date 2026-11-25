@@ -100,7 +100,7 @@ reference:
       - scale_inference
       - multiScale_joint
       - footprint_sd
-      - multiScaleR_joint-methods
+      - "`multiScaleR_joint-methods`"
       - diagnostics
       - vcov.multiScaleR
   - title: Bayesian scale estimation
@@ -119,6 +119,7 @@ reference:
   - title: Summarize and compare models
     contents:
       - summary.multiScaleR
+      - "`multiScaleR-methods`"
       - kernel_dist
       - aic_tab
       - bic_tab
