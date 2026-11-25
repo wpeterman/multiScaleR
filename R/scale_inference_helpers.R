@@ -23,12 +23,24 @@
 }
 
 .msr_inference_setup <- function(object, n_starts) {
-  if (!inherits(object, "multiScaleR") || !.msr_analytic_backend(object))
-    stop("scale_inference requires a profile_glm or joint_nb2 fit.", call. = FALSE)
+  .msr_stop_bayes_fit(object, "scale_inference")
+  # State the full requirement in both refusals: an analytic backend, an NB2
+  # family, and exactly one spatial covariate.
+  requirement <- paste0("scale_inference requires a negative binomial fit ",
+    "(NB2 with one spatial covariate) from multiScale_optim(backend = ",
+    "\"profile_glm\") or backend = \"joint_nb2\"")
+  if (!inherits(object, "multiScaleR"))
+    stop(requirement, "; `object` is not a multiScaleR fit.", call. = FALSE)
+  if (!.msr_analytic_backend(object))
+    stop(requirement, "; this fit used the ",
+         if (is.null(object$backend)) "refit" else object$backend,
+         " backend.", call. = FALSE)
   pf <- object$profile_fit
   obj <- pf$contract$objective
   if (obj$family != "nbinom2" || obj$engine$p != 1L)
-    stop("scale_inference currently supports NB2 with one spatial covariate.", call. = FALSE)
+    stop(requirement, "; this fit has family ", obj$family, " and ",
+         obj$engine$p, " spatial covariate", if (obj$engine$p != 1L) "s", ".",
+         call. = FALSE)
   # Isolate the likelihood cache as well as the returned fit metadata.
   factory <- if (isTRUE(obj$boundary_nb2)) .msr_joint_nb2_objective else .msr_profile_glm_objective
   obj <- factory(obj$engine, obj$y, obj$family,

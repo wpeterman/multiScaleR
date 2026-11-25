@@ -3,14 +3,23 @@
 \name{diagnostics}
 \alias{diagnostics}
 \alias{diagnostics.multiScaleR}
+\alias{diagnostics.multiScaleR_bayes}
+\alias{diagnostics.default}
 \title{Retrieve diagnostics from multiScaleR objects}
 \usage{
 diagnostics(object, ...)
 
 \method{diagnostics}{multiScaleR}(object, ...)
+
+\method{diagnostics}{multiScaleR_bayes}(object, ...)
+
+\method{diagnostics}{default}(object, ...)
 }
 \arguments{
-\item{object}{An object to inspect. Must be of class \code{multiScaleR}.}
+\item{object}{An object to inspect. Must be of class \code{multiScaleR}.
+A Bayesian fit from \code{\link{multiScale_bayes}} stops with a pointer
+to \code{\link{diagnose_bayes_scales}}, and other objects stop with an
+error.}
 
 \item{...}{Additional arguments passed to methods.}
 }

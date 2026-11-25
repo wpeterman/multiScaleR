@@ -73,6 +73,13 @@
   if (inherits(mod, "glmmTMB")) formulas <- c(formulas,
     mod$modelInfo$allForm[c("ziformula", "dispformula")])
   offsets <- unlist(lapply(formulas, .msr_raster_offset_terms), recursive = FALSE)
+  # An offset given through the fitting function's `offset =` argument is
+  # evaluated in the prediction data, exactly like offset() in the formula.
+  # Without a layer for it, native prediction would reuse the training
+  # offsets, recycled over the raster cells.
+  call_offset <- if (!unmarked && is.list(mod))
+    tryCatch(mod$call$offset, error = function(e) NULL) else NULL
+  if (!is.null(call_offset)) offsets <- c(offsets, list(call_offset))
   offset_vars <- character()
   offset_defaults <- numeric()
   available <- c(names(offset_values), names(site_values), raster_covs)
@@ -115,6 +122,10 @@
     stop("offset_values cannot overwrite a computed spatial layer.", call. = FALSE)
   template <- smooth_stack[[1L]]
   strata <- if (unmarked) NULL else .msr_strata_ids(mod)
+  # Numeric site covariates default to 0. Record the fitted range of each so a
+  # default that makes a formula term undefined (log(sl_) at sl_ = 0) can be
+  # reported below; such a map is 0 or infinite in every cell.
+  outside_zero <- character()
   for (v in site_vars) {
     x <- if (!is.null(mf) && v %in% names(mf)) mf[[v]] else raw[[v]]
     if (!is.null(strata) && v == strata$name) {
@@ -158,6 +169,11 @@
       next
     } else if (is.numeric(x) || is.integer(x) || is.logical(x)) {
       rr <- template * 0
+      observed <- suppressWarnings(range(as.numeric(x), na.rm = TRUE))
+      if (is.numeric(x) && all(is.finite(observed)) && (observed[1L] > 0 || observed[2L] < 0))
+        outside_zero[v] <- sprintf("%s (fitted %s to %s; mean %s)", v,
+          signif(observed[1L], 3), signif(observed[2L], 3),
+          signif(mean(as.numeric(x), na.rm = TRUE), 3))
     } else {
       warning(paste0("Site-level covariate '", v,
         "' is not numeric/integer/logical. Skipping dummy raster creation."), call. = FALSE)
@@ -166,5 +182,49 @@
     names(rr) <- v
     smooth_stack <- c(smooth_stack, rr)
   }
+  undefined <- .msr_undefined_default_terms(formulas, names(outside_zero), mod)
+  if (length(undefined)) {
+    vars <- names(undefined)
+    warning("Nonspatial site covariates default to 0 in the map, where ",
+      paste(unique(unlist(undefined)), collapse = ", "),
+      " is not finite, so the whole map is undefined (0 or infinite). Fitted values: ",
+      paste(outside_zero[vars], collapse = "; "),
+      ". Supply a value with site_values, for example site_values = list(",
+      vars[1L], " = <a typical value>).", call. = FALSE)
+  }
   smooth_stack
+}
+
+# Formula terms that are not finite when the named site covariates take their
+# default value 0 (for example log(sl_)). Each term is evaluated with every
+# variable it uses set to 0, the value the map gives a covariate without a
+# scenario. Terms that cannot be evaluated alone (poly(), strata()) are skipped.
+# Returns a named list: covariate -> deparsed undefined terms.
+.msr_undefined_default_terms <- function(formulas, candidates, model) {
+  if (!length(candidates)) return(list())
+  operators <- c("~", "+", "-", "*", "/", ":", "^", "|", "||", "(", "%in%")
+  calls <- list()
+  collect <- function(x) {
+    if (!is.call(x)) return(invisible(NULL))
+    head <- if (is.symbol(x[[1L]])) as.character(x[[1L]]) else ""
+    if (head %in% operators) {
+      for (part in as.list(x)[-1L]) collect(part)
+    } else if (any(all.vars(x) %in% candidates)) {
+      calls[[length(calls) + 1L]] <<- x
+    }
+    invisible(NULL)
+  }
+  for (f in formulas) if (inherits(f, "formula")) collect(f[[length(f)]])
+  env <- tryCatch(environment(stats::formula(model)), error = function(e) NULL)
+  if (!is.environment(env)) env <- globalenv()
+  out <- list()
+  for (term in calls) {
+    values <- stats::setNames(as.list(rep(0, length(all.vars(term)))), all.vars(term))
+    value <- tryCatch(suppressWarnings(eval(term, values, env)), error = function(e) NULL)
+    if (is.numeric(value) && length(value) && !all(is.finite(value))) {
+      for (v in intersect(all.vars(term), candidates))
+        out[[v]] <- unique(c(out[[v]], paste(deparse(term), collapse = "")))
+    }
+  }
+  out
 }

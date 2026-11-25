@@ -106,7 +106,13 @@ test_that("GDR effect curves use active component rows and raw modeled values", 
         phi = c("wind", "wind_good"), dist = "temperature", rem = if (name == "mixed") character() else "effort")
       defaults <- lapply(raw[variables], function(x) if (is.numeric(x)) mean(x) else x[1L])
       options(contrasts = c("contr.helmert", "contr.poly"))
-      plots <- plot_marginal_effects(object, type = type, length.out = 5L)
+      # A component without covariates now warns instead of returning nothing silently.
+      if (length(variables)) {
+        plots <- plot_marginal_effects(object, type = type, length.out = 5L)
+      } else {
+        expect_warning(plots <- plot_marginal_effects(object, type = type, length.out = 5L),
+                       "no covariates")
+      }
       expect_setequal(names(plots), variables)
       for (variable in variables) {
         x <- raw[[variable]]

@@ -98,7 +98,8 @@
   }
   model <- .analysis_model(object$opt_mod)
   if (methods::is(model, "unmarkedFit") && is.null(type))
-    stop("Specify the native unmarked prediction component explicitly.", call. = FALSE)
+    stop("Specify `type =` with one prediction component of the unmarked `",
+         class(model)[1L], "` model: ", .msr_native_type_list(model), ".", call. = FALSE)
   if (identical(object$backend, "conditional_logit")) {
     if (is.null(type) || identical(type, "response"))
       stop("Choice-set probabilities need complete point choice sets; raster prediction requires type = 'link' or 'risk'.", call. = FALSE)

@@ -1,3 +1,36 @@
+# Valid native prediction types, read from the model where possible, so that a
+# refusal can list them. For unmarked fits these are the estimate types (for
+# example "state" and "det"). For other classes they are the literal choices in
+# the `type` default of the predict() method, which match.arg() enforces (for
+# example "response", "prob", "count", "zero" for pscl::zeroinfl()). Returns
+# NULL when the values cannot be read.
+.msr_native_prediction_types <- function(model) {
+  if (methods::is(model, "unmarkedFit")) {
+    types <- tryCatch(names(model@estimates@estimates), error = function(e) NULL)
+    return(if (length(types)) types else NULL)
+  }
+  for (cl in class(model)) {
+    method <- utils::getS3method("predict", cl, optional = TRUE)
+    if (is.null(method)) next
+    default <- formals(method)$type
+    if (is.call(default) && identical(default[[1L]], as.name("c"))) {
+      values <- as.list(default)[-1L]
+      if (length(values) > 1L && all(vapply(values, function(v)
+          is.character(v) && length(v) == 1L, logical(1))))
+        return(unlist(values, use.names = FALSE))
+    }
+    return(NULL)
+  }
+  NULL
+}
+
+# Format the valid types for a message, or describe them when unreadable.
+.msr_native_type_list <- function(model) {
+  types <- .msr_native_prediction_types(model)
+  if (length(types)) paste0("one of ", paste0("\"", types, "\"", collapse = ", ")) else
+    "a `type` value accepted by the native predict() method"
+}
+
 # Refit snapshots cache numerical outputs only. An unavailable native SE is
 # recorded separately, so preparing point predictions never manufactures it.
 .msr_prepare_refit_prediction <- function(object, newdata, kernel_inputs,
@@ -30,7 +63,9 @@
     if (inherits(model, "coxph")) types <- c("lp", "risk") else
     if (inherits(model, c("lm", "glm", "glmmTMB", "merMod", "gls", "lme")))
       types <- c("response", "link") else
-      stop("Specify the native model's prediction component explicitly.", call. = FALSE)
+      stop("Specify `component =` with one prediction type of the native `",
+           class(model)[1L], "` model: ", .msr_native_type_list(model), ".",
+           call. = FALSE)
   } else {
     validate_character_scalar(component, "component")
     types <- component

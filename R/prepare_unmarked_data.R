@@ -219,6 +219,15 @@ prepare_unmarked_data <- function(object, newdata, kernel_inputs, join_by,
     } else NULL
     if (!is.data.frame(site_covs))
       stop("Automatic fixed predictors require a supported native model with a retained model frame.", call. = FALSE)
+    # A fixed metric used only inside an expression (poly(ed, 2), log(ed))
+    # appears in the model frame as that expression. Take its raw column
+    # from the model data, restricted to the model frame's rows.
+    if (!all(fixed %in% names(site_covs))) {
+      raw <- .model_data(model)
+      rows <- if (is.data.frame(raw)) match(rownames(site_covs), rownames(raw)) else NA
+      if (is.data.frame(raw) && all(fixed %in% names(raw)) && !anyNA(rows))
+        site_covs <- raw[rows, , drop = FALSE]
+    }
   }
   if (!all(fixed %in% names(site_covs)) ||
       !all(fixed %in% names(train$kernel_dat)))

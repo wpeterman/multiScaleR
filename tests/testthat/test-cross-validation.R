@@ -88,9 +88,9 @@ cv_stage1_fixture <- function() {
       rare <- f$data
       rare$group <- factor(c(as.character(rare$group[1:48]), rep("c", 24L)))
       ids <- rownames(rare)
-      failed <- run(formulas$gaussian, rare, folds = list(
+      failed <- msr_quiet_incomplete(run(formulas$gaussian, rare, folds = list(
         good = list(analysis = ids[13:48], assessment = ids[1:12]),
-        bad = list(analysis = ids[1:48], assessment = ids[49:72])), keep_fits = FALSE)
+        bad = list(analysis = ids[1:48], assessment = ids[49:72])), keep_fits = FALSE))
       m <- cv_stage1_inputs()
       for (i in seq_along(m$inputs$raw_cov)) {
         terrain <- m$inputs$raw_cov[[i]][, "terrain"]

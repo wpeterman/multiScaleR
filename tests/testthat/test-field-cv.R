@@ -159,7 +159,8 @@ test_that("invalid geometry, budgets and failed field folds remain explicit", {
   bad <- list(one = list(analysis = rownames(f$data)[-1L], assessment = rownames(f$data)[1L]))
   expect_error(cross_validate_field(y ~ mean, f$data, f$xy, bad,
     crs = f$crs, audit_dir = gdr_test_audit_path("field-cv-location-")), "complete locations")
-  failed <- with_mocked_bindings(run(), .msr_field_cv_fit = function(...) stop("declared fit failure"))
+  expect_warning(failed <- with_mocked_bindings(run(), .msr_field_cv_fit = function(...) stop("declared fit failure")),
+    "incomplete result")
   expect_false(failed$complete)
   expect_true(all(failed$fold_results$status == "failed"))
   expect_true(all(vapply(failed$errors, function(e) grepl("declared fit failure", e$message), logical(1))))

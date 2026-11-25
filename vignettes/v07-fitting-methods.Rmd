@@ -126,7 +126,7 @@ covariate types, and its own requirements appear under
 | Case weights | Whatever the model class allows | Whole-number frequency weights for count and binomial models | No | No |
 | Covariates kept in their own units, `covariate_transform = "raw"` | Yes | No | No | No |
 | Interval for sigma | Wald, or profile likelihood with `summary(fit, profile = TRUE)` | Wald, or profile likelihood with `summary(fit, profile = TRUE)` | None | Posterior credible interval |
-| Uncertainty from `predict()` | Conditional standard errors | Conditional or joint standard errors and confidence intervals | Conditional standard errors | Posterior intervals |
+| Uncertainty from `predict()` | Conditional standard errors when the model class's own `predict()` gives them (not `pscl`, `gls`, or `spaMM` fits) | Conditional or joint standard errors and confidence intervals | Conditional standard errors | Posterior intervals |
 | Model comparison with `aic_tab()` and `bic_tab()` | Yes | Yes | Yes | No |
 
 **How to read the table:** A *conditional* standard error treats the estimated

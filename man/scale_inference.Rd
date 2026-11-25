@@ -20,7 +20,9 @@ scale_inference(
 or \code{backend = "joint_nb2"},
 with NB2 errors and exactly one optimized kernel mean or weighted surface
 SQ covariate. Weighted SQ requires retained raw buffers and a Gaussian or
-exponential kernel.}
+exponential kernel. A Bayesian fit from \code{\link{multiScale_bayes}} is
+refused; its posterior already describes scale uncertainty (see
+\code{\link{posterior_scales}}).}
 
 \item{sigma_values}{Optional positive scale values in map units to examine.
 The search bounds and the refined optimum are always included.}

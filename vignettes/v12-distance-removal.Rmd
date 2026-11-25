@@ -602,6 +602,7 @@ on data like these. `?fit_gdr_response_field` gives the full requirements.
 | A scale of effect for a covariate that appears only in the availability formula of a single-visit design, or only in the distance formula with `keyfun = "uniform"` | Those components are not estimated in such models. Put the landscape covariate in a component the model estimates |
 | A landscape covariate with the same name as a column in the yearly or interval covariate tables | Give each its own name, for example with an alias in `expand_gdr_intervals()` |
 | Intervals that include uncertainty in the scale of effect | Report intervals as conditional on the estimated scale |
+| A map from `kernel_scale.raster()` and `terra::predict()` for an `engine = "TMB"` fit with a random intercept such as <code>(1 &#124; block)</code>. The grouping variable has no map layer, and `terra::predict()` stops with "variable lengths differ" | No tested route yet. Map a fit without the random intercept, or use `predict_gdistremoval()` for surveyed sites |
 | `cross_validate()` for `unmarked` fits | Compare models fitted to the same surveys with `aic_tab()` |
 | `sim_dat_gdr()` for negative binomial or zero-inflated abundance, detection functions other than half-normal, or repeat visits | Simulate those designs with your own code |
 | `make_gdr_refitter()` and `fit_gdr_response_field()` with other package versions. They require `unmarked` 1.5.2, and TMB 1.9.25 for models fitted with `engine = "TMB"` | Use the default refit in `multiScale_optim()`, which has no version requirement |

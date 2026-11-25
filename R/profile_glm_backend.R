@@ -26,13 +26,19 @@
   rows
 }
 
-.msr_profile_contract <- function(model, inputs, kernel_engine = "reference") {
+# `backend` names the requested analytic backend ("profile_glm" or
+# "joint_nb2") in the refusal messages; both share this contract.
+.msr_profile_contract <- function(model, inputs, kernel_engine = "reference",
+                                  backend = "profile_glm") {
   if (!inherits(model, "glm") || !is.data.frame(model$model))
-    stop("profile_glm requires a glm or MASS::glm.nb fit with model = TRUE.", call. = FALSE)
+    stop(backend, " requires a glm or MASS::glm.nb fit with model = TRUE.", call. = FALSE)
   if (inherits(model, "gam"))
     stop("GAM smooth and penalty targets require backend = 'refit'; analytic GLM backends require ordinary unpenalized GLMs.", call. = FALSE)
   if (inputs$kernel == "fixed")
-    stop("profile_glm requires smooth kernels.", call. = FALSE)
+    stop(backend, " requires a smooth kernel, ",
+         "but these inputs use kernel = \"fixed\". Prepare ",
+         "the inputs with a smooth kernel, or use the default refit backend for ",
+         "fixed-radius kernels.", call. = FALSE)
   if (!is.null(model$call$offset))
     stop("Use an offset() term in the formula, not the separate offset argument.", call. = FALSE)
   fam <- model$family
@@ -276,10 +282,10 @@ summary.msr_conditional_glm <- function(object, ...) {
                                       n_cores, refit_fn, control, verbose, call,
                                       backend = "profile_glm") {
   if (!is.null(join_by) || !is.null(refit_fn))
-    stop("profile_glm uses retained model rows and does not accept join_by or refit_fn.",
+    stop(backend, " uses retained model rows and does not accept join_by or refit_fn.",
          call. = FALSE)
   if ((!is.null(n_cores) && n_cores > 1L) || start_strategy != "single")
-    stop("profile_glm runs serial full multi-start fits. Use n_cores = 1, start_strategy = 'single', and profile_control.",
+    stop(backend, " runs serial full multi-start fits. Use n_cores = 1, start_strategy = 'single', and profile_control.",
          call. = FALSE)
   joint_nb2 <- identical(backend, "joint_nb2")
   control <- .msr_profile_control(control, joint_nb2)
@@ -288,7 +294,8 @@ summary.msr_conditional_glm <- function(object, ...) {
   control["worker_pool"] <- list(NULL)
   if (!is.null(pool))
     .msr_stop_unsafe_parallel_ram(inputs, model, NULL, NULL, length(pool), TRUE)
-  contract <- .msr_profile_contract(model, inputs, control$kernel_engine)
+  contract <- .msr_profile_contract(model, inputs, control$kernel_engine,
+                                    backend = backend)
   if (joint_nb2) {
     old <- contract$objective
     contract$objective <- .msr_joint_nb2_objective(old$engine, old$y, old$family,

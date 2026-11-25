@@ -136,6 +136,12 @@ diagnose_bayes_probabilities <- function(object, thresholds,
     out$reason <- "MCMC probability diagnostics are unavailable for approximate draws or importance candidates."
     return(out)
   }
+  # A method = "prepare" object holds no draws at all, so say that rather
+  # than that its chains were not retained.
+  if (is.null(object$draws) && is.null(object$sampler) && is.null(object$chains)) {
+    out$reason <- "This object has no posterior draws. Fit with method = 'sample', 'slice', 'laplace', or 'marginal'."
+    return(out)
+  }
   if (is.null(object$sampler) && is.null(object$chains)) {
     out$reason <- "Full unpermuted MCMC chains are not retained; stored permuted or thinned draws cannot recover them."
     return(out)

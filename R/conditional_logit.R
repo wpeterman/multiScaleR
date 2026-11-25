@@ -102,9 +102,19 @@ terms.msr_clogit_frame_formula <- function(x, ...) {
   dat <- .model_data(m)
   required <- all.vars(stats::formula(m))
   response <- stats::formula(m)[[2L]]
-  response_vars <- all.vars(response)
-  if (!is.call(response) || length(response_vars) != 1L || !is.symbol(response[[length(response)]]))
-    stop("Use a direct case response rather than a transformed response.", call. = FALSE)
+  # The case indicator must be a bare column in the last argument of Surv().
+  # The time argument may be any expression, as in survival::clogit():
+  # rep(1, 360L), rep(1, nrow(dat)), rep(1, n), or a column of ones. Its
+  # constant value of 1 was already checked on the fitted response above.
+  if (!is.call(response) || !is.symbol(response[[length(response)]]))
+    stop("conditional_logit requires the case indicator as a bare 0/1 column ",
+         "in the last argument of Surv(), for example ",
+         "Surv(rep(1, nrow(data)), case) or the response that survival::clogit(case ~ ...) builds. ",
+         "Create a transformed case column in the data before fitting.", call. = FALSE)
+  response_vars <- as.character(response[[length(response)]])
+  # Variables of the time expression that are not data columns (such as `dat`
+  # or `n`) select the retained model frame, so the saved Surv() values are
+  # reused and the expression is never evaluated again.
   frame_mode <- !is.data.frame(dat) || !all(setdiff(required, response_vars) %in% names(dat))
   if (frame_mode) {
     # Fixed expressions and offsets are already evaluated in the saved frame.
@@ -390,6 +400,10 @@ update.msr_conditional_clogit <- function(object, ..., data = NULL) {
   winner <- good[which.min(records$value[good])]; best <- fits[[winner]]
   kp <- unname(best$par[seq_len(obj$nk)]); kd <- .msr_eval_kernel_engine(e, kp)
   class(best$native) <- c("msr_conditional_clogit", class(best$native))
+  # The training data are dropped from the contract below. Keep only the raw
+  # inputs the native fit cannot return, such as ta_ inside cos(ta_), so
+  # effect curves and maps can rebuild those terms.
+  best$native <- .msr_retain_training_data(best$native, contract$data)
   opt_mod <- best$native
   if (inherits(model, "fit_clogit")) {opt_mod <- model; opt_mod$model <- best$native}
   attr(opt_mod, "scale_uncertainty") <- "conditional on optimized kernel scales"

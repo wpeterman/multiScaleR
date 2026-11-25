@@ -135,7 +135,8 @@ test_that("SQ predictions and proposals share frozen reference maps and raw sour
     ids <- c(8, 2, 2, 5)
     new <- predict(fit, f$data[ids, ], kernel_inputs = f$inputs, summary = FALSE)
     expect_equal(as.numeric(new), as.numeric(old[,ids]), tolerance = 1e-12)
-    expect_error(prepare_prediction(fit), "Preparation requires")
+    # A Bayesian fit is pointed to the Bayesian prediction tools.
+    expect_error(prepare_prediction(fit), "works on fits from `multiScale_optim\\(\\)`.*predict\\(\\)")
     restored <- unserialize(serialize(fit, NULL))
     expect_equal(predict(restored, f$data[ids, ], kernel_inputs = f$inputs, summary = FALSE), new)
     expect_identical(fit$specification, before)

@@ -212,20 +212,7 @@ kernel_dist <- function(model,
     if(!missing("model")){
       # ci_ <- summary(model)$opt_scale
 
-      opt_mod <- .analysis_model(model$opt_mod)
-
-      if(any(class(opt_mod) == 'gls')){
-        df <- opt_mod$dims$N - opt_mod$dims$p
-        names <- all.vars(formula(opt_mod)[-2])
-
-      } else if(any(grepl("^unmarked", class(opt_mod)))){
-        df <- dim(opt_mod@data@y)[1]
-        names <- .unmarked_model_predictors(opt_mod)
-
-      } else {
-        df <- get_df(opt_mod, type = "residual")
-        names <- all.vars(formula(opt_mod)[-2])
-      }
+      df <- .msr_residual_df(model$opt_mod)
 
       model <- .msr_refit_bound_view(model)
       if(!is.null(model$profile_scale_est)){
@@ -394,6 +381,32 @@ kernel_dist <- function(model,
   } else {
     stop("Parameters not correctly specified to calculate distance. See Details and try again.")
   }
+}
+
+
+#' Scalar residual degrees of freedom for Wald scale limits
+#'
+#' `ci_func()` needs one residual df for the t quantile of every scale
+#' limit. `insight::get_df()` returns one value per fixed-effect term for
+#' `nlme::lme`, so nlme models use N minus the number of fixed coefficients,
+#' the rule already used for `gls`. `unmarked` models keep the number of
+#' sites. Any other model that reports one value per term uses the smallest,
+#' which gives the widest limits.
+#'
+#' @param model The final native model (`opt_mod`); `amt` wrappers are
+#'   unwrapped here.
+#' @return A single number.
+#' @keywords internal
+#' @noRd
+.msr_residual_df <- function(model) {
+  model <- .analysis_model(model)
+  if (inherits(model, "gls")) return(model$dims$N - model$dims$p)
+  # lme stores no `p` in `dims`; its fixed coefficients give the count.
+  if (inherits(model, "lme")) return(model$dims$N - length(model$coefficients$fixed))
+  if (any(grepl("^unmarked", class(model)))) return(dim(model@data@y)[1])
+  df <- get_df(model, type = "residual")
+  if (length(df) > 1L) df <- min(df)
+  df
 }
 
 

@@ -180,8 +180,12 @@
 #'   "Compare models".
 #' @param bin_reference `"training"` (default) computes the representative
 #'   bin distances from the unique analysis points of each fold and freezes
-#'   them for its assessment points. Use `"fixed"` only when the supplied bins
-#'   were fixed independently of all analysis and assessment data.
+#'   them for its assessment points. It needs the raw cells, so it refuses
+#'   inputs prepared with `store_cell_data = FALSE`, such as lean inputs from
+#'   [kernel_prep_by_group()]. `"fixed"` uses the prepared bin distances as
+#'   given, so lean inputs of kernel means work with it. Use `"fixed"` only
+#'   when the supplied bins were fixed independently of all analysis and
+#'   assessment data.
 #' @param seed Optional positive integer seed. It generates distinct fitting
 #'   and scoring seeds for every fold, and your own random-number state is
 #'   restored afterward.
@@ -265,7 +269,10 @@
 #' approximation and its checks. Importance-corrected fits are scored with
 #' their normalized candidate weights. Passing numerical checks does not
 #' establish predictive calibration. Every fold runs the full fitting
-#' method, so a run takes about as long as one fit per fold.
+#' method, so a run takes about as long as one fit per fold. When any fold
+#' is not scored, the function returns the result and gives one warning that
+#' counts the failed folds and quotes their first distinct reasons. Read
+#' `errors` for the stage and message of every failed fold.
 #'
 #' # Compare models
 #'
@@ -300,8 +307,8 @@
 #'
 #' # Very short slice chains keep this example quick. With the posterior
 #' # package installed, they usually fail the diagnostics, so the folds are
-#' # marked "diagnostic_failed" and the pooled score is NA. Use the default
-#' # chains and iter in an analysis.
+#' # marked "diagnostic_failed", the pooled score is NA, and a warning says
+#' # so. Use the default chains and iter in an analysis.
 #' cv <- cross_validate_bayes(counts ~ land1, landscape_counts, inputs, folds,
 #'                            family = "poisson",
 #'                            priors = list(scale_median = 300),
@@ -363,7 +370,7 @@ cross_validate_bayes <- function(formula, data, kernel_inputs, folds, scales = N
     stop("Raster groups must be named in prepared point-ID order.", call. = FALSE)
   if (bin_reference == "training" && !is.null(kernel_inputs$binned) &&
       (!raw || is.null(kernel_inputs$scale_vars)))
-    stop("Training binning needs declared spatial predictors and raw cells. Supply store_cell_data = TRUE.", call. = FALSE)
+    stop("Training binning needs declared spatial predictors and raw cells. Supply inputs prepared with store_cell_data = TRUE, or set bin_reference = 'fixed' to score with the prepared bins as given (appropriate only when those bins were fixed independently of the analysis and assessment data).", call. = FALSE)
   if (!is.null(assessment_group) && (!is.character(assessment_group) ||
       length(assessment_group) != 1L || !assessment_group %in% names(data) ||
       assessment_group %in% response))
@@ -471,5 +478,7 @@ cross_validate_bayes <- function(formula, data, kernel_inputs, folds, scales = N
     assessment_group = assessment_group, new_group_draws = new_group_draws,
     normalization = "training_only", bin_reference = bin_reference)
   out$call <- match.call()
-  .msr_bayes_cv_finish(out, ids)
+  out <- .msr_bayes_cv_finish(out, ids)
+  .msr_cv_warn_incomplete(out, "cross_validate_bayes")
+  out
 }

@@ -21,7 +21,10 @@
       is.na(component) || !nzchar(component)))
     stop("component must be one native prediction type.", call. = FALSE)
   if (kind == "unmarked") {
-    if (is.null(component)) stop("Specify the native unmarked component explicitly.", call. = FALSE)
+    if (is.null(component))
+      stop("Specify `component =` with one prediction type of the unmarked `",
+           class(object$opt_mod)[1L], "` model: ",
+           .msr_native_type_list(object$opt_mod), ".", call. = FALSE)
     model <- object$opt_mod
     nd <- if (is.null(kernel_inputs)) newdata else
       prepare_unmarked_data(object, newdata, kernel_inputs, join_by, include_fixed)

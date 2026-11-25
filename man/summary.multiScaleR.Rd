@@ -48,7 +48,7 @@ through version 0.7.3).
 \item \code{dimension}: the selected definition, \code{"2d"} or \code{"1d"}.
 \item \code{prob}: the cumulative weight proportion used for the distances.
 \item \code{fitted_mod}: the model refit at the estimated scales (\code{opt_mod} of the
-fit).
+fit, or the native \code{survival} model inside an \code{amt} wrapper).
 \item \code{kernel}: the kernel name.
 \item \code{hard_radius}: names of covariates whose scale is a hard radius.
 \item \code{diagnostics}, \code{warn_message}, \code{next_run}, \code{call}: copied from the fit;
@@ -96,6 +96,15 @@ numerical profile failures still raise errors. The returned refit scale
 table records cache availability in its \code{profile_cache} attribute. The
 option bounds retained entries, not temporary key construction or the
 memory used by the numerical profile.
+
+Two kinds of fit have no profile intervals. For a fit with a declared
+\code{radius_grid} (see \code{\link[=multiScale_optim]{multiScale_optim()}}), \code{profile = TRUE} warns and
+returns the summary with the ordinary limits: \code{NA} for the hard radii and
+Wald limits, conditional on the selected radii, for any smooth scale.
+Inspect \code{diagnostics(object)$radius_profile} for the candidate
+likelihoods. For \code{backend = "conditional_logit"}, scale uncertainty is not
+calibrated, so \code{profile = TRUE} warns and returns \code{NA} scale limits; use
+\code{\link[=profile_sigma]{profile_sigma()}} to view the log-likelihood across sigma.
 }
 
 \section{Analytic backends}{

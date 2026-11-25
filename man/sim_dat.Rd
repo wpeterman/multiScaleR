@@ -93,9 +93,9 @@ raster layer. The layer columns hold the true kernel-weighted means,
 standardized to mean 0 and standard deviation 1. A model fitted to this
 data frame estimates the coefficients at the true scales.
 \item \code{pts}: the survey points with an \code{obs} column holding the response.
-With an integer \code{n_points}, an \code{sf} POINT object with no coordinate
-reference system. Otherwise the supplied points. Pass it to
-\code{\link[=kernel_prep]{kernel_prep()}} as \code{pts}.
+With an integer \code{n_points}, an \code{sf} POINT object with the coordinate
+reference system of \code{raster_stack} (none when the raster has none).
+Otherwise the supplied points. Pass it to \code{\link[=kernel_prep]{kernel_prep()}} as \code{pts}.
 }
 }
 \description{

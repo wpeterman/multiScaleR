@@ -93,7 +93,9 @@ test_that("Bayesian CV refits training rows and scores joint new-group predictio
   expect_false(isTRUE(all.equal(changed$joint_scores$neg_log_score, cv$joint_scores$neg_log_score)))
   args$kernel_inputs$d_list[[point[1L]]] <- args$kernel_inputs$d_list[[point[1L]]] / 2
   args$new_scale_levels <- "error"
-  rejected <- do.call(cross_validate_bayes, args)
+  # An incomplete result now also warns, quoting the fold's reason.
+  expect_warning(rejected <- do.call(cross_validate_bayes, args), "New scale group levels",
+    fixed = TRUE)
   expect_identical(rejected$training, cv$training)
   expect_identical(rejected$fits$holdout$draws, fit$draws)
   expect_identical(rejected$fold_results$status, "failed")
@@ -167,9 +169,10 @@ test_that("Bayesian CV rebuilds fixed metrics and retains weighted surface buffe
   d <- f$data
   # A short run checks the actual held-out computations and failed chain
   # diagnostic records without claiming it supplies a usable posterior.
-  cv <- cross_validate_bayes(count ~ habitat + weighted + fixed, d, f$inputs, f$folds,
-    row_id = "key", family = "gaussian", seed = 15L, keep_fits = TRUE,
-    fit_args = list(chains = 2L, iter = 24L, warmup = 10L))
+  expect_warning(cv <- cross_validate_bayes(count ~ habitat + weighted + fixed, d, f$inputs,
+    f$folds, row_id = "key", family = "gaussian", seed = 15L, keep_fits = TRUE,
+    fit_args = list(chains = 2L, iter = 24L, warmup = 10L)),
+    "did not pass its posterior diagnostics", fixed = TRUE)
   expect_identical(cv$fold_results$status, "diagnostic_failed",
     info = paste(unlist(cv$errors), collapse = " "))
   expect_true(is.finite(cv$joint_scores$neg_log_score))

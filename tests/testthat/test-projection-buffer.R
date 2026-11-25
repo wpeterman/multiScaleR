@@ -134,7 +134,7 @@ test_that("prepared matching refuses incompatible modes and leaves defaults inta
   unknown_crs <- f$source
   terra::crs(unknown_crs) <- ""
   expect_error(kernel_scale.raster(unknown_crs, multiScaleR = inputs,
-    match_buffer = TRUE, verbose = FALSE), "projected square cells")
+    match_buffer = TRUE, verbose = FALSE), "`raster_stack` has none")
   legacy <- kernel_scale.raster(f$source, multiScaleR = inputs, verbose = FALSE)
   explicit <- kernel_scale.raster(f$source, multiScaleR = inputs,
     match_buffer = FALSE, verbose = FALSE)

@@ -171,7 +171,9 @@
 #'   `joint_scores` the joint log score of each held-out group, and
 #'   `training` the coefficients, random-effect covariance, dispersion, and
 #'   any fitted scales of each fold. Compact `selection_records` are always
-#'   kept. A failed fold makes the pooled scores `NA`. The mixed model
+#'   kept. A failed fold makes the pooled scores `NA`, its stage and message
+#'   are kept in `errors`, and the function gives one warning with the number
+#'   of failed folds and their first distinct reasons. The mixed model
 #'   section of [multiScaleR_cv-class] describes every element.
 #'
 #' @details
@@ -367,7 +369,9 @@ cross_validate_mixed <- function(formula, data, folds,
     out$warnings[name] <- list(messages)
     out$errors[name] <- list(error)
   }
-  .msr_mixed_cv_finish(out)
+  out <- .msr_mixed_cv_finish(out)
+  .msr_cv_warn_incomplete(out, "cross_validate_mixed")
+  out
 }
 
 .msr_mixed_cv_predict <- function(design, train, test, family, tolerance) {

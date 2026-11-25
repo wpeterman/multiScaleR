@@ -24,6 +24,76 @@
   output
 }
 
+# Warn once when a cross-validation function returns unscored folds. Failed
+# folds are recorded rather than raised, so without this a script that never
+# prints the result sees only NA scores. The result is not modified: the
+# warning reports how many folds failed, quotes the first distinct reasons
+# from `errors`, and points to that element for the rest.
+.msr_cv_warn_incomplete <- function(x, fun) {
+  status <- as.character(x$fold_results$status)
+  if (!length(status) || all(status == "scored")) return(invisible(x))
+  folds <- as.character(x$fold_results$fold)
+  failed <- folds[status != "scored"]
+  reasons <- vapply(failed, function(name) {
+    e <- x$errors[[name]]
+    reason <- if (is.list(e) && is.character(e$message) && length(e$message))
+      e$message[1L] else paste0("fold status '", status[match(name, folds)], "'")
+    # Keep the condition readable when a native message is long.
+    if (nchar(reason) > 300L) paste0(substr(reason, 1L, 297L), "...") else reason
+  }, character(1), USE.NAMES = FALSE)
+  distinct <- unique(reasons)
+  shown <- utils::head(distinct, 2L)
+  quoted <- vapply(shown, function(reason) sprintf("\"%s\" (%s)", reason,
+    paste(failed[reasons == reason], collapse = ", ")), character(1), USE.NAMES = FALSE)
+  others <- length(distinct) - length(shown)
+  warning(sprintf(paste0("%s() returned an incomplete result: %d of %d folds failed, ",
+      "so the pooled scores are NA. %s %s%s Inspect `$errors` of the result for the ",
+      "stage and message of every failed fold."),
+    fun, length(failed), length(status),
+    if (length(distinct) == 1L) "Reason:" else "Reasons:",
+    paste(quoted, collapse = "; "),
+    if (others > 0L) sprintf("; and %d other reason%s.", others, if (others > 1L) "s" else "") else "."),
+    call. = FALSE)
+  invisible(x)
+}
+
+# Tibbles, including amt::random_steps() output, drop row names when
+# subset, so fold rows would lose the IDs that bind them to the prepared
+# points. A plain data frame keeps the same row IDs (rownames() of a tibble
+# are "1" to "n") and makes a tibble behave like the equivalent data frame.
+.msr_cv_plain_data <- function(data) {
+  if (inherits(data, "tbl_df")) data <- as.data.frame(data)
+  data
+}
+
+# cv_tab() and select_cv() take a named list of CV results. Name the actual
+# problem when they receive one result, or a list that holds a fitted model,
+# instead of reporting failed folds.
+.msr_cv_check_candidates <- function(mod_list, fun) {
+  if (inherits(mod_list, "multiScaleR_cv"))
+    stop(fun, "() needs a named list of cross-validation results, but mod_list is a single ",
+      class(mod_list)[1L], " result. Wrap the candidates in list(), for example ",
+      fun, "(list(model_a = cv_a, model_b = cv_b), ...).", call. = FALSE)
+  if (is.object(mod_list))
+    stop(fun, "() needs a named list of cross-validation results, but mod_list is a ",
+      class(mod_list)[1L], " object.", call. = FALSE)
+  # Flag classed objects such as a multiScaleR fit or a glm. Unclassed or
+  # altered records fall through to the comparison checks of each CV kind.
+  other <- vapply(mod_list, function(x) is.object(x) && !inherits(x, "multiScaleR_cv"), logical(1))
+  if (any(other)) {
+    labels <- names(mod_list)
+    if (is.null(labels)) labels <- rep("", length(mod_list))
+    labels <- ifelse(is.na(labels) | !nzchar(labels), paste0("#", seq_along(mod_list)), labels)
+    kinds <- vapply(mod_list[other], function(x) class(x)[1L], character(1))
+    stop(fun, "() compares cross-validation results only. Not a CV result: ",
+      paste0(labels[other], " (", kinds, ")", collapse = ", "),
+      ". Supply a named list of results from cross_validate(), cross_validate_glm(), ",
+      "cross_validate_clogit(), cross_validate_mixed(), cross_validate_field(), or ",
+      "cross_validate_bayes(); a fitted model cannot be compared here.", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 #' Cross-Validate an Ordinary GLM Reference Model
 #'
 #' Fit a GLM to the analysis rows of each fold and score its predictions for
@@ -72,7 +142,8 @@
 #' standardized with all rows. The section "Formula terms that learn from the
 #' data" in [cross_validate()] lists the supported terms and their limits.
 #' Missing values are never dropped silently, and native warnings and failed
-#' folds are kept.
+#' folds are kept. When any fold fails, the function gives one warning with
+#' the number of failed folds and their first distinct reasons.
 #'
 #' # Binomial responses
 #'
@@ -168,10 +239,13 @@ cross_validate_glm <- function(formula, data, folds,
     keep_selection = FALSE, theta = NULL, dispersion = NULL) {
   if (identical(family, "gamma")) family <- "Gamma"
   family <- match.arg(family)
+  data <- .msr_cv_plain_data(data)
   if (.msr_cv_distribution_family(family)) {
     out <- .msr_cv_distribution(formula, data, folds, family, weights, glm_control, metrics,
       keep_fits, keep_selection, theta, dispersion)
-    out$call <- match.call(); return(out)
+    out$call <- match.call()
+    .msr_cv_warn_incomplete(out, "cross_validate_glm")
+    return(out)
   }
   if (!is.null(theta) || !is.null(dispersion)) stop("theta/dispersion controls apply only to NB2/Gamma CV.", call. = FALSE)
   validate_scalar_logical(keep_fits, "keep_fits")
@@ -256,6 +330,7 @@ cross_validate_glm <- function(formula, data, folds,
     glm_control = glm_control, normalization = "training_only", prediction_target = "held_out_GLM_expected_response",
     parameter_uncertainty = "not_integrated", observation_intervals = "not_provided", calibration = "not_established", workers = 1L)
   output$call <- match.call()
+  .msr_cv_warn_incomplete(output, "cross_validate_glm")
   output
 }
 
@@ -445,6 +520,7 @@ cv_tab <- function(mod_list, metric, by_fold = FALSE) {
   if (!is.character(metric) || length(metric) != 1L || is.na(metric) ||
       !metric %in% c("rmse", "mae", "neg_log_score", "deviance", "brier"))
     stop("Select one supported metric explicitly.", call. = FALSE)
+  .msr_cv_check_candidates(mod_list, "cv_tab")
   if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_bayes_cv")))
     return(.msr_bayes_cv_tab(mod_list, metric, by_fold))
   if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_field_cv")))
@@ -643,6 +719,7 @@ select_cv <- function(mod_list, criterion = c("AICc", "AIC", "BIC"),
     ties = c("error", "first"), keep_fits = FALSE) {
   criterion <- match.arg(criterion); ties <- match.arg(ties)
   validate_scalar_logical(keep_fits, "keep_fits")
+  .msr_cv_check_candidates(mod_list, "select_cv")
   if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_bayes_cv")))
     stop("Bayesian CV has no training ML selection criterion. Compare predictive scores with cv_tab().", call. = FALSE)
   if (is.list(mod_list) && any(vapply(mod_list, inherits, logical(1), "multiScaleR_field_cv")))

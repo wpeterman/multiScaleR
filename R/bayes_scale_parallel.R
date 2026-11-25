@@ -46,9 +46,27 @@
     stop("Cannot publish Bayesian worker data at ", basename(file), ".", call. = FALSE)
 }
 
+# Thin wrapper so tests can simulate a file that Windows briefly keeps open.
+.msr_bayes_pool_unlink <- function(files) unlink(files)
+
+# Remove handed-over files. On Windows, antivirus or a synced folder can hold
+# a just-closed file for a moment, so one failed unlink() is not final.
+# Retry with short sleeps (about 2 s in total) and fail only if a file still
+# exists afterward.
+.msr_bayes_pool_clear <- function(files, attempts = 20L, wait = 0.1) {
+  for (i in seq_len(attempts)) {
+    .msr_bayes_pool_unlink(files)
+    remaining <- files[file.exists(files)]
+    if (!length(remaining)) return(TRUE)
+    files <- remaining
+    if (i < attempts) Sys.sleep(wait)
+  }
+  FALSE
+}
+
 .msr_bayes_pool_take <- function(file) {
   value <- readRDS(file)
-  if (unlink(c(file, paste0(file, ".ready"))) != 0L)
+  if (!.msr_bayes_pool_clear(c(file, paste0(file, ".ready"))))
     stop("Cannot clear Bayesian worker data at ", basename(file), ".", call. = FALSE)
   value
 }

@@ -30,7 +30,15 @@ kernel-weighted variables defined in \code{kernel_inputs}. Supported classes
 include \code{lm}, \code{glm}, \code{gls} (nlme), and \code{unmarkedFit} (unmarked). Many
 other model classes also work through \code{stats::update()} or a custom
 \code{refit_fn}. A predictor cannot be named \code{"x"}, which is reserved for
-internal coordinate data.}
+internal coordinate data. Fit the model with \verb{data =} naming a data frame
+that holds every model variable. A model fitted inside a function or
+\code{lapply()} is refitted in the environment where it was fitted, so a
+formula held in a local variable works; other inputs to the fitting call,
+such as a \code{family} or \code{start} object, must still exist there. For
+\code{survival::clogit()}, \code{survival::coxph()}, and \code{amt} fits, also set
+\code{model = TRUE}, and add transformed terms such as \code{cos(ta_)} to the data
+as columns when the fit comes from \code{amt::fit_issf()}, which does not keep
+its input data.}
 
 \item{kernel_inputs}{A list of class \code{"multiScaleR_data"} created by
 \code{\link[=kernel_prep]{kernel_prep()}}. It must contain the elements \code{raw_cov}, \code{d_list}, \code{min_D},
@@ -62,7 +70,10 @@ and the backend is \code{"refit"} without a \code{radius_grid}, and \code{"singl
 otherwise. Under a fixed kernel every optimized scale is a hard radius,
 and a gradient search cannot leave a single start on that stepped
 likelihood. A refit search that returns its starting values gives a
-warning and records \code{start_stall} in \code{\link[=diagnostics]{diagnostics()}}.}
+warning and records \code{start_stall} in \code{\link[=diagnostics]{diagnostics()}}. The analytic
+backends (\code{"profile_glm"}, \code{"joint_nb2"}, \code{"conditional_logit"}) run their
+own multi-start search and accept only \code{"single"}; set their starts with
+\code{profile_control}.}
 
 \item{screen_n_sigma}{Positive integer. Number of log-spaced sigma values
 evaluated per covariate during the prescreen when

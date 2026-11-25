@@ -138,7 +138,7 @@ test_that("mixed CV comparison, selection and scoring use training outcomes only
   changed$joint_scores[[1]]$neg_log_score[1] <- 0
   expect_error(cv_tab(list(changed = changed), "neg_log_score"), "changed")
   d[hold, "x"] <- NA_real_
-  failed <- cross_validate_mixed(fixed, d, f$new)
+  expect_warning(failed <- cross_validate_mixed(fixed, d, f$new), "incomplete result")
   expect_false(failed$complete)
   expect_true(all(is.na(failed$summary$estimate)))
   expect_true(all(!failed$predictions$eligible))

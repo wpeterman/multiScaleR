@@ -92,8 +92,9 @@ argument when constructing an \code{unmarkedFrame}.}
 contains the simulated true abundance/occupancy (before detection
 thinning). Remaining columns are the true kernel-weighted covariate
 values, scaled to zero mean and unit variance.}
-\item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
-An \code{obs} column is appended containing the true
+\item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows
+and the coordinate reference system of \code{raster_stack} (none when
+the raster has none). An \code{obs} column is appended containing the true
 abundance/occupancy values. Pass to \code{\link{kernel_prep}} as
 \code{pts}.}
 }

@@ -80,7 +80,9 @@ scores, \code{predictions} the integrated response mean of each held-out row,
 \code{joint_scores} the joint log score of each held-out group, and
 \code{training} the coefficients, random-effect covariance, dispersion, and
 any fitted scales of each fold. Compact \code{selection_records} are always
-kept. A failed fold makes the pooled scores \code{NA}. The mixed model
+kept. A failed fold makes the pooled scores \code{NA}, its stage and message
+are kept in \code{errors}, and the function gives one warning with the number
+of failed folds and their first distinct reasons. The mixed model
 section of \link[=multiScaleR_cv-class]{multiScaleR_cv} describes every element.
 }
 \description{

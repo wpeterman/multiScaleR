@@ -33,7 +33,9 @@ the columns of \code{data}, so remove the set ID from it, for example
 \item{data}{Data frame with one row per alternative, holding the case
 column, the set ID, and every predictor. Its row names are the row IDs
 used by \code{folds} and, when supplied, by \code{kernel_inputs}. They must be
-unique.}
+unique. A tibble, such as the output of \code{amt::random_steps()}, is used
+as the equivalent data frame, whose row IDs are \code{"1"} to the number of
+rows.}
 
 \item{folds}{Named list of explicit splits of row IDs, as in
 \code{\link[=cross_validate]{cross_validate()}}. Every choice set must lie wholly in the analysis
@@ -49,11 +51,14 @@ supplied, each fold also estimates the scales, and learns the
 standardization and distance bins, from its analysis rows only.}
 
 \item{backend}{Scale-fitting route used with \code{kernel_inputs}, either
-\code{"conditional_logit"} (default) or \code{"refit"}. Supply
-\code{optim_args = list(radius_grid = ...)} with \code{"refit"} to profile hard
-radii, together with any smooth scales, in each training split. The
-usual kernel, metric, and numerical checks of \code{\link[=multiScale_optim]{multiScale_optim()}}
-apply. Ignored when \code{kernel_inputs} is \code{NULL}.}
+\code{"conditional_logit"} (default) or \code{"refit"}. \code{"conditional_logit"}
+accepts Gaussian or exponential kernels with kernel means or weighted
+surface SQ, and other kernels or hard-radius predictors stop before any
+fold is fitted. Supply \code{optim_args = list(radius_grid = ...)} with
+\code{"refit"} to profile hard radii, together with any smooth scales, in
+each training split. The usual kernel, metric, and numerical checks of
+\code{\link[=multiScale_optim]{multiScale_optim()}} apply in every fold. Ignored when \code{kernel_inputs}
+is \code{NULL}.}
 
 \item{method}{Partial-likelihood method passed to \code{\link[survival:clogit]{survival::clogit()}},
 one of \code{"exact"} (default), \code{"efron"}, or \code{"breslow"}. These are rules
@@ -68,7 +73,9 @@ the native training fit. The default keeps the settings of
 \item{optim_args}{Named list of extra \code{\link[=multiScale_optim]{multiScale_optim()}} arguments used
 in every fold, such as \code{par} or \code{profile_control}. Supply \code{radius_grid}
 with \code{backend = "refit"} to profile hard radii, together with any smooth
-scales, in each training split. Supply \code{covariate_transform = "raw"} with
+scales, in each training split. An estimated hard radius usually needs
+it, because without it folds often fail (see "How each fold is
+fitted"). Supply \code{covariate_transform = "raw"} with
 \code{backend = "refit"} to keep optimized covariates in their own units (see
 "Keep optimized covariates in their own units"). Arguments that supply
 data, the starting model, a custom refit function, parallel workers,
@@ -134,7 +141,9 @@ fold checks that its native fit is unweighted and unpenalized, uses the
 analysis rows and complete sets, and used the declared \code{method}, whether
 or not fits or records are kept. Learned transformations follow the rules
 described in \code{\link[=cross_validate]{cross_validate()}}. Their training constants add no stratum
-effects and do not change the event count.
+effects and do not change the event count. A failed fold is recorded in
+\code{errors}, and when any fold fails the function gives one warning with the
+number of failed folds and their first distinct reasons.
 }
 
 \section{Estimate scales within the folds}{

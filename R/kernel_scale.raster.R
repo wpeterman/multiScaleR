@@ -21,7 +21,9 @@
 #'   or a prepared `multiScaleR_data` object from [kernel_prep()]. When
 #'   supplied, `sigma`, `shape`, `kernel`, and `scale_vars` are taken from it.
 #'   A fitted object supplies the estimated scales. A prepared object supplies
-#'   the starting scales of [kernel_prep()]. Default: `NULL`.
+#'   the starting scales of [kernel_prep()]. Default: `NULL`. A Bayesian fit
+#'   from [multiScale_bayes()] is refused; to map it, pass a posterior scale
+#'   from [posterior_scales()] to `sigma`.
 #' @param shape Numeric vector of shape parameters for the exponential power
 #'   kernel (`kernel = "expow"`), one per optimized covariate. A hard-radius
 #'   covariate ignores its shape position. Ignored when `multiScaleR` is
@@ -353,7 +355,8 @@ kernel_scale.raster <- function(raster_stack,
   validate_pct_mx(pct_mx)
 
   if(!is.null(multiScaleR)){
-    validate_multiScaleR_input(multiScaleR)
+    # A Bayesian fit gets a pointer to the Bayesian tools, not a class error.
+    validate_multiScaleR_input(multiScaleR, fn = "kernel_scale.raster")
   }
   buffer_radius <- NULL
   if (match_buffer) {
@@ -367,9 +370,27 @@ kernel_scale.raster <- function(raster_stack,
     buffer_radius <- multiScaleR$max_D
     validate_scalar_numeric(buffer_radius, "prepared max_D", positive = TRUE)
     validate_scalar_numeric(prepared$resolution, "prepared resolution", positive = TRUE)
-    if (!nzchar(terra::crs(raster_stack)) || isTRUE(terra::is.lonlat(raster_stack)) ||
-        !isTRUE(all.equal(terra::res(raster_stack), rep(prepared$resolution, 2L))))
-      stop("match_buffer requires projected square cells at the prepared resolution.", call. = FALSE)
+    # Check each requirement separately so the message names the one that
+    # failed. An empty CRS is the usual cause: sim_rast() output and the
+    # shipped example rasters carry none.
+    if (!nzchar(terra::crs(raster_stack)))
+      stop("match_buffer requires a projected coordinate reference system, but ",
+           "`raster_stack` has none (an empty CRS, as `sim_rast()` returns). ",
+           "Assign the projected CRS of the data before the call, for example ",
+           "terra::crs(r) <- \"EPSG:32617\" with the EPSG code of your projection, ",
+           "or terra::crs(r) <- \"local\" for planar coordinates in map units.",
+           call. = FALSE)
+    if (isTRUE(terra::is.lonlat(raster_stack)))
+      stop("match_buffer requires a projected coordinate reference system, but ",
+           "`raster_stack` uses longitude/latitude. Project it with ",
+           "terra::project() to the projected CRS used when the inputs were prepared.",
+           call. = FALSE)
+    if (!isTRUE(all.equal(terra::res(raster_stack), rep(prepared$resolution, 2L))))
+      stop(sprintf(paste0("match_buffer requires square cells at the prepared ",
+           "resolution (%s map units), but `raster_stack` has %s x %s cells. ",
+           "Use the raster resolution the inputs were prepared with."),
+           format(prepared$resolution), format(terra::res(raster_stack)[1L]),
+           format(terra::res(raster_stack)[2L])), call. = FALSE)
   }
   fixed_contract <- NULL
   if (include_fixed) {
@@ -626,6 +647,8 @@ kernel_scale.raster <- function(raster_stack,
 
       smooth_list[[i]] <- out
     } else {
+      # Name the window and raster sizes before terra refuses a large window.
+      .msr_check_focal_window(wt_mat, raster_stack[[lyr]])
       smooth_list[[i]] <- focal(raster_stack[[lyr]],
                                 w = wt_mat,
                                 fun = "mean",

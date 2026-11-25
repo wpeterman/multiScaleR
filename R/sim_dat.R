@@ -63,9 +63,9 @@
 #'   standardized to mean 0 and standard deviation 1. A model fitted to this
 #'   data frame estimates the coefficients at the true scales.
 #' * `pts`: the survey points with an `obs` column holding the response.
-#'   With an integer `n_points`, an `sf` POINT object with no coordinate
-#'   reference system. Otherwise the supplied points. Pass it to
-#'   [kernel_prep()] as `pts`.
+#'   With an integer `n_points`, an `sf` POINT object with the coordinate
+#'   reference system of `raster_stack` (none when the raster has none).
+#'   Otherwise the supplied points. Pass it to [kernel_prep()] as `pts`.
 #'
 #' @details
 #' **Model.** For each point, `sim_dat()` computes the kernel-weighted mean of

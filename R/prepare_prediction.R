@@ -13,7 +13,8 @@
 #'   `backend = "profile_glm"`, `"joint_nb2"`, `"conditional_logit"`, or
 #'   `"joint_mixed"`, or the default refit backend with a supported native
 #'   model in `object$opt_mod`. For `predict()`, a snapshot returned by
-#'   `prepare_prediction()`.
+#'   `prepare_prediction()`. A Bayesian fit from [multiScale_bayes()] is
+#'   refused; use [predict.multiScaleR_bayes()] with new kernel inputs.
 #' @param newdata,kernel_inputs Prediction rows and matching spatial inputs
 #'   from [kernel_prep()], with the same requirements as in
 #'   [predict.multiScaleR()]. The default `NULL` for both uses the rows
@@ -236,6 +237,8 @@ prepare_prediction <- function(object, newdata = NULL, kernel_inputs = NULL,
                                max_bytes = 64 * 1024^2,
                                component = NULL, native_args = list(), join_by = NULL,
                                include_fixed = FALSE) {
+  # A Bayesian fit gets a pointer to the Bayesian tools, not a class error.
+  .msr_stop_bayes_fit(object, "prepare_prediction")
   validate_scalar_numeric(max_bytes, "max_bytes", positive = TRUE)
   validate_scalar_logical(include_fixed, "include_fixed")
   refit <- inherits(object, "multiScaleR") &&

@@ -21,7 +21,8 @@ test_that("probability diagnostics validate requests without extracting unavaila
     .package = "multiScaleR")
   d <- diagnose_bayes_probabilities(fit, list(habitat = 100))
   expect_false(d$available)
-  expect_match(d$reason, "not retained")
+  # A prepared object has no draws at all (audit B-3).
+  expect_match(d$reason, "no posterior draws")
   expect_identical(d$raw_diagnostics, fit$diagnostics)
   expect_equal(nrow(d$probabilities), 0L)
   expect_equal(nrow(d$chain_probabilities), 0L)
@@ -30,6 +31,8 @@ test_that("probability diagnostics validate requests without extracting unavaila
   expect_false("passed" %in% names(d))
   fit <- fake_bayesian_draws(fit)
   expect_false(diagnose_bayes_probabilities(fit, list(habitat = 100))$available)
+  # Draws without the original chains keep the chain-retention reason.
+  expect_match(diagnose_bayes_probabilities(fit, list(habitat = 100))$reason, "not retained")
   for (nm in c("laplace", "marginal", "importance")) {
     f <- fit; f[[nm]] <- list(passed = TRUE); f$sampler <- "mock"
     expect_match(diagnose_bayes_probabilities(f, list(habitat = 100))$reason, "approximate draws")

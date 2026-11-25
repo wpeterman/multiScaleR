@@ -52,7 +52,11 @@ test_that("a declared radius profile matches separate native likelihoods", {
   expect_equal(fit$optim_results$value, -max(ref), tolerance = 1e-10)
   expect_equal(as.numeric(predict(fit, f$data, f$inputs)), unname(fitted(fit$opt_mod)))
   expect_true(is.na(summary(fit)$opt_scale["diversity", "SE"]))
-  expect_error(summary(fit, profile = TRUE), "radius_profile")
+  # No profile intervals for a declared grid: warn and keep the summary.
+  expect_warning(s <- summary(fit, profile = TRUE), "radius_profile")
+  expect_s3_class(s, "summary_multiScaleR")
+  expect_true(all(is.na(unlist(s$opt_scale["diversity", c("2.5%", "97.5%")]))))
+  expect_identical(unname(attr(s$opt_scale, "interval_method")), "unavailable")
   expect_error(multiScale_optim(initial, f$inputs, radius_grid = c(50, 250)), "within min_D")
   expect_error(multiScale_optim(initial, f$inputs, backend = "profile_glm",
     radius_grid = f$radius), "requires backend")
@@ -110,7 +114,7 @@ test_that("choice CV profiles the hard radius using training sets only", {
   expect_identical(diagnostics(changed$fits[[1L]])$radius_profile, profile)
   expect_equal(changed$predictions$prediction, cv$predictions$prediction)
 
-  failed <- run(d, c(50, 60))
+  expect_warning(failed <- run(d, c(50, 60)), "incomplete result")
   expect_false(failed$complete)
   expect_identical(failed$errors[[1L]]$radius_profile$status, c("failed", "failed"))
 })

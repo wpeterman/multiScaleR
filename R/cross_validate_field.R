@@ -150,9 +150,13 @@
 #' With few locations in a training fold, the field's standard deviation and
 #' range are often weakly identified, and the two Gaussian starts can stop at
 #' different points of a nearly flat likelihood. Those folds fail by design
-#' ("starts disagree") rather than report one arbitrary solution. Use more
-#' locations per fold, or fewer folds, and inspect `audit_dir` to see how far
-#' apart the starts ended.
+#' ("starts disagree") rather than report one arbitrary solution. This can
+#' also happen when the response has little spatial structure left after the
+#' fixed predictors, because the range of a field whose SD is near zero is
+#' poorly identified. Use more locations per fold, or fewer folds, and inspect
+#' `audit_dir` to see how far apart the starts ended. When any fold fails,
+#' the function gives one warning with the number of failed folds and their
+#' first distinct reasons, and `errors` keeps the stage and message of each.
 #'
 #' # Build folds for a field model
 #'
@@ -448,5 +452,7 @@ cross_validate_field <- function(formula, data, coords, folds, audit_dir, crs = 
     ecological_scale_uncertainty = "not_integrated", observation_noise_included = TRUE,
     calibration = "not_established", workers = 1L)
   out$call <- match.call()
-  .msr_field_cv_finish(out, ids)
+  out <- .msr_field_cv_finish(out, ids)
+  .msr_cv_warn_incomplete(out, "cross_validate_field")
+  out
 }

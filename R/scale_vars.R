@@ -1186,6 +1186,7 @@ print.multiScaleR_vars <- function(x, ...) {
     terra::values(out) <- as.vector(out_mat)
     out
   } else {
+    .msr_check_focal_window(wt_mat, raster)
     terra::focal(raster,
                  w = wt_mat,
                  fun = "mean",

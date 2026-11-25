@@ -416,7 +416,9 @@ likelihood of a finite choice set: one used step and at least one available
 step per set. See \code{vignette("v10-step-selection", package = "multiScaleR")}.
 \subsection{Models and data it accepts}{
 
-Use a \code{survival::clogit()} model fitted with \code{model = TRUE}, or an
+Use a \code{survival::clogit()} model fitted with \code{model = TRUE}, a
+\code{survival::coxph()} model with a constant-time response such as
+\code{Surv(rep(1, nrow(dat)), case)}, or an
 \code{amt::fit_clogit()} wrapper, with Gaussian or exponential kernels and one
 bare \code{strata(choice_id)} term. A quoted choice-set ID is still one bare
 variable, and special-call text inside a quoted predictor name is not read

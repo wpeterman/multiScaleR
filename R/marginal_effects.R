@@ -387,18 +387,28 @@ plot_marginal_effects <- function(x,
   trained_unmarked_curve <- ordinary_unmarked_curve || gdr_unmarked_curve
   # Extract variables from fitted model
   if (any(grepl("^unmarked", class(mod)))) {
+    # Other unmarked classes plot their site-level state component only, which
+    # each class names differently: "state" (occuRN, distsamp), "lambda"
+    # (gdistsamp, gmultmix), or "psi" (colext). Accept any of the three.
+    state_names <- c("state", "lambda", "psi")
     allowed <- if (gdr_unmarked_curve) c("state", names(.msr_gdr_active_formulas(mod))) else
-      if (ordinary_unmarked_curve) c("lambda", "state", "det") else c("lambda", "state")
+      if (ordinary_unmarked_curve) c("lambda", "state", "det") else state_names
     if (is.null(type) || !type %in% allowed) {
       if (gdr_unmarked_curve)
         stop("`type` must name an active native GDR component: ", paste(setdiff(allowed, "state"), collapse = ", "), ".")
       if (ordinary_unmarked_curve)
         stop("`type` must be specified as 'state', 'lambda', or 'det'.")
-      stop("`type` must be specified as either 'lambda' or 'state'.")
+      stop("For this unmarked class, `type` must name the site-level state component ",
+           "('state', 'lambda', or 'psi'); detection and other components are not plotted.")
     }
     # Keep the documented plotting alias; ordinary providers name it state.
     if (ordinary_unmarked_curve && identical(type, "lambda")) type <- "state"
     if (gdr_unmarked_curve && identical(type, "state")) type <- "lambda"
+    if (!trained_unmarked_curve) {
+      component_names <- if ("formlist" %in% methods::slotNames(mod)) names(mod@formlist) else character()
+      native_state <- intersect(state_names, component_names)
+      type <- if (length(native_state)) native_state[1L] else "state"
+    }
     component <- .msr_unmarked_marginal_formula(mod, type)
     dat <- if (trained_unmarked_curve)
       get("get_covariates", asNamespace("unmarked"))(mod, type) else
@@ -500,6 +510,10 @@ plot_marginal_effects <- function(x,
       if (!native_mixed_response && !native_gam_components &&
           !inherits(analysis_mod, "zeroinfl")) link_inverse(analysis_mod) else NULL
     curve_predictor <- if (inherits(analysis_mod, "gam")) .msr_predict_gam else predict
+    if (inherits(analysis_mod, "coxph.penal"))
+      stop("Effect curves are not available for penalized Cox models such as frailty() fits: ",
+           "survival's predict() cannot hold the penalized term at one value for new data. ",
+           "Use summary() for the coefficients, or refit without the penalized term.", call. = FALSE)
     native_fixed_terms <- if (class(analysis_mod)[1L] %in%
         c("lm", "glm", "negbin", "coxph", "clogit")) stats::terms(analysis_mod) else NULL
     cox_groups <- if (inherits(analysis_mod, "coxph"))
@@ -543,6 +557,14 @@ plot_marginal_effects <- function(x,
       }, error = function(e) character(0))
       c_vars <- setdiff(c_vars, setdiff(offset_vars, term_vars))
     }
+    # An offset passed through the fitting function's `offset =` argument is
+    # evaluated in the prediction data, like offset() in the formula. Hold its
+    # inputs at their mean; otherwise native prediction recycles the training
+    # offsets (or a same-named workspace vector) over the curve grid.
+    call_offset <- if (is.list(analysis_mod))
+      tryCatch(analysis_mod$call$offset, error = function(e) NULL) else NULL
+    call_offset_vars <- if (is.null(call_offset)) character() else all.vars(call_offset)
+    vars <- union(vars, call_offset_vars)
     if (!is.null(reference)) vars <- union(vars, reference$required_inputs)
     dat_all <- if (!is.null(reference)) reference$data else
       if (identical(x$backend, "joint_mixed") &&
@@ -572,6 +594,12 @@ plot_marginal_effects <- function(x,
         paste(missing, collapse = ", "), ". Refit with recoverable raw training data.", call. = FALSE)
     }
 
+    absent_offset <- setdiff(call_offset_vars, names(dat_all))
+    if (length(absent_offset))
+      stop("The model's `offset =` argument uses ", paste(absent_offset, collapse = ", "),
+        ", which is not a column of the model data, so effect curves cannot hold the offset fixed. ",
+        "Add it to the data and refit, with offset() in the formula or `offset =` naming that column.",
+        call. = FALSE)
     absent <- setdiff(vars, names(dat_all))
     if (length(absent)) stop("Raw inputs were not retained for effect curves: ",
       paste(absent, collapse = ", "), ". Supply verified reference_data.", call. = FALSE)
@@ -709,6 +737,14 @@ plot_marginal_effects <- function(x,
       } else if (inherits(analysis_mod, "coxph")) {
         preds <- predict(analysis_mod, newdata = newdata, type = "lp",
                          reference = "zero", se.fit = TRUE)
+      } else if (inherits(analysis_mod, "lme")) {
+        # Population-level curve: random effects at zero, as for lme4 and
+        # glmmTMB curves. nlme's predict() gives no standard errors.
+        preds <- tryCatch(
+          list(stats::predict(analysis_mod, newdata = newdata, level = 0)),
+          error = function(e) stop(sprintf(
+            "Failed to compute marginal effects for covariate '%s': %s", v,
+            e$message), call. = FALSE))
       } else {
         preds <- tryCatch(
           curve_predictor(analysis_mod, newdata = newdata, se.fit = TRUE),
@@ -770,6 +806,21 @@ plot_marginal_effects <- function(x,
 
   names(plot_list) <- c_vars
 
+  # An empty component used to return an empty list with no explanation, so a
+  # default call on a model whose covariates sit in another component (for
+  # example occu(~ x ~ 1), with x in detection) silently drew nothing.
+  if (!length(c_vars)) {
+    others <- if (any(grepl("^unmarked", class(mod))) && "formlist" %in% methods::slotNames(mod))
+      names(Filter(function(f) inherits(f, "formula") &&
+        length(all.vars(f[[length(f)]])) > 0L, mod@formlist)) else character()
+    warning("No covariate effects to plot",
+      if (!is.null(type) && any(grepl("^unmarked", class(mod)))) paste0(" in the '", type, "' component"),
+      "; it has no covariates.",
+      if (length(others)) paste0(" Components with covariates: ", paste(others, collapse = ", "),
+                                 ". Choose one with `type`."),
+      call. = FALSE)
+  }
+
   # Build ggplots, adding subtitles for polynomial and interaction terms
   gg_list <- lapply(c_vars, function(v) {
     df <- plot_list[[v]]
@@ -800,7 +851,8 @@ plot_marginal_effects <- function(x,
       theme_cowplot()
     if (all(is.na(df$lwr)) && all(is.na(df$upr)))
       p <- p + labs(caption = paste(c(
-        if (trained_unmarked_curve || native_mixed_response || inherits(analysis_mod, "HLfit"))
+        if (trained_unmarked_curve || native_mixed_response ||
+            inherits(analysis_mod, c("HLfit", "lme")))
           "Random effects are set to zero, not integrated.",
         "Confidence limits unavailable; point predictions condition on spatial scales."), collapse = " "))
     else if (trained_unmarked_curve)

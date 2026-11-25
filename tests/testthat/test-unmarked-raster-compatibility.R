@@ -11,7 +11,7 @@ test_that("unmarked S4 raster preparation discovers formulas without generic dol
   inputs <- kernel_scale.raster(f$rasters, multiScaleR = f$object,
     scale_center = TRUE, match_buffer = TRUE, verbose = FALSE)
   expect_s4_class(inputs, "SpatRaster")
-  expect_error(predict(f$object, inputs), "component explicitly")
+  expect_error(predict(f$object, inputs), "Specify `type =` with one prediction component")
   data <- as.data.frame(inputs, na.rm = FALSE)
   expected <- unmarked::predict(f$object$opt_mod, newdata = data, type = "state")
   actual <- predict(f$object, inputs, type = "state")

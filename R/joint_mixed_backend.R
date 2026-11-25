@@ -4,9 +4,18 @@
   for (pkg in c("RTMB", "TMB", "glmmTMB"))
     if (!requireNamespace(pkg, quietly = TRUE))
       stop("joint_mixed requires the optional package ", pkg, ".", call. = FALSE)
-  if (!inherits(model, "glmmTMB") ||
-      !inputs$kernel %in% c("gaussian", "exp"))
-    stop("joint_mixed requires a glmmTMB model and Gaussian or exponential inputs.", call. = FALSE)
+  # Report the model class and the kernel separately so the user sees which
+  # requirement failed.
+  if (!inherits(model, "glmmTMB"))
+    stop("joint_mixed requires a glmmTMB model, but the model has class `",
+         class(model)[1L], "`. Fit the model with glmmTMB::glmmTMB(), or use ",
+         "the default refit backend.", call. = FALSE)
+  if (!inputs$kernel %in% c("gaussian", "exp"))
+    stop("joint_mixed requires inputs prepared with a Gaussian or exponential ",
+         "kernel, but these inputs use kernel = \"", inputs$kernel, "\". ",
+         "Prepare them with kernel_prep(kernel = \"gaussian\") or ",
+         "kernel_prep(kernel = \"exp\"), or use the default refit backend.",
+         call. = FALSE)
   if (!is.null(join_by) || !is.null(refit_fn) || start_strategy != "single" ||
       (!is.null(n_cores) && n_cores != 1L))
     stop("joint_mixed uses retained rows and serial independent starts; join_by and refit_fn are unsupported.", call. = FALSE)

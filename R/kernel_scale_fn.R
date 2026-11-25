@@ -34,7 +34,9 @@
     }
   }
   if (length(vars) > 0) {
-    return(vars)
+    # A variable shared by two linear predictors (for example the count and
+    # zero parts of pscl::zeroinfl()) is one data column and takes one scale.
+    return(unique(vars))
   }
 
   formula <- try(stats::formula(model), silent = TRUE)
@@ -138,6 +140,10 @@
     get_data(model, ...),
     error = function(e) NULL
   ))
+  # A call whose data argument names an object that no longer exists can make
+  # data recovery return whatever that name now refers to, for example the
+  # utils::data() function. Only a data frame is model data.
+  if (!is.null(dat) && !is.data.frame(dat)) dat <- NULL
   # Some insight/survival combinations rename a saved conditional-logistic
   # response to `x`. Reconstruct its original name from the retained frame
   # before accepting data that cannot be used to refit the model.
@@ -150,17 +156,84 @@
       is.symbol(response[[length(response)]])
     required <- all.vars(formula)
     if (direct_response && (is.null(dat) || !all(required %in% names(dat)))) {
-      recovered <- extract_model_data(model)
+      # A recovery attempt; failure keeps the data found above.
+      recovered <- suppressWarnings(extract_model_data(model))
       if (!is.null(recovered) && all(required %in% names(recovered))) {
         dat <- recovered
       }
     }
   }
+  .msr_complete_training_data(model, dat)
+}
+
+
+# Raw formula inputs of a native (non-unmarked) model: response, predictors,
+# strata and offset inputs. Used to decide which training columns a refitted
+# model must keep so that effect curves and maps can rebuild its predictors.
+.msr_raw_formula_variables <- function(model) {
+  vars <- tryCatch(all.vars(stats::formula(model)), error = function(e) character())
+  call <- tryCatch(stats::getCall(model), error = function(e) NULL)
+  # Some fitters drop special terms from the stored formula (survival moves
+  # cluster(id) out of it), but a refit replays the call's own formula.
+  call_formula <- if (is.call(call)) call$formula else NULL
+  if (inherits(call_formula, "formula") ||
+      (is.call(call_formula) && identical(call_formula[[1L]], as.name("~"))))
+    vars <- c(vars, all.vars(call_formula))
+  # Arguments that model.frame() evaluates in the data, including survival's
+  # cluster(id), which coxph() rewrites from the formula into `cluster = id`.
+  if (is.call(call))
+    for (arg in c("offset", "weights", "subset", "cluster", "id", "istate"))
+      if (!is.null(call[[arg]])) vars <- c(vars, all.vars(call[[arg]]))
+  unique(vars)
+}
+
+
+# Add retained raw training columns to recovered model data. A refitted
+# model's call names internal data (for example `data = data`), and some
+# classes keep only evaluated expressions such as cos(ta_), so a few raw
+# inputs can be unrecoverable from the model itself. multiScaleR stores only
+# those columns (see .msr_retain_training_data()) and restores them here,
+# matched by row name.
+.msr_complete_training_data <- function(model, dat) {
+  stored <- attr(model, "msr_training_data", exact = TRUE)
+  if (!is.data.frame(stored) || !ncol(stored)) return(dat)
+  if (is.null(dat)) return(stored)
+  extra <- setdiff(names(stored), names(dat))
+  if (!length(extra)) return(dat)
+  rows <- match(row.names(dat), row.names(stored))
+  if (anyNA(rows)) {
+    if (nrow(dat) != nrow(stored)) return(dat)
+    rows <- seq_len(nrow(dat))
+  }
+  dat[extra] <- stored[rows, extra, drop = FALSE]
   dat
 }
 
 
-.refit_from_call <- function(model, data) {
+# Keep the raw training columns a refitted native model cannot return. Nothing
+# is stored when model data recovery already finds every raw formula input,
+# so ordinary lm/glm/mixed-model fits are unchanged. A model with no
+# recoverable data (for example nlme::gls, whose call names internal data)
+# keeps the whole training data frame.
+.msr_retain_training_data <- function(model, data) {
+  analysis <- .analysis_model(model)
+  if (!is.data.frame(data) || !is.list(analysis) ||
+      methods::is(analysis, "unmarkedFit")) return(model)
+  recovered <- suppressWarnings(.model_data(analysis))
+  keep <- if (is.null(recovered)) names(data) else
+    setdiff(intersect(.msr_raw_formula_variables(analysis), names(data)),
+            names(recovered))
+  if (!length(keep)) return(model)
+  attr(analysis, "msr_training_data") <- data[, keep, drop = FALSE]
+  if (.has_nested_analysis_model(model)) {
+    model$model <- analysis
+    return(model)
+  }
+  analysis
+}
+
+
+.refit_from_call <- function(model, data, replay_environment = NULL) {
   refit_call <- try(stats::getCall(model), silent = TRUE)
   if (inherits(refit_call, "try-error") || is.null(refit_call)) {
     refit_call <- model$call
@@ -192,6 +265,8 @@
     }
   }
 
+  if (is.environment(replay_environment))
+    return(eval(refit_call, envir = list(data = data), enclos = replay_environment))
   replay_environment <- parent.frame()
   if (identical(class(model)[1L], "glmmTMB")) {
     # A reusable native call can contain locally bound family/start/map/control
@@ -205,7 +280,35 @@
 }
 
 
+# The environment in which a model's call was evaluated, when the model was
+# fitted inside a function (including lapply()). Its formula keeps that
+# function's frame. Returns NULL for models fitted at top level or by package
+# code, whose calls are replayed exactly as before.
+.msr_local_call_environment <- function(model) {
+  if (identical(class(model)[1L], "glmmTMB")) return(NULL)
+  call <- tryCatch(stats::getCall(model), error = function(e) NULL)
+  if (!is.call(call) || is.null(call$data)) return(NULL)
+  env <- tryCatch(environment(stats::formula(model)), error = function(e) NULL)
+  if (!is.environment(env) || identical(env, globalenv()) || isNamespace(env) ||
+      identical(env, baseenv()) || identical(env, emptyenv()))
+    return(NULL)
+  env
+}
+
+
 .update_model_data <- function(model, data) {
+  # A model fitted inside a function can name local objects in its call, such
+  # as a formula stored in a variable or reformulate(covs, species). Replaying
+  # that call from here cannot see them, and a same-named object in the
+  # workspace would silently be used instead. Replay such calls in the
+  # model's own formula environment first, with the new data bound explicitly.
+  local_env <- .msr_local_call_environment(model)
+  if (!is.null(local_env)) {
+    local_refit <- try(.refit_from_call(model, data, replay_environment = local_env),
+                       silent = TRUE)
+    if (!inherits(local_refit, "try-error")) return(local_refit)
+  }
+
   refit <- try(stats::update(model, data = data), silent = TRUE)
   if (!inherits(refit, "try-error")) {
     return(refit)
@@ -271,6 +374,15 @@
   }
 
   .update_model_data(model, data = data)
+}
+
+
+# TRUE for refit errors that mean the fitting call cannot be evaluated at all,
+# rather than a numerical failure at one candidate scale.
+.msr_lookup_error <- function(message) {
+  is.character(message) && length(message) == 1L && !is.na(message) &&
+    grepl("object '.*' not found|could not find function|argument \".*\" is missing",
+          message)
 }
 
 
@@ -621,7 +733,12 @@ kernel_scale_fn <- function(par,
   }
 
   if (is.null(mod_u)) {
-    if (is.null(mod_return)) {
+    # The pre-search probe in multiScale_optim() stops at once when the call
+    # cannot be replayed at all (a name it uses cannot be found), instead of
+    # letting every candidate fail and reporting it after the whole search.
+    probe_failure <- isTRUE(opt_context$stop_on_lookup_error) &&
+      .msr_lookup_error(refit_error)
+    if (is.null(mod_return) && !probe_failure) {
       return(1e6^10)
     }
 
@@ -629,7 +746,12 @@ kernel_scale_fn <- function(par,
       paste0(
         "Failed to refit the model with the optimized covariates. ",
         "Make sure the fitted model can be updated with a modified data argument. ",
-        "Original error: ", refit_error
+        "Original error: ", refit_error,
+        if (.msr_lookup_error(refit_error))
+          paste0(" The model's fitting call names an object that multiScaleR cannot ",
+                 "find when it refits the model. Keep every model variable in the ",
+                 "`data` argument, and pass other inputs (family, start values, ",
+                 "offsets) as values or data columns rather than local objects.")
       ),
       call. = FALSE
     )
@@ -662,6 +784,14 @@ kernel_scale_fn <- function(par,
     analysis <- .analysis_model(mod_u)
     if (mod_class != "unmarked" && is.null(opt_context$refit_fn) &&
         inherits(analysis, "coxph")) {
+      # A Cox fit made without model = TRUE rebuilds its model frame from its
+      # call when it predicts, and that call names this function's local data.
+      # Keep the training frame now, as model = TRUE would have.
+      if (is.null(analysis$model)) {
+        frame <- tryCatch(stats::model.frame(analysis, data = dat),
+                          error = function(e) NULL)
+        if (is.data.frame(frame)) analysis$model <- frame
+      }
       # The final raw training rows are still available here. Freeze any
       # original fixed recipes before the native call's local binding expires.
       repaired <- .msr_native_fixed_metadata(analysis, training = dat)
@@ -672,6 +802,10 @@ kernel_scale_fn <- function(par,
         training = dat), error = function(e) repaired)
       if (.has_nested_analysis_model(mod_u)) mod_u$model <- repaired else mod_u <- repaired
     }
+    # The returned model's call names this function's local `dat`. Keep any
+    # raw training columns that post-fit tools cannot otherwise recover.
+    if (mod_class != "unmarked" && is.null(opt_context$refit_fn))
+      mod_u <- .msr_retain_training_data(mod_u, dat)
     obj <- list(mod = mod_u,
                 scl_params = list(mean = attr(scl_df, "scaled:center"),
                                   sd = attr(scl_df, "scaled:scale")))
@@ -746,18 +880,47 @@ build_opt_context <- function(fitted_mod,
     mod_vars <- .model_predictors(analysis_mod)
     dat <- .model_data(analysis_mod, effects = 'all')
     if(is.null(dat)){
-      dat <- extract_model_data(mod)
+      # A NULL result stops below with the remedy, so the extractor's own
+      # warning would only repeat the failure.
+      dat <- suppressWarnings(extract_model_data(mod))
     }
   }
+
+  if (mod_class != "unmarked" && !is.null(dat))
+    dat <- .msr_add_call_data_columns(analysis_mod, dat)
 
   if(is.null(dat)){
     stop(
       paste0(
         "Could not recover the original model data needed to refit the model during optimization. ",
-        "Refit the model with an explicit `data = ...` argument and try again."
+        "Refit the model with an explicit `data = ...` argument and try again.",
+        if (inherits(analysis_mod, "coxph"))
+          " For survival::clogit(), survival::coxph(), and amt::fit_clogit() or fit_issf() fits, also set `model = TRUE` so the fit keeps its data."
       ),
       call. = FALSE
     )
+  }
+
+  if (mod_class != "unmarked") {
+    # Every raw formula input must be in the recovered data or visible from
+    # the formula environment; otherwise every refit fails. Stop before the
+    # search with the variables and the usual cause. A wrapper such as
+    # amt::fit_issf() keeps only evaluated terms, so an input used inside
+    # cos(ta_) or log(sl_) cannot be recovered from the fit.
+    needed <- .msr_raw_formula_variables(analysis_mod)
+    formula_env <- tryCatch(environment(stats::formula(analysis_mod)),
+                            error = function(e) NULL)
+    unresolved <- needed[!needed %in% names(dat) & !vapply(needed, function(v)
+      is.environment(formula_env) && exists(v, envir = formula_env), logical(1))]
+    if (length(unresolved))
+      stop("Could not recover the raw values of ", paste(unresolved, collapse = ", "),
+           " from the fitted model, so it cannot be refitted with new covariate values. ",
+           "Fit the model with `data =` naming a data frame that holds every model variable",
+           if (inherits(analysis_mod, "coxph"))
+             paste0(" and `model = TRUE`. amt::fit_clogit() and fit_issf() do not keep their ",
+                    "input data: add transformed terms such as cos(ta_) as data columns first, ",
+                    "or fit with survival::clogit(..., data = <your data>, model = TRUE)") else "",
+           ".", call. = FALSE)
   }
 
   covs <- unname(mod_vars[which(mod_vars %in% cov_names)])
@@ -836,6 +999,27 @@ build_opt_context <- function(fitted_mod,
   }
 
   return(out)
+}
+
+
+# Recovered model data can omit inputs of special terms, for example the
+# animal ID in survival's cluster(animal). When the fitting call's `data`
+# argument still evaluates to a data frame that holds the same rows and the
+# missing raw inputs, add those columns, matched by row name.
+.msr_add_call_data_columns <- function(model, dat) {
+  missing <- setdiff(.msr_raw_formula_variables(model), names(dat))
+  if (!length(missing)) return(dat)
+  call_data <- tryCatch({
+    expr <- stats::getCall(model)$data
+    env <- environment(stats::formula(model))
+    if (is.symbol(expr) && is.environment(env)) eval(expr, env) else NULL
+  }, error = function(e) NULL)
+  if (!is.data.frame(call_data)) return(dat)
+  found <- intersect(missing, names(call_data))
+  rows <- match(row.names(dat), row.names(call_data))
+  if (!length(found) || anyNA(rows)) return(dat)
+  dat[found] <- call_data[rows, found, drop = FALSE]
+  dat
 }
 
 
@@ -927,9 +1111,13 @@ build_opt_context <- function(fitted_mod,
     } else if (var %in% names(response_data)) {
       out[[var]] <- response_data[[var]]
     } else {
-      strata_col <- paste0("strata(", var, ")")
-      if (strata_col %in% names(mf)) {
-        out[[var]] <- mf[[strata_col]]
+      # Survival specials keep a bare variable under the special's name.
+      for (special in c("strata", "cluster")) {
+        special_col <- paste0(special, "(", var, ")")
+        if (special_col %in% names(mf)) {
+          out[[var]] <- mf[[special_col]]
+          break
+        }
       }
     }
   }
@@ -980,11 +1168,14 @@ extract_model_data <- function(model) {
       return(analysis_mod$data)
     }
 
-    # Method 4: Try eval(model$call$data) (if data was passed in the call)
+    # Method 4: Try eval(model$call$data) (if data was passed in the call).
+    # The name can now refer to something else, such as utils::data() when a
+    # wrapper passed its own `data` argument, so accept only a data frame.
     if (!is.null(analysis_mod$call$data)) {
       data_name <- as.character(analysis_mod$call$data)
       if (exists(data_name, envir = parent.frame())) {
-        return(get(data_name, envir = parent.frame()))
+        candidate <- get(data_name, envir = parent.frame())
+        if (is.data.frame(candidate)) return(candidate)
       }
     }
 

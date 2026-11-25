@@ -1,3 +1,22 @@
+# The conditional_logit backend admits only Gaussian or exponential kernels,
+# smooth kernel means, and weighted surface SQ. These depend only on the
+# declared inputs, so stop before any fold is fitted, with the messages
+# .msr_clogit_contract() gives, rather than fail every fold identically.
+.msr_cv_choice_admission <- function(inputs, covariates, backend) {
+  if (is.null(inputs) || backend != "conditional_logit") return(invisible(TRUE))
+  if (!inputs$kernel %in% c("gaussian", "exp"))
+    stop("conditional_logit requires Gaussian or exponential kernels.", call. = FALSE)
+  specs <- inputs$scale_vars
+  if (is.null(specs)) return(invisible(TRUE))
+  weighted <- if ("weighted" %in% names(specs)) as.logical(specs$weighted) else rep(FALSE, nrow(specs))
+  surface_sq <- specs$covariate[which(specs$type == "surface" & specs$metric == "sq" &
+    weighted & specs$optimize)]
+  optimized <- specs[which(specs$covariate %in% covariates & specs$optimize), , drop = FALSE]
+  if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface_sq)))
+    stop("conditional_logit optimizes smooth kernel means and weighted SQ only; hard-radius surface optimization requires the refit backend.", call. = FALSE)
+  invisible(TRUE)
+}
+
 # Conditional-choice CV has a set-level target, distinct from binary GLM loss.
 .msr_choice_formula <- function(formula, data, spatial = character()) {
   if (!inherits(formula, "formula") || length(formula) != 3L || !is.symbol(formula[[2L]]))
@@ -179,7 +198,9 @@ logLik.msr_cv_choice_null <- function(object, ...) {
 #' @param data Data frame with one row per alternative, holding the case
 #'   column, the set ID, and every predictor. Its row names are the row IDs
 #'   used by `folds` and, when supplied, by `kernel_inputs`. They must be
-#'   unique.
+#'   unique. A tibble, such as the output of `amt::random_steps()`, is used
+#'   as the equivalent data frame, whose row IDs are `"1"` to the number of
+#'   rows.
 #' @param folds Named list of explicit splits of row IDs, as in
 #'   [cross_validate()]. Every choice set must lie wholly in the analysis
 #'   rows, wholly in the assessment rows, or wholly outside the split.
@@ -192,11 +213,14 @@ logLik.msr_cv_choice_null <- function(object, ...) {
 #'   supplied, each fold also estimates the scales, and learns the
 #'   standardization and distance bins, from its analysis rows only.
 #' @param backend Scale-fitting route used with `kernel_inputs`, either
-#'   `"conditional_logit"` (default) or `"refit"`. Supply
-#'   `optim_args = list(radius_grid = ...)` with `"refit"` to profile hard
-#'   radii, together with any smooth scales, in each training split. The
-#'   usual kernel, metric, and numerical checks of [multiScale_optim()]
-#'   apply. Ignored when `kernel_inputs` is `NULL`.
+#'   `"conditional_logit"` (default) or `"refit"`. `"conditional_logit"`
+#'   accepts Gaussian or exponential kernels with kernel means or weighted
+#'   surface SQ, and other kernels or hard-radius predictors stop before any
+#'   fold is fitted. Supply `optim_args = list(radius_grid = ...)` with
+#'   `"refit"` to profile hard radii, together with any smooth scales, in
+#'   each training split. The usual kernel, metric, and numerical checks of
+#'   [multiScale_optim()] apply in every fold. Ignored when `kernel_inputs`
+#'   is `NULL`.
 #' @param method Partial-likelihood method passed to [survival::clogit()],
 #'   one of `"exact"` (default), `"efron"`, or `"breslow"`. These are rules
 #'   for tied event times. With one used alternative per set they give the
@@ -239,7 +263,9 @@ logLik.msr_cv_choice_null <- function(object, ...) {
 #' analysis rows and complete sets, and used the declared `method`, whether
 #' or not fits or records are kept. Learned transformations follow the rules
 #' described in [cross_validate()]. Their training constants add no stratum
-#' effects and do not change the event count.
+#' effects and do not change the event count. A failed fold is recorded in
+#' `errors`, and when any fold fails the function gives one warning with the
+#' number of failed folds and their first distinct reasons.
 #'
 #' # Estimate scales within the folds
 #'
@@ -315,6 +341,9 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
   if (!requireNamespace("survival", quietly = TRUE)) stop("Choice CV requires survival.", call. = FALSE)
   backend <- match.arg(backend); method <- match.arg(method)
   validate_scalar_logical(keep_fits, "keep_fits"); validate_scalar_logical(keep_selection, "keep_selection")
+  # A tibble (for example from amt::random_steps()) drops row names when
+  # subset; use the equivalent data frame so fold rows keep their IDs.
+  data <- .msr_cv_plain_data(data)
   if (!is.data.frame(data) || !nrow(data) || anyDuplicated(names(data))) stop("Supply nonempty data with unique columns.", call. = FALSE)
   ids <- .msr_fold_ids(rownames(data), nrow(data)); inputs <- kernel_inputs
   spatial <- if (is.null(inputs)) character() else inputs$scale_vars$covariate
@@ -333,6 +362,7 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
         !identical(names(inputs$raster_group), rownames(inputs$kernel_dat)) ||
         anyNA(inputs$raster_group) || any(!nzchar(inputs$raster_group))))
       stop("raster_group must align exactly with prepared row IDs.", call. = FALSE)
+    .msr_cv_choice_admission(inputs, covariates, backend)
   }
   allowed <- setdiff(names(formals(multiScale_optim)), c("fitted_mod", "kernel_inputs", "join_by", "n_cores", "PSOCK", "refit_fn", "backend", "verbose"))
   if (!is.list(optim_args) || (length(optim_args) && (is.null(names(optim_args)) || anyNA(names(optim_args)) ||
@@ -383,7 +413,9 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
         fit <- NULL
         fit <- do.call(multiScale_optim, c(list(fitted_mod = initial, kernel_inputs = train, n_cores = 1L,
           backend = backend, verbose = FALSE), optim_args))
-        if (!identical(as.integer(fit$optim_results$convergence), 0L)) stop("Training scale optimizer did not converge.")
+        if (!identical(as.integer(fit$optim_results$convergence), 0L))
+          stop(.msr_cv_convergence_message("Training scale optimizer did not converge.",
+            train, covariates, optim_args))
         output$training[[name]] <- c(output$training[[name]], list(fitted_normalization = fit$scl_params,
           coefficients = stats::coef(.analysis_model(fit$opt_mod)), scale_est = fit$scale_est, shape_est = fit$shape_est,
           optimizer = fit$optim_results[c("par", "value", "convergence", "message")], start_results = fit$profile_fit$start_results))
@@ -436,7 +468,9 @@ cross_validate_clogit <- function(formula, data, folds, kernel_inputs = NULL,
   output <- .msr_cv_finish(output, folds, ids, "conditional_choice", "neg_log_score")
   used <- sort(unique(unlist(lapply(folds, function(f) c(f$analysis, f$assessment)), use.names = FALSE)))
   output$targets <- specification$targets[match(used, specification$targets$row_id), , drop = FALSE]; rownames(output$targets) <- NULL
-  output$settings <- settings; output$call <- match.call(); output
+  output$settings <- settings; output$call <- match.call()
+  .msr_cv_warn_incomplete(output, "cross_validate_clogit")
+  output
 }
 
 #' @rdname cross_validate_clogit

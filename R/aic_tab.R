@@ -308,6 +308,35 @@
 }
 
 
+# Check the shape of `mod_list` before any model is inspected, so an empty
+# list, a bare fit, or a NULL element gets a message about `mod_list` itself.
+# Bayesian fits and CV results pass here and keep their own refusals in
+# .msr_selection_model().
+.msr_validate_mod_list <- function(mod_list, fn) {
+  if (!is.list(mod_list) || is.object(mod_list))
+    stop(sprintf(paste0("`mod_list` must be a plain list of fitted models, for ",
+      "example %s(list(fit1, fit2)); wrap a single fit in list()."), fn),
+      call. = FALSE)
+  if (!length(mod_list))
+    stop(sprintf(paste0("`mod_list` is empty. Supply a list of one or more ",
+      "fitted models, for example %s(list(fit1, fit2))."), fn), call. = FALSE)
+  not_model <- vapply(mod_list, function(m) is.null(m) || is.atomic(m) ||
+    is.function(m) || inherits(m, "formula"), logical(1))
+  if (any(not_model)) {
+    labels <- names(mod_list)
+    if (is.null(labels)) labels <- rep("", length(mod_list))
+    labels <- ifelse(nzchar(labels), paste0("`", labels, "`"),
+                     paste0("element ", seq_along(mod_list)))
+    what <- vapply(mod_list[not_model], function(m)
+      if (is.null(m)) "NULL" else paste0("a `", class(m)[1L], "`"), character(1))
+    stop(paste0("Every `mod_list` element must be a fitted model. Not a model: ",
+      paste0(labels[not_model], " (", what, ")", collapse = ", "),
+      ". Remove these elements or replace them with fitted models."),
+      call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 .msr_validate_comparable_models <- function(mod_list) {
   mod_dims <- vapply(mod_list, .msr_model_nobs, integer(1))
   if (length(unique.default(mod_dims)) != 1L) {
@@ -565,6 +594,7 @@ aic_tab <- function(mod_list,
 
   p <- list(...)
 
+  .msr_validate_mod_list(mod_list, "aic_tab")
   opt_list <- lapply(mod_list, .msr_selection_model)
   .msr_validate_comparable_models(opt_list)
   mod_n <- vapply(opt_list, .msr_selection_nobs, integer(1))
@@ -718,6 +748,7 @@ bic_tab <- function(mod_list,
 
   p <- list(...)
 
+  .msr_validate_mod_list(mod_list, "bic_tab")
   opt_list <- lapply(mod_list, .msr_selection_model)
   .msr_validate_comparable_models(opt_list)
   mod_n <- vapply(opt_list, .msr_selection_nobs, integer(1))

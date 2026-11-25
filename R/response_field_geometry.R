@@ -1,7 +1,12 @@
 # A planar two-axis map is required, including when reading an older descriptor.
 # Excluding longitude/latitude alone would also admit geocentric/vertical CRS.
 .msr_response_field_crs <- function(crs) {
-  declared <- sf::st_crs(crs)
+  # terra::crs() returns "" for a raster or vector with no CRS. Treat an empty
+  # string like NA, and any definition sf cannot parse like an unknown CRS, so
+  # the caller gets the package message rather than sf's "invalid crs".
+  if (is.character(crs) && length(crs) == 1L && !is.na(crs) && !nzchar(trimws(crs)))
+    crs <- NA
+  declared <- tryCatch(sf::st_crs(crs), error = function(e) sf::NA_crs_)
   if (!is.na(declared)) {
     wkt <- gsub("[[:space:]]", "", declared$wkt)
     projected <- any(startsWith(wkt, c("PROJCRS[", "PROJCS[",
@@ -253,7 +258,13 @@ response_field_geometry <- function(object, coords, crs, batch_size = 128L,
     stop("Recreate the unchanged response_field_geometry() descriptor.", call. = FALSE)
   if (!identical(geometry$binding_sha256, .msr_response_field_binding(object)))
     stop("Field geometry must match this retained fitted context.", call. = FALSE)
-  if (!isTRUE(sf::st_crs(terra::crs(raster)) == .msr_response_field_crs(geometry$crs)))
+  # sf::st_crs("") stops with "invalid crs"; name the empty raster CRS instead.
+  raster_crs <- terra::crs(raster)
+  if (!nzchar(raster_crs))
+    stop("The prediction raster has no CRS. Assign the CRS of the field ",
+         "geometry, for example terra::crs(r) <- geometry$crs, before predicting.",
+         call. = FALSE)
+  if (!isTRUE(sf::st_crs(raster_crs) == .msr_response_field_crs(geometry$crs)))
     stop("Prediction raster CRS and linear units must match field geometry; transform explicitly.", call. = FALSE)
   if (!is.numeric(cores) || length(cores) != 1L || !identical(as.numeric(cores), 1))
     stop("Coordinate-aware field maps require cores = 1 and serial native batches.", call. = FALSE)

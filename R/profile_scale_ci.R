@@ -71,8 +71,17 @@ scale_ci_table <- function(object,
   methods <- ifelse(is.finite(tab$SE), "wald", "unavailable")
   names(methods) <- row.names(tab)
 
-  if (isTRUE(profile) && !is.null(object$diagnostics$radius_profile))
-    stop("Profile intervals are unavailable for a declared radius_grid. Inspect diagnostics(object)$radius_profile.", call. = FALSE)
+  # A declared radius grid replaces profiling with its candidate table. As for
+  # conditional_logit above, warn and return the ordinary table so the rest
+  # of the summary is still returned: hard radii keep NA limits, and smooth
+  # scales keep Wald limits conditional on the selected radii.
+  if (isTRUE(profile) && !is.null(object$diagnostics$radius_profile)) {
+    warning("Profile intervals are unavailable for a declared radius_grid. ",
+            "Hard-radius limits are reported as NA; any smooth-scale limits ",
+            "are Wald limits conditional on the selected radii. ",
+            "Inspect diagnostics(object)$radius_profile.", call. = FALSE)
+    profile <- FALSE
+  }
 
   if (!isTRUE(profile)) {
     attr(tab, "interval_method") <- methods
@@ -153,7 +162,9 @@ profile_scale_cache_key <- function(object,
                                     names = row.names(object$scale_est)) {
 
   key_payload <- list(
-    call = deparse(object$call, width.cutoff = 500L),
+    # Compact form: a do.call() fit inlines the model and inputs in its call,
+    # and deparsing them is slow. The payload below binds those data anyway.
+    call = deparse(.msr_compact_call(object$call), width.cutoff = 500L),
     kernel = object$kernel_inputs$kernel,
     min_D = min_D,
     max_D = object$max_D,

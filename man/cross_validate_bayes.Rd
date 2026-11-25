@@ -89,8 +89,12 @@ to reduce the simulation error of the average over new groups. See
 
 \item{bin_reference}{\code{"training"} (default) computes the representative
 bin distances from the unique analysis points of each fold and freezes
-them for its assessment points. Use \code{"fixed"} only when the supplied bins
-were fixed independently of all analysis and assessment data.}
+them for its assessment points. It needs the raw cells, so it refuses
+inputs prepared with \code{store_cell_data = FALSE}, such as lean inputs from
+\code{\link[=kernel_prep_by_group]{kernel_prep_by_group()}}. \code{"fixed"} uses the prepared bin distances as
+given, so lean inputs of kernel means work with it. Use \code{"fixed"} only
+when the supplied bins were fixed independently of all analysis and
+assessment data.}
 
 \item{seed}{Optional positive integer seed. It generates distinct fitting
 and scoring seeds for every fold, and your own random-number state is
@@ -187,7 +191,10 @@ precision. Laplace and marginal scores inherit the limits of their
 approximation and its checks. Importance-corrected fits are scored with
 their normalized candidate weights. Passing numerical checks does not
 establish predictive calibration. Every fold runs the full fitting
-method, so a run takes about as long as one fit per fold.
+method, so a run takes about as long as one fit per fold. When any fold
+is not scored, the function returns the result and gives one warning that
+counts the failed folds and quotes their first distinct reasons. Read
+\code{errors} for the stage and message of every failed fold.
 }
 
 \section{Compare models}{
@@ -219,8 +226,8 @@ folds <- grouped_cv_folds(rep(1:2, length.out = nrow(landscape_counts)),
 
 # Very short slice chains keep this example quick. With the posterior
 # package installed, they usually fail the diagnostics, so the folds are
-# marked "diagnostic_failed" and the pooled score is NA. Use the default
-# chains and iter in an analysis.
+# marked "diagnostic_failed", the pooled score is NA, and a warning says
+# so. Use the default chains and iter in an analysis.
 cv <- cross_validate_bayes(counts ~ land1, landscape_counts, inputs, folds,
                            family = "poisson",
                            priors = list(scale_median = 300),

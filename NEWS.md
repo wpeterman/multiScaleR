@@ -1,6 +1,129 @@
 multiScaleR (development version)
 ---------------------------------
 
+* Fixes from an integration audit that ran every post-fit function on real
+  fits of each supported model class and backend. A new test,
+  `test-integration-matrix.R`, now repeats that check: each combination of
+  model and post-fit function must either work or refuse with a documented
+  message.
+
+* `coef()`, `fitted()`, `residuals()`, `nobs()`, `formula()`, `family()`,
+  `deviance()`, and `df.residual()` now work on `multiScale_optim()` fits and
+  read the model refitted at the estimated scales. `fitted(fit)` used to
+  return the starting model, and the others returned `NULL` or failed.
+  `logLik()`, `AIC()`, and `BIC()` now work too and count each estimated scale
+  and shape parameter, so they match `aic_tab(AICc = FALSE)` and `bic_tab()`.
+  On a `multiScale_bayes()` fit, `coef()`, `fitted()`, `residuals()`, `vcov()`,
+  `logLik()`, and `diagnostics()` now stop with a pointer to the Bayesian
+  tools, and `nobs()` returns the number of observations.
+
+* `multiScale_optim()` now completes for `nlme::lme()` models, which failed
+  after the search with "Expecting a single value". Wald scale limits use N
+  minus the number of fixed coefficients as residual degrees of freedom.
+  `summary()` and `plot()` now work for `amt::fit_clogit()` and
+  `amt::fit_issf()` fits made with the default `refit` backend.
+
+* `print()` and `summary()` now explain every scale reported without a
+  standard error: `conditional_logit` fits point to `profile_sigma()`,
+  `profile_glm` and `joint_nb2` fits name the withheld scales and the reasons
+  under the scale table, and fits whose Hessian included a failed refit or
+  could not be inverted now say so. Fits made through `do.call()` print a
+  compact call instead of appearing to hang. `summary(fit, profile = TRUE)` on
+  a fit with a declared `radius_grid` now warns and returns the summary
+  instead of stopping. Printing the summary of a `profile_glm` negative
+  binomial fit at the Poisson limit no longer fails inside `MASS` on the
+  undefined theta standard error.
+
+* `multiScale_optim()` now refits models fitted inside a function or
+  `lapply()` with the formula in a local variable, such as a multi-species
+  loop built with `reformulate()`. These fits used to fail after the whole
+  search with "object 'form' not found". When a workspace object had the
+  same name as the local formula, the refit silently used the workspace
+  object and could fit a different model. The model's own formula
+  environment is now used first.
+
+* `multiScale_optim()` now checks once, before the search, that the model
+  can be refitted. A fitting call that names an object that no longer
+  exists, or a model whose raw inputs cannot be recovered (for example an
+  `amt::fit_issf()` fit with `cos(ta_)` in its formula, or a Cox or `amt` fit
+  made without `model = TRUE`), now stops at once and says what to change.
+
+* Refitted models keep any raw training inputs that post-fit tools cannot
+  otherwise recover. `plot_marginal_effects()`, `kernel_scale.raster()`, and
+  raster `predict()` now work for `nlme::gls()` fits, for `clogit()` and
+  `coxph()` fits made without `model = TRUE`, and for step-selection formulas
+  with `cos(ta_)` or similar terms on both the `refit` and `conditional_logit`
+  backends.
+
+* A covariate used in both parts of a `pscl::zeroinfl()` or `pscl::hurdle()`
+  model now gets one scale; these fits failed after the search. Cox models
+  with `cluster()` terms now refit.
+
+* `kernel_scale.raster(clamp = TRUE)` now works when a covariate enters the
+  model only through a function such as `poly()`, `splines::ns()`, or `log()`,
+  and `include_fixed = TRUE` now works for a fixed-radius metric used inside
+  `poly()` or `log()`.
+
+* A model fitted with the `offset =` argument (rather than `offset()` in the
+  formula) no longer gets predictions that reuse its training offsets.
+  `plot_marginal_effects()` holds the offset at its mean,
+  `kernel_scale.raster()` adds an offset layer, and an offset that is not a
+  data column gives a clear error.
+
+* `kernel_scale.raster()` now warns when the default value 0 of a
+  nonspatial covariate makes a formula term undefined, such as `log(sl_)`,
+  which made every cell of the map 0 or infinite. Supply a value with
+  `site_values`.
+
+* `plot_marginal_effects()` now draws `colext()` fits (state component
+  `psi`), accepts `type = "state"` for `gdistsamp()` and `gmultmix()` fits,
+  warns instead of silently returning an empty list when the requested
+  component has no covariates, and refuses penalized Cox (`frailty()`) fits
+  with a clear message.
+
+* Cross-validation: `cross_validate()`, `cross_validate_glm()`,
+  `cross_validate_clogit()`, `cross_validate_mixed()`, `cross_validate_field()`,
+  and `cross_validate_bayes()` now warn when they return a result with
+  unscored folds, giving the number of failed folds and the first reasons
+  recorded in `errors`. `cross_validate()` with the `profile_glm` or
+  `joint_nb2` backend now stops before fitting any fold when the formula has
+  an estimated hard radius, a weighted surface metric other than SQ, or a
+  fixed kernel, and `cross_validate_clogit()` with `conditional_logit` stops
+  before fitting when the kernel is not Gaussian or exponential or a
+  predictor is a hard radius. `cross_validate()`, `cross_validate_glm()`, and
+  `cross_validate_clogit()` now accept a tibble, such as `amt::random_steps()`
+  output. A fold stopped by an estimated hard radius now suggests
+  `optim_args = list(radius_grid = ...)`. `cv_tab()` and `select_cv()` now say
+  when they receive one CV result or a fitted model instead of a named list,
+  and `cross_validate_bayes()` names `bin_reference = "fixed"` when it refuses
+  inputs prepared with `store_cell_data = FALSE`.
+
+* Bayesian fits: parallel `multiScale_bayes()` fits on Windows now retry
+  briefly when a worker file cannot be removed at once, instead of stopping
+  with "Cannot clear Bayesian worker data". `diagnose_bayes_scales()` and
+  `diagnose_bayes_probabilities()` now report that a `method = "prepare"`
+  object has no posterior draws. `kernel_scale.raster()`, `profile_sigma()`,
+  `prepare_prediction()`, and `scale_inference()` now point a Bayesian fit to
+  `posterior_scales()`, `predict_scales()`, and `predict()`.
+
+* `backend = "conditional_logit"` now accepts `coxph()` responses such as
+  `Surv(rep(1, nrow(dat)), case)` and `Surv(one, case)`, not only a literal
+  row count.
+
+* Clearer messages: `kernel_scale.raster(match_buffer = TRUE)` names the
+  failed requirement (missing CRS, longitude/latitude, or resolution) and
+  shows how to assign a CRS; `kernel_scale.raster(fft = FALSE)` explains a
+  kernel window larger than twice the raster and suggests `fft = TRUE`;
+  `kernel_prep()` suggests `sigma =` when an estimated metric is constant at
+  its starting scale; `aic_tab()` and `bic_tab()` name an empty list, a bare
+  fit, or NULL elements; and refusals from `joint_mixed`, `joint_nb2`,
+  `scale_inference()`, `response_field_geometry()`, and prediction of
+  `pscl` and `unmarked` fits without a valid `type` or `component` name the
+  failed condition and the valid values.
+
+* `sim_dat_unmarked()` points now carry the raster's CRS, so `kernel_prep()`
+  no longer warns about a missing CRS. Simulated values are unchanged.
+
 * New experimental `predict_gdistremoval()` and `simulate_gdistremoval()`
   for `unmarked::gdistremoval()` models, alone or inside a `multiScaleR`
   fit. `predict_gdistremoval()` combines the fitted components into

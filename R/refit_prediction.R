@@ -347,7 +347,20 @@
   } else if (inherits(model, "gam"))
     .msr_predict_gam else stats::predict
   if (!unmarked) args$se.fit <- se.fit
-  value <- do.call(predictor, args)
+  value <- tryCatch(do.call(predictor, args), error = function(e) {
+    # A native match.arg() refusal of `type` (for example "link" for a pscl
+    # zeroinfl or hurdle fit) does not name the argument. Restate it with the
+    # valid types when they can be read and `type` matches none of them;
+    # rethrow every other error unchanged.
+    valid <- if (unmarked || !is.character(type) || length(type) != 1L) NULL else
+      .msr_native_prediction_types(model)
+    if (length(valid) && is.na(pmatch(type, valid)))
+      stop("Prediction type \"", type, "\" (`type` in predict(), `component` ",
+           "in prepare_prediction()) is not available for the native `",
+           class(model)[1L], "` model. Use ", .msr_native_type_list(model), ".",
+           call. = FALSE)
+    stop(e)
+  })
   if (unmarked && !se.fit) value <- value$Predicted
   if (se.fit && !unmarked &&
       (!is.list(value) || is.null(value$se.fit)))

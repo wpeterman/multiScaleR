@@ -86,7 +86,24 @@ validate_reserved_variable_names <- function(variable_names, context) {
   invisible(TRUE)
 }
 
-validate_multiScaleR_input <- function(x, arg = "multiScaleR") {
+# Refuse a Bayesian fit in a function that needs a multiScale_optim() fit, and
+# name the Bayesian tools that cover the same need. `fn` is the calling
+# function's name, used in the message.
+.msr_stop_bayes_fit <- function(x, fn = NULL) {
+  if (!inherits(x, "multiScaleR_bayes")) return(invisible(NULL))
+  fn <- if (is.null(fn)) "This function" else paste0("`", fn, "()`")
+  stop(sprintf(paste0(
+    "%s works on fits from `multiScale_optim()`, not on a Bayesian ",
+    "`multiScaleR_bayes` fit from `multiScale_bayes()`. For a Bayesian fit, ",
+    "use `posterior_scales()` to summarize the posterior scales, ",
+    "`predict_scales()` to predict scales for new covariates or groups, and ",
+    "`predict()` with new kernel inputs for posterior predictions. For a map, ",
+    "pass a posterior scale to `kernel_scale.raster(sigma = )`."), fn),
+    call. = FALSE)
+}
+
+validate_multiScaleR_input <- function(x, arg = "multiScaleR", fn = NULL) {
+  .msr_stop_bayes_fit(x, fn)
   if (!inherits(x, c("multiScaleR", "multiScaleR_data"))) {
     stop(sprintf("`%s` must be a `multiScaleR` or `multiScaleR_data` object.", arg), call. = FALSE)
   }
@@ -137,6 +154,7 @@ validate_covariates_before_scale <- function(x,
       stop(
         paste0(
           sprintf("Cannot scale %s: covariate `%s` has zero variance.", context, covariate),
+          .msr_start_scale_hint(covariate, scale_vars, context),
           .msr_covariate_scale_hint(covariate, scale_vars)
         ),
         call. = FALSE
@@ -145,6 +163,30 @@ validate_covariates_before_scale <- function(x,
   }
 
   invisible(TRUE)
+}
+
+# kernel_prep() evaluates every estimated landscape or surface metric once at
+# its starting scale. A metric that is constant there (for example `pr` when
+# every buffer holds the same classes) may still vary at other scales, so name
+# the starting scale and the `sigma =` argument that changes it. Other callers
+# (optimization, fixed radii) keep the generic message.
+.msr_start_scale_hint <- function(covariate, scale_vars = NULL, context = "") {
+  start_contexts <- c("`kernel_prep()` covariates", "pooled group covariates")
+  if (!context %in% start_contexts || is.null(scale_vars) ||
+      !inherits(scale_vars, "multiScaleR_vars")) {
+    return("")
+  }
+  spec <- scale_vars[scale_vars$covariate == covariate, , drop = FALSE]
+  if (nrow(spec) != 1 || !spec$type %in% c("landscape", "surface") ||
+      !isTRUE(spec$optimize)) {
+    return("")
+  }
+  paste0(
+    " Metric `", spec$metric, "` is constant across the sample points at the ",
+    "starting scale (`max_D / 2` unless `sigma` is supplied), although it may ",
+    "vary at other scales. Supply a starting scale at which it varies with ",
+    "`sigma =` (in map units, one value per estimated scale)."
+  )
 }
 
 .msr_covariate_scale_hint <- function(covariate, scale_vars = NULL) {

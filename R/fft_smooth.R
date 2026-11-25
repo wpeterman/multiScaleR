@@ -96,6 +96,20 @@ fft_convolution <- function(x, kernel, fun = "mean", na.rm = TRUE) {
   t(conv_crop)
 }
 
+# terra::focal() refuses a window more than twice the raster in either
+# dimension and reports "[focal] nrow(w) > 2 * nrow(x)". Stop before the call
+# with a message that names the sizes and points to fft = TRUE, whose padded
+# convolution accepts any window size. `x` is a matrix or a SpatRaster.
+.msr_check_focal_window <- function(w, x) {
+  if (nrow(w) > 2 * nrow(x) || ncol(w) > 2 * ncol(x))
+    stop(sprintf(paste0(
+      "The kernel window (%d x %d cells) is more than twice the size of the ",
+      "raster (%d x %d cells), which the direct focal path (fft = FALSE) ",
+      "cannot use. Use fft = TRUE (the default), which accepts any window size."),
+      nrow(w), ncol(w), nrow(x), ncol(x)), call. = FALSE)
+  invisible(TRUE)
+}
+
 # Direct sum counterpart with the same transposed output and zero padding as
 # fft_convolution(). Reverse the stencil because focal uses correlation, while
 # FFT uses convolution. This matters for directional adjacency/edge kernels.
@@ -108,6 +122,7 @@ fft_convolution <- function(x, kernel, fun = "mean", na.rm = TRUE) {
   } else {
     weights <- kernel[nrow(kernel):1L, ncol(kernel):1L, drop = FALSE]
     weights[weights == 0] <- NA_real_
+    .msr_check_focal_window(weights, x)
     result <- terra::as.matrix(terra::focal(terra::rast(x), w = weights,
       fun = "sum", na.rm = na.rm, fillvalue = if (na.rm) 0 else NA_real_,
       expand = FALSE), wide = TRUE)

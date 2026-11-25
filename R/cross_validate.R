@@ -19,6 +19,44 @@
   list(mean = center, sd = spread)
 }
 
+# The analytic backends (profile_glm, and joint_nb2 built on it) admit only
+# smooth kernels, optimized kernel means, and optimized weighted surface SQ.
+# These conditions depend only on the declared inputs and formula, so check
+# them before any fold is fitted. The messages repeat those of
+# .msr_profile_contract(), which multiScale_optim() raises at once; without
+# this check every fold failed with the same text and the call returned NA
+# scores.
+.msr_cv_analytic_admission <- function(inputs, covariates, backend) {
+  if (is.null(inputs) || !backend %in% c("profile_glm", "joint_nb2")) return(invisible(TRUE))
+  if (identical(inputs$kernel, "fixed"))
+    stop("profile_glm requires smooth kernels.", call. = FALSE)
+  specs <- inputs$scale_vars
+  if (is.null(specs)) return(invisible(TRUE))
+  weighted <- if ("weighted" %in% names(specs)) as.logical(specs$weighted) else rep(FALSE, nrow(specs))
+  surface_sq <- specs$covariate[which(specs$type == "surface" & specs$metric == "sq" &
+    weighted & specs$optimize)]
+  optimized <- specs[which(specs$covariate %in% covariates & specs$optimize), , drop = FALSE]
+  if (any(!(optimized$type == "kernel" | optimized$covariate %in% surface_sq)))
+    stop("profile_glm supports optimized kernel means and weighted surface SQ only; use refit for other surface metrics or hard-radius predictors.",
+         call. = FALSE)
+  invisible(TRUE)
+}
+
+# A stepped hard-radius likelihood often stops the gradient search with a
+# nonzero convergence code, which fails the fold. The rule is unchanged; the
+# message only names the remedy when a fold has an estimated hard radius.
+.msr_cv_convergence_message <- function(base, inputs, covariates, optim_args) {
+  if (!is.null(optim_args$radius_grid) || is.null(inputs$scale_vars)) return(base)
+  specs <- inputs$scale_vars
+  optimized <- specs$covariate[which(specs$covariate %in% covariates & specs$optimize)]
+  hard <- intersect(optimized, .msr_hard_radius_covariates(specs, inputs$kernel, optimized))
+  if (!length(hard)) return(base)
+  paste0(base, " The estimated hard radius of ", paste(hard, collapse = ", "),
+    " has a stepped likelihood that often ends the search with a nonzero convergence code;",
+    " supply optim_args = list(radius_grid = ...) with backend = 'refit' to profile it over",
+    " candidate radii instead.")
+}
+
 # Validate the whole split plan before starting any fold fits. IDs, rather than
 # changing row positions, bind raw data, spatial buffers and assessment output.
 .msr_cv_folds <- function(folds, ids) {
@@ -283,8 +321,13 @@
 #'   and theta together, and applies only to `family = "nbinom2"` with `theta`
 #'   estimated. If you leave `backend` unset, `"Gamma"` and an NB2 model with
 #'   a fixed `theta` use `"refit"`, the only route they support. Naming another
-#'   backend for them is an error. The usual starting-value, convergence, and
-#'   kernel or metric checks of [multiScale_optim()] apply in every fold. See
+#'   backend for them is an error. `"profile_glm"` and `"joint_nb2"` accept
+#'   only smooth kernels, optimized kernel means, and optimized weighted
+#'   surface SQ. A formula with an estimated hard radius (a landscape metric
+#'   or an unweighted surface metric) or another weighted surface metric
+#'   stops before any fold is fitted, so choose `backend = "refit"` for those
+#'   predictors. The usual starting-value, convergence, and kernel or metric
+#'   checks of [multiScale_optim()] apply in every fold. See
 #'   [multiScaleR-fitting-methods].
 #' @param weights Optional case frequencies, one nonnegative whole number per
 #'   row of `data` in the same order. If the vector has names, they must equal
@@ -298,7 +341,9 @@
 #' @param optim_args Named list of extra [multiScale_optim()] arguments used
 #'   in every fold, such as `par` or `profile_control`. Supply `radius_grid`
 #'   with `backend = "refit"` to profile hard radii, together with any smooth
-#'   scales, in each training split. Supply `covariate_transform = "raw"` with
+#'   scales, in each training split. An estimated hard radius usually needs
+#'   it, because without it folds often fail (see "How each fold is
+#'   fitted"). Supply `covariate_transform = "raw"` with
 #'   `backend = "refit"` to keep optimized covariates in their own units (see
 #'   "Keep optimized covariates in their own units"). Arguments that supply
 #'   data, the starting model, a custom refit function, parallel workers,
@@ -370,6 +415,16 @@
 #' The fold fails if the initial GLM, the final GLM, or the scale optimizer
 #' does not converge. Folds run one after another, and a failed fold is
 #' recorded and never retried.
+#'
+#' An estimated hard radius, such as a landscape metric whose radius is
+#' optimized, changes the likelihood only in steps as the radius crosses
+#' cell distances. A gradient search on such a likelihood often stops with a
+#' nonzero convergence code, and then the fold fails even when the same model
+#' fitted to all of the data looks acceptable. With `backend = "refit"`,
+#' supply candidate radii through `optim_args = list(radius_grid = ...)` so
+#' each fold profiles the hard radius over a grid instead (see
+#' [multiScale_optim()]). The message of a fold that fails this way names
+#' the hard-radius predictors and this remedy.
 #'
 #' # Build the folds
 #'
@@ -527,7 +582,9 @@
 #' scored. When a fold fails, `complete` is `FALSE` and the pooled scores in
 #' `summary` are `NA`. The scores of the folds that finished, the failed
 #' assessment rows, the diagnostics, and the warnings all stay available, and
-#' `errors` names the stage and message of each failure. [cv_tab()] and
+#' `errors` names the stage and message of each failure. The function also
+#' gives one warning when it returns an incomplete result, with the number
+#' of failed folds and their first distinct reasons. [cv_tab()] and
 #' [select_cv()] refuse an incomplete result rather than rank a model on its
 #' easier folds. A complete result says only that the calculations finished,
 #' so inspect `diagnostics` and `warnings` before you rank models.
@@ -599,11 +656,14 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
     keep_fits = FALSE, keep_selection = FALSE, theta = NULL, dispersion = NULL) {
   if (identical(family, "gamma")) family <- "Gamma"
   family <- match.arg(family)
+  data <- .msr_cv_plain_data(data)
   if (.msr_cv_distribution_family(family)) {
     selected_backend <- if (missing(backend) && (family == "Gamma" || !is.null(theta))) "refit" else match.arg(backend)
     out <- .msr_cv_distribution(formula, data, folds, family, weights, glm_control, metrics,
       keep_fits, keep_selection, theta, dispersion, kernel_inputs, selected_backend, optim_args)
-    out$call <- match.call(); return(out)
+    out$call <- match.call()
+    .msr_cv_warn_incomplete(out, "cross_validate")
+    return(out)
   }
   if (!is.null(theta) || !is.null(dispersion)) stop("theta/dispersion controls apply only to NB2/Gamma CV.", call. = FALSE)
   backend <- match.arg(backend)
@@ -642,6 +702,7 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
     stop("Supply every formula variable explicitly in data or spatial inputs.", call. = FALSE)
   if (length(intersect(all.vars(formula[[2L]]), spatial)))
     stop("A spatial predictor cannot be the CV response.", call. = FALSE)
+  .msr_cv_analytic_admission(inputs, covariates, backend)
   folds <- .msr_cv_folds(folds, ids)
   defaults <- list(gaussian = c("rmse", "mae"),
     poisson = c("rmse", "mae", "neg_log_score", "deviance"),
@@ -722,7 +783,8 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
         optimizer = fit$optim_results[c("par", "value", "convergence", "message")],
         start_results = fit$profile_fit$start_results)
       if (!isTRUE(fit$opt_mod$converged) || !identical(as.integer(fit$optim_results$convergence), 0L))
-        stop("Training GLM or scale optimizer did not converge.", call. = FALSE)
+        stop(.msr_cv_convergence_message("Training GLM or scale optimizer did not converge.",
+          train, covariates, optim_args), call. = FALSE)
       stage <- "prediction"
       fit <- .msr_cv_prediction_metadata(fit, training_data, train)
       assess <- .msr_cv_inputs(inputs, split$assessment, covariates,
@@ -797,6 +859,7 @@ cross_validate <- function(formula, data, kernel_inputs, folds,
     observation_intervals = "not_provided", calibration = "not_established", workers = 1L)
   output$call <- match.call()
   class(output) <- "multiScaleR_cv"
+  .msr_cv_warn_incomplete(output, "cross_validate")
   output
 }
 

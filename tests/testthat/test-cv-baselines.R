@@ -59,7 +59,8 @@ test_that("ordinary GLM scoring retains frequency, zero-trial and failure cases"
     rep(binary$summary$estimate[2], 2))
   # A native prediction error is retained, with no retries or dropped fold.
   d$g <- factor(ifelse(rownames(d) %in% z$folds[[1]]$assessment, "new", as.character(d$g)))
-  failed <- cross_validate_glm(count ~ g + x, d, z$folds, "poisson")
+  expect_warning(failed <- cross_validate_glm(count ~ g + x, d, z$folds, "poisson"),
+    "incomplete result")
   expect_false(failed$complete)
   expect_identical(failed$fold_results$status[1], "failed")
   expect_match(failed$errors[[1]]$message, "new level")

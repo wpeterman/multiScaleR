@@ -30,8 +30,8 @@ cv_distribution_fixture <- function() {
         w <- if (weighted) rep(c(0, 2, 1, 1), 24) else rep(1, 96)
         control <- list(theta = if (family == "nbinom2" && known) 3 else NULL,
           dispersion = if (family == "Gamma" && known) .4 else NULL)
-        cv <- do.call(cross_validate_glm, c(list(form, d, z$folds, family, w,
-          keep_fits = TRUE, keep_selection = TRUE), control))
+        cv <- msr_quiet_incomplete(do.call(cross_validate_glm, c(list(form, d, z$folds, family, w,
+          keep_fits = TRUE, keep_selection = TRUE), control)))
         native_warnings <- list()
         native <- lapply(names(z$folds), function(name) {
           f <- z$folds[[name]]; messages <- character()
@@ -179,7 +179,8 @@ test_that("NB/Gamma support, backend, likelihood and record failures remain expl
   for (family in c("nbinom2", "Gamma")) {
     changed <- d; changed$y <- changed[[if (family == "nbinom2") "nb" else "positive"]]
     changed$y[1] <- if (family == "nbinom2") .5 else 0
-    bad <- cross_validate_glm(y ~ x, changed, z$folds, family, weights = c(0, rep(1, 95)))
+    expect_warning(bad <- cross_validate_glm(y ~ x, changed, z$folds, family, weights = c(0, rep(1, 95))),
+      "incomplete result")
     expect_false(bad$complete); expect_true(all(is.na(bad$summary$estimate)))
     expect_equal(nrow(bad$predictions), 96)
     expect_true(any(grepl("requires", unlist(bad$errors))))

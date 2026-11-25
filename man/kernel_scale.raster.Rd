@@ -41,7 +41,9 @@ warning and the first value is used for every layer. Ignored when
 or a prepared \code{multiScaleR_data} object from \code{\link[=kernel_prep]{kernel_prep()}}. When
 supplied, \code{sigma}, \code{shape}, \code{kernel}, and \code{scale_vars} are taken from it.
 A fitted object supplies the estimated scales. A prepared object supplies
-the starting scales of \code{\link[=kernel_prep]{kernel_prep()}}. Default: \code{NULL}.}
+the starting scales of \code{\link[=kernel_prep]{kernel_prep()}}. Default: \code{NULL}. A Bayesian fit
+from \code{\link[=multiScale_bayes]{multiScale_bayes()}} is refused; to map it, pass a posterior scale
+from \code{\link[=posterior_scales]{posterior_scales()}} to \code{sigma}.}
 
 \item{shape}{Numeric vector of shape parameters for the exponential power
 kernel (\code{kernel = "expow"}), one per optimized covariate. A hard-radius

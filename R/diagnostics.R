@@ -6,6 +6,9 @@
 #' optimization result.
 #'
 #' @param object An object to inspect. Must be of class \code{multiScaleR}.
+#'   A Bayesian fit from \code{\link{multiScale_bayes}} stops with a pointer
+#'   to \code{\link{diagnose_bayes_scales}}, and other objects stop with an
+#'   error.
 #' @param ... Additional arguments passed to methods.
 #'
 #' @return A named list with the following elements:
@@ -170,4 +173,22 @@ diagnostics.multiScaleR <- function(object, ...) {
     shape_precision = NULL,
     sample_size = NULL
   )
+}
+
+
+# Bayesian fits keep their own convergence and sampling checks.
+#' @rdname diagnostics
+#' @export
+diagnostics.multiScaleR_bayes <- function(object, ...) {
+  stop("diagnostics() reads fits from multiScale_optim(). For a Bayesian fit ",
+       "from multiScale_bayes(), use diagnose_bayes_scales() for the scale ",
+       "chains and summary() for the posterior.", call. = FALSE)
+}
+
+
+#' @rdname diagnostics
+#' @export
+diagnostics.default <- function(object, ...) {
+  stop("diagnostics() needs a multiScaleR fit from multiScale_optim(), not an ",
+       "object of class `", class(object)[1L], "`.", call. = FALSE)
 }

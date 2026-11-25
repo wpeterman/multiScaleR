@@ -16,7 +16,9 @@ profile_sigma(
 )
 }
 \arguments{
-\item{x}{A fitted \code{multiScaleR} object returned by \code{\link[=multiScale_optim]{multiScale_optim()}}.}
+\item{x}{A fitted \code{multiScaleR} object returned by \code{\link[=multiScale_optim]{multiScale_optim()}}.
+A Bayesian fit from \code{\link[=multiScale_bayes]{multiScale_bayes()}} is refused; summarize its scales
+with \code{\link[=posterior_scales]{posterior_scales()}} instead.}
 
 \item{n_pts}{Positive integer, at least 3. Number of sigma values in the
 generated grid for each covariate. More values give a smoother curve at

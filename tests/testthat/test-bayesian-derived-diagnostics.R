@@ -21,7 +21,8 @@ test_that("derived diagnostics require original chains and preserve unavailable 
     .package = "multiScaleR")
   d <- diagnose_bayes_scales(fit)
   expect_false(d$available)
-  expect_match(d$reason, "not retained")
+  # A prepared object has no draws at all (audit B-3).
+  expect_match(d$reason, "no posterior draws")
   expect_identical(d$raw_diagnostics, fit$diagnostics)
   expect_true(is.na(d$passed))
   expect_true(is.na(d$derived_passed))
@@ -29,6 +30,8 @@ test_that("derived diagnostics require original chains and preserve unavailable 
   expect_equal(nrow(d$quantiles), 0L)
   fit <- fake_bayesian_draws(fit)
   expect_false(diagnose_bayes_scales(fit)$available)
+  # Draws without the original chains keep the chain-retention reason.
+  expect_match(diagnose_bayes_scales(fit)$reason, "not retained")
   for (nm in c("laplace", "marginal", "importance")) {
     f <- fit; f[[nm]] <- list(passed = TRUE)
     expect_match(diagnose_bayes_scales(f)$reason, "approximate draws")

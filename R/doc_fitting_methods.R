@@ -404,7 +404,9 @@
 #'
 #' ## Models and data it accepts
 #'
-#' Use a `survival::clogit()` model fitted with `model = TRUE`, or an
+#' Use a `survival::clogit()` model fitted with `model = TRUE`, a
+#' `survival::coxph()` model with a constant-time response such as
+#' `Surv(rep(1, nrow(dat)), case)`, or an
 #' `amt::fit_clogit()` wrapper, with Gaussian or exponential kernels and one
 #' bare `strata(choice_id)` term. A quoted choice-set ID is still one bare
 #' variable, and special-call text inside a quoted predictor name is not read

@@ -423,7 +423,15 @@
 #'   include `lm`, `glm`, `gls` (nlme), and `unmarkedFit` (unmarked). Many
 #'   other model classes also work through `stats::update()` or a custom
 #'   `refit_fn`. A predictor cannot be named `"x"`, which is reserved for
-#'   internal coordinate data.
+#'   internal coordinate data. Fit the model with `data =` naming a data frame
+#'   that holds every model variable. A model fitted inside a function or
+#'   `lapply()` is refitted in the environment where it was fitted, so a
+#'   formula held in a local variable works; other inputs to the fitting call,
+#'   such as a `family` or `start` object, must still exist there. For
+#'   `survival::clogit()`, `survival::coxph()`, and `amt` fits, also set
+#'   `model = TRUE`, and add transformed terms such as `cos(ta_)` to the data
+#'   as columns when the fit comes from `amt::fit_issf()`, which does not keep
+#'   its input data.
 #' @param kernel_inputs A list of class `"multiScaleR_data"` created by
 #'   [kernel_prep()]. It must contain the elements `raw_cov`, `d_list`, `min_D`,
 #'   `max_D`, `unit_conv`, and `kernel`. See [multiScaleR_data-class].
@@ -451,7 +459,10 @@
 #'   otherwise. Under a fixed kernel every optimized scale is a hard radius,
 #'   and a gradient search cannot leave a single start on that stepped
 #'   likelihood. A refit search that returns its starting values gives a
-#'   warning and records `start_stall` in [diagnostics()].
+#'   warning and records `start_stall` in [diagnostics()]. The analytic
+#'   backends (`"profile_glm"`, `"joint_nb2"`, `"conditional_logit"`) run their
+#'   own multi-start search and accept only `"single"`; set their starts with
+#'   `profile_control`.
 #' @param screen_n_sigma Positive integer. Number of log-spaced sigma values
 #'   evaluated per covariate during the prescreen when
 #'   `start_strategy = "screen"`. Default: `5`.
@@ -1088,6 +1099,18 @@ multiScale_optim <- function(fitted_mod,
     par <- c(par, rep(2, n_covs))
     # par <- exp(rep(par_starts[2], n_covs))
     # par <- c(par, sqrt(rep(2, n_covs)))
+  }
+
+  # Probe the refit once before screening or searching. When the model's call
+  # cannot be replayed at all (for example it names an object that no longer
+  # exists), every candidate would fail and the error would surface only
+  # after the whole search. Numerical failures at this one scale are not
+  # fatal here.
+  if (is.null(radius_grid)) {
+    kernel_scale_fn(par = par, d_list = kernel_inputs$d_list,
+      cov_df = kernel_inputs$raw_cov, kernel = kernel_inputs$kernel,
+      fitted_mod = fitted_mod, join_by = join_by,
+      opt_context = utils::modifyList(opt_context, list(stop_on_lookup_error = TRUE)))
   }
 
   if (!user_supplied_par && identical(start_strategy, "screen")) {

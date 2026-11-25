@@ -389,9 +389,10 @@ cv_tab(list(linear = cv, curved = curve_cv),
        metric = "rmse")[, c("Modnames", "Rank", "Score", "Delta")]
 ```
 
-**How to read this output:** The first run fails in every fold. The default
-backend accepts a spline only when you fix its `knots` and `Boundary.knots` in
-the formula, and the `errors` element says so. With `backend = "refit"` all
+**How to read this output:** The first run fails in every fold and warns,
+quoting the reason. The default backend accepts a spline only when you fix its
+`knots` and `Boundary.knots` in the formula, and the `errors` element records
+this for each fold. With `backend = "refit"` all
 folds finish, and the curved model ranks first by
 `r round(abs(diff(cv_tab(list(linear = cv, curved = curve_cv), metric = "rmse")$Score)), 2)`
 animals per survey. The counts were simulated with a straight-line effect of

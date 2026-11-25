@@ -73,8 +73,13 @@ without fixed knots. \code{"joint_nb2"} estimates the scales, coefficients,
 and theta together, and applies only to \code{family = "nbinom2"} with \code{theta}
 estimated. If you leave \code{backend} unset, \code{"Gamma"} and an NB2 model with
 a fixed \code{theta} use \code{"refit"}, the only route they support. Naming another
-backend for them is an error. The usual starting-value, convergence, and
-kernel or metric checks of \code{\link[=multiScale_optim]{multiScale_optim()}} apply in every fold. See
+backend for them is an error. \code{"profile_glm"} and \code{"joint_nb2"} accept
+only smooth kernels, optimized kernel means, and optimized weighted
+surface SQ. A formula with an estimated hard radius (a landscape metric
+or an unweighted surface metric) or another weighted surface metric
+stops before any fold is fitted, so choose \code{backend = "refit"} for those
+predictors. The usual starting-value, convergence, and kernel or metric
+checks of \code{\link[=multiScale_optim]{multiScale_optim()}} apply in every fold. See
 \link{multiScaleR-fitting-methods}.}
 
 \item{weights}{Optional case frequencies, one nonnegative whole number per
@@ -90,7 +95,9 @@ weight requirements.}
 \item{optim_args}{Named list of extra \code{\link[=multiScale_optim]{multiScale_optim()}} arguments used
 in every fold, such as \code{par} or \code{profile_control}. Supply \code{radius_grid}
 with \code{backend = "refit"} to profile hard radii, together with any smooth
-scales, in each training split. Supply \code{covariate_transform = "raw"} with
+scales, in each training split. An estimated hard radius usually needs
+it, because without it folds often fail (see "How each fold is
+fitted"). Supply \code{covariate_transform = "raw"} with
 \code{backend = "refit"} to keep optimized covariates in their own units (see
 "Keep optimized covariates in their own units"). Arguments that supply
 data, the starting model, a custom refit function, parallel workers,
@@ -182,6 +189,16 @@ expected response and score it.
 The fold fails if the initial GLM, the final GLM, or the scale optimizer
 does not converge. Folds run one after another, and a failed fold is
 recorded and never retried.
+
+An estimated hard radius, such as a landscape metric whose radius is
+optimized, changes the likelihood only in steps as the radius crosses
+cell distances. A gradient search on such a likelihood often stops with a
+nonzero convergence code, and then the fold fails even when the same model
+fitted to all of the data looks acceptable. With \code{backend = "refit"},
+supply candidate radii through \code{optim_args = list(radius_grid = ...)} so
+each fold profiles the hard radius over a grid instead (see
+\code{\link[=multiScale_optim]{multiScale_optim()}}). The message of a fold that fails this way names
+the hard-radius predictors and this remedy.
 }
 
 \section{Build the folds}{
@@ -342,7 +359,9 @@ Read \code{complete} first. \code{TRUE} means every planned fold was fitted and
 scored. When a fold fails, \code{complete} is \code{FALSE} and the pooled scores in
 \code{summary} are \code{NA}. The scores of the folds that finished, the failed
 assessment rows, the diagnostics, and the warnings all stay available, and
-\code{errors} names the stage and message of each failure. \code{\link[=cv_tab]{cv_tab()}} and
+\code{errors} names the stage and message of each failure. The function also
+gives one warning when it returns an incomplete result, with the number
+of failed folds and their first distinct reasons. \code{\link[=cv_tab]{cv_tab()}} and
 \code{\link[=select_cv]{select_cv()}} refuse an incomplete result rather than rank a model on its
 easier folds. A complete result says only that the calculations finished,
 so inspect \code{diagnostics} and \code{warnings} before you rank models.

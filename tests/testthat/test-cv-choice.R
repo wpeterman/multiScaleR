@@ -110,7 +110,8 @@ test_that("choice CV retains native failures and rejects split or target substit
   expect_false(tie$complete); expect_true(all(is.na(tie$predictions$linear_predictor)))
   expect_true(all(is.na(tie$summary$estimate)))
   failed_data <- d; failed_data$g <- factor(ifelse(rownames(d) %in% z$folds[[1L]]$assessment, "new", as.character(d$g)))
-  failed <- cross_validate_clogit(case_ ~ x + g + strata(choice), failed_data, z$folds)
+  expect_warning(failed <- cross_validate_clogit(case_ ~ x + g + strata(choice), failed_data, z$folds),
+    "incomplete result")
   # survival retains an absent factor level as an aliased coefficient, so
   # its native training guard fires before the prediction new-level check.
   expect_false(failed$complete); expect_match(failed$errors[[1L]]$message, "nonfinite coefficients")
@@ -164,8 +165,8 @@ test_that("native choice admission does not depend on retained representations",
     expect_true(inherits(native, "coxph") && (!is.null(native$penalty) ||
       any(vapply(native$model, inherits, logical(1), "coxph.penalty"))))
     expect_true(all(is.finite(coef(native))) && is.finite(as.numeric(logLik(native))))
-    cv <- cross_validate_clogit(case_ ~ ridge(x, theta = 1) + strata(choice), d,
-      z$folds[1L], method = method, keep_fits = FALSE, keep_selection = FALSE)
+    expect_warning(cv <- cross_validate_clogit(case_ ~ ridge(x, theta = 1) + strata(choice), d,
+      z$folds[1L], method = method, keep_fits = FALSE, keep_selection = FALSE), "incomplete result")
     expect_false(cv$complete)
     expect_identical(cv$errors[[1L]]$stage, "training_identity")
     expect_match(cv$errors[[1L]]$message, "unpenalized")

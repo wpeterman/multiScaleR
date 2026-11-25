@@ -124,7 +124,8 @@ happen within the analysis rows of each fold, so do not supply predictors
 standardized with all rows. The section "Formula terms that learn from the
 data" in \code{\link[=cross_validate]{cross_validate()}} lists the supported terms and their limits.
 Missing values are never dropped silently, and native warnings and failed
-folds are kept.
+folds are kept. When any fold fails, the function gives one warning with
+the number of failed folds and their first distinct reasons.
 }
 
 \section{Binomial responses}{

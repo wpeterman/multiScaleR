@@ -125,7 +125,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
   }
   dimension <- match.arg(dimension, c("2d", "1d"))
   cat("\nCall:\n")
-  print(x$call)
+  .msr_print_call(x$call)
 
   cat("\n\nKernel used:\n")
   cat(x$kernel)
@@ -133,6 +133,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
   cat("\n\n***** Optimized Scale of Effect *****\n\n")
   print(x$opt_scale)
   hard_radius <- x$hard_radius
+  .msr_print_clogit_scale_note(x$backend, rownames(x$opt_scale), hard_radius)
   if (length(hard_radius)) {
     cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ".\n", sep = "")
     cat("Hard-radius effects change in steps as cells enter the buffer. ")
@@ -159,14 +160,13 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
   } else if (!is.null(scale_ci_method) && any(scale_ci_method == "log_wald")) {
     cat("\nScale confidence limits use joint observed information on the log scale.\n")
     # joint_mixed reports withheld scales below, even when none has a limit.
-    if (!identical(x$backend, "joint_mixed")) {
-      if (any(scale_ci_method == "unavailable"))
-        cat("Scale SEs failing their own checks are withheld; see diagnostics(x)$profile_glm.\n")
-      bounded <- x$diagnostics$profile_glm$scale_se_conditional_on
-      if (length(bounded))
-        cat("Other scale SEs hold ", paste(bounded, collapse = ", "),
-            " fixed at the search bound.\n", sep = "")
-    }
+    if (!identical(x$backend, "joint_mixed"))
+      .msr_print_analytic_scale_se(x$opt_scale, x$diagnostics$profile_glm)
+  } else if (.msr_analytic_backend(x)) {
+    # Every analytic scale SE is withheld: name them and the reasons here,
+    # under the table, as the refit summary does for bounded scales.
+    cat("\n")
+    .msr_print_analytic_scale_se(x$opt_scale, x$diagnostics$profile_glm)
   }
   if (identical(x$backend, "joint_mixed"))
     .msr_print_mixed_scale_se(x$diagnostics$joint_mixed)
@@ -203,7 +203,17 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
   if(any(grepl("^unmarked", class(x$fitted_mod)))) {
     print(x$fitted_mod)
   } else {
-    print(summary(x$fitted_mod))
+    native_summary <- summary(x$fitted_mod)
+    printed <- tryCatch({ print(native_summary); NULL }, error = function(e) e)
+    if (inherits(printed, "error")) {
+      # Some native print methods fail on an undefined quantity, for example
+      # MASS with an NA theta standard error at the Poisson limit. Show the
+      # coefficient table rather than losing the rest of the summary.
+      cat("\n(The native model summary could not be printed: ",
+          conditionMessage(printed), ")\n", sep = "")
+      coefs <- tryCatch(stats::coef(native_summary), error = function(e) NULL)
+      if (is.matrix(coefs)) stats::printCoefmat(coefs)
+    }
   }
 
   # Warning Messages --------------------------------------------------------
@@ -285,7 +295,7 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #'   * `dimension`: the selected definition, `"2d"` or `"1d"`.
 #'   * `prob`: the cumulative weight proportion used for the distances.
 #'   * `fitted_mod`: the model refit at the estimated scales (`opt_mod` of the
-#'     fit).
+#'     fit, or the native `survival` model inside an `amt` wrapper).
 #'   * `kernel`: the kernel name.
 #'   * `hard_radius`: names of covariates whose scale is a hard radius.
 #'   * `diagnostics`, `warn_message`, `next_run`, `call`: copied from the fit;
@@ -329,6 +339,15 @@ print.summary_multiScaleR <- function(x, dimension = NULL, ...){
 #' table records cache availability in its `profile_cache` attribute. The
 #' option bounds retained entries, not temporary key construction or the
 #' memory used by the numerical profile.
+#'
+#' Two kinds of fit have no profile intervals. For a fit with a declared
+#' `radius_grid` (see [multiScale_optim()]), `profile = TRUE` warns and
+#' returns the summary with the ordinary limits: `NA` for the hard radii and
+#' Wald limits, conditional on the selected radii, for any smooth scale.
+#' Inspect `diagnostics(object)$radius_profile` for the candidate
+#' likelihoods. For `backend = "conditional_logit"`, scale uncertainty is not
+#' calibrated, so `profile = TRUE` warns and returns `NA` scale limits; use
+#' [profile_sigma()] to view the log-likelihood across sigma.
 #'
 #' # Analytic backends
 #'
@@ -393,21 +412,12 @@ summary.multiScaleR <- function(object, profile = FALSE,
     stop("`profile` must be TRUE or FALSE.")
   }
   object <- .msr_refit_bound_view(object)
-  if (identical(object$backend, "conditional_logit"))
-    object$opt_mod <- .analysis_model(object$opt_mod)
+  # Summaries read the native model inside amt wrappers (fit_clogit,
+  # fit_issf) under every backend; insight and stats cannot read the wrapper.
+  object$opt_mod <- .analysis_model(object$opt_mod)
 
-  if(any(class(object$opt_mod) == 'gls')){
-    df <- object$opt_mod$dims$N - object$opt_mod$dims$p
-    names <- all.vars(formula(object$opt_mod)[-2])
-
-  } else if(any(grepl("^unmarked", class(object$opt_mod)))){
-    df <- dim(object$opt_mod@data@y)[1]
-    names <- .unmarked_model_predictors(object$opt_mod)
-
-  } else {
-    df <- get_df(object$opt_mod, type = "residual")
-    names <- all.vars(formula(object$opt_mod)[-2])
-  }
+  # One residual df for the t quantile of the Wald scale limits.
+  df <- .msr_residual_df(object$opt_mod)
 
   tab_scale <- scale_ci_table(object = object,
                               df = df,
@@ -520,7 +530,7 @@ summary.multiScaleR <- function(object, profile = FALSE,
 print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
   dimension <- match.arg(dimension)
   cat("\nCall:\n")
-  print(x$call)
+  .msr_print_call(x$call)
 
   cat('\n\nKernel used: \n')
   cat(x$kernel_inputs$kernel)
@@ -535,6 +545,10 @@ print.multiScaleR <- function(x, dimension = c("2d", "1d"), prob = 0.9, ...){
   print(display_scale)
   .msr_print_refit_bounds(display_fit$diagnostics)
   .msr_print_mixed_scale_se(x$diagnostics$joint_mixed)
+  .msr_print_clogit_scale_note(x$backend, rownames(display_scale), hard_radius)
+  if (.msr_analytic_backend(x))
+    .msr_print_analytic_scale_se(display_scale, x$diagnostics$profile_glm,
+                                 leading_newline = TRUE)
   if (length(hard_radius)) {
     cat("\nRadius (map units) for: ", paste(hard_radius, collapse = ", "), ". ", sep = "")
     if (identical(x$backend, "conditional_logit")) {
@@ -702,6 +716,85 @@ print.multiScaleR_data <- function(x, ...){
     if (length(rh$conditional_on))
       cat("Wald SEs for the other smooth parameters hold the bounded ones fixed.\n")
     cat("Coefficient uncertainty still conditions on the selected kernels.\n")
+  }
+  # Curvature that cannot support Wald SEs. `curvature_status` keeps the
+  # original Hessian result when a bound later replaced `status`; fits saved
+  # before it existed have `status` only.
+  curvature <- if (is.null(rh$curvature_status)) rh$status else rh$curvature_status
+  if (any(rh$active) && identical(curvature, "hessian_includes_failed_refit")) {
+    cat("\nA model refit failed while the Hessian was computed, so Wald SEs and ",
+        "limits for the scales are withheld.\nUse `summary(x, profile = TRUE)` ",
+        "for profile-likelihood limits; see diagnostics(x)$refit_hessian.\n", sep = "")
+  } else if (any(rh$active) && identical(curvature, "invalid_hessian")) {
+    cat("\nThe Hessian at the estimates could not be inverted, so Wald SEs and ",
+        "limits for the scales are withheld.\nUse `summary(x, profile = TRUE)` ",
+        "for profile-likelihood limits; see diagnostics(x)$refit_hessian.\n", sep = "")
+  }
+  invisible(NULL)
+}
+
+# Step-selection fits withhold smooth-scale uncertainty by design. Hard radii
+# already get their own pointer beside the radius line.
+.msr_print_clogit_scale_note <- function(backend, scales, hard_radius) {
+  if (identical(backend, "conditional_logit") && length(setdiff(scales, hard_radius)))
+    cat("\nScale SEs and limits are not reported for conditional_logit fits; ",
+        "use `profile_sigma(x)` to view the log-likelihood across sigma.\n", sep = "")
+  invisible(NULL)
+}
+
+# Analytic backends (profile_glm, joint_nb2): name the scale SEs that are
+# withheld, and the bounded kernel parameters that the remaining scale SEs
+# hold fixed (per-scale SEs from the reduced observed information).
+.msr_print_analytic_scale_se <- function(scale_tab, pg, leading_newline = FALSE) {
+  if (is.null(pg) || is.null(scale_tab)) return(invisible(NULL))
+  withheld <- rownames(scale_tab)[!is.finite(scale_tab$SE)]
+  bounded <- pg$scale_se_conditional_on
+  if (leading_newline && (length(withheld) || length(bounded))) cat("\n")
+  if (length(withheld) && length(withheld) == nrow(scale_tab)) {
+    cat("Scale SEs and limits are withheld for ", paste0("sigma:", withheld, collapse = ", "),
+        if (length(pg$reasons)) paste0(" (", paste(pg$reasons, collapse = "; "), ")"),
+        ". See diagnostics(x)$profile_glm.\n", sep = "")
+  } else if (length(withheld)) {
+    cat("Scale SEs failing their own checks are withheld for ",
+        paste0("sigma:", withheld, collapse = ", "),
+        "; see diagnostics(x)$profile_glm.\n", sep = "")
+  }
+  if (length(bounded))
+    cat("Other scale SEs hold ", paste(bounded, collapse = ", "),
+        " fixed at the search bound.\n", sep = "")
+  invisible(NULL)
+}
+
+# A call made through do.call() holds its evaluated arguments, such as the
+# fitted model and the prepared inputs, and deparsing them can take minutes.
+# Replace every argument that is not a symbol, a call, or a short constant
+# with a placeholder naming its class, for example `<glm>`. An inlined
+# function in the function position becomes its name when it is
+# multiScale_optim(), otherwise `<function>`.
+.msr_compact_call <- function(call) {
+  if (!is.call(call)) return(call)
+  keep <- function(a) is.null(a) || is.symbol(a) || is.call(a) ||
+    (is.atomic(a) && length(a) <= 10L &&
+       all(names(attributes(a)) %in% "names"))
+  parts <- as.list(call)
+  fun <- parts[[1L]]
+  if (!is.symbol(fun) && !is.call(fun))
+    parts[[1L]] <- if (identical(fun, multiScale_optim)) quote(multiScale_optim) else
+      as.name("<function>")
+  for (i in seq_along(parts)[-1L]) {
+    a <- parts[[i]]
+    if (!keep(a)) parts[[i]] <- as.name(paste0("<", class(a)[1L], ">"))
+  }
+  as.call(parts)
+}
+
+# Print a stored call compactly. Ordinary calls print exactly as before.
+.msr_print_call <- function(call) {
+  compact <- .msr_compact_call(call)
+  if (identical(compact, call)) {
+    print(call)
+  } else {
+    cat(deparse(compact, backtick = FALSE), sep = "\n")
   }
   invisible(NULL)
 }

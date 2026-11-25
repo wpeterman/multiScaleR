@@ -102,6 +102,7 @@
       stop("raster_group must align exactly with prepared row IDs.", call. = FALSE)
     if ((family == "Gamma" || !is.null(theta)) && backend != "refit")
       stop("Gamma and fixed-theta NB2 scale fits require backend = 'refit'; analytic NB backends estimate theta.", call. = FALSE)
+    .msr_cv_analytic_admission(inputs, covariates, backend)
     allowed <- setdiff(names(formals(multiScale_optim)), c("fitted_mod", "kernel_inputs", "join_by", "n_cores", "PSOCK", "refit_fn", "backend", "verbose"))
     if (!is.list(optim_args) || (length(optim_args) && (is.null(names(optim_args)) || anyNA(names(optim_args)) ||
         anyDuplicated(names(optim_args)) || any(!names(optim_args) %in% allowed))) ||
@@ -158,7 +159,9 @@
         stage <- "scale_fit"; fit <- NULL
         fit <- do.call(multiScale_optim, c(list(fitted_mod = initial, kernel_inputs = train, n_cores = 1L,
           backend = backend, verbose = FALSE), optim_args))
-        if (!identical(as.integer(fit$optim_results$convergence), 0L)) stop("Training scale optimizer did not converge.")
+        if (!identical(as.integer(fit$optim_results$convergence), 0L))
+          stop(.msr_cv_convergence_message("Training scale optimizer did not converge.",
+            train, covariates, optim_args))
         output$training[[name]] <- c(output$training[[name]], list(fitted_normalization = fit$scl_params,
           coefficients = stats::coef(fit$opt_mod), scale_est = fit$scale_est, shape_est = fit$shape_est,
           optimizer = fit$optim_results[c("par", "value", "convergence", "message")], start_results = fit$profile_fit$start_results))

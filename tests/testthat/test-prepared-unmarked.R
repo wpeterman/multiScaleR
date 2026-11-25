@@ -24,7 +24,7 @@ test_that("N-mixture snapshots retain native tables and component controls", {
   nd$cont1 <- 999
   object$opt_mod@data@siteCovs$cont1 <- 999
   expect_equal(predict(prepared), expected)
-  expect_error(prepare_prediction(object), "component explicitly")
+  expect_error(prepare_prediction(object), "Specify `component =` with one prediction type")
   expect_error(prepare_prediction(object, kernel_inputs = f$kernel_inputs,
                                  component = "state"), "newdata must")
   expect_error(prepare_prediction(object, component = "state", max_bytes = 1), "max_bytes")

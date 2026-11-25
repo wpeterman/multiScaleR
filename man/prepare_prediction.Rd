@@ -34,7 +34,8 @@ prepare_prediction(
 \code{backend = "profile_glm"}, \code{"joint_nb2"}, \code{"conditional_logit"}, or
 \code{"joint_mixed"}, or the default refit backend with a supported native
 model in \code{object$opt_mod}. For \code{predict()}, a snapshot returned by
-\code{prepare_prediction()}.}
+\code{prepare_prediction()}. A Bayesian fit from \code{\link[=multiScale_bayes]{multiScale_bayes()}} is
+refused; use \code{\link[=predict.multiScaleR_bayes]{predict.multiScaleR_bayes()}} with new kernel inputs.}
 
 \item{newdata, kernel_inputs}{Prediction rows and matching spatial inputs
 from \code{\link[=kernel_prep]{kernel_prep()}}, with the same requirements as in

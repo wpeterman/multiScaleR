@@ -7,6 +7,8 @@
 #' result with [plot.sigma_profile()].
 #'
 #' @param x A fitted `multiScaleR` object returned by [multiScale_optim()].
+#'   A Bayesian fit from [multiScale_bayes()] is refused; summarize its scales
+#'   with [posterior_scales()] instead.
 #' @param n_pts Positive integer, at least 3. Number of sigma values in the
 #'   generated grid for each covariate. More values give a smoother curve at
 #'   the cost of more model refits. Ignored when `sigma_values` is supplied.
@@ -160,6 +162,8 @@ profile_sigma <- function(x,
                           sigma_values = NULL,
                           sigma_range = NULL) {
 
+  # A Bayesian fit gets a pointer to the Bayesian tools, not a class error.
+  .msr_stop_bayes_fit(x, "profile_sigma")
   if (!inherits(x, "multiScaleR")) {
     stop("`x` must be a fitted `multiScaleR` object.", call. = FALSE)
   }

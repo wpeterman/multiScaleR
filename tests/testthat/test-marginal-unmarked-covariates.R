@@ -114,7 +114,9 @@ test_that("intercept-only unmarked states return no covariate panels", {
   f <- make_marginal_year_fixture()
   obj <- f$obj
   obj$opt_mod <- unmarked::pcount(~Year ~ 1, data = f$umf, K = 40)
-  expect_length(plot_marginal_effects(obj), 0L)
+  # An empty component now warns instead of returning nothing silently.
+  expect_warning(out <- plot_marginal_effects(obj), "no covariates")
+  expect_length(out, 0L)
 })
 
 test_that("occupancy models use the state formula even without a detection intercept", {

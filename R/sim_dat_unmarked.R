@@ -59,8 +59,9 @@
 #'     contains the simulated true abundance/occupancy (before detection
 #'     thinning). Remaining columns are the true kernel-weighted covariate
 #'     values, scaled to zero mean and unit variance.}
-#'   \item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows.
-#'     An \code{obs} column is appended containing the true
+#'   \item{\code{pts}}{An \code{sf} POINT object with \code{n_points} rows
+#'     and the coordinate reference system of \code{raster_stack} (none when
+#'     the raster has none). An \code{obs} column is appended containing the true
 #'     abundance/occupancy values. Pass to \code{\link{kernel_prep}} as
 #'     \code{pts}.}
 #' }
@@ -188,7 +189,10 @@ sim_dat_unmarked <- function(alpha = 1,
   max_x <- max_y <- floor(s_ext[2] - (s_ext[2] * 0.15))
   r <- rast()
   ext(r) <- c(min_x, max_x, min_y, max_y)
-  poly <- as.polygons(ext(c(min_x, max_x, min_y, max_y)))
+  # Generated points share the raster's coordinate reference system, so
+  # kernel_prep() does not warn about a missing CRS. A raster with no CRS
+  # gives points with none, as before. The point locations are unchanged.
+  poly <- as.polygons(ext(c(min_x, max_x, min_y, max_y)), crs = terra::crs(raster_stack))
   poly_sf <- st_as_sf(poly)
 
   pts <- 0

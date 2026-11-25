@@ -44,19 +44,19 @@ scale_center_raster <- function(r,
       stop('Rasters scaled in model absent from input r.')
     }
 
-    if(any(class(mod) == 'gls')){
-      mod_class <- 'gls'
-      dat <- get_data(mod, effects = 'all')
-
-    } else if(any(grepl("^unmarked", class(mod)))) {
-      mod_class <- 'unmarked'
+    if(any(grepl("^unmarked", class(mod)))) {
       dat <- mod@data@siteCovs
-
     } else {
-      mod_class <- 'other'
-      dat <- extract_model_data(mod)
-      if(is.null(dat)){
-        dat <- get_data(mod, effects = 'all')
+      # Clamping needs each covariate's own column. A model frame holds
+      # expressions such as poly(x, 2) or log(x + 10) instead, so try the
+      # raw model data first (it also restores inputs that multiScaleR kept
+      # for refitted gls and Cox fits), then the model frame.
+      analysis <- .analysis_model(mod)
+      dat <- .model_data(analysis, effects = 'all')
+      if (is.null(dat) || !all(covs %in% names(dat))) {
+        frame_data <- suppressWarnings(extract_model_data(analysis))
+        if (!is.null(frame_data) && (is.null(dat) || all(covs %in% names(frame_data))))
+          dat <- frame_data
       }
     }
   }
