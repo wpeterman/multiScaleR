@@ -138,6 +138,7 @@ website](https://wpeterman.github.io/multiScaleR/articles/).
 | [13. Estimate scales of effect with a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.html) | `v13-bayesian-scales` |
 | [14. Predict new sites and years from a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.html) | `v14-bayesian-prediction` |
 | [15. Choose and check a Bayesian computation method](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.html) | `v15-bayesian-computation` |
+| [16. Combine data sets to estimate a shared scale of effect](https://wpeterman.github.io/multiScaleR/articles/v16-joint-data-sets.html) | `v16-joint-data-sets` |
 
 Reference topics in the help system give the details that the vignettes
 leave out:

@@ -60,6 +60,13 @@ articles:
       - v13-bayesian-scales
       - v14-bayesian-prediction
       - v15-bayesian-computation
+  - title: Combining data sets
+    navbar: Combining data sets
+    desc: >
+      Estimate a shared scale of effect from several surveys, including
+      surveys that measure the response over an area.
+    contents:
+      - v16-joint-data-sets
 
 # Function reference, grouped by step in the analysis workflow.
 # Every non-internal help topic must be listed here, or check_pkgdown() fails.

@@ -99,8 +99,12 @@
 #' data sets this test has little power, so a nonsignificant result is weak
 #' evidence for a common scale. Fit several structures and compare them with
 #' [stats::AIC()] (the fits have [stats::logLik()] methods) or [stats::anova()].
-#' The test of `kappa = 0` in `"footprint_scaled"` lies on the boundary of the
-#' parameter space, so its p-value is halved.
+#' To test `kappa = 0`, compare a `"common"` fit with a `"footprint_scaled"`
+#' fit in [stats::anova()]. That value lies on the boundary of the parameter
+#' space, so `anova()` refers the statistic to a mixture of chi-square
+#' distributions, which halves the p-value for one `kappa`. With a single data
+#' set that has a footprint, `kappa` can match that data set's apparent scale
+#' exactly, so the ecological scale then rests on the point data sets alone.
 #'
 #' **Sampling footprints.** A response is often measured over an area, not at a
 #' point: counts within a fixed radius, detections by an acoustic recorder, a
@@ -144,7 +148,9 @@
 #'   scales, `kappa`, coefficients), `structure`, `footprint`, `share`,
 #'   `standardization`, `uncertainty`, `optim`, and `call`.
 #'
-#' @seealso [multiScale_optim()], [footprint_sd()], [profile_sigma()]
+#' @seealso [multiScale_optim()], [footprint_sd()], [profile_sigma()].
+#'   `vignette("v16-joint-data-sets", package = "multiScaleR")` works through
+#'   an example with three surveys, shared sites, and a sampling footprint.
 #'
 #' @examples
 #' \donttest{
@@ -218,7 +224,7 @@ multiScale_joint <- function(fits,
   opt <- .msr_joint_optimize(spec, fn)
   theta <- stats::setNames(opt$par, spec$parameters$parameter)
 
-  hess <- .msr_joint_hessian(fn, theta, spec$parameters)
+  hess <- .msr_joint_hessian(fn, theta, spec$parameters, .msr_joint_edge(theta, spec))
   vcov_theta <- hess$vcov
   jack <- NULL
   if (identical(uncertainty, "jackknife")) {
@@ -322,7 +328,9 @@ multiScale_joint <- function(fits,
 #' a bivariate normal distribution.
 #'
 #' @return A numeric vector of footprint SDs in map units.
-#' @seealso [multiScale_joint()]
+#' @seealso [multiScale_joint()].
+#'   `vignette("v16-joint-data-sets", package = "multiScaleR")` uses a footprint
+#'   for acoustic recorders.
 #' @examples
 #' footprint_sd("disk", 100)          # 100 m fixed-radius point count: 50
 #' footprint_sd("halfnormal", 60)     # distance sampling, sigma = 60 m: 60
@@ -632,7 +640,14 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
 
 
 # Apparent scale (map units) of every covariate in every data set.
-.msr_joint_sigma <- function(theta, spec, eco = FALSE) {
+#
+# With clamp = TRUE each apparent scale is held inside its data set's search
+# range [min_D, max_D], and attribute "excess" sums how far (on the log scale)
+# the unclamped values lay outside it. Only "footprint_scaled" can leave the
+# range inside its parameter box, because the scales it allows form a curved,
+# not rectangular, region of (sigma, kappa). The objective turns the excess
+# into a finite penalty so that the optimizer can step back inside.
+.msr_joint_sigma <- function(theta, spec, eco = FALSE, clamp = TRUE) {
   par <- spec$parameters
   out <- lapply(spec$sets, function(s) stats::setNames(rep(NA_real_, length(s$covs)), s$covs))
   for (j in names(spec$structure)) {
@@ -648,14 +663,47 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
     for (d in spec$members[[j]])
       out[[d]][[j]] <- if (k == 0) sigma else sqrt(sigma^2 + (k * spec$tau[[d]])^2)
   }
+  if (!clamp) return(out)
+  excess <- 0
+  for (d in names(out)) {
+    v <- out[[d]]
+    ok <- is.finite(v) & v > 0
+    held <- v
+    held[ok] <- pmin(pmax(v[ok], spec$sets[[d]]$min_D), spec$sets[[d]]$max_D)
+    excess <- excess + sum(abs(log(v[ok]) - log(held[ok])))
+    out[[d]] <- held
+  }
+  attr(out, "excess") <- excess
   out
+}
+
+
+# Covariates under "footprint_scaled" whose optimum puts an apparent scale on
+# the edge of a data set's search range. That edge is not a bound of the
+# parameter box, so it is reported through the kappa rows: the Hessian holds
+# kappa fixed there, as at any other bound.
+.msr_joint_edge <- function(theta, spec) {
+  par <- spec$parameters
+  edge <- rep(FALSE, nrow(par))
+  raw <- .msr_joint_sigma(theta, spec, clamp = FALSE)
+  for (j in names(spec$structure)[spec$structure == "footprint_scaled"]) {
+    hit <- vapply(spec$members[[j]], function(d) {
+      v <- raw[[d]][[j]]
+      s <- spec$sets[[d]]
+      is.finite(v) && (v <= s$min_D * (1 + 1e-5) || v >= s$max_D * (1 - 1e-5))
+    }, logical(1))
+    if (any(hit)) edge[par$covariate == j & par$type == "kappa"] <- TRUE
+  }
+  edge
 }
 
 
 # One center and spread per shared covariate, pooled across data sets at the
 # ecological scale (or at each data set's own scale under "separate").
 .msr_joint_standardize <- function(theta, sigma, spec) {
-  ref <- .msr_joint_sigma(theta, spec, eco = TRUE)
+  # The ecological scale is not an apparent scale, so it is not held inside a
+  # data set's search range.
+  ref <- .msr_joint_sigma(theta, spec, eco = TRUE, clamp = FALSE)
   center <- spread <- stats::setNames(numeric(length(spec$shared)), spec$shared)
   for (j in spec$shared) {
     values <- unlist(lapply(spec$members[[j]], function(d) {
@@ -676,9 +724,17 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
 
 .msr_joint_penalty <- 1e60
 
+# Penalty per unit of log-scale excess outside a data set's search range. It is
+# steep enough to dominate any likelihood gradient yet finite, so a line search
+# that crosses the edge sees a slope back toward it rather than a wall.
+.msr_joint_edge_weight <- 1e4
+
 .msr_joint_objective <- function(spec) {
   function(theta) {
     sigma <- .msr_joint_sigma(theta, spec)
+    excess <- attr(sigma, "excess")
+    edge_penalty <- if (is.finite(excess) && excess > 0)
+      .msr_joint_edge_weight * (excess + excess^2) else 0
     for (s in spec$sets) {
       v <- sigma[[s$name]]
       if (any(!is.finite(v)) || any(v < s$min_D * (1 - 1e-8)) || any(v > s$max_D * (1 + 1e-8)))
@@ -700,7 +756,7 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
         return(.msr_joint_penalty)
       total <- total + v
     }
-    total
+    total + edge_penalty
   }
 }
 
@@ -818,10 +874,12 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
 
 
 # Outer Hessian on the optimizer scale. Parameters on a bound are held fixed;
-# the remaining block gives SEs conditional on them.
-.msr_joint_hessian <- function(fn, theta, par) {
+# the remaining block gives SEs conditional on them. `edge` flags further
+# parameters to hold fixed (see .msr_joint_edge()).
+.msr_joint_hessian <- function(fn, theta, par, edge = NULL) {
   p <- length(theta)
   at_bound <- .msr_joint_at_bound(theta, par)
+  if (!is.null(edge)) at_bound <- at_bound | edge
   V <- matrix(NA_real_, p, p)
   free <- which(!at_bound)
   if (length(free)) {
@@ -1028,11 +1086,10 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
   k_sep <- sum(vapply(spec$sets, `[[`, numeric(1), "k_sep"))
   df <- k_sep - k
   stat <- 2 * (ll_sep - ll)
-  boundary <- any(spec$structure == "footprint_scaled")
   p <- if (df > 0) stats::pchisq(max(stat, 0), df, lower.tail = FALSE) else NA_real_
   list(logLik = c(joint = ll, separate = ll_sep), df = c(joint = k, separate = k_sep),
        statistic = max(stat, 0), df_difference = df, p_value = p,
-       improved = improved, boundary = boundary)
+       improved = improved)
 }
 
 
@@ -1062,9 +1119,16 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
   x$warn_message <- 0
   x$joint <- info
   scale_D <- tryCatch(kernel_dist(x, dimension = "1d"), error = function(e) NULL)
-  if (!is.null(scale_D))
+  if (!is.null(scale_D)) {
     x$diagnostics$max_distance <- .max_distance_diagnostic(scale_D = scale_D,
                                                            max_D = s$max_D)
+    if (isTRUE(x$diagnostics$max_distance$triggered)) x$warn_message <- c(x$warn_message, 1)
+  }
+  # The separate fit's follow-up advice names its own scales. Rebuild it at
+  # the joint scales (Gaussian and exponential kernels have no shape).
+  x$next_run <- .next_run_recommendation(scale_est = as.matrix(x$scale_est),
+                                         shape_est = NULL, max_D = s$max_D,
+                                         diagnostics = x$diagnostics)
   x
 }
 

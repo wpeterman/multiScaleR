@@ -46,5 +46,7 @@ footprint_sd("halfnormal", 60)     # distance sampling, sigma = 60 m: 60
 footprint_sd("rectangle", 200, 20) # 200 m by 20 m transect strip
 }
 \seealso{
-\code{\link[=multiScale_joint]{multiScale_joint()}}
+\code{\link[=multiScale_joint]{multiScale_joint()}}.
+\code{vignette("v16-joint-data-sets", package = "multiScaleR")} uses a footprint
+for acoustic recorders.
 }

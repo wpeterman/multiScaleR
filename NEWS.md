@@ -146,6 +146,18 @@ multiScaleR (development version)
   against separate scales, `logLik()` for `AIC()`, and one `multiScaleR` fit
   per data set for plots, marginal effects, and maps.
 
+* New vignette, `vignette("v16-joint-data-sets", package = "multiScaleR")`,
+  works through `multiScale_joint()` with three simulated surveys: a common
+  scale and its test, surveys that share sites, a shared coefficient, and
+  acoustic recorders with a sampling footprint.
+
+* `multiScale_joint(scales = "footprint_scaled")` no longer stops at its
+  starting values when a trial step would carry a data set's apparent scale
+  past its `max_D`. `anova()` of a common-scale fit against a
+  `"footprint_scaled"` fit now treats `kappa = 0` as a boundary value, and the
+  printed test against separate scales is no longer halved. Component fits
+  in `$fits` now give follow-up advice at the joint scales.
+
 * New experimental `predict_gdistremoval()` and `simulate_gdistremoval()`
   for `unmarked::gdistremoval()` models, alone or inside a `multiScaleR`
   fit. `predict_gdistremoval()` combines the fitted components into

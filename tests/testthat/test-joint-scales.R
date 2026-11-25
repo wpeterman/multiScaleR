@@ -47,7 +47,19 @@ joint_fixture <- local({
     fb <- multiScale_optim(glm(y ~ hab, family = binomial(link = "cloglog"), data = db),
                            b$inputs, verbose = FALSE)
     fc <- multiScale_optim(glm(y ~ hab, family = poisson, data = dc), c$inputs, verbose = FALSE)
-    cache <<- list(raster = r, counts = fa, presence = fb, counts2 = fc,
+    # Counts over a 120 m radius disk: the landscape is seen at the apparent
+    # scale sqrt(60^2 + 60^2), since the disk's per-axis SD is 60 m.
+    sim <- sim_dat(alpha = 1, beta = 0.8, kernel = "gaussian", sigma = sqrt(2) * 60,
+                   type = "count", n_points = 50, raster_stack = r, max_D = 250,
+                   user_seed = 4)
+    pts <- sim$pts
+    sf::st_crs(pts) <- 32617
+    e_inputs <- kernel_prep(pts, r, max_D = 250, kernel = "gaussian", verbose = FALSE)
+    e_inputs$min_D <- 10
+    fe <- multiScale_optim(glm(y ~ hab, family = poisson,
+                               data = data.frame(y = sim$obs, e_inputs$kernel_dat)),
+                           e_inputs, verbose = FALSE)
+    cache <<- list(raster = r, counts = fa, presence = fb, counts2 = fc, area = fe,
                    presence_data = db, presence_inputs = b$inputs)
     cache
   }
@@ -107,6 +119,45 @@ test_that("zero footprints give the common scale and footprints add in variance"
                "two different footprint")
 })
 
+test_that("footprint_scaled reaches the footprint and common optima it nests", {
+  f <- joint_fixture()
+  fits <- list(counts = f$counts, presence = f$presence, area = f$area)
+  tau <- c(counts = 0, presence = 0, area = footprint_sd("disk", 120))
+  common <- suppressWarnings(multiScale_joint(fits, profile = FALSE, verbose = FALSE))
+  fp <- suppressWarnings(multiScale_joint(fits, scales = "footprint", footprint = tau,
+                                          profile = FALSE, verbose = FALSE))
+  fps <- suppressWarnings(multiScale_joint(fits, scales = "footprint_scaled", footprint = tau,
+                                           profile = FALSE, verbose = FALSE))
+  # kappa = 1 is the footprint fit and kappa = 0 the common fit.
+  expect_gte(fps$logLik, fp$logLik - 1e-4)
+  expect_gte(fps$logLik, common$logLik - 1e-4)
+  # anova() of common against footprint_scaled tests kappa = 0, a boundary
+  # value: half the chi-square p-value. The test against separate scales is
+  # an ordinary chi-square test and is not halved.
+  a <- anova(common, fps)
+  lr <- max(a$LR[2], 0)
+  expect_equal(a$p_value[2], if (lr > 0) 0.5 * stats::pchisq(lr, 1, lower.tail = FALSE) else 1)
+  expect_match(attr(a, "heading"), "boundary")
+  expect_no_match(attr(anova(common, fp), "heading"), "boundary")
+  printed <- paste(utils::capture.output(print(fps)), collapse = "\n")
+  expect_no_match(printed, "halved")
+  expect_equal(fps$comparison$p_value,
+               stats::pchisq(fps$comparison$statistic, fps$comparison$df_difference,
+                             lower.tail = FALSE))
+  # Large kappa at a small sigma pushes the area data set's apparent scale past
+  # its max_D. The objective there must be a finite slope back toward the
+  # allowed scales, not the 1e60 wall that stalled L-BFGS-B at its start.
+  ns <- asNamespace("multiScaleR")
+  sets <- ns$.msr_joint_sets(fits)
+  structure <- ns$.msr_joint_structure("footprint_scaled", sets)
+  spec <- ns$.msr_joint_spec(sets, structure, ns$.msr_joint_footprint(tau, structure, sets), NULL)
+  fn <- ns$.msr_joint_objective(spec)
+  par <- spec$parameters
+  outside <- fn(c(par$lower[1], par$upper[2]))
+  expect_true(is.finite(outside) && outside < 1e50)
+  expect_gt(outside, -fps$logLik)
+})
+
 test_that("a shared coefficient equals one stacked model with data-set intercepts", {
   f <- joint_fixture()
   joint <- suppressWarnings(multiScale_joint(list(a = f$counts, c = f$counts2),
@@ -164,6 +215,8 @@ test_that("component fits work with the existing post-fit tools", {
   expect_s3_class(comp, "multiScaleR")
   expect_equal(comp$scale_est$Mean, unname(coef(joint)["sigma:hab"]))
   expect_equal(comp$joint$data_set, "presence")
+  # Follow-up advice names the joint scale, not the separate fit's.
+  expect_equal(unname(comp$next_run$start_sigma), comp$scale_est$Mean)
   expect_s3_class(summary(comp), "summary_multiScaleR")
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)

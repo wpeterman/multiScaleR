@@ -52,6 +52,10 @@ Print, summarize, and extract results from a joint fit made with
 \code{\link[=multiScale_joint]{multiScale_joint()}}. \code{logLik()} makes \code{\link[stats:AIC]{stats::AIC()}} and \code{\link[stats:BIC]{stats::BIC()}}
 work, so several structures fitted to the same data sets can be compared
 directly. \code{anova()} gives likelihood-ratio tests between nested structures.
+A test of a \code{"common"} fit against a \code{"footprint_scaled"} fit tests
+\code{kappa = 0}, on the boundary of the parameter space, and uses the matching
+mixture of chi-square distributions (half the chi-square p-value for one
+\code{kappa}).
 }
 \seealso{
 \code{\link[=multiScale_joint]{multiScale_joint()}}

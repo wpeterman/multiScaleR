@@ -132,8 +132,12 @@ test of the fitted structure against separate scales. With two or three
 data sets this test has little power, so a nonsignificant result is weak
 evidence for a common scale. Fit several structures and compare them with
 \code{\link[stats:AIC]{stats::AIC()}} (the fits have \code{\link[stats:logLik]{stats::logLik()}} methods) or \code{\link[stats:anova]{stats::anova()}}.
-The test of \code{kappa = 0} in \code{"footprint_scaled"} lies on the boundary of the
-parameter space, so its p-value is halved.
+To test \code{kappa = 0}, compare a \code{"common"} fit with a \code{"footprint_scaled"}
+fit in \code{\link[stats:anova]{stats::anova()}}. That value lies on the boundary of the parameter
+space, so \code{anova()} refers the statistic to a mixture of chi-square
+distributions, which halves the p-value for one \code{kappa}. With a single data
+set that has a footprint, \code{kappa} can match that data set's apparent scale
+exactly, so the ecological scale then rests on the point data sets alone.
 
 \strong{Sampling footprints.} A response is often measured over an area, not at a
 point: counts within a fixed radius, detections by an acoustic recorder, a
@@ -202,5 +206,7 @@ AIC(joint, separate)
 }
 }
 \seealso{
-\code{\link[=multiScale_optim]{multiScale_optim()}}, \code{\link[=footprint_sd]{footprint_sd()}}, \code{\link[=profile_sigma]{profile_sigma()}}
+\code{\link[=multiScale_optim]{multiScale_optim()}}, \code{\link[=footprint_sd]{footprint_sd()}}, \code{\link[=profile_sigma]{profile_sigma()}}.
+\code{vignette("v16-joint-data-sets", package = "multiScaleR")} works through
+an example with three surveys, shared sites, and a sampling footprint.
 }

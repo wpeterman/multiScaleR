@@ -7,6 +7,10 @@
 #' [multiScale_joint()]. `logLik()` makes [stats::AIC()] and [stats::BIC()]
 #' work, so several structures fitted to the same data sets can be compared
 #' directly. `anova()` gives likelihood-ratio tests between nested structures.
+#' A test of a `"common"` fit against a `"footprint_scaled"` fit tests
+#' `kappa = 0`, on the boundary of the parameter space, and uses the matching
+#' mixture of chi-square distributions (half the chi-square p-value for one
+#' `kappa`).
 #'
 #' @param x,object A `multiScaleR_joint` object.
 #' @param digits Number of significant digits to print.
@@ -91,11 +95,11 @@ print.multiScaleR_joint <- function(x, digits = 4, ...) {
     cat("Same number of parameters as separate fits; no likelihood-ratio test.\n")
     return(invisible(NULL))
   }
-  p <- if (isTRUE(cmp$boundary)) cmp$p_value / 2 else cmp$p_value
-  cat(sprintf("Against separate scales: LR chi-square = %s, df = %d, p = %s%s\n",
+  # Every structure lies inside the separate-scales model, away from its
+  # boundary, so this is an ordinary chi-square test.
+  cat(sprintf("Against separate scales: LR chi-square = %s, df = %d, p = %s\n",
               format(cmp$statistic, digits = digits), as.integer(cmp$df_difference),
-              format.pval(p, digits = 3),
-              if (isTRUE(cmp$boundary)) " (boundary, halved)" else ""))
+              format.pval(cmp$p_value, digits = 3)))
   invisible(NULL)
 }
 
@@ -208,13 +212,47 @@ anova.multiScaleR_joint <- function(object, ...) {
                     logLik = vapply(fits, `[[`, numeric(1), "logLik"),
                     row.names = make.unique(paste0(label, shared)))
   tab$AIC <- -2 * tab$logLik + 2 * tab$df
-  tab <- tab[order(tab$df), , drop = FALSE]
+  ord <- order(tab$df)
+  tab <- tab[ord, , drop = FALSE]
+  fits <- fits[ord]
   tab$LR <- c(NA, 2 * diff(tab$logLik))
   tab$df_difference <- c(NA, diff(tab$df))
   tab$p_value <- ifelse(is.finite(tab$df_difference) & tab$df_difference > 0,
                         stats::pchisq(pmax(tab$LR, 0), tab$df_difference, lower.tail = FALSE),
                         NA_real_)
-  attr(tab, "heading") <- "Likelihood-ratio tests between joint fits (valid only for nested structures)\n"
+  # A common scale is "footprint_scaled" with kappa = 0, the edge of kappa >= 0.
+  # With q such kappas the statistic follows a mixture of chi-square
+  # distributions with 0 to q degrees of freedom and binomial(q, 1/2) weights,
+  # which halves the p-value when q = 1.
+  boundary <- FALSE
+  for (i in seq_len(nrow(tab))[-1L]) {
+    q <- .msr_joint_kappa_boundary(fits[[i - 1L]], fits[[i]])
+    if (q > 0L && isTRUE(tab$df_difference[i] == q)) {
+      lr <- max(tab$LR[i], 0)
+      tab$p_value[i] <- if (lr <= 0) 1 else
+        sum(choose(q, seq_len(q)) * 0.5^q * stats::pchisq(lr, seq_len(q), lower.tail = FALSE))
+      boundary <- TRUE
+    }
+  }
+  attr(tab, "heading") <- paste0(
+    "Likelihood-ratio tests between joint fits (valid only for nested structures)\n",
+    if (boundary) paste0("A test of a common scale against footprint_scaled tests kappa = 0, ",
+                         "on the boundary of the parameter space;\nits p-value uses the ",
+                         "matching chi-square mixture (half the chi-square p-value for one kappa).\n"))
   class(tab) <- c("anova", "data.frame")
   tab
+}
+
+
+# Number of covariates that are "footprint_scaled" in the larger fit and
+# "common" in the smaller one, with every other structure and shared
+# coefficient the same. Their kappas are 0 under the smaller fit.
+.msr_joint_kappa_boundary <- function(small, big) {
+  s <- stats::setNames(small$structure$structure, small$structure$covariate)
+  b <- stats::setNames(big$structure$structure, big$structure$covariate)
+  if (!setequal(names(s), names(b)) || !setequal(small$share, big$share)) return(0L)
+  b <- b[names(s)]
+  hit <- s == "common" & b == "footprint_scaled"
+  if (!any(hit) || any(s[!hit] != b[!hit])) return(0L)
+  sum(hit)
 }
