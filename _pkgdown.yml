@@ -98,6 +98,9 @@ reference:
       - multiScale_optim
       - profile_sigma
       - scale_inference
+      - multiScale_joint
+      - footprint_sd
+      - multiScaleR_joint-methods
       - diagnostics
       - vcov.multiScaleR
   - title: Bayesian scale estimation

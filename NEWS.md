@@ -133,6 +133,19 @@ multiScaleR (development version)
   spurious lower bound with its standard error withheld. Inputs whose first
   two cells were neighbors in one row are unchanged.
 
+* New experimental `multiScale_joint()` estimates scales of effect jointly
+  across two or more independent data sets. Each data set is first fitted
+  with the default refit backend of `multiScale_optim()`, so the data sets
+  can use different model classes, for example Poisson counts and an
+  `unmarked` occupancy model. A scale can be common to all data sets,
+  separate for each, or common but seen through each data set's sampling
+  footprint (`footprint_sd()`), and a landscape coefficient can be shared
+  across data sets. Sites that data sets share can be named through
+  `cluster` to report residual correlation and jackknife standard errors.
+  The result gives profile-likelihood intervals, a likelihood-ratio test
+  against separate scales, `logLik()` for `AIC()`, and one `multiScaleR` fit
+  per data set for plots, marginal effects, and maps.
+
 * New experimental `predict_gdistremoval()` and `simulate_gdistremoval()`
   for `unmarked::gdistremoval()` models, alone or inside a `multiScaleR`
   fit. `predict_gdistremoval()` combines the fitted components into
