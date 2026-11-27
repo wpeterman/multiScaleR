@@ -153,10 +153,11 @@ multiScaleR (development version)
 
 * `multiScale_joint(scales = "footprint_scaled")` no longer stops at its
   starting values when a trial step would carry a data set's apparent scale
-  past its `max_D`. `anova()` of a common-scale fit against a
-  `"footprint_scaled"` fit now treats `kappa = 0` as a boundary value, and the
-  printed test against separate scales is no longer halved. Component fits
-  in `$fits` now give follow-up advice at the joint scales.
+  past its `max_D`, and it now also starts `kappa` at 0, so it no longer ends
+  below the common-scale fit that it nests. `anova()` of a common-scale fit
+  against a `"footprint_scaled"` fit now treats `kappa = 0` as a boundary
+  value, and the printed test against separate scales is no longer halved.
+  Component fits in `$fits` now give follow-up advice at the joint scales.
 
 * New experimental `predict_gdistremoval()` and `simulate_gdistremoval()`
   for `unmarked::gdistremoval()` models, alone or inside a `multiScaleR`

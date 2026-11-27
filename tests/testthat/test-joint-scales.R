@@ -17,6 +17,21 @@ test_that("multiScale_joint() validates its inputs before fitting", {
   expect_error(multiScale_joint(list(a = 1, b = 2)), "multiScale_optim")
 })
 
+test_that("footprint_scaled optimization also starts kappa at zero", {
+  # A kappa profile with a local optimum near 1.5 and the global optimum on
+  # the kappa = 0 edge (the common scale). Starts at kappa = 1 alone stop at
+  # the local optimum, below the common fit that footprint_scaled nests.
+  spec <- list(parameters = data.frame(
+    parameter = c("sigma:x", "kappa:x"), type = c("log_sigma", "kappa"),
+    lower = c(log(10), 0), upper = c(log(800), 10), start = c(log(120), 1)))
+  fn <- function(theta) (theta[1] - log(150))^2 -
+    exp(-(theta[2] - 1.5)^2 / 0.1) - 2 * exp(-theta[2]^2 / 0.02)
+  res <- multiScaleR:::.msr_joint_optimize(spec, fn)
+  expect_lt(res$par[2], 1e-3)
+  expect_equal(res$par[1], log(150), tolerance = 1e-3)
+  expect_lt(res$value, -1.9)
+})
+
 skip_on_cran()
 
 joint_fixture <- local({

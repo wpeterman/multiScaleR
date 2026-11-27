@@ -46,6 +46,23 @@ test_that("extract_namespace identifies namespaced calls and plain calls", {
   expect_equal(multiScaleR:::extract_call_function_package(glm_mod), "stats")
 })
 
+test_that("extract_call_function_package matches utils::find() and stays cheap", {
+  # The package of an attached fitting function, as utils::find() reports it.
+  # The lookup runs on every refit, so it must not list each attached
+  # environment (find() does, at several milliseconds per call).
+  fits <- list(glm(mpg ~ wt, data = mtcars), lm(mpg ~ wt, data = mtcars))
+  for (m in fits) {
+    fun <- as.character(stats::getCall(m)[[1]])
+    on_path <- grep("^package:", utils::find(fun, mode = "function"), value = TRUE)
+    expect_equal(multiScaleR:::extract_call_function_package(m),
+                 sub("^package:", "", on_path[[1]]))
+  }
+  skip_on_cran()
+  elapsed <- system.time(for (i in seq_len(500))
+    multiScaleR:::extract_call_function_package(fits[[1]]))[["elapsed"]]
+  expect_lt(elapsed, 1)
+})
+
 test_that("cluster_prep covers direct, fallback, and error branches", {
   data(quine, package = "MASS")
   nb_mod <- MASS::glm.nb(Days ~ Sex/(Age + Eth * Lrn), data = quine)

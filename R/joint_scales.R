@@ -833,6 +833,15 @@ footprint_sd <- function(type = c("point", "disk", "square", "rectangle", "halfn
   scale_rows <- par$type == "log_sigma"
   alt[scale_rows] <- (par$lower[scale_rows] + par$upper[scale_rows]) / 2
   if (!isTRUE(all.equal(alt, par$start))) starts <- c(starts, list(alt))
+  # footprint_scaled nests the common scale (kappa = 0) and the stated
+  # footprint (kappa = 1). Starting kappa only at 1 can leave the search at a
+  # local optimum below the common fit, so repeat each start with kappa = 0.
+  kappa_rows <- par$type == "kappa"
+  if (any(kappa_rows))
+    starts <- c(starts, lapply(starts, function(s) {
+      s[kappa_rows] <- 0
+      s
+    }))
   best <- NULL
   for (start in starts) {
     res <- tryCatch(stats::optim(start, fn, method = "L-BFGS-B", lower = par$lower,

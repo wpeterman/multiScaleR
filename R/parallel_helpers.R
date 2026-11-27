@@ -208,10 +208,16 @@ extract_call_function_package <- function(x) {
 
   fit_fun <- as.character(fit_fun)
 
-  attached <- tryCatch(
-    utils::find(fit_fun, mode = "function"),
-    error = function(e) character()
-  )
+  # Search-path entries that hold a function of this name, as
+  # utils::find(fit_fun, mode = "function") reports them. find() lists every
+  # attached environment with ls() first, which costs milliseconds per call;
+  # this runs on every refit, so test each entry with exists() directly.
+  attached <- tryCatch({
+    sp <- search()
+    sp[vapply(seq_along(sp), function(i)
+      exists(fit_fun, where = i, mode = "function", inherits = FALSE),
+      logical(1))]
+  }, error = function(e) character())
   attached <- attached[grepl("^package:", attached)]
   attached <- sub("^package:", "", attached)
   attached <- attached[attached %in% loadedNamespaces()]
