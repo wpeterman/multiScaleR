@@ -1,5 +1,5 @@
-multiScaleR (development version)
----------------------------------
+multiScaleR 1.1.0
+-----------------
 
 * Fixes from an integration audit that ran every post-fit function on real
   fits of each supported model class and backend. A new test,
