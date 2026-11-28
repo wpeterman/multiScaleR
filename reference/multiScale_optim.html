@@ -23,7 +23,7 @@ multiScaleR-fitting-methods."><meta property="og:image" content="https://wpeterm
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,6 +60,9 @@ multiScaleR-fitting-methods."><meta property="og:image" content="https://wpeterm
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -128,7 +131,15 @@ kernel-weighted variables defined in <code>kernel_inputs</code>. Supported class
 include <code>lm</code>, <code>glm</code>, <code>gls</code> (nlme), and <code>unmarkedFit</code> (unmarked). Many
 other model classes also work through <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">stats::update()</a></code> or a custom
 <code>refit_fn</code>. A predictor cannot be named <code>"x"</code>, which is reserved for
-internal coordinate data.</p></dd>
+internal coordinate data. Fit the model with <code>data =</code> naming a data frame
+that holds every model variable. A model fitted inside a function or
+<code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply()</a></code> is refitted in the environment where it was fitted, so a
+formula held in a local variable works; other inputs to the fitting call,
+such as a <code>family</code> or <code>start</code> object, must still exist there. For
+<code><a href="https://rdrr.io/pkg/survival/man/clogit.html" class="external-link">survival::clogit()</a></code>, <code><a href="https://rdrr.io/pkg/survival/man/coxph.html" class="external-link">survival::coxph()</a></code>, and <code>amt</code> fits, also set
+<code>model = TRUE</code>, and add transformed terms such as <code>cos(ta_)</code> to the data
+as columns when the fit comes from <code><a href="https://rdrr.io/pkg/amt/man/fit_clogit.html" class="external-link">amt::fit_issf()</a></code>, which does not keep
+its input data.</p></dd>
 
 
 <dt id="arg-kernel-inputs">kernel_inputs<a class="anchor" aria-label="anchor" href="#arg-kernel-inputs"></a></dt>
@@ -168,7 +179,10 @@ and the backend is <code>"refit"</code> without a <code>radius_grid</code>, and 
 otherwise. Under a fixed kernel every optimized scale is a hard radius,
 and a gradient search cannot leave a single start on that stepped
 likelihood. A refit search that returns its starting values gives a
-warning and records <code>start_stall</code> in <code><a href="diagnostics.html">diagnostics()</a></code>.</p></dd>
+warning and records <code>start_stall</code> in <code><a href="diagnostics.html">diagnostics()</a></code>. The analytic
+backends (<code>"profile_glm"</code>, <code>"joint_nb2"</code>, <code>"conditional_logit"</code>) run their
+own multi-start search and accept only <code>"single"</code>; set their starts with
+<code>profile_control</code>.</p></dd>
 
 
 <dt id="arg-screen-n-sigma">screen_n_sigma<a class="anchor" aria-label="anchor" href="#arg-screen-n-sigma"></a></dt>
@@ -411,19 +425,17 @@ namespace-qualified calls such as <code><a href="https://rdrr.io/r/stats/update.
 large local objects.</p>
 <p>The function receives <code>context$return_model = FALSE</code> for scalar objective
 evaluations and <code>TRUE</code> when a fitted model is wanted, including the final
-refit at the selected scales. For supported <code>unmarked</code> models, you can skip
-the intermediate Hessian calculations while keeping the original model's
-uncertainty settings whenever a fitted model is returned:</p>
-<p></p><div class="sourceCode r"><pre><code><span><span class="va">refit_unmarked</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">model</span>, <span class="va">data</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">context</span><span class="op">$</span><span class="va">return_model</span>, <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
-<span>    <span class="fu">unmarked</span><span class="fu">::</span><span class="fu">update</span><span class="op">(</span><span class="va">model</span>, data <span class="op">=</span> <span class="va">data</span>, se <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span>  <span class="kw">else</span></span>
-<span>    <span class="fu">unmarked</span><span class="fu">::</span><span class="fu">update</span><span class="op">(</span><span class="va">model</span>, data <span class="op">=</span> <span class="va">data</span><span class="op">)</span></span>
-<span><span class="op">}</span></span></code></pre><p></p></div>
-<p>This changes neither the coefficient starts nor the model's likelihood. It
-does not add uncertainty for the kernel scales or override an original
-<code>se = FALSE</code> setting. Verify this behavior for your model class before you
-rely on a custom refit function.</p>
+refit at the selected scales. Use the flag to skip work that only a
+returned model needs, such as coefficient standard errors.</p>
+<p>The default <code>unmarked</code> refit already does this. When the fitting function
+has an <code>se</code> argument, as <code>occu()</code>, <code>pcount()</code>, and <code>gdistremoval()</code> do,
+objective evaluations refit with <code>se = FALSE</code>, so <code>unmarked</code> skips the
+Hessian it computes after its optimizer converges. The estimates and
+log-likelihood are unchanged, and each objective refit of an N-mixture or
+distance-removal model takes about a quarter less time. Returned models,
+including the final one, keep the original model's <code>se</code> setting. A
+custom <code>refit_fn</code> replaces this default, so apply the same rule there if
+you want the saving.</p>
     </div>
     <div class="section level2">
     <h2 id="fit-wrapper-model-objects">Fit wrapper model objects<a class="anchor" aria-label="anchor" href="#fit-wrapper-model-objects"></a></h2>
@@ -490,7 +502,8 @@ examples.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Optimization complete</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> A smooth kernel parameter reaches an optimization bound. Outer Wald SEs and limits are withheld.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> At an optimization bound: sigma:r2. Wald SEs and limits are withheld for this parameter.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Wald SEs for the other smooth parameters hold the bounded ones fixed.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Coefficient uncertainty still conditions on the selected kernels.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BB0000;"> WARNING!!!</span></span>
@@ -568,7 +581,7 @@ examples.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Call:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> glm(formula = y ~ hab, family = poisson, data = data)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> stats::glm(formula = y ~ hab, family = poisson, data = data)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             Estimate Std. Error z value Pr(&gt;|z|)    </span>
@@ -676,10 +689,10 @@ examples.</p></div>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Extracting values from raster layers...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Analytic-profile GLM fit: 6/6 starts passed; family nbinom2.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                  log_scale:hab beta:(Intercept)      beta:hab     log_theta</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> log_scale:hab      0.166706060     0.0015047670 -0.0061313367  0.0224171250</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> log_scale:hab      0.166706071     0.0015047672 -0.0061313371  0.0224171251</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> beta:(Intercept)   0.001504767     0.0169312902 -0.0078480893  0.0001863306</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> beta:hab          -0.006131337    -0.0078480893  0.0148171832 -0.0006320777</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> log_theta          0.022417125     0.0001863306 -0.0006320777  0.1745158401</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> log_theta          0.022417125     0.0001863306 -0.0006320777  0.1745158389</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

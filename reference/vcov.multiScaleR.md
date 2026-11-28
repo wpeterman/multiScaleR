@@ -23,7 +23,8 @@ vcov(object, type = c("joint", "conditional"), ...)
 
   A `multiScaleR` fit from `backend = "profile_glm"` or
   `backend = "joint_nb2"`. A `backend = "joint_mixed"` fit returns only
-  native conditional covariance. Other backends raise an error. Use
+  native conditional covariance; its scale standard errors are in
+  `object$scale_est`. Other backends raise an error. Use
   `vcov(object$opt_mod)` for their coefficient covariance conditional on
   the selected scales.
 
@@ -86,6 +87,21 @@ Joint covariance is unavailable for fits at a parameter bound or when
 the identifiability checks fail. In that case `type = "joint"` raises an
 error that lists `object$uncertainty$reasons`, rather than reporting a
 misleading Wald result. The conditional matrix remains available.
+
+One exception applies to both backends. When kernel parameters at a
+search bound are the only failed check, the joint matrix holds those
+parameters fixed at their bounds. Their rows and columns are zero, and
+the other rows and columns come from the observed information with the
+bounded parameters removed. That reduced information must pass the
+remaining checks. The matrix then carries a `conditional_on` attribute
+that names the bounded parameters, as does
+`object$uncertainty$joint_conditional_on`. A zero there means the
+parameter was held fixed, not that it is known exactly, and its standard
+error is missing in `object$scale_est`. The other standard errors are no
+wider than they would be if the bounded scale were free to vary, so
+treat them as conditional on that scale. A dispersion bound, every
+kernel parameter at a bound, or any other failed check still withholds
+joint covariance.
 
 ## Read the conditional matrix
 

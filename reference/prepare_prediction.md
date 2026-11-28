@@ -49,7 +49,11 @@ print(x, ...)
   or `"joint_mixed"`, or the default refit backend with a supported
   native model in `object$opt_mod`. For
   [`predict()`](https://rspatial.github.io/terra/reference/predict.html),
-  a snapshot returned by `prepare_prediction()`.
+  a snapshot returned by `prepare_prediction()`. A Bayesian fit from
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  is refused; use
+  [`predict.multiScaleR_bayes()`](https://wpeterman.github.io/multiScaleR/reference/predict.multiScaleR_bayes.md)
+  with new kernel inputs.
 
 - newdata, kernel_inputs:
 
@@ -336,7 +340,7 @@ new_inputs <- kernel_prep(pts[1:3], land, max_D = 1700, kernel = "gaussian",
 new_sites <- data.frame(site = c(-1, 0, 1))
 prepared <- prepare_prediction(fit, new_sites, new_inputs)
 prepared
-#> Prepared multiscale predictions (profile_glm): 3 fixed predictions, 87.5 Kb.
+#> Prepared multiscale predictions (profile_glm): 3 fixed predictions, 88.4 Kb.
 
 ## Several summaries of the same rows, without rebuilding the kernels
 predict(prepared)                                  # expected counts

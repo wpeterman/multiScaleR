@@ -15,7 +15,7 @@ result with plot.sigma_profile()."><meta property="og:image" content="https://wp
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,6 +52,9 @@ result with plot.sigma_profile()."><meta property="og:image" content="https://wp
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -103,7 +106,8 @@ result with <code><a href="plot.sigma_profile.html">plot.sigma_profile()</a></co
 
 <dl><dt id="arg-x">x<a class="anchor" aria-label="anchor" href="#arg-x"></a></dt>
 <dd><p>A fitted <code>multiScaleR</code> object returned by <code><a href="multiScale_optim.html">multiScale_optim()</a></code>.
-Fits from <code>backend = "joint_mixed"</code> are not supported.</p></dd>
+A Bayesian fit from <code><a href="multiScale_bayes.html">multiScale_bayes()</a></code> is refused; summarize its scales
+with <code><a href="posterior_scales.html">posterior_scales()</a></code> instead.</p></dd>
 
 
 <dt id="arg-n-pts">n_pts<a class="anchor" aria-label="anchor" href="#arg-n-pts"></a></dt>
@@ -128,8 +132,8 @@ Default: <code>TRUE</code>.</p></dd>
 <dt id="arg-n-cores">n_cores<a class="anchor" aria-label="anchor" href="#arg-n-cores"></a></dt>
 <dd><p>Optional positive integer. Number of CPU cores used to
 profile covariates in parallel, one covariate per worker (a PSOCK
-cluster). Default: <code>NULL</code> (serial). The analytic and
-conditional-logistic backends always profile serially.</p></dd>
+cluster). Default: <code>NULL</code> (serial). The analytic, conditional-logistic,
+and joint mixed backends always profile serially.</p></dd>
 
 
 <dt id="arg-spacing">spacing<a class="anchor" aria-label="anchor" href="#arg-spacing"></a></dt>
@@ -210,15 +214,22 @@ shape positions do not affect the profile or the parameter count. See
 <a href="multiScaleR-kernels.html">multiScaleR-kernels</a>.</p>
     </div>
     <div class="section level2">
-    <h2 id="analytic-and-conditional-logistic-fits">Analytic and conditional-logistic fits<a class="anchor" aria-label="anchor" href="#analytic-and-conditional-logistic-fits"></a></h2>
-    <p>Fits from <code>backend = "profile_glm"</code>, <code>"joint_nb2"</code>, and
-<code>"conditional_logit"</code> profile serially, and every sigma value must lie
+    <h2 id="analytic-conditional-logistic-and-joint-mixed-fits">Analytic, conditional-logistic, and joint mixed fits<a class="anchor" aria-label="anchor" href="#analytic-conditional-logistic-and-joint-mixed-fits"></a></h2>
+    <p>Fits from <code>backend = "profile_glm"</code>, <code>"joint_nb2"</code>, <code>"conditional_logit"</code>,
+and <code>"joint_mixed"</code> profile serially, and every sigma value must lie
 within the fitted bounds (<code>min_D</code> to <code>max_D</code>). For a <code>"conditional_logit"</code>
 fit, each grid value is the log-likelihood of a native
 <code><a href="https://rdrr.io/pkg/survival/man/coxph.html" class="external-link">survival::coxph()</a></code> refit at that sigma, with the coefficients refit and
 every other scale held at its estimate. That backend withholds scale
 uncertainty, so <code>summary(fit, profile = TRUE)</code> returns no profile interval
 for it. The grid describes the likelihood surface only.</p>
+<p>For a <code>"joint_mixed"</code> fit, each grid value is the log-likelihood of a new
+native <code>glmmTMB</code> fit at that sigma, the same refit the backend uses to
+check each start. The coefficients, the random-intercept standard
+deviation, and any NB2 dispersion are re-estimated, the random intercept is
+integrated out with the Laplace approximation, and every other scale stays
+at its estimate. A refit that fails gives <code>NA</code> at that value, and
+profiling stops if every refit for a covariate fails.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

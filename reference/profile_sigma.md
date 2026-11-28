@@ -28,7 +28,11 @@ profile_sigma(
 
   A fitted `multiScaleR` object returned by
   [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md).
-  Fits from `backend = "joint_mixed"` are not supported.
+  A Bayesian fit from
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  is refused; summarize its scales with
+  [`posterior_scales()`](https://wpeterman.github.io/multiScaleR/reference/posterior_scales.md)
+  instead.
 
 - n_pts:
 
@@ -53,8 +57,8 @@ profile_sigma(
 
   Optional positive integer. Number of CPU cores used to profile
   covariates in parallel, one covariate per worker (a PSOCK cluster).
-  Default: `NULL` (serial). The analytic and conditional-logistic
-  backends always profile serially.
+  Default: `NULL` (serial). The analytic, conditional-logistic, and
+  joint mixed backends always profile serially.
 
 - spacing:
 
@@ -147,18 +151,26 @@ exponential-power fits, and their unused shape positions do not affect
 the profile or the parameter count. See
 [multiScaleR-kernels](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.md).
 
-## Analytic and conditional-logistic fits
+## Analytic, conditional-logistic, and joint mixed fits
 
-Fits from `backend = "profile_glm"`, `"joint_nb2"`, and
-`"conditional_logit"` profile serially, and every sigma value must lie
-within the fitted bounds (`min_D` to `max_D`). For a
-`"conditional_logit"` fit, each grid value is the log-likelihood of a
+Fits from `backend = "profile_glm"`, `"joint_nb2"`,
+`"conditional_logit"`, and `"joint_mixed"` profile serially, and every
+sigma value must lie within the fitted bounds (`min_D` to `max_D`). For
+a `"conditional_logit"` fit, each grid value is the log-likelihood of a
 native
 [`survival::coxph()`](https://rdrr.io/pkg/survival/man/coxph.html) refit
 at that sigma, with the coefficients refit and every other scale held at
 its estimate. That backend withholds scale uncertainty, so
 `summary(fit, profile = TRUE)` returns no profile interval for it. The
 grid describes the likelihood surface only.
+
+For a `"joint_mixed"` fit, each grid value is the log-likelihood of a
+new native `glmmTMB` fit at that sigma, the same refit the backend uses
+to check each start. The coefficients, the random-intercept standard
+deviation, and any NB2 dispersion are re-estimated, the random intercept
+is integrated out with the Laplace approximation, and every other scale
+stays at its estimate. A refit that fails gives `NA` at that value, and
+profiling stops if every refit for a covariate fails.
 
 ## See also
 

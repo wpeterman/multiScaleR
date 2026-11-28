@@ -17,7 +17,7 @@ element."><meta property="og:image" content="https://wpeterman.github.io/multiSc
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,6 +54,9 @@ element."><meta property="og:image" content="https://wpeterman.github.io/multiSc
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -122,6 +125,12 @@ metrics.</p></li>
 (representative bin distances and value and count matrices for each
 covariate) that speed up the search. <code>NULL</code> when <code>bin = FALSE</code> or when no
 covariate is a kernel-weighted mean.</p></li>
+<li><p><code>surface_binned</code>: when <code>bin = TRUE</code>, linearly binned power sums for
+kernel-weighted surface metrics (<code>surface_var(weighted = TRUE)</code> with
+<code>"sq"</code>, <code>"ssk"</code>, or <code>"sku"</code>) that speed up the refit search. Each cell's
+centered value powers are split between the two nearest distance nodes.
+<code>NULL</code> when <code>bin = FALSE</code>, when <code>kernel = "fixed"</code>, or when no covariate is
+such a metric. The cell-level data stay stored.</p></li>
 <li><p><code>cell_data_stored</code>: <code>FALSE</code> only in lean mode
 (<code>store_cell_data = FALSE</code>), when <code>d_list</code> and <code>raw_cov</code> were dropped.</p></li>
 <li><p><code>scl_params</code>: named list with <code>mean</code> and <code>sd</code>, the centering and scaling

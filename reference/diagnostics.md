@@ -12,13 +12,24 @@ diagnostics(object, ...)
 
 # S3 method for class 'multiScaleR'
 diagnostics(object, ...)
+
+# S3 method for class 'multiScaleR_bayes'
+diagnostics(object, ...)
+
+# Default S3 method
+diagnostics(object, ...)
 ```
 
 ## Arguments
 
 - object:
 
-  An object to inspect. Must be of class `multiScaleR`.
+  An object to inspect. Must be of class `multiScaleR`. A Bayesian fit
+  from
+  [`multiScale_bayes`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  stops with a pointer to
+  [`diagnose_bayes_scales`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_scales.md),
+  and other objects stop with an error.
 
 - ...:
 
@@ -88,16 +99,18 @@ A named list with the following elements:
 
   For the default refit backend, retains the outer curvature status and
   active smooth-parameter mask. A bound table records estimates,
-  lower/upper bounds in reporting units, and bound flags. If any active
-  parameter is within `1e-5` log units of a positive bound, joint outer
-  Wald SEs are withheld. A zero lower bound is flagged only when
-  reached. The original curvature status is retained separately. A
-  status of `"hessian_includes_failed_refit"` means a refit failed at
-  one of the finite-difference points used for the Hessian, so its
-  curvature reflects the failure penalty; Wald SEs are withheld and a
-  warning is given. This is a numerical support flag, not a test of
-  identification or a calibrated confidence limit. Native coefficient
-  covariance and parameter counts are unchanged.
+  lower/upper bounds in reporting units, and bound flags. An active
+  parameter within `1e-5` log units of a positive bound loses its outer
+  Wald SE. The other active parameters keep Wald SEs from their own
+  Hessian block, holding the bounded parameters fixed; `conditional_on`
+  names the bounded parameters when that happens. A zero lower bound is
+  flagged only when reached. The original curvature status is retained
+  separately. A status of `"hessian_includes_failed_refit"` means a
+  refit failed at one of the finite-difference points used for the
+  Hessian, so its curvature reflects the failure penalty; Wald SEs are
+  withheld and a warning is given. This is a numerical support flag, not
+  a test of identification or a calibrated confidence limit. Native
+  coefficient covariance and parameter counts are unchanged.
 
 - `radius_profile`:
 
@@ -118,11 +131,33 @@ A named list with the following elements:
   `uncertainty_available`, explanatory `reasons`,
   `weak_identifiability`, `boundary`, `condition_number`, log-kernel
   standard errors, competing-mode flags, and attempted/eligible start
-  counts. `poisson_limit` marks negligible fitted NB2 extra variance;
-  `poisson_compatible` and `poisson_deviance` compare the NB2 fit with a
-  Poisson fit at the selected kernel scales. See
+  counts. `scale_se_conditional_on` names kernel parameters at a search
+  bound that the reported scale SEs hold fixed. `joint_conditional_on`
+  names the bounded kernel parameters that joint covariance and joint
+  prediction uncertainty hold fixed. When it is not empty,
+  [`vcov()`](https://rdrr.io/r/stats/vcov.html) and
+  `predict(uncertainty = "joint")` are available even though
+  `uncertainty_available` is `FALSE`. `poisson_limit` marks negligible
+  fitted NB2 extra variance; `poisson_compatible` and `poisson_deviance`
+  compare the NB2 fit with a Poisson fit at the selected kernel scales.
+  See
   [`multiScale_optim`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
   for thresholds and limitations.
+
+- `joint_mixed`:
+
+  Present for `backend = "joint_mixed"`. `triggered` is `TRUE` when any
+  scale SE is withheld. Includes attempted and eligible start counts and
+  a `boundary` flag. `scale_se_status` is `"available"`, `"partial"`,
+  `"withheld"`, or the reason every scale SE is missing, such as
+  `"hessian_not_positive_definite"` or `"all_scales_at_bound"`.
+  `pd_hessian` records whether the selected start's joint Hessian was
+  positive definite. `log_scale_se` holds the reported log-scale SEs,
+  `scale_se_reasons` gives `"available"` or the reason for each scale,
+  and `scale_se_conditional_on` names scales at a search bound that the
+  other SEs hold fixed. `uncertainty_available` is `FALSE` because
+  coefficient and prediction uncertainty condition on the selected
+  scales.
 
 ## Details
 

@@ -585,4 +585,5 @@ pred <- terra::predict(r_scaled, opt$opt_mod, type = "response")
 | Let the scale of effect vary among years in a Bayesian model | [`vignette("v13-bayesian-scales", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.md) |
 | Predict new sites or years from a Bayesian fit | [`vignette("v14-bayesian-prediction", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.md) |
 | Choose and check a faster Bayesian approximation | [`vignette("v15-bayesian-computation", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.md) |
+| Combine several surveys to estimate a shared scale of effect | [`vignette("v16-joint-data-sets", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v16-joint-data-sets.md) |
 | Look up a term used in these vignettes | [`?"multiScaleR-glossary"`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-glossary.md) |

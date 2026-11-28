@@ -283,8 +283,59 @@ the unnormalized value, and only ratios between rows carry meaning.
 with `se.fit = TRUE, uncertainty = "conditional"`. They hold sigma
 fixed.
 
+## Map the relative selection score
+
 A raster has no choice sets, so a map can show the link or the relative
-score only.
+score only. Build the map in two steps. First,
+[`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+smooths the forest layer at the estimated sigma and standardizes it with
+the training mean and standard deviation. Second,
+[`terra::predict()`](https://rspatial.github.io/terra/reference/predict.html)
+applies the fitted coefficients to every cell.
+
+[`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+also adds a constant layer for each model term that is not a raster.
+Here those are step length, set to 0 by default, and the choice-set ID,
+set to the first fitted ID. `survival` needs a fitted ID before it will
+predict, but with `reference = "zero"` the ID does not change the map.
+Use `site_values` to hold step length at another value, for example
+`site_values = list(sl_km = 0.1)`.
+
+``` r
+
+# Smoothed, standardized forest plus constant sl_km and step_id layers
+map_stack <- kernel_scale.raster(forest, multiScaleR = opt,
+                                 scale_center = TRUE, verbose = FALSE)
+names(map_stack)
+#> [1] "forest"  "sl_km"   "step_id"
+
+# exp(linear predictor) with no centering: a relative selection score
+rss_map <- terra::predict(map_stack, opt$opt_mod,
+                          type = "risk", reference = "zero", na.rm = TRUE)
+plot(rss_map)
+```
+
+![\*\*\*Relative selection score for forest at the estimated sigma, with
+step length held at
+0.\*\*\*](v10-step-selection_files/figure-html/map-1.png)
+
+***Relative selection score for forest at the estimated sigma, with step
+length held at 0.***
+
+**How to read this map:** Each cell holds the relative selection score
+of a step ending there, compared with a step ending where
+kernel-weighted forest is at its training mean. A cell with a value of 2
+is twice as likely to be chosen as such a step, when both are equally
+reachable. The map does not account for how far the animal must travel
+to reach a cell, and it is not a map of space use. Use `type = "lp"` for
+the log of the same score.
+
+If you fitted the starting model with
+[`amt::fit_clogit()`](https://rdrr.io/pkg/amt/man/fit_clogit.html),
+`opt$opt_mod` is the `amt` wrapper, which has no
+[`predict()`](https://rspatial.github.io/terra/reference/predict.html)
+method. Pass the native model inside it, `opt$opt_mod$model`, to
+[`terra::predict()`](https://rspatial.github.io/terra/reference/predict.html).
 
 ## Score the model on held-out choice sets
 
@@ -349,7 +400,7 @@ error when a model falls outside the cases below.
 | Kernels | `"gaussian"` and `"exp"`, prepared with `bin = TRUE` (the default) |
 | Spline terms | [`ns()`](https://rdrr.io/r/splines/ns.html) or [`bs()`](https://rdrr.io/r/splines/bs.html) with literal `knots` and `Boundary.knots` only. Adaptive `df` is not supported |
 | Parallel fitting, `join_by`, `refit_fn` | Not supported. Use `n_cores = 1` |
-| Standard error and interval for sigma | Not available. `summary(opt, profile = TRUE)` stops with an error. `profile_sigma(opt)` draws the log-likelihood across sigma |
+| Standard error and interval for sigma | Not available. `summary(opt, profile = TRUE)` warns and reports the limits as `NA`. `profile_sigma(opt)` draws the log-likelihood across sigma |
 | Prediction intervals | Not available. Standard errors are conditional on sigma |
 | Raster prediction | `type = "link"` or `type = "risk"` only |
 
@@ -397,6 +448,7 @@ cv_tab(list(movement = cv_move, forest = cv_forest), metric = "neg_log_score")
 | [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md) | Estimate sigma and the selection coefficients with `backend = "conditional_logit"` |
 | [`plot()`](https://rspatial.github.io/terra/reference/plot.html), [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md) | Draw the kernel and the selection curves |
 | [`predict()`](https://rspatial.github.io/terra/reference/predict.html) | Choice-set probabilities, relative selection scores, or the linear predictor |
+| [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md), [`terra::predict()`](https://rspatial.github.io/terra/reference/predict.html) | Map the relative selection score. For an `amt` fit, pass `opt$opt_mod$model` |
 | [`grouped_cv_folds()`](https://wpeterman.github.io/multiScaleR/reference/grouped_cv_folds.md) | Build folds that keep choice sets, or animals, together |
 | [`cross_validate_clogit()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md) | Score a step-selection model on held-out choice sets |
 | [`cv_tab()`](https://wpeterman.github.io/multiScaleR/reference/cv_tab.md) | Compare cross-validation scores among models |

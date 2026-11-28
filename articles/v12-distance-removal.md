@@ -12,8 +12,9 @@ model, fitted with
 
 You will simulate a survey with known values, prepare the data, fit the
 model, estimate the scale of effect, and read the abundance,
-availability, and detection results. The last section lists what is not
-supported yet. Read
+availability, and detection results. You will also predict what a whole
+survey records and simulate new surveys from the fitted model. The last
+section lists what is not supported yet. Read
 [`vignette("v01-quickstart", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v01-quickstart.md)
 first, because this vignette builds on its four steps. Experience with
 `unmarked` helps but is not required.
@@ -396,7 +397,7 @@ prem <- unmarked::predict(fit, type = "rem")      # one row per point and interv
 # First survey point
 rbind(density = dens[1, ], distance = dsig[1, ], removal = prem[1, ])
 #>            Predicted          SE       lower       upper
-#> density  721.9869294 76.96948489 585.8474668 889.7625334
+#> density  721.9869292 76.96948493 585.8474665 889.7625333
 #> distance  39.5339089  2.44584632  35.0193780  44.6304314
 #> removal    0.2092183  0.01802931   0.1760664   0.2467431
 
@@ -469,6 +470,95 @@ It cannot show that the intervals are reliable in general.
 > estimated scale.
 > [`vignette("v09-estimates-and-intervals", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v09-estimates-and-intervals.md)
 > explains what that leaves out.
+
+### Predict detection and expected counts for a whole survey
+
+The calculation above combined the two detection components by hand for
+one point.
+[`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md)
+does the same for every point and visit, combining the components as the
+model’s likelihood does, and adds the number of birds an observer would
+be expected to record. The function is experimental.
+
+``` r
+
+surv <- predict_gdistremoval(opt)     # one row per survey point and visit
+head(surv[, c("density", "availability", "perceptibility",
+              "detection", "expected_count")], 3)
+#>    density availability perceptibility detection expected_count
+#> 1 721.9869    0.9043762      0.4638049 0.4194542       5.351632
+#> 2 353.8101    0.9043762      0.4638049 0.4194542       2.622571
+#> 3 241.1276    0.9043762      0.4638049 0.4194542       1.787326
+```
+
+**How to read the output:** `density` is in birds per square kilometer,
+as in the fitted model. `availability` is the chance that a bird present
+gives a cue during at least one interval of the 10-minute count, and
+`perceptibility` is the chance that the observer detects a bird giving a
+cue somewhere in the 75 m circle. `detection` is their product, 42% at
+the first point, the same value as the hand calculation above. With
+repeat visits it also includes the availability between visits, `phi`.
+`expected_count` is the expected number of birds in the circle times
+`detection`, so it is the count an observer would record on average,
+about 5.4 birds at the first point.
+
+Change the protocol in the survey frame to ask what a different survey
+would record.
+
+``` r
+
+planned <- fit@data                   # fitted covariates, distance bands, and intervals
+planned@period.lengths <- c(1, 2, 2)  # a 5-minute count in three intervals
+short <- predict_gdistremoval(opt, newdata = planned)
+round(c(ten_minutes  = mean(surv$detection),
+        five_minutes = mean(short$detection)), 2)
+#>  ten_minutes five_minutes 
+#>         0.42         0.32
+```
+
+**How to read the output:** Shortening the count from ten to five
+minutes lowers the average detection probability from 0.42 to 0.32, so a
+5-minute count would record about 76% as many birds. Density does not
+change, because the protocol affects only detection. The removal
+intervals may change, but the distance bands must match the fitted ones.
+For points that were not surveyed, supply a frame of zero counts with
+their covariates, together with `kernel_inputs` and `join_by` to compute
+the landscape covariate at the fitted scale.
+
+[`simulate_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/simulate_gdistremoval.md)
+draws new surveys from the fitted model. Each replicate is a complete
+`unmarkedFrameGDR` whose distance and removal tables count the same
+simulated birds, so you can summarize the replicates as you would the
+real data.
+
+``` r
+
+set.seed(4)
+reps <- simulate_gdistremoval(opt, nsim = 200)     # 200 simulated surveys
+sim_total <- vapply(reps, function(x) sum(x@yRemoval), numeric(1))
+obs_total <- sum(fit@data@yRemoval)                # birds recorded in the real survey
+round(c(observed = obs_total, simulated_mean = mean(sim_total),
+        quantile(sim_total, c(0.025, 0.975))))
+#>       observed simulated_mean           2.5%          97.5% 
+#>            343            342            302            372
+```
+
+**How to read the output:** The real survey recorded 343 birds. The
+simulated surveys recorded 342 on average, and 95% of them recorded
+between 302 and 372. A real total far outside that range would suggest
+that the model misses something about abundance or detection. Compare
+other summaries, such as counts by distance band or by interval, the
+same way. The replicates hold the coefficients and the scale of effect
+at their estimates, so they check the fitted model, not the uncertainty
+in its estimates.
+
+> **What this means for your study.** For models with repeat visits, use
+> these two functions rather than
+> [`unmarked::getP()`](https://ecoverseR.github.io/unmarked/reference/getP.html),
+> [`fitted()`](https://rdrr.io/r/stats/fitted.values.html), or
+> [`simulate()`](https://rdrr.io/r/stats/simulate.html). In `unmarked`
+> 1.5.2, those apply the first visit’s distance scale to every visit.
+> This vignette’s survey has one visit, so the results agree here.
 
 ### Plot the kernel and the density response
 
@@ -643,9 +733,11 @@ gives the full requirements.
 | A scale of effect for a covariate that appears only in the availability formula of a single-visit design, or only in the distance formula with `keyfun = "uniform"` | Those components are not estimated in such models. Put the landscape covariate in a component the model estimates |
 | A landscape covariate with the same name as a column in the yearly or interval covariate tables | Give each its own name, for example with an alias in [`expand_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/expand_gdr_intervals.md) |
 | Intervals that include uncertainty in the scale of effect | Report intervals as conditional on the estimated scale |
+| A map from [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md) and [`terra::predict()`](https://rspatial.github.io/terra/reference/predict.html) for an `engine = "TMB"` fit with a random intercept such as `(1 | block)`. The grouping variable has no map layer, and [`terra::predict()`](https://rspatial.github.io/terra/reference/predict.html) stops with “variable lengths differ” | No tested route yet. Map a fit without the random intercept, or use [`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md) for surveyed sites |
 | [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md) for `unmarked` fits | Compare models fitted to the same surveys with [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md) |
 | [`sim_dat_gdr()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_gdr.md) for negative binomial or zero-inflated abundance, detection functions other than half-normal, or repeat visits | Simulate those designs with your own code |
 | [`make_gdr_refitter()`](https://wpeterman.github.io/multiScaleR/reference/make_gdr_refitter.md) and [`fit_gdr_response_field()`](https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.md) with other package versions. They require `unmarked` 1.5.2, and TMB 1.9.25 for models fitted with `engine = "TMB"` | Use the default refit in [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md), which has no version requirement |
+| Standard errors or intervals from [`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md), and [`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md) or [`simulate_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/simulate_gdistremoval.md) for models from [`fit_gdr_response_field()`](https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.md) | Report whole-survey predictions as point estimates. Use [`predict()`](https://rspatial.github.io/terra/reference/predict.html) on a response field fit |
 | [`fit_gdr_response_field()`](https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.md) beyond Poisson abundance, a half-normal detection function, density per square kilometer, one visit per point, a 75 m survey radius, and one random intercept for abundance. The range is not estimated | Fit independent random intercepts with `engine = "TMB"` |
 
 ## Quick reference
@@ -696,6 +788,8 @@ fit <- opt$opt_mod
 unmarked::predict(fit, type = "lambda")       # density, birds per square km
 unmarked::predict(fit, type = "dist")         # distance scale, m
 unmarked::predict(fit, type = "rem")          # removal probability per minute
+predict_gdistremoval(opt)                     # detection and expected counts
+simulate_gdistremoval(opt, nsim = 200)        # new surveys from the fitted model
 plot(opt)                                     # kernel weight against distance
 plot_marginal_effects(opt, type = "lambda")   # density across the covariate
 
@@ -715,6 +809,8 @@ dens_map <- terra::predict(r_scaled, fit, type = "lambda")
 | [`expand_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/expand_gdr_intervals.md) | Copy site or visit covariates into the interval table |
 | [`prepare_gdr_intervals()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_intervals.md) | Add covariates that differ among time intervals |
 | [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md) | Estimate the scale of effect together with the model coefficients |
+| [`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md) | Predict whole-survey detection, abundance, density, and expected counts |
+| [`simulate_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/simulate_gdistremoval.md) | Simulate new surveys from the fitted model |
 | [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md) | Plot a covariate’s effect in one component with `type` |
 | [`make_gdr_refitter()`](https://wpeterman.github.io/multiScaleR/reference/make_gdr_refitter.md) | Refit from several starting values at each candidate scale |
 | [`fit_gdr_response_field()`](https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.md) | Replace independent block effects with a spatially correlated field |

@@ -17,7 +17,8 @@ articles:
   v13-bayesian-scales: v13-bayesian-scales.html
   v14-bayesian-prediction: v14-bayesian-prediction.html
   v15-bayesian-computation: v15-bayesian-computation.html
-last_built: 2026-11-17T22:12Z
+  v16-joint-data-sets: v16-joint-data-sets.html
+last_built: 2026-11-28T01:29Z
 urls:
   reference: https://wpeterman.github.io/multiScaleR/reference
   article: https://wpeterman.github.io/multiScaleR/articles

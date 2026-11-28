@@ -53,3 +53,11 @@ surveys.
   Model](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.md):
 - [15. Choose and Check a Bayesian Computation
   Method](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.md):
+
+### Combining data sets
+
+Estimate a shared scale of effect from several surveys, including
+surveys that measure the response over an area.
+
+- [16. Combine Data Sets to Estimate a Shared Scale of
+  Effect](https://wpeterman.github.io/multiScaleR/articles/v16-joint-data-sets.md):

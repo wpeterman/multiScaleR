@@ -46,8 +46,11 @@ report. Its elements:
 
 - `opt_scale`: data frame with one row per optimized covariate and
   columns `Mean` (estimated sigma, map units), `SE`, `2.5%`, and
-  `97.5%`. Its `interval_method` attribute records `"wald"` or
-  `"profile"` for each row.
+  `97.5%`. Its `interval_method` attribute records how each row's limits
+  were found, such as `"wald"`, `"log_wald"`, `"profile"`, or
+  `"unavailable"`. Profile limits that reach a search bound are labeled
+  `"profile_bound"` by the default refit backend and
+  `"profile-bound-limited"` by the analytic and joint mixed backends.
 
 - `opt_shape`: the same table for the shape parameter under
   `kernel = "expow"`, otherwise `NULL`.
@@ -71,7 +74,7 @@ report. Its elements:
 - `prob`: the cumulative weight proportion used for the distances.
 
 - `fitted_mod`: the model refit at the estimated scales (`opt_mod` of
-  the fit).
+  the fit, or the native `survival` model inside an `amt` wrapper).
 
 - `kernel`: the kernel name.
 
@@ -114,7 +117,7 @@ data.
 ## Profile-likelihood intervals
 
 The default refit backend caches profile results during the current R
-session; the analytic backends recompute them. Set
+session; the analytic and joint mixed backends recompute them. Set
 `options(multiScaleR.profile_cache_max_bytes = 64 * 1024^2)` to bound
 the retained cache entries (64 MiB by default), or set it to zero to
 disable caching and clear retained entries at the next profile request.
@@ -125,21 +128,39 @@ returned refit scale table records cache availability in its
 `profile_cache` attribute. The option bounds retained entries, not
 temporary key construction or the memory used by the numerical profile.
 
+Two kinds of fit have no profile intervals. For a fit with a declared
+`radius_grid` (see
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)),
+`profile = TRUE` warns and returns the summary with the ordinary limits:
+`NA` for the hard radii and Wald limits, conditional on the selected
+radii, for any smooth scale. Inspect
+`diagnostics(object)$radius_profile` for the candidate likelihoods. For
+`backend = "conditional_logit"`, scale uncertainty is not calibrated, so
+`profile = TRUE` warns and returns `NA` scale limits; use
+[`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+to view the log-likelihood across sigma.
+
 ## Analytic backends
 
 For `backend = "profile_glm"` or `"joint_nb2"`, default scale limits use
 joint information on the log scale and are omitted when the
 identifiability checks fail (see
 [multiScaleR-fitting-methods](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-fitting-methods.md)).
-A returned Wald interval describes the local curvature around the
-selected optimum and can extend beyond the searched scale range.
-Coverage can fall below the nominal level even for an interior fit, so
-inspect the likelihood over the admissible range when scale inference
-matters.
+`backend = "joint_mixed"` reports the same log-scale Wald limits from
+its joint Hessian, one scale at a time. A returned Wald interval
+describes the local curvature around the selected optimum and can extend
+beyond the searched scale range. Coverage can fall below the nominal
+level even for an interior fit, so inspect the likelihood over the
+admissible range when scale inference matters.
 
-With `profile = TRUE`, the analytic summary follows the connected
-likelihood region around the fitted scale, and an endpoint at a search
-bound is labeled bound-limited. For a supported one-scale NB2 fit,
+With `profile = TRUE`, the analytic and `"joint_mixed"` summaries follow
+the connected likelihood region around the fitted scale, and an endpoint
+at a search bound is labeled bound-limited. A `"joint_mixed"` profile
+refits the native `glmmTMB` model at each candidate sigma and reports
+limits for every scale, including one whose standard error is withheld
+(see
+[multiScaleR-fitting-methods](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-fitting-methods.md)).
+For a supported one-scale NB2 fit,
 [`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md)
 checks the full range and reports the regions it detects. If a
 full-range profile suggests a competing optimum, compare additional

@@ -46,7 +46,18 @@ multiScale_optim(
   classes also work through
   [`stats::update()`](https://rdrr.io/r/stats/update.html) or a custom
   `refit_fn`. A predictor cannot be named `"x"`, which is reserved for
-  internal coordinate data.
+  internal coordinate data. Fit the model with `data =` naming a data
+  frame that holds every model variable. A model fitted inside a
+  function or [`lapply()`](https://rdrr.io/r/base/lapply.html) is
+  refitted in the environment where it was fitted, so a formula held in
+  a local variable works; other inputs to the fitting call, such as a
+  `family` or `start` object, must still exist there. For
+  [`survival::clogit()`](https://rdrr.io/pkg/survival/man/clogit.html),
+  [`survival::coxph()`](https://rdrr.io/pkg/survival/man/coxph.html),
+  and `amt` fits, also set `model = TRUE`, and add transformed terms
+  such as `cos(ta_)` to the data as columns when the fit comes from
+  [`amt::fit_issf()`](https://rdrr.io/pkg/amt/man/fit_clogit.html),
+  which does not keep its input data.
 
 - kernel_inputs:
 
@@ -90,6 +101,9 @@ multiScale_optim(
   stepped likelihood. A refit search that returns its starting values
   gives a warning and records `start_stall` in
   [`diagnostics()`](https://wpeterman.github.io/multiScaleR/reference/diagnostics.md).
+  The analytic backends (`"profile_glm"`, `"joint_nb2"`,
+  `"conditional_logit"`) run their own multi-start search and accept
+  only `"single"`; set their starts with `profile_control`.
 
 - screen_n_sigma:
 
@@ -373,22 +387,19 @@ closures over large local objects.
 
 The function receives `context$return_model = FALSE` for scalar
 objective evaluations and `TRUE` when a fitted model is wanted,
-including the final refit at the selected scales. For supported
-`unmarked` models, you can skip the intermediate Hessian calculations
-while keeping the original model's uncertainty settings whenever a
-fitted model is returned:
+including the final refit at the selected scales. Use the flag to skip
+work that only a returned model needs, such as coefficient standard
+errors.
 
-    refit_unmarked <- function(model, data, context) {
-      if (identical(context$return_model, FALSE))
-        unmarked::update(model, data = data, se = FALSE)
-      else
-        unmarked::update(model, data = data)
-    }
-
-This changes neither the coefficient starts nor the model's likelihood.
-It does not add uncertainty for the kernel scales or override an
-original `se = FALSE` setting. Verify this behavior for your model class
-before you rely on a custom refit function.
+The default `unmarked` refit already does this. When the fitting
+function has an `se` argument, as `occu()`, `pcount()`, and
+`gdistremoval()` do, objective evaluations refit with `se = FALSE`, so
+`unmarked` skips the Hessian it computes after its optimizer converges.
+The estimates and log-likelihood are unchanged, and each objective refit
+of an N-mixture or distance-removal model takes about a quarter less
+time. Returned models, including the final one, keep the original
+model's `se` setting. A custom `refit_fn` replaces this default, so
+apply the same rule there if you want the saving.
 
 ## Fit wrapper model objects
 
@@ -467,7 +478,8 @@ opt_mod <- multiScale_optim(fitted_mod = mod1,
 #> 
 #> Optimization complete
 #> 
-#> A smooth kernel parameter reaches an optimization bound. Outer Wald SEs and limits are withheld.
+#> At an optimization bound: sigma:r2. Wald SEs and limits are withheld for this parameter.
+#> Wald SEs for the other smooth parameters hold the bounded ones fixed.
 #> Coefficient uncertainty still conditions on the selected kernels.
 #> 
 #>  WARNING!!!
@@ -545,7 +557,7 @@ summary(opt)
 #> 
 #> 
 #> Call:
-#> glm(formula = y ~ hab, family = poisson, data = data)
+#> stats::glm(formula = y ~ hab, family = poisson, data = data)
 #> 
 #> Coefficients:
 #>             Estimate Std. Error z value Pr(>|z|)    
@@ -653,9 +665,9 @@ if (requireNamespace("MASS", quietly = TRUE)) {
 #> Extracting values from raster layers...
 #> Analytic-profile GLM fit: 6/6 starts passed; family nbinom2.
 #>                  log_scale:hab beta:(Intercept)      beta:hab     log_theta
-#> log_scale:hab      0.166706060     0.0015047670 -0.0061313367  0.0224171250
+#> log_scale:hab      0.166706071     0.0015047672 -0.0061313371  0.0224171251
 #> beta:(Intercept)   0.001504767     0.0169312902 -0.0078480893  0.0001863306
 #> beta:hab          -0.006131337    -0.0078480893  0.0148171832 -0.0006320777
-#> log_theta          0.022417125     0.0001863306 -0.0006320777  0.1745158401
+#> log_theta          0.022417125     0.0001863306 -0.0006320777  0.1745158389
 # }
 ```

@@ -21,8 +21,8 @@ that explains the idea in more depth.
 - **Binned inputs**: distance-binned summaries that
   [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
   stores when `bin = TRUE` (the default). They let the search compute
-  kernel-weighted means without visiting every cell, which is much
-  faster.
+  kernel-weighted means, and kernel-weighted surface metrics other than
+  `"sa"`, without visiting every cell, which is much faster.
 
 - **Buffer**: the set of raster cells within `max_D` of a survey point.
   Only these cells contribute to the point's kernel-weighted covariates.

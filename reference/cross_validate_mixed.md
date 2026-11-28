@@ -117,7 +117,9 @@ scores, `predictions` the integrated response mean of each held-out row,
 `joint_scores` the joint log score of each held-out group, and
 `training` the coefficients, random-effect covariance, dispersion, and
 any fitted scales of each fold. Compact `selection_records` are always
-kept. A failed fold makes the pooled scores `NA`. The mixed model
+kept. A failed fold makes the pooled scores `NA`, its stage and message
+are kept in `errors`, and the function gives one warning with the number
+of failed folds and their first distinct reasons. The mixed model
 section of
 [multiScaleR_cv](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_cv-class.md)
 describes every element.

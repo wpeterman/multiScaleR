@@ -243,7 +243,7 @@ lean_inputs <- kernel_prep(pts = pts, raster_stack = land_rast,
 c(full = as.numeric(object.size(kernel_inputs)),
   lean = as.numeric(object.size(lean_inputs))) / 1e6
 #>      full      lean 
-#> 58.666440  1.257416
+#> 58.666520  1.257496
 ```
 
 **How to read the output:** The lean object is a small fraction of the

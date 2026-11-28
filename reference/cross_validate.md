@@ -102,7 +102,12 @@ print(x, ...)
   theta together, and applies only to `family = "nbinom2"` with `theta`
   estimated. If you leave `backend` unset, `"Gamma"` and an NB2 model
   with a fixed `theta` use `"refit"`, the only route they support.
-  Naming another backend for them is an error. The usual starting-value,
+  Naming another backend for them is an error. `"profile_glm"` and
+  `"joint_nb2"` accept only smooth kernels, optimized kernel means, and
+  optimized weighted surface SQ. A formula with an estimated hard radius
+  (a landscape metric or an unweighted surface metric) or another
+  weighted surface metric stops before any fold is fitted, so choose
+  `backend = "refit"` for those predictors. The usual starting-value,
   convergence, and kernel or metric checks of
   [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
   apply in every fold. See
@@ -126,15 +131,16 @@ print(x, ...)
   [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
   arguments used in every fold, such as `par` or `profile_control`.
   Supply `radius_grid` with `backend = "refit"` to profile hard radii,
-  together with any smooth scales, in each training split. Supply
-  `covariate_transform = "raw"` with `backend = "refit"` to keep
-  optimized covariates in their own units (see "Keep optimized
-  covariates in their own units"). Arguments that supply data, the
-  starting model, a custom refit function, parallel workers, `backend`,
-  or `verbose` are reserved. Every fold runs on one worker. The default
-  [`list()`](https://rdrr.io/r/base/list.html) keeps the backend's own
-  defaults. Choose starting values without using the assessment
-  outcomes.
+  together with any smooth scales, in each training split. An estimated
+  hard radius usually needs it, because without it folds often fail (see
+  "How each fold is fitted"). Supply `covariate_transform = "raw"` with
+  `backend = "refit"` to keep optimized covariates in their own units
+  (see "Keep optimized covariates in their own units"). Arguments that
+  supply data, the starting model, a custom refit function, parallel
+  workers, `backend`, or `verbose` are reserved. Every fold runs on one
+  worker. The default [`list()`](https://rdrr.io/r/base/list.html) keeps
+  the backend's own defaults. Choose starting values without using the
+  assessment outcomes.
 
 - glm_control:
 
@@ -241,6 +247,18 @@ alone.
 The fold fails if the initial GLM, the final GLM, or the scale optimizer
 does not converge. Folds run one after another, and a failed fold is
 recorded and never retried.
+
+An estimated hard radius, such as a landscape metric whose radius is
+optimized, changes the likelihood only in steps as the radius crosses
+cell distances. A gradient search on such a likelihood often stops with
+a nonzero convergence code, and then the fold fails even when the same
+model fitted to all of the data looks acceptable. With
+`backend = "refit"`, supply candidate radii through
+`optim_args = list(radius_grid = ...)` so each fold profiles the hard
+radius over a grid instead (see
+[`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)).
+The message of a fold that fails this way names the hard-radius
+predictors and this remedy.
 
 ## Build the folds
 
@@ -421,7 +439,9 @@ Read `complete` first. `TRUE` means every planned fold was fitted and
 scored. When a fold fails, `complete` is `FALSE` and the pooled scores
 in `summary` are `NA`. The scores of the folds that finished, the failed
 assessment rows, the diagnostics, and the warnings all stay available,
-and `errors` names the stage and message of each failure.
+and `errors` names the stage and message of each failure. The function
+also gives one warning when it returns an incomplete result, with the
+number of failed folds and their first distinct reasons.
 [`cv_tab()`](https://wpeterman.github.io/multiScaleR/reference/cv_tab.md)
 and
 [`select_cv()`](https://wpeterman.github.io/multiScaleR/reference/select_cv.md)

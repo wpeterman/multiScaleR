@@ -171,7 +171,9 @@ analysis rows of each fold, so do not supply predictors standardized
 with all rows. The section "Formula terms that learn from the data" in
 [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md)
 lists the supported terms and their limits. Missing values are never
-dropped silently, and native warnings and failed folds are kept.
+dropped silently, and native warnings and failed folds are kept. When
+any fold fails, the function gives one warning with the number of failed
+folds and their first distinct reasons.
 
 ## Binomial responses
 

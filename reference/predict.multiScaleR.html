@@ -27,7 +27,7 @@ vignette(&quot;v03-map-predictions&quot;, package = &quot;multiScaleR&quot;) map
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -64,6 +64,9 @@ vignette(&quot;v03-map-predictions&quot;, package = &quot;multiScaleR&quot;) map
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -223,7 +226,9 @@ of predictions on the scale of <code>type</code>, named by row ID.</p></li>
 a list with <code>fit</code> (the predictions), <code>se.fit</code> (standard errors on the
 scale of <code>type</code>), <code>type</code>, and <code>uncertainty</code> (<code>"joint"</code> or
 <code>"conditional"</code>). Confidence intervals add <code>lower</code> and <code>upper</code>, on the
-scale of <code>type</code>, and <code>level</code>.</p></li>
+scale of <code>type</code>, and <code>level</code>. Joint uncertainty from a fit with kernel
+parameters at a search bound adds <code>conditional_on</code>, which names the
+parameters held fixed.</p></li>
 <li><p><strong><code>"conditional_logit"</code>:</strong> a named numeric vector, or with
 <code>se.fit = TRUE</code> a list with <code>fit</code>, <code>se.fit</code>, <code>type</code>, and
 <code>uncertainty = "conditional"</code>.</p></li>
@@ -304,7 +309,15 @@ standard errors are <code>abs(d mu / d eta)</code> times the link-scale standard
 error. Binomial response predictions are probabilities.</p>
 <p>Joint uncertainty is refused for fits at a parameter bound or with weak
 identifiability. <code>fit$uncertainty$reasons</code> says why, and point predictions
-and conditional uncertainty remain available. At the exact Poisson
+and conditional uncertainty remain available. Kernel parameters at a
+search bound do not block joint uncertainty when they are the only failed
+check. Joint standard errors and limits then hold those
+parameters fixed at their bounds and let the other kernel parameters vary.
+The result names them in <code>conditional_on</code>, and
+<code>fit$uncertainty$joint_conditional_on</code> records them. These limits are
+narrower than limits that also let the bounded scale vary, and the true
+scale may lie beyond the bound. Widen the search, for example with a larger
+<code>max_D</code> in <code><a href="kernel_prep.html">kernel_prep()</a></code>, before you rely on them. At the exact Poisson
 boundary of a <code>"joint_nb2"</code> fit, point predictions and explicitly
 conditional intervals hold both the scales and the Poisson dispersion
 boundary fixed. Use <code><a href="vcov.multiScaleR.html">vcov.multiScaleR()</a></code> for the covariance matrices.</p>

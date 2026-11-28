@@ -104,7 +104,10 @@ Every fit has these elements:
   estimates, the starts and their convergence scores, the profile and
   joint information matrices, identifiability diagnostics, and NB2
   theta. `uncertainty$available` says whether joint uncertainty passed
-  its checks, and `uncertainty$reasons` says why not. `opt_mod` and its
+  its checks, and `uncertainty$reasons` says why not.
+  `uncertainty$joint_available` is also `TRUE` when joint uncertainty
+  holds bounded kernel parameters fixed, and
+  `uncertainty$joint_conditional_on` names them. `opt_mod` and its
   coefficient summary condition on the estimated kernel parameters. Use
   [`vcov.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/vcov.multiScaleR.md)
   and
@@ -118,8 +121,12 @@ Every fit has these elements:
 - `mixed_fit` for `"joint_mixed"`: the kernel engine, log-scale
   estimates and bounds in internal distance units, the independent
   starts, every start outcome and warning, the selected start, and the
-  variables prediction needs. `uncertainty$available` is `FALSE`, and
-  `next_run` and `opt_context` are `NULL`.
+  variables that prediction and profile refits need. `scale_est$SE` and
+  the log-scale Wald limits in `profile_scale_est` come from the
+  selected start's joint Hessian, one scale at a time.
+  `uncertainty$available` is `FALSE` because coefficient and prediction
+  uncertainty still condition on the scales. `next_run` and the `max_D`
+  warning follow the analytic GLM backends, and `opt_context` is `NULL`.
 
 [multiScaleR-fitting-methods](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-fitting-methods.md)
 explains what each backend records and why uncertainty may be withheld.

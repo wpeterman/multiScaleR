@@ -246,16 +246,16 @@ par(op)
 round(c(min_ratio = minmax(change)[1], max_ratio = minmax(change)[2],
         max_count = minmax(pred_clamped)[2]), 2)
 #> min_ratio max_ratio max_count 
-#>      0.53      1.97     21.63
+#>      0.31      1.55      9.39
 ```
 
 **How to read these maps:** The left panel is the clamped prediction.
 The right panel shows what clamping changed. A ratio of 1 means no
 change, and that holds for every cell inside the surveyed range. Ratios
 below 1 mark cells where clamping lowered the expected count, by as much
-as 47%. Ratios above 1 mark cells where it raised a count that
-extrapolation had lowered, by a factor of up to 1.97. The largest
-expected count on the map fell from 30.6 to 21.6.
+as 69%. Ratios above 1 mark cells where it raised a count that
+extrapolation had lowered, by a factor of up to 1.55. The largest
+expected count on the map fell from 30.6 to 9.4.
 
 The clamped maximum still exceeds the largest fitted count at a survey
 point. Clamping limits each covariate separately. The cell with the
@@ -318,9 +318,9 @@ knitr::kable(pct_tab, digits = 2, row.names = FALSE)
 
 | pct_mx | land1_lower | land1_upper | land2_lower | land2_upper | pct_clamped | max_count |
 |-------:|------------:|------------:|------------:|------------:|------------:|----------:|
-|   -0.1 |       -2.22 |        1.60 |       -1.96 |        1.73 |       25.94 |     12.85 |
-|    0.0 |       -2.70 |        2.08 |       -2.42 |        2.19 |       11.16 |     21.63 |
-|    0.1 |       -3.18 |        2.56 |       -2.88 |        2.65 |        3.60 |     28.63 |
+|   -0.1 |       -1.16 |        2.67 |       -1.84 |        1.28 |       36.48 |      5.83 |
+|    0.0 |       -1.64 |        3.15 |       -2.23 |        1.67 |       22.13 |      9.39 |
+|    0.1 |       -2.12 |        3.47 |       -2.62 |        2.06 |       11.58 |     15.13 |
 
 **How to read the table:** Each row is one setting. The four limit
 columns give the smallest and largest value left in each covariate

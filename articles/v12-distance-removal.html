@@ -24,7 +24,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,6 +63,9 @@
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -114,8 +117,9 @@ scale of effect of a landscape covariate on bird density inside such a
 model, fitted with <code><a href="https://ecoverseR.github.io/unmarked/reference/gdistremoval.html" class="external-link">unmarked::gdistremoval()</a></code>.</p>
 <p>You will simulate a survey with known values, prepare the data, fit
 the model, estimate the scale of effect, and read the abundance,
-availability, and detection results. The last section lists what is not
-supported yet. Read
+availability, and detection results. You will also predict what a whole
+survey records and simulate new surveys from the fitted model. The last
+section lists what is not supported yet. Read
 <code><a href="../articles/v01-quickstart.html">vignette("v01-quickstart", package = "multiScaleR")</a></code> first,
 because this vignette builds on its four steps. Experience with
 <code>unmarked</code> helps but is not required.</p>
@@ -557,7 +561,7 @@ natural scale.</p>
 <span><span class="co"># First survey point</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span>density <span class="op">=</span> <span class="va">dens</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span>, distance <span class="op">=</span> <span class="va">dsig</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span>, removal <span class="op">=</span> <span class="va">prem</span><span class="op">[</span><span class="fl">1</span>, <span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;            Predicted          SE       lower       upper</span></span>
-<span><span class="co">#&gt; density  721.9869294 76.96948489 585.8474668 889.7625334</span></span>
+<span><span class="co">#&gt; density  721.9869292 76.96948493 585.8474665 889.7625333</span></span>
 <span><span class="co">#&gt; distance  39.5339089  2.44584632  35.0193780  44.6304314</span></span>
 <span><span class="co">#&gt; removal    0.2092183  0.01802931   0.1760664   0.2467431</span></span>
 <span></span>
@@ -679,9 +683,86 @@ explains what that leaves out.</p>
 </blockquote>
 </div>
 <div class="section level3">
+<h3 id="predict-detection-and-expected-counts-for-a-whole-survey">Predict detection and expected counts for a whole survey<a class="anchor" aria-label="anchor" href="#predict-detection-and-expected-counts-for-a-whole-survey"></a>
+</h3>
+<p>The calculation above combined the two detection components by hand
+for one point. <code><a href="../reference/predict_gdistremoval.html">predict_gdistremoval()</a></code> does the same for
+every point and visit, combining the components as the model’s
+likelihood does, and adds the number of birds an observer would be
+expected to record. The function is experimental.</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">surv</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/predict_gdistremoval.html">predict_gdistremoval</a></span><span class="op">(</span><span class="va">opt</span><span class="op">)</span>     <span class="co"># one row per survey point and visit</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/headtail.html" class="external-link">head</a></span><span class="op">(</span><span class="va">surv</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"density"</span>, <span class="st">"availability"</span>, <span class="st">"perceptibility"</span>,</span>
+<span>              <span class="st">"detection"</span>, <span class="st">"expected_count"</span><span class="op">)</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    density availability perceptibility detection expected_count</span></span>
+<span><span class="co">#&gt; 1 721.9869    0.9043762      0.4638049 0.4194542       5.351632</span></span>
+<span><span class="co">#&gt; 2 353.8101    0.9043762      0.4638049 0.4194542       2.622571</span></span>
+<span><span class="co">#&gt; 3 241.1276    0.9043762      0.4638049 0.4194542       1.787326</span></span></code></pre></div>
+<p><strong>How to read the output:</strong> <code>density</code> is in
+birds per square kilometer, as in the fitted model.
+<code>availability</code> is the chance that a bird present gives a cue
+during at least one interval of the 10-minute count, and
+<code>perceptibility</code> is the chance that the observer detects a
+bird giving a cue somewhere in the 75 m circle. <code>detection</code>
+is their product, 42% at the first point, the same value as the hand
+calculation above. With repeat visits it also includes the availability
+between visits, <code>phi</code>. <code>expected_count</code> is the
+expected number of birds in the circle times <code>detection</code>, so
+it is the count an observer would record on average, about 5.4 birds at
+the first point.</p>
+<p>Change the protocol in the survey frame to ask what a different
+survey would record.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">planned</span> <span class="op">&lt;-</span> <span class="va">fit</span><span class="op">@</span><span class="va">data</span>                   <span class="co"># fitted covariates, distance bands, and intervals</span></span>
+<span><span class="va">planned</span><span class="op">@</span><span class="va">period.lengths</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>  <span class="co"># a 5-minute count in three intervals</span></span>
+<span><span class="va">short</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/predict_gdistremoval.html">predict_gdistremoval</a></span><span class="op">(</span><span class="va">opt</span>, newdata <span class="op">=</span> <span class="va">planned</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/math-generics.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>ten_minutes  <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/summarize-generics.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">surv</span><span class="op">$</span><span class="va">detection</span><span class="op">)</span>,</span>
+<span>        five_minutes <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/summarize-generics.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">short</span><span class="op">$</span><span class="va">detection</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="co">#&gt;  ten_minutes five_minutes </span></span>
+<span><span class="co">#&gt;         0.42         0.32</span></span></code></pre></div>
+<p><strong>How to read the output:</strong> Shortening the count from
+ten to five minutes lowers the average detection probability from 0.42
+to 0.32, so a 5-minute count would record about 76% as many birds.
+Density does not change, because the protocol affects only detection.
+The removal intervals may change, but the distance bands must match the
+fitted ones. For points that were not surveyed, supply a frame of zero
+counts with their covariates, together with <code>kernel_inputs</code>
+and <code>join_by</code> to compute the landscape covariate at the
+fitted scale.</p>
+<p><code><a href="../reference/simulate_gdistremoval.html">simulate_gdistremoval()</a></code> draws new surveys from the
+fitted model. Each replicate is a complete <code>unmarkedFrameGDR</code>
+whose distance and removal tables count the same simulated birds, so you
+can summarize the replicates as you would the real data.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">4</span><span class="op">)</span></span>
+<span><span class="va">reps</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_gdistremoval.html">simulate_gdistremoval</a></span><span class="op">(</span><span class="va">opt</span>, nsim <span class="op">=</span> <span class="fl">200</span><span class="op">)</span>     <span class="co"># 200 simulated surveys</span></span>
+<span><span class="va">sim_total</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">reps</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">x</span><span class="op">@</span><span class="va">yRemoval</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">obs_total</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">fit</span><span class="op">@</span><span class="va">data</span><span class="op">@</span><span class="va">yRemoval</span><span class="op">)</span>                <span class="co"># birds recorded in the real survey</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/math-generics.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>observed <span class="op">=</span> <span class="va">obs_total</span>, simulated_mean <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/summarize-generics.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">sim_total</span><span class="op">)</span>,</span>
+<span>        <span class="fu"><a href="https://rspatial.github.io/terra/reference/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">sim_total</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.025</span>, <span class="fl">0.975</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;       observed simulated_mean           2.5%          97.5% </span></span>
+<span><span class="co">#&gt;            343            342            302            372</span></span></code></pre></div>
+<p><strong>How to read the output:</strong> The real survey recorded 343
+birds. The simulated surveys recorded 342 on average, and 95% of them
+recorded between 302 and 372. A real total far outside that range would
+suggest that the model misses something about abundance or detection.
+Compare other summaries, such as counts by distance band or by interval,
+the same way. The replicates hold the coefficients and the scale of
+effect at their estimates, so they check the fitted model, not the
+uncertainty in its estimates.</p>
+<blockquote>
+<p><strong>What this means for your study.</strong> For models with
+repeat visits, use these two functions rather than
+<code><a href="https://ecoverseR.github.io/unmarked/reference/getP.html" class="external-link">unmarked::getP()</a></code>, <code><a href="https://rdrr.io/r/stats/fitted.values.html" class="external-link">fitted()</a></code>, or
+<code><a href="https://rdrr.io/r/stats/simulate.html" class="external-link">simulate()</a></code>. In <code>unmarked</code> 1.5.2, those apply the
+first visit’s distance scale to every visit. This vignette’s survey has
+one visit, so the results agree here.</p>
+</blockquote>
+</div>
+<div class="section level3">
 <h3 id="plot-the-kernel-and-the-density-response">Plot the kernel and the density response<a class="anchor" aria-label="anchor" href="#plot-the-kernel-and-the-density-response"></a>
 </h3>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">opt</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="v12-distance-removal_files/figure-html/plot-kernel-1.png" class="r-plt" alt="***Kernel weight against distance for `land1`.***" width="624"><p class="caption">
@@ -689,7 +770,7 @@ explains what that leaves out.</p>
 <code>land1</code>.</em></strong>
 </p>
 </div>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_marginal_effects.html">plot_marginal_effects</a></span><span class="op">(</span><span class="va">opt</span>, type <span class="op">=</span> <span class="st">"lambda"</span>,</span>
 <span>                      ylab <span class="op">=</span> <span class="st">"Density (birds per square km)"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
@@ -710,7 +791,7 @@ those components.</p>
 <div class="section level3">
 <h3 id="map-density">Map density<a class="anchor" aria-label="anchor" href="#map-density"></a>
 </h3>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Smooth the raster at the estimated scale, standardized as in the model</span></span>
 <span><span class="va">r_scaled</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/kernel_scale.raster.html">kernel_scale.raster</a></span><span class="op">(</span>raster_stack <span class="op">=</span> <span class="va">land1</span>, multiScaleR <span class="op">=</span> <span class="va">opt</span>,</span>
 <span>                                scale_center <span class="op">=</span> <span class="cn">TRUE</span>, clamp <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -747,7 +828,7 @@ model from the starting model’s coefficients and from each extra set of
 starting values you declare. The search stops with an error when the
 best likelihood comes from a fit that did not converge cleanly, and a
 record of every attempt goes to <code>audit_dir</code>.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># A second set of starting values, named like the model coefficients</span></span>
 <span><span class="va">cold</span> <span class="op">&lt;-</span> <span class="fu">unmarked</span><span class="fu">::</span><span class="fu">coef</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
 <span><span class="va">cold</span><span class="op">[</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">300</span><span class="op">)</span>, <span class="fl">0</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">30</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">qlogis</a></span><span class="op">(</span><span class="fl">0.4</span><span class="op">)</span><span class="op">)</span></span>
@@ -779,7 +860,7 @@ independent block effects first, then pass it to
 values. The simulated landscape has no real location, so the EPSG code
 below is a placeholder. Use the code of your own projected
 coordinates.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Template: an independent random intercept for each block (TMB engine)</span></span>
 <span><span class="va">template</span> <span class="op">&lt;-</span> <span class="fu">unmarked</span><span class="fu">::</span><span class="fu"><a href="https://ecoverseR.github.io/unmarked/reference/gdistremoval.html" class="external-link">gdistremoval</a></span><span class="op">(</span></span>
 <span>  lambdaformula <span class="op">=</span> <span class="op">~</span> <span class="va">land1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">block</span><span class="op">)</span>, removalformula <span class="op">=</span> <span class="op">~</span> <span class="fl">1</span>,</span>
@@ -909,6 +990,16 @@ effect</td>
 scale</td>
 </tr>
 <tr class="even">
+<td align="left">A map from <code><a href="../reference/kernel_scale.raster.html">kernel_scale.raster()</a></code> and
+<code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">terra::predict()</a></code> for an <code>engine = "TMB"</code> fit
+with a random intercept such as <code>(1 | block)</code>. The grouping
+variable has no map layer, and <code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">terra::predict()</a></code> stops with
+“variable lengths differ”</td>
+<td align="left">No tested route yet. Map a fit without the random
+intercept, or use <code><a href="../reference/predict_gdistremoval.html">predict_gdistremoval()</a></code> for surveyed
+sites</td>
+</tr>
+<tr class="odd">
 <td align="left">
 <code><a href="../reference/cross_validate.html">cross_validate()</a></code> for <code>unmarked</code>
 fits</td>
@@ -916,14 +1007,14 @@ fits</td>
 <code><a href="../reference/aic_tab.html">aic_tab()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">
 <code><a href="../reference/sim_dat_gdr.html">sim_dat_gdr()</a></code> for negative binomial or
 zero-inflated abundance, detection functions other than half-normal, or
 repeat visits</td>
 <td align="left">Simulate those designs with your own code</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">
 <code><a href="../reference/make_gdr_refitter.html">make_gdr_refitter()</a></code> and
 <code><a href="../reference/fit_gdr_response_field.html">fit_gdr_response_field()</a></code> with other package versions. They
@@ -932,6 +1023,16 @@ with <code>engine = "TMB"</code>
 </td>
 <td align="left">Use the default refit in
 <code><a href="../reference/multiScale_optim.html">multiScale_optim()</a></code>, which has no version requirement</td>
+</tr>
+<tr class="even">
+<td align="left">Standard errors or intervals from
+<code><a href="../reference/predict_gdistremoval.html">predict_gdistremoval()</a></code>, and
+<code><a href="../reference/predict_gdistremoval.html">predict_gdistremoval()</a></code> or
+<code><a href="../reference/simulate_gdistremoval.html">simulate_gdistremoval()</a></code> for models from
+<code><a href="../reference/fit_gdr_response_field.html">fit_gdr_response_field()</a></code>
+</td>
+<td align="left">Report whole-survey predictions as point estimates. Use
+<code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict()</a></code> on a response field fit</td>
 </tr>
 <tr class="odd">
 <td align="left">
@@ -949,7 +1050,7 @@ intercept for abundance. The range is not estimated</td>
 <div class="section level2">
 <h2 id="quick-reference">Quick reference<a class="anchor" aria-label="anchor" href="#quick-reference"></a>
 </h2>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://wpeterman.github.io/multiScaleR/">multiScaleR</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://rspatial.org/" class="external-link">terra</a></span><span class="op">)</span></span>
 <span></span>
@@ -994,6 +1095,8 @@ intercept for abundance. The range is not estimated</td>
 <span><span class="fu">unmarked</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"lambda"</span><span class="op">)</span>       <span class="co"># density, birds per square km</span></span>
 <span><span class="fu">unmarked</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"dist"</span><span class="op">)</span>         <span class="co"># distance scale, m</span></span>
 <span><span class="fu">unmarked</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"rem"</span><span class="op">)</span>          <span class="co"># removal probability per minute</span></span>
+<span><span class="fu"><a href="../reference/predict_gdistremoval.html">predict_gdistremoval</a></span><span class="op">(</span><span class="va">opt</span><span class="op">)</span>                     <span class="co"># detection and expected counts</span></span>
+<span><span class="fu"><a href="../reference/simulate_gdistremoval.html">simulate_gdistremoval</a></span><span class="op">(</span><span class="va">opt</span>, nsim <span class="op">=</span> <span class="fl">200</span><span class="op">)</span>        <span class="co"># new surveys from the fitted model</span></span>
 <span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">opt</span><span class="op">)</span>                                     <span class="co"># kernel weight against distance</span></span>
 <span><span class="fu"><a href="../reference/plot_marginal_effects.html">plot_marginal_effects</a></span><span class="op">(</span><span class="va">opt</span>, type <span class="op">=</span> <span class="st">"lambda"</span><span class="op">)</span>   <span class="co"># density across the covariate</span></span>
 <span></span>
@@ -1042,6 +1145,15 @@ table</td>
 <td align="left"><code><a href="../reference/multiScale_optim.html">multiScale_optim()</a></code></td>
 <td align="left">Estimate the scale of effect together with the model
 coefficients</td>
+</tr>
+<tr class="odd">
+<td align="left"><code><a href="../reference/predict_gdistremoval.html">predict_gdistremoval()</a></code></td>
+<td align="left">Predict whole-survey detection, abundance, density, and
+expected counts</td>
+</tr>
+<tr class="even">
+<td align="left"><code><a href="../reference/simulate_gdistremoval.html">simulate_gdistremoval()</a></code></td>
+<td align="left">Simulate new surveys from the fitted model</td>
 </tr>
 <tr class="odd">
 <td align="left"><code><a href="../reference/plot_marginal_effects.html">plot_marginal_effects()</a></code></td>

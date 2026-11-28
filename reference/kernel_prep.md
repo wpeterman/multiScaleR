@@ -113,8 +113,16 @@ kernel_prep(
   is much faster and no longer depends on `max_D`, at the cost of a
   negligible approximation. The analytic backends and
   [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
-  require it for kernel means. Landscape and surface metrics are never
-  binned. `FALSE` forces exact cell-by-cell evaluation.
+  require it for kernel means. With the default `refit` backend it also
+  bins kernel-weighted surface metrics (`surface_var(weighted = TRUE)`
+  with `"sq"`, `"ssk"`, or `"sku"`): each cell's centered value powers
+  are split between the two nearest distance nodes, which keeps their
+  approximation as small as that of a binned kernel mean. Weighted
+  `"sa"`, `kernel = "fixed"`, landscape metrics, and hard-radius surface
+  metrics are never binned, and the analytic backends and
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  evaluate weighted surface metrics from every cell. `FALSE` forces
+  exact cell-by-cell evaluation.
 
 - nbins:
 
@@ -258,5 +266,5 @@ lean_inputs <- kernel_prep(pts = pts, raster_stack = hab, max_D = 250,
 c(full = as.numeric(object.size(kernel_inputs)),
   lean = as.numeric(object.size(lean_inputs))) / 1e6
 #>     full     lean 
-#> 2.547640 0.328192 
+#> 2.547720 0.328272 
 ```

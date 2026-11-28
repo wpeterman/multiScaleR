@@ -29,7 +29,7 @@ predictions and limit extrapolation."><meta property="og:image" content="https:/
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -66,6 +66,9 @@ predictions and limit extrapolation."><meta property="og:image" content="https:/
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -173,13 +176,17 @@ observation noise.</p>
     <div class="section level2">
     <h2 id="choose-conditional-or-joint-uncertainty">Choose conditional or joint uncertainty<a class="anchor" aria-label="anchor" href="#choose-conditional-or-joint-uncertainty"></a></h2>
 
-<table class="table table"><tr><td>Fitting route</td><td>Joint uncertainty</td><td>Conditional uncertainty</td></tr><tr><td><code>backend = "profile_glm"</code> or <code>"joint_nb2"</code></td><td>Yes, from <code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict()</a></code> at points and from <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, when <code>fit$uncertainty$available</code> is <code>TRUE</code></td><td>Yes, at points and on rasters</td></tr><tr><td><code>backend = "conditional_logit"</code></td><td>No</td><td>Yes</td></tr><tr><td><code>backend = "joint_mixed"</code></td><td>No</td><td>Yes, from native glmmTMB</td></tr><tr><td>Default <code>backend = "refit"</code></td><td>No</td><td>Yes, from the native provider</td></tr><tr><td><code><a href="multiScale_bayes.html">multiScale_bayes()</a></code></td><td>The posterior already covers scales and coefficients together</td><td>Not applicable</td></tr></table><p><code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict()</a></code> defaults to <code>uncertainty = "joint"</code>. Every route except the
+<table class="table table"><tr><td>Fitting route</td><td>Joint uncertainty</td><td>Conditional uncertainty</td></tr><tr><td><code>backend = "profile_glm"</code> or <code>"joint_nb2"</code></td><td>Yes, from <code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict()</a></code> at points and from <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, when <code>fit$uncertainty$available</code> is <code>TRUE</code>, or when <code>fit$uncertainty$joint_conditional_on</code> names scales held fixed at a search bound</td><td>Yes, at points and on rasters</td></tr><tr><td><code>backend = "conditional_logit"</code></td><td>No</td><td>Yes</td></tr><tr><td><code>backend = "joint_mixed"</code></td><td>No</td><td>Yes, from native glmmTMB</td></tr><tr><td>Default <code>backend = "refit"</code></td><td>No</td><td>Yes, from the native provider</td></tr><tr><td><code><a href="multiScale_bayes.html">multiScale_bayes()</a></code></td><td>The posterior already covers scales and coefficients together</td><td>Not applicable</td></tr></table><p><code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict()</a></code> defaults to <code>uncertainty = "joint"</code>. Every route except the
 analytic backends at points needs <code>uncertainty = "conditional"</code> before it
 returns a standard error, and stops otherwise rather than silently
 returning a conditional one. For the analytic backends, joint uncertainty
 is refused when the fit sits at a parameter bound or fails its
 identifiability checks. <code>fit$uncertainty$reasons</code> says why. Point
-predictions remain available in that case. At the exact Poisson boundary
+predictions remain available in that case. The one exception is a fit
+whose only failed check is a kernel parameter at a search bound. Its joint uncertainty holds that parameter fixed at the bound
+and lets the other parameters vary, so it sits between conditional and
+fully joint uncertainty. Report it as conditional on the bounded scale, and
+consider widening the search. At the exact Poisson boundary
 of a <code>"joint_nb2"</code> fit, conditional standard errors and intervals also hold
 the dispersion at that boundary.</p>
 <p>Effect curves from <code><a href="plot_marginal_effects.html">plot_marginal_effects()</a></code> and predictions from the

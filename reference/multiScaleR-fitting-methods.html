@@ -23,7 +23,7 @@ them on one data set."><meta property="og:image" content="https://wpeterman.gith
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,6 +60,9 @@ them on one data set."><meta property="og:image" content="https://wpeterman.gith
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -99,7 +102,7 @@ them on one data set.</p>
     <div class="section level2">
     <h2 id="compare-the-backends">Compare the backends<a class="anchor" aria-label="anchor" href="#compare-the-backends"></a></h2>
 
-<table class="table table"><tr><td><code>backend</code></td><td>Models it fits</td><td>Estimated in one search</td><td>Uncertainty for the scales</td></tr><tr><td><code>"refit"</code> (default)</td><td>Any model that <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">stats::update()</a></code>, the <code>unmarked</code> equivalent, or a <code>refit_fn</code> can refit</td><td>Kernel scales and shapes. The model's own parameters are refit at every candidate</td><td>Hessian (Wald) standard errors for smooth kernels. Profile likelihood with <code>summary(fit, profile = TRUE)</code></td></tr><tr><td><code>"profile_glm"</code></td><td>Gaussian identity, Poisson log, and binomial logit <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> fits, and NB2 log-link fits</td><td>Kernel scales and NB2 theta. Coefficients are solved at every candidate</td><td>Joint Wald limits when the checks below pass</td></tr><tr><td><code>"joint_nb2"</code></td><td>NB2 log-link fits, including the exact Poisson boundary</td><td>Kernel scales, coefficients, and dispersion</td><td>Joint Wald limits when the checks pass. None at the Poisson boundary</td></tr><tr><td><code>"joint_mixed"</code></td><td>Poisson and NB2 <code>glmmTMB</code> fits with one random intercept</td><td>Kernel scales and all model parameters, with the random intercept integrated out</td><td>None. Coefficient uncertainty is conditional on the scales</td></tr><tr><td><code>"conditional_logit"</code></td><td>Step-selection models from <code><a href="https://rdrr.io/pkg/survival/man/clogit.html" class="external-link">survival::clogit()</a></code> or <code><a href="https://rdrr.io/pkg/amt/man/fit_clogit.html" class="external-link">amt::fit_clogit()</a></code></td><td>Smooth kernel scales and conditional-logistic coefficients</td><td>None. Coefficient uncertainty is conditional on the scales</td></tr></table><p>A <em>conditional</em> standard error treats the estimated scales as known. A
+<table class="table table"><tr><td><code>backend</code></td><td>Models it fits</td><td>Estimated in one search</td><td>Uncertainty for the scales</td></tr><tr><td><code>"refit"</code> (default)</td><td>Any model that <code><a href="https://rdrr.io/r/stats/update.html" class="external-link">stats::update()</a></code>, the <code>unmarked</code> equivalent, or a <code>refit_fn</code> can refit</td><td>Kernel scales and shapes. The model's own parameters are refit at every candidate</td><td>Hessian (Wald) standard errors for smooth kernels. Profile likelihood with <code>summary(fit, profile = TRUE)</code></td></tr><tr><td><code>"profile_glm"</code></td><td>Gaussian identity, Poisson log, and binomial logit <code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code> fits, and NB2 log-link fits</td><td>Kernel scales and NB2 theta. Coefficients are solved at every candidate</td><td>Joint Wald limits when the checks below pass</td></tr><tr><td><code>"joint_nb2"</code></td><td>NB2 log-link fits, including the exact Poisson boundary</td><td>Kernel scales, coefficients, and dispersion</td><td>Joint Wald limits when the checks pass. None at the Poisson boundary</td></tr><tr><td><code>"joint_mixed"</code></td><td>Poisson and NB2 <code>glmmTMB</code> fits with one random intercept</td><td>Kernel scales and all model parameters, with the random intercept integrated out</td><td>Wald limits for each scale that passes its checks. Profile likelihood with <code>summary(fit, profile = TRUE)</code>. Coefficient uncertainty is conditional on the scales</td></tr><tr><td><code>"conditional_logit"</code></td><td>Step-selection models from <code><a href="https://rdrr.io/pkg/survival/man/clogit.html" class="external-link">survival::clogit()</a></code> or <code><a href="https://rdrr.io/pkg/amt/man/fit_clogit.html" class="external-link">amt::fit_clogit()</a></code></td><td>Smooth kernel scales and conditional-logistic coefficients</td><td>None. Coefficient uncertainty is conditional on the scales</td></tr></table><p>A <em>conditional</em> standard error treats the estimated scales as known. A
 <em>joint</em> standard error lets the scales and the coefficients vary together,
 so it also carries uncertainty about the scales.
 <code><a href="multiScale_bayes.html">multiScale_bayes()</a></code> is a separate route that samples or approximates a
@@ -135,8 +138,12 @@ returns a large penalty, and a finite-difference point that lands on one
 gives an absurdly large curvature. This case also gives a warning, because
 it means the model is hard to refit near the estimate.</p>
 <p>A smooth kernel or shape parameter within <code>1e-5</code> of a search bound, on the
-log scale, invalidates the Wald approximation. Its standard errors and Wald
-limits are withheld. The raw Hessian, the original curvature status, and a
+log scale, invalidates the Wald approximation for that parameter. Its
+standard error and Wald limits are withheld. The other smooth parameters keep
+Wald standard errors from their own block of the Hessian, which holds the
+bounded parameters fixed at their bounds;
+<code>diagnostics(fit)$refit_hessian$conditional_on</code> names those bounded
+parameters. The raw Hessian, the original curvature status, and a
 table of parameter bounds stay in <code>diagnostics(fit)$refit_hessian</code>. A lower
 bound of zero is flagged only when it is reached. This flag is numerical. It
 does not establish that a scale is identified or give a calibrated interval.
@@ -332,6 +339,27 @@ near-Poisson diagnostic flags <code>max(mu/theta) &lt; 0.01</code>. A finite upp
 bound does not establish a finite dispersion maximum. The marginal
 covariance and Hessian are missing whenever joint uncertainty is
 unavailable.</p>
+<p>A kernel parameter at a search bound does not withhold
+joint uncertainty when every other rule passes for the remaining
+parameters. Joint covariance and joint prediction uncertainty then hold the
+bounded kernel parameters fixed at their bounds. They come from the observed
+information with those parameters removed, which must be positive and well
+conditioned, with every remaining log-kernel standard error at most one.
+Competing modes, a dispersion bound, a Poisson-compatible NB2 fit, or every
+kernel parameter at a bound still withholds them. <code>vcov(fit)</code> returns zero
+rows and columns for the held parameters, the marginal Hessian is missing
+for them, and <code>diagnostics(fit)$profile_glm$joint_conditional_on</code> names
+them. <code>uncertainty_available</code> stays <code>FALSE</code>. The rule is the same for
+<code>"profile_glm"</code> and <code>"joint_nb2"</code>.</p>
+<p>The scale table applies the kernel-specific rules one parameter at a time.
+A kernel parameter loses its standard error and Wald limits only when it sits
+at a search bound, its own log-scale standard error exceeds one, or competing
+starts move it by more than 0.5 log units. Bounded kernel parameters are
+dropped from the observed information, so the remaining standard errors hold
+them fixed at their bounds, and <code>diagnostics(fit)$profile_glm</code> names them in
+<code>scale_se_conditional_on</code>. Unusable information, a dispersion bound, a
+Poisson-compatible NB2 fit, or the exact Poisson boundary still withholds
+every scale standard error.</p>
 <p>Predictions with <code>uncertainty = "conditional"</code> at the Poisson boundary
 condition on both the kernel parameters and the boundary dispersion. They
 say nothing about uncertainty in either. See <a href="multiScaleR-prediction.html">multiScaleR-prediction</a>.</p>
@@ -388,13 +416,59 @@ bypassed.</p>
 records the log scales, bounds, starts, every outcome, and the selected
 start. Narrow raw prediction data keep fixed-transform inputs for effect
 curves once the temporary refit data are gone. <code>diagnostics(fit)$joint_mixed</code>
-reports eligibility and scale-boundary flags. Scale uncertainty has not been
-calibrated: scale standard errors and legacy scale Hessians are <code>NA</code>, and
-joint intervals are unavailable. Coefficient and prediction covariance
-condition on the selected scales. Use
+reports eligibility and scale-boundary flags. As with the analytic GLM
+backends, an estimate whose distance approaches <code>max_D</code> records the
+<code>max_distance</code> diagnostic and warning code, and <code>fit$next_run</code> suggests a
+follow-up <code>max_D</code> and starts.</p>
+<p>Scale standard errors come from the joint Hessian of the selected start,
+which TMB computes for the Laplace-approximated likelihood with every model
+parameter free. <code>fit$scale_est$SE</code> is sigma times the standard error of
+log(sigma), and <code>summary(fit)</code> reports Wald limits on the log scale, as for
+<code>"profile_glm"</code>. The checks match that backend, one scale at a time. A scale
+within <code>1e-5</code> of a search bound on the log scale loses its standard error,
+and the other scales hold it fixed at its bound. A scale also loses its
+standard error when its log-scale standard error exceeds one, or when
+another start within the 95 percent likelihood threshold moves it by more
+than 0.5 log units. A Hessian that is not positive definite, or unusable
+covariance, withholds every scale standard error.
+<code>diagnostics(fit)$joint_mixed</code> gives the status, the reason for each scale,
+and the bounded scales held fixed. Legacy scale Hessians stay <code>NA</code>.</p>
+<p>Treat these limits with caution. In a simulation with one Gaussian kernel
+mean and 200 points in 40 sites, 95 percent Wald intervals held the true
+sigma in 77 percent to 97 percent of interior fits, depending on the scale
+and response family. They fell short where the likelihood was sharply
+peaked near the estimate but stayed close to its maximum over a wider range
+of scales. The
+limits describe local curvature only, and coefficient and prediction
+covariance still condition on the selected scales. Use
 <code>predict(fit, se.fit = TRUE, uncertainty = "conditional")</code> or
 <code>predict(fit$opt_mod, ...)</code>. This backend does not extend the
 single-predictor NB2 contract of <code><a href="scale_inference.html">scale_inference()</a></code>.</p>
+<p><code>summary(fit, profile = TRUE)</code> reports profile-likelihood limits instead.
+For each scale in turn, it holds sigma at candidate values and refits the
+native <code>glmmTMB</code> model, the same new fit that checks each start. The
+coefficients, the random-intercept standard deviation, and any NB2
+dispersion are re-estimated, and the random intercept is integrated out
+as in the fit. With several scales, the other scales are re-estimated too,
+on the joint likelihood from the optimum of each eligible start, and a
+native refit checks that value. As for the analytic GLM backends, the
+limits bound the connected region around the estimate where the
+likelihood-ratio statistic stays below the 95 percent chi-square quantile
+with one degree of freedom. A limit that reaches a search bound is labeled
+<code>"profile-bound-limited"</code> and is not a fully resolved confidence limit.
+Every scale gets profile limits, including one whose standard error is
+withheld, for example at a search bound. Profiling stops with an error when
+a refit fails or finds a better optimum than the fit, and it needs the
+optional packages and the refit data stored in <code>mixed_fit</code>. In the same
+simulation, profile intervals held the true sigma in 842 of 900 data sets
+(89 percent to 96 percent by scale and family), against 821 of 899 for the
+Wald intervals. Where Wald coverage was lowest, NB2 at a true sigma of 240,
+the profile intervals held it in 133 of 150 data sets and the Wald
+intervals in 115 of 149. Profile limits therefore describe scale
+uncertainty better than the Wald limits, but they can still fall short of
+nominal coverage, as they did in that scenario. Each profile took a median
+of 2 to 5 seconds there. <code><a href="profile_sigma.html">profile_sigma()</a></code> instead holds the other scales
+at their estimates.</p>
     </div>
     <div class="section level2">
     <h2 id="conditional-logistic-backend">Conditional-logistic backend<a class="anchor" aria-label="anchor" href="#conditional-logistic-backend"></a></h2>
@@ -404,7 +478,9 @@ step per set. See <code><a href="../articles/v10-step-selection.html">vignette("
 <h3 id="models-and-data-it-accepts">Models and data it accepts<a class="anchor" aria-label="anchor" href="#models-and-data-it-accepts"></a></h3>
 
 
-<p>Use a <code><a href="https://rdrr.io/pkg/survival/man/clogit.html" class="external-link">survival::clogit()</a></code> model fitted with <code>model = TRUE</code>, or an
+<p>Use a <code><a href="https://rdrr.io/pkg/survival/man/clogit.html" class="external-link">survival::clogit()</a></code> model fitted with <code>model = TRUE</code>, a
+<code><a href="https://rdrr.io/pkg/survival/man/coxph.html" class="external-link">survival::coxph()</a></code> model with a constant-time response such as
+<code>Surv(rep(1, nrow(dat)), case)</code>, or an
 <code><a href="https://rdrr.io/pkg/amt/man/fit_clogit.html" class="external-link">amt::fit_clogit()</a></code> wrapper, with Gaussian or exponential kernels and one
 bare <code>strata(choice_id)</code> term. A quoted choice-set ID is still one bare
 variable, and special-call text inside a quoted predictor name is not read

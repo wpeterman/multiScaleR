@@ -19,7 +19,7 @@ random steps."><meta property="og:image" content="https://wpeterman.github.io/mu
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -56,6 +56,9 @@ random steps."><meta property="og:image" content="https://wpeterman.github.io/mu
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -127,7 +130,9 @@ the columns of <code>data</code>, so remove the set ID from it, for example
 <dd><p>Data frame with one row per alternative, holding the case
 column, the set ID, and every predictor. Its row names are the row IDs
 used by <code>folds</code> and, when supplied, by <code>kernel_inputs</code>. They must be
-unique.</p></dd>
+unique. A tibble, such as the output of <code><a href="https://rdrr.io/pkg/amt/man/random_steps.html" class="external-link">amt::random_steps()</a></code>, is used
+as the equivalent data frame, whose row IDs are <code>"1"</code> to the number of
+rows.</p></dd>
 
 
 <dt id="arg-folds">folds<a class="anchor" aria-label="anchor" href="#arg-folds"></a></dt>
@@ -149,11 +154,14 @@ standardization and distance bins, from its analysis rows only.</p></dd>
 
 <dt id="arg-backend">backend<a class="anchor" aria-label="anchor" href="#arg-backend"></a></dt>
 <dd><p>Scale-fitting route used with <code>kernel_inputs</code>, either
-<code>"conditional_logit"</code> (default) or <code>"refit"</code>. Supply
-<code>optim_args = list(radius_grid = ...)</code> with <code>"refit"</code> to profile hard
-radii, together with any smooth scales, in each training split. The
-usual kernel, metric, and numerical checks of <code><a href="multiScale_optim.html">multiScale_optim()</a></code>
-apply. Ignored when <code>kernel_inputs</code> is <code>NULL</code>.</p></dd>
+<code>"conditional_logit"</code> (default) or <code>"refit"</code>. <code>"conditional_logit"</code>
+accepts Gaussian or exponential kernels with kernel means or weighted
+surface SQ, and other kernels or hard-radius predictors stop before any
+fold is fitted. Supply <code>optim_args = list(radius_grid = ...)</code> with
+<code>"refit"</code> to profile hard radii, together with any smooth scales, in
+each training split. The usual kernel, metric, and numerical checks of
+<code><a href="multiScale_optim.html">multiScale_optim()</a></code> apply in every fold. Ignored when <code>kernel_inputs</code>
+is <code>NULL</code>.</p></dd>
 
 
 <dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
@@ -174,7 +182,9 @@ the native training fit. The default keeps the settings of
 <dd><p>Named list of extra <code><a href="multiScale_optim.html">multiScale_optim()</a></code> arguments used
 in every fold, such as <code>par</code> or <code>profile_control</code>. Supply <code>radius_grid</code>
 with <code>backend = "refit"</code> to profile hard radii, together with any smooth
-scales, in each training split. Supply <code>covariate_transform = "raw"</code> with
+scales, in each training split. An estimated hard radius usually needs
+it, because without it folds often fail (see "How each fold is
+fitted"). Supply <code>covariate_transform = "raw"</code> with
 <code>backend = "refit"</code> to keep optimized covariates in their own units (see
 "Keep optimized covariates in their own units"). Arguments that supply
 data, the starting model, a custom refit function, parallel workers,
@@ -242,7 +252,9 @@ fold checks that its native fit is unweighted and unpenalized, uses the
 analysis rows and complete sets, and used the declared <code>method</code>, whether
 or not fits or records are kept. Learned transformations follow the rules
 described in <code><a href="cross_validate.html">cross_validate()</a></code>. Their training constants add no stratum
-effects and do not change the event count.</p>
+effects and do not change the event count. A failed fold is recorded in
+<code>errors</code>, and when any fold fails the function gives one warning with the
+number of failed folds and their first distinct reasons.</p>
     </div>
     <div class="section level2">
     <h2 id="estimate-scales-within-the-folds">Estimate scales within the folds<a class="anchor" aria-label="anchor" href="#estimate-scales-within-the-folds"></a></h2>

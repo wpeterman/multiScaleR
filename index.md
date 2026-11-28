@@ -1,12 +1,16 @@
 # multiScaleR
 
-README last updated: 2026-11-14
+README last updated: 2026-11-18
 
 | CI | Development | CRAN | License |
 |----|----|----|----|
 | [![R-CMD-check](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml/badge.svg)](https://github.com/wpeterman/multiScaleR/actions/workflows/GitHub.yaml) | [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable) | [![CRAN status](https://www.r-pkg.org/badges/version/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) |
 | [![codecov](https://codecov.io/gh/wpeterman/multiScaleR/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/multiScaleR) | [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/multiScaleR)](https://cran.r-project.org/package=multiScaleR) | [![DOI](https://img.shields.io/badge/DOI-10.1007/s10980--025--02267--x-yellow.svg)](https://doi.org/10.1007/s10980-025-02267-x) |
 | [![r-universe checks](https://wpeterman.r-universe.dev/multiScaleR/badges/checks)](https://wpeterman.r-universe.dev/multiScaleR) | [![r-universe version](https://wpeterman.r-universe.dev/multiScaleR/badges/version)](https://wpeterman.r-universe.dev/multiScaleR) |  |  |
+
+**Documentation:** the package website,
+<https://wpeterman.github.io/multiScaleR/>, has every vignette, the
+function reference, and the changelog.
 
 ## Overview
 
@@ -135,6 +139,7 @@ website](https://wpeterman.github.io/multiScaleR/articles/).
 | [13. Estimate scales of effect with a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.html) | `v13-bayesian-scales` |
 | [14. Predict new sites and years from a Bayesian model](https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.html) | `v14-bayesian-prediction` |
 | [15. Choose and check a Bayesian computation method](https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.html) | `v15-bayesian-computation` |
+| [16. Combine data sets to estimate a shared scale of effect](https://wpeterman.github.io/multiScaleR/articles/v16-joint-data-sets.html) | `v16-joint-data-sets` |
 
 Reference topics in the help system give the details that the vignettes
 leave out:

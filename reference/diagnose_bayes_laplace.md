@@ -187,8 +187,8 @@ if (requireNamespace("RTMB", quietly = TRUE) &&
 #>       group approximation   reference     status
 #> 1 year=2021        0.0140 0.001640765 unresolved
 #> 2 year=2022        0.0175 0.002140476 unresolved
-#> 3 year=2023        0.2050 0.108813215 unresolved
-#> 4 year=2024        0.0175 0.003687778 unresolved
+#> 3 year=2023        0.2050 0.108813207 unresolved
+#> 4 year=2024        0.0175 0.003687777 unresolved
 #> 5 year=2025        0.1465 0.002778998 unresolved
 # }
 ```

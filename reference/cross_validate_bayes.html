@@ -13,7 +13,7 @@ its random effect when they are scored."><meta property="og:image" content="http
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,6 +50,9 @@ its random effect when they are scored."><meta property="og:image" content="http
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -198,8 +201,12 @@ to reduce the simulation error of the average over new groups. See
 <dt id="arg-bin-reference">bin_reference<a class="anchor" aria-label="anchor" href="#arg-bin-reference"></a></dt>
 <dd><p><code>"training"</code> (default) computes the representative
 bin distances from the unique analysis points of each fold and freezes
-them for its assessment points. Use <code>"fixed"</code> only when the supplied bins
-were fixed independently of all analysis and assessment data.</p></dd>
+them for its assessment points. It needs the raw cells, so it refuses
+inputs prepared with <code>store_cell_data = FALSE</code>, such as lean inputs from
+<code><a href="kernel_prep_by_group.html">kernel_prep_by_group()</a></code>. <code>"fixed"</code> uses the prepared bin distances as
+given, so lean inputs of kernel means work with it. Use <code>"fixed"</code> only
+when the supplied bins were fixed independently of all analysis and
+assessment data.</p></dd>
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
@@ -295,7 +302,10 @@ precision. Laplace and marginal scores inherit the limits of their
 approximation and its checks. Importance-corrected fits are scored with
 their normalized candidate weights. Passing numerical checks does not
 establish predictive calibration. Every fold runs the full fitting
-method, so a run takes about as long as one fit per fold.</p>
+method, so a run takes about as long as one fit per fold. When any fold
+is not scored, the function returns the result and gives one warning that
+counts the failed folds and quotes their first distinct reasons. Read
+<code>errors</code> for the stage and message of every failed fold.</p>
     </div>
     <div class="section level2">
     <h2 id="compare-models">Compare models<a class="anchor" aria-label="anchor" href="#compare-models"></a></h2>
@@ -335,13 +345,14 @@ settings, and treat the comparison as unresolved if the ranking changes.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Very short slice chains keep this example quick. With the posterior</span></span></span>
 <span class="r-in"><span><span class="co"># package installed, they usually fail the diagnostics, so the folds are</span></span></span>
-<span class="r-in"><span><span class="co"># marked "diagnostic_failed" and the pooled score is NA. Use the default</span></span></span>
-<span class="r-in"><span><span class="co"># chains and iter in an analysis.</span></span></span>
+<span class="r-in"><span><span class="co"># marked "diagnostic_failed", the pooled score is NA, and a warning says</span></span></span>
+<span class="r-in"><span><span class="co"># so. Use the default chains and iter in an analysis.</span></span></span>
 <span class="r-in"><span><span class="va">cv</span> <span class="op">&lt;-</span> <span class="fu">cross_validate_bayes</span><span class="op">(</span><span class="va">counts</span> <span class="op">~</span> <span class="va">land1</span>, <span class="va">landscape_counts</span>, <span class="va">inputs</span>, <span class="va">folds</span>,</span></span>
 <span class="r-in"><span>                           family <span class="op">=</span> <span class="st">"poisson"</span>,</span></span>
 <span class="r-in"><span>                           priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>scale_median <span class="op">=</span> <span class="fl">300</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                           method <span class="op">=</span> <span class="st">"slice"</span>,</span></span>
 <span class="r-in"><span>                           fit_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>chains <span class="op">=</span> <span class="fl">2</span>, iter <span class="op">=</span> <span class="fl">200</span><span class="op">)</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>cross_validate_bayes() returned an incomplete result: 2 of 2 folds failed, so the pooled scores are NA. Reason: "The fold did not pass its posterior diagnostics." (fold1, fold2). Inspect `$errors` of the result for the stage and message of every failed fold.</span>
 <span class="r-in"><span><span class="va">cv</span><span class="op">$</span><span class="va">fold_results</span>    <span class="co"># status of each fold</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    fold n_analysis n_assessment            status</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1 fold1         50           50 diagnostic_failed</span>

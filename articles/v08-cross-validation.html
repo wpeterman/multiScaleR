@@ -24,7 +24,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,6 +63,9 @@
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -573,14 +576,15 @@ transform the full data set beforehand.</p>
 <span><span class="co">#&gt; 1   curved    1 1.502297 0.0000000</span></span>
 <span><span class="co">#&gt; 2   linear    2 1.620410 0.1181136</span></span></code></pre></div>
 <p><strong>How to read this output:</strong> The first run fails in
-every fold. The default backend accepts a spline only when you fix its
-<code>knots</code> and <code>Boundary.knots</code> in the formula, and
-the <code>errors</code> element says so. With
-<code>backend = "refit"</code> all folds finish, and the curved model
-ranks first by 0.12 animals per survey. The counts were simulated with a
-straight-line effect of <code>land1</code> on the log scale, so a gap
-this small, from three folds of one data set, is weak evidence for
-curvature. <code><a href="../reference/cross_validate.html">?cross_validate</a></code> describes the backends.</p>
+every fold and warns, quoting the reason. The default backend accepts a
+spline only when you fix its <code>knots</code> and
+<code>Boundary.knots</code> in the formula, and the <code>errors</code>
+element records this for each fold. With <code>backend = "refit"</code>
+all folds finish, and the curved model ranks first by 0.12 animals per
+survey. The counts were simulated with a straight-line effect of
+<code>land1</code> on the log scale, so a gap this small, from three
+folds of one data set, is weak evidence for curvature.
+<code><a href="../reference/cross_validate.html">?cross_validate</a></code> describes the backends.</p>
 </div>
 <div class="section level3">
 <h3 id="overdispersed-counts-and-positive-responses">Overdispersed counts and positive responses<a class="anchor" aria-label="anchor" href="#overdispersed-counts-and-positive-responses"></a>
@@ -606,9 +610,9 @@ scored.</p>
 <span>       metric <span class="op">=</span> <span class="st">"neg_log_score"</span><span class="op">)</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Modnames"</span>, <span class="st">"Rank"</span>, <span class="st">"Score"</span>, <span class="st">"Delta"</span>, <span class="st">"Warnings"</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;            Modnames Rank    Score       Delta Warnings</span></span>
 <span><span class="co">#&gt; 1 landscape_poisson    1 1.631381 0.000000000        0</span></span>
-<span><span class="co">#&gt; 2      landscape_nb    2 1.633579 0.002198071        3</span></span>
-<span><span class="co">#&gt; 3           site_nb    3 1.931871 0.300489986        0</span></span>
-<span><span class="co">#&gt; 4      site_poisson    4 2.169778 0.538396766        0</span></span>
+<span><span class="co">#&gt; 2      landscape_nb    2 1.633579 0.002198079        3</span></span>
+<span><span class="co">#&gt; 3           site_nb    3 1.931871 0.300489994        0</span></span>
+<span><span class="co">#&gt; 4      site_poisson    4 2.169778 0.538396774        0</span></span>
 <span></span>
 <span><span class="co"># Theta estimated in each fold</span></span>
 <span><span class="fu"><a href="https://rspatial.github.io/terra/reference/math-generics.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span>site_nb      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">site_nb</span><span class="op">$</span><span class="va">distribution</span>, <span class="kw">function</span><span class="op">(</span><span class="va">fold</span><span class="op">)</span> <span class="va">fold</span><span class="op">$</span><span class="va">theta</span><span class="op">)</span>,</span>

@@ -232,13 +232,13 @@ ram
 # Estimated size of each component, largest first
 ram$component_bytes[order(-ram$component_bytes$bytes), ]
 #>                 component    bytes   pretty
-#> 11 peak_parallel_estimate 11590880  11.1 Mb
-#> 10            main_bundle  3143672     3 Mb
-#> 9           worker_bundle  2815736   2.7 Mb
-#> 1     kernel_inputs_total  2547640   2.4 Mb
+#> 11 peak_parallel_estimate 11591216  11.1 Mb
+#> 10            main_bundle  3143816     3 Mb
+#> 9           worker_bundle  2815800   2.7 Mb
+#> 1     kernel_inputs_total  2547720   2.4 Mb
 #> 3                  d_list  1243160   1.2 Mb
 #> 4                 raw_cov   976288 953.4 Kb
-#> 8             opt_context   461680 450.9 Kb
+#> 8             opt_context   461744 450.9 Kb
 #> 5                  binned   316504 309.1 Kb
 #> 7              fitted_mod   133832 130.7 Kb
 #> 2              kernel_dat     6120     6 Kb

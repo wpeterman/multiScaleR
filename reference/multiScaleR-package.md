@@ -189,7 +189,7 @@ summary(fit)   # sigma near the simulated value of 75 map units
 #> 
 #> 
 #> Call:
-#> glm(formula = y ~ hab, family = poisson, data = data)
+#> stats::glm(formula = y ~ hab, family = poisson, data = data)
 #> 
 #> Coefficients:
 #>             Estimate Std. Error z value Pr(>|z|)    

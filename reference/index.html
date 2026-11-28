@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,9 @@
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -221,6 +224,27 @@
 
         <dt>
 
+          <code><a href="multiScale_joint.html">multiScale_joint()</a></code>
+
+        </dt>
+        <dd>Estimate scales of effect jointly across independent data sets</dd>
+
+        <dt>
+
+          <code><a href="footprint_sd.html">footprint_sd()</a></code>
+
+        </dt>
+        <dd>Convert a sampling geometry to a footprint SD</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR_joint-methods.html">print(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">summary(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">print(<i>&lt;summary_multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">logLik(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">nobs(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">coef(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">vcov(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">anova(<i>&lt;multiScaleR_joint&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Methods for joint scale fits</dd>
+
+        <dt>
+
           <code><a href="diagnostics.html">diagnostics()</a></code>
 
         </dt>
@@ -323,6 +347,13 @@
 
         <dt>
 
+          <code><a href="multiScaleR-methods.html">coef(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">fitted(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">residuals(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">nobs(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">formula(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">family(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">deviance(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">df.residual(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">logLik(<i>&lt;multiScaleR&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">coef(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">fitted(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">residuals(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">vcov(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">logLik(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code> <code><a href="multiScaleR-methods.html">nobs(<i>&lt;multiScaleR_bayes&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Standard model methods for multiScaleR fits</dd>
+
+        <dt>
+
           <code><a href="kernel_dist.html">kernel_dist()</a></code>
 
         </dt>
@@ -383,6 +414,13 @@
 
         </dt>
         <dd>Define Model Covariates from Raster Layers</dd>
+
+        <dt>
+
+          <code><a href="multiScaleR_joint-methods.html">print(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">summary(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">print(<i>&lt;summary_multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">logLik(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">nobs(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">coef(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">vcov(<i>&lt;multiScaleR_joint&gt;</i>)</a></code> <code><a href="multiScaleR_joint-methods.html">anova(<i>&lt;multiScaleR_joint&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Methods for joint scale fits</dd>
 
         <dt>
 
@@ -579,7 +617,7 @@
       </dl></div><div class="section level2">
       <h2 id="distance-removal-models">Distance-removal models<a class="anchor" aria-label="anchor" href="#distance-removal-models"></a></h2>
 
-      <div class="section-desc"><p>Data preparation, fitting helpers, and audits for generalized distance-removal (GDR) models, including spatial response fields.</p></div>
+      <div class="section-desc"><p>Data preparation, fitting helpers, whole-survey predictions and simulations, and audits for generalized distance-removal (GDR) models, including spatial response fields.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -620,6 +658,20 @@
 
         </dt>
         <dd>Create an Audited Refit Function for Distance-Removal Models</dd>
+
+        <dt>
+
+          <code><a href="predict_gdistremoval.html">predict_gdistremoval()</a></code>
+
+        </dt>
+        <dd>Predict Whole-Survey Detection and Expected Counts for Distance-Removal Models</dd>
+
+        <dt>
+
+          <code><a href="simulate_gdistremoval.html">simulate_gdistremoval()</a></code>
+
+        </dt>
+        <dd>Simulate Distance-Removal Surveys from a Fitted Model</dd>
 
         <dt>
 

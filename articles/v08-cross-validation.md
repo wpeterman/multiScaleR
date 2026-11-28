@@ -459,13 +459,14 @@ cv_tab(list(linear = cv, curved = curve_cv),
 #> 2   linear    2 1.620410 0.1181136
 ```
 
-**How to read this output:** The first run fails in every fold. The
-default backend accepts a spline only when you fix its `knots` and
-`Boundary.knots` in the formula, and the `errors` element says so. With
-`backend = "refit"` all folds finish, and the curved model ranks first
-by 0.12 animals per survey. The counts were simulated with a
-straight-line effect of `land1` on the log scale, so a gap this small,
-from three folds of one data set, is weak evidence for curvature.
+**How to read this output:** The first run fails in every fold and
+warns, quoting the reason. The default backend accepts a spline only
+when you fix its `knots` and `Boundary.knots` in the formula, and the
+`errors` element records this for each fold. With `backend = "refit"`
+all folds finish, and the curved model ranks first by 0.12 animals per
+survey. The counts were simulated with a straight-line effect of `land1`
+on the log scale, so a gap this small, from three folds of one data set,
+is weak evidence for curvature.
 [`?cross_validate`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md)
 describes the backends.
 
@@ -492,9 +493,9 @@ cv_tab(count_models,
        metric = "neg_log_score")[, c("Modnames", "Rank", "Score", "Delta", "Warnings")]
 #>            Modnames Rank    Score       Delta Warnings
 #> 1 landscape_poisson    1 1.631381 0.000000000        0
-#> 2      landscape_nb    2 1.633579 0.002198071        3
-#> 3           site_nb    3 1.931871 0.300489986        0
-#> 4      site_poisson    4 2.169778 0.538396766        0
+#> 2      landscape_nb    2 1.633579 0.002198079        3
+#> 3           site_nb    3 1.931871 0.300489994        0
+#> 4      site_poisson    4 2.169778 0.538396774        0
 
 # Theta estimated in each fold
 round(rbind(site_nb      = sapply(site_nb$distribution, function(fold) fold$theta),

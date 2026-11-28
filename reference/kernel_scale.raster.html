@@ -19,7 +19,7 @@ projection, extrapolation checks, and clamping."><meta property="og:image" conte
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -56,6 +56,9 @@ projection, extrapolation checks, and clamping."><meta property="og:image" conte
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -137,7 +140,9 @@ warning and the first value is used for every layer. Ignored when
 or a prepared <code>multiScaleR_data</code> object from <code><a href="kernel_prep.html">kernel_prep()</a></code>. When
 supplied, <code>sigma</code>, <code>shape</code>, <code>kernel</code>, and <code>scale_vars</code> are taken from it.
 A fitted object supplies the estimated scales. A prepared object supplies
-the starting scales of <code><a href="kernel_prep.html">kernel_prep()</a></code>. Default: <code>NULL</code>.</p></dd>
+the starting scales of <code><a href="kernel_prep.html">kernel_prep()</a></code>. Default: <code>NULL</code>. A Bayesian fit
+from <code><a href="multiScale_bayes.html">multiScale_bayes()</a></code> is refused; to map it, pass a posterior scale
+from <code><a href="posterior_scales.html">posterior_scales()</a></code> to <code>sigma</code>.</p></dd>
 
 
 <dt id="arg-shape">shape<a class="anchor" aria-label="anchor" href="#arg-shape"></a></dt>
@@ -248,7 +253,11 @@ predictors, in their native units, for example
 <code>list(season = "spring", effort = 2, surveyed = TRUE)</code>. Requires a
 fitted object. Factor and character values must be fitted levels.
 Omitted numeric predictors default to zero, and categorical predictors
-need an explicit value. Unknown names and attempts to overwrite a
+need an explicit value. For a <code>conditional_logit</code> fit, the <code>strata()</code>
+choice-set ID defaults to the first fitted ID, and any other fitted ID
+may be supplied. The ID does not change link or relative-score maps
+from <code>terra::predict(..., reference = "zero")</code>. Unknown names and
+attempts to overwrite a
 spatial layer are errors. Use <code>offset_values</code> for variables that occur
 only inside offsets.</p></dd>
 

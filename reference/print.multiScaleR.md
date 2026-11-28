@@ -86,7 +86,7 @@ fit                      # same as print(fit)
 #> 
 #>  ***** Fitted Model *****
 #> 
-#> Call:  glm(formula = y ~ hab, family = poisson, data = data)
+#> Call:  stats::glm(formula = y ~ hab, family = poisson, data = data)
 #> 
 #> Coefficients:
 #> (Intercept)          hab  
@@ -141,7 +141,7 @@ print(fit, prob = 0.5)   # distances holding half of each kernel's weight
 #> 
 #>  ***** Fitted Model *****
 #> 
-#> Call:  glm(formula = y ~ hab, family = poisson, data = data)
+#> Call:  stats::glm(formula = y ~ hab, family = poisson, data = data)
 #> 
 #> Coefficients:
 #> (Intercept)          hab  

@@ -24,7 +24,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,6 +63,9 @@
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -240,7 +243,16 @@ the Quick Start fit, because both backends maximize the same likelihood
 for this model. The last line reports whether the fit passed the
 numerical checks that a joint interval requires. When it is
 <code>FALSE</code>, only conditional intervals are available, and
-<code>diagnostics(fit)$profile_glm$reasons</code> says why.</p>
+<code>diagnostics(fit)$profile_glm$reasons</code> says why. The standard
+errors in <code>fit$scale_est</code> are checked one scale at a time, so
+a scale that passes its own checks keeps its standard error even when
+this flag is <code>FALSE</code>. One case keeps joint intervals with the
+flag <code>FALSE</code>: when the only failed check is a scale at a
+search bound,
+<code>diagnostics(fit)$profile_glm$joint_conditional_on</code> names
+that scale, and joint intervals hold it fixed at the bound. They are
+narrower than intervals that let that scale vary, so widen the search
+before you rely on them.</p>
 </div>
 <div class="section level3">
 <h3 id="predict-with-each-kind-of-uncertainty">Predict with each kind of uncertainty<a class="anchor" aria-label="anchor" href="#predict-with-each-kind-of-uncertainty"></a>

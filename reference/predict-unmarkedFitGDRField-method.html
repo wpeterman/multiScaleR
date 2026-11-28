@@ -13,7 +13,7 @@ standard errors include the field's uncertainty."><meta property="og:image" cont
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,6 +50,9 @@ standard errors include the field's uncertainty."><meta property="og:image" cont
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -271,15 +274,15 @@ as known.</p>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/headtail.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">field_fit</span>, type <span class="op">=</span> <span class="st">"rem"</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   Predicted        SE    lower    upper</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> block b3           378.4863  85.53074 243.0495 589.3939</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> between b3 and b4  423.9838  94.82578 273.5107 657.2402</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> no field           459.1513 100.73197 298.6847 705.8276</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> block b3           378.4862  85.53076 243.0494 589.3938</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> between b3 and b4  423.9838  94.82588 273.5106 657.2404</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> no field           459.1515 100.73214 298.6847 705.8283</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>         fitted between_blocks </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     0.03513006     0.01489118 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Predicted         SE     lower     upper</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 0.1637236 0.02684601 0.1176291 0.2233096</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 0.1637236 0.02684601 0.1176291 0.2233096</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 0.1637236 0.02684601 0.1176291 0.2233096</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     0.03513009     0.01489125 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Predicted         SE    lower     upper</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 0.1637236 0.02684602 0.117629 0.2233096</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 0.1637236 0.02684602 0.117629 0.2233096</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 0.1637236 0.02684602 0.117629 0.2233096</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

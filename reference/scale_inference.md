@@ -29,7 +29,11 @@ scale_inference(
   A `multiScaleR` fit from `backend = "profile_glm"` or
   `backend = "joint_nb2"`, with NB2 errors and exactly one optimized
   kernel mean or weighted surface SQ covariate. Weighted SQ requires
-  retained raw buffers and a Gaussian or exponential kernel.
+  retained raw buffers and a Gaussian or exponential kernel. A Bayesian
+  fit from
+  [`multiScale_bayes`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  is refused; its posterior already describes scale uncertainty (see
+  [`posterior_scales`](https://wpeterman.github.io/multiScaleR/reference/posterior_scales.md)).
 
 - sigma_values:
 
@@ -231,7 +235,7 @@ if (requireNamespace("MASS", quietly = TRUE)) {
   assessment$profile_set   # Separate regions, with explicit search bounds.
   assessment$diagnostics  # A broad region may leave scale unresolved.
 }
-#> Warning: Joint Wald uncertainty unavailable: Poisson limit within the diagnostic likelihood threshold. Inspect diagnostics and likelihood profiles.
+#> Warning: Joint Wald uncertainty unavailable: Poisson limit within the diagnostic likelihood threshold. Scale SEs are withheld for: hab. Inspect diagnostics and likelihood profiles.
 #> $zero_effect_deviance
 #> [1] 20.88188
 #> 

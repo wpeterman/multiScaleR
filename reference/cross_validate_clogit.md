@@ -48,7 +48,11 @@ print(x, ...)
 
   Data frame with one row per alternative, holding the case column, the
   set ID, and every predictor. Its row names are the row IDs used by
-  `folds` and, when supplied, by `kernel_inputs`. They must be unique.
+  `folds` and, when supplied, by `kernel_inputs`. They must be unique. A
+  tibble, such as the output of
+  [`amt::random_steps()`](https://rdrr.io/pkg/amt/man/random_steps.html),
+  is used as the equivalent data frame, whose row IDs are `"1"` to the
+  number of rows.
 
 - folds:
 
@@ -75,12 +79,14 @@ print(x, ...)
 - backend:
 
   Scale-fitting route used with `kernel_inputs`, either
-  `"conditional_logit"` (default) or `"refit"`. Supply
-  `optim_args = list(radius_grid = ...)` with `"refit"` to profile hard
-  radii, together with any smooth scales, in each training split. The
-  usual kernel, metric, and numerical checks of
+  `"conditional_logit"` (default) or `"refit"`. `"conditional_logit"`
+  accepts Gaussian or exponential kernels with kernel means or weighted
+  surface SQ, and other kernels or hard-radius predictors stop before
+  any fold is fitted. Supply `optim_args = list(radius_grid = ...)` with
+  `"refit"` to profile hard radii, together with any smooth scales, in
+  each training split. The usual kernel, metric, and numerical checks of
   [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
-  apply. Ignored when `kernel_inputs` is `NULL`.
+  apply in every fold. Ignored when `kernel_inputs` is `NULL`.
 
 - method:
 
@@ -107,15 +113,16 @@ print(x, ...)
   [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
   arguments used in every fold, such as `par` or `profile_control`.
   Supply `radius_grid` with `backend = "refit"` to profile hard radii,
-  together with any smooth scales, in each training split. Supply
-  `covariate_transform = "raw"` with `backend = "refit"` to keep
-  optimized covariates in their own units (see "Keep optimized
-  covariates in their own units"). Arguments that supply data, the
-  starting model, a custom refit function, parallel workers, `backend`,
-  or `verbose` are reserved. Every fold runs on one worker. The default
-  [`list()`](https://rdrr.io/r/base/list.html) keeps the backend's own
-  defaults. Choose starting values without using the assessment
-  outcomes.
+  together with any smooth scales, in each training split. An estimated
+  hard radius usually needs it, because without it folds often fail (see
+  "How each fold is fitted"). Supply `covariate_transform = "raw"` with
+  `backend = "refit"` to keep optimized covariates in their own units
+  (see "Keep optimized covariates in their own units"). Arguments that
+  supply data, the starting model, a custom refit function, parallel
+  workers, `backend`, or `verbose` are reserved. Every fold runs on one
+  worker. The default [`list()`](https://rdrr.io/r/base/list.html) keeps
+  the backend's own defaults. Choose starting values without using the
+  assessment outcomes.
 
 - keep_fits:
 
@@ -186,7 +193,9 @@ or not fits or records are kept. Learned transformations follow the
 rules described in
 [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md).
 Their training constants add no stratum effects and do not change the
-event count.
+event count. A failed fold is recorded in `errors`, and when any fold
+fails the function gives one warning with the number of failed folds and
+their first distinct reasons.
 
 ## Estimate scales within the folds
 

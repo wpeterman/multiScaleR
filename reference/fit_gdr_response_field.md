@@ -345,9 +345,9 @@ if (requireNamespace("TMB", quietly = TRUE) &&
   print(c(template = template@AIC, field = field_fit@AIC))
 }
 #> lambda(Int) lambda(hab)   dist(Int)    rem(Int) 
-#>    6.129380    0.442348    3.660080   -1.630779 
-#>    Model Groups        Name     sigma      lower     upper
-#> 1 lambda  block (Intercept) 0.2465776 0.09603019 0.6331394
+#>   6.1293802   0.4423489   3.6600799  -1.6307798 
+#>    Model Groups        Name     sigma      lower   upper
+#> 1 lambda  block (Intercept) 0.2465782 0.09603057 0.63314
 #> template    field 
 #> 581.9212 580.3834 
 # }

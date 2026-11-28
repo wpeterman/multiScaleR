@@ -16,6 +16,7 @@
 <url><loc>https://wpeterman.github.io/multiScaleR/articles/v13-bayesian-scales.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/articles/v14-bayesian-prediction.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/articles/v15-bayesian-computation.html</loc></url>
+<url><loc>https://wpeterman.github.io/multiScaleR/articles/v16-joint-data-sets.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/authors.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/index.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/news/index.html</loc></url>
@@ -37,6 +38,7 @@
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/estimate_multiscale_ram.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/expand_gdr_intervals.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.html</loc></url>
+<url><loc>https://wpeterman.github.io/multiScaleR/reference/footprint_sd.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/gdr_start_values.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/grouped_cv_folds.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/hab.html</loc></url>
@@ -53,12 +55,15 @@
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR-fitting-methods.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR-glossary.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR-kernels.html</loc></url>
+<url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR-package.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR-prediction.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR_bayes-class.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR_cv-class.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR_data-class.html</loc></url>
+<url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.html</loc></url>
+<url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScale_joint.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/plot.multiScaleR_bayes.html</loc></url>
@@ -69,6 +74,7 @@
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/predict-unmarkedFitGDRField-method.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/predict.multiScaleR.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/predict.multiScaleR_bayes.html</loc></url>
+<url><loc>https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/predict_scales.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/prediction_contract.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.html</loc></url>
@@ -89,6 +95,7 @@
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/sim_rast.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/simulate.multiScaleR_bayes.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/simulate_bayes_prior.html</loc></url>
+<url><loc>https://wpeterman.github.io/multiScaleR/reference/simulate_gdistremoval.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/spatial_cv_folds.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.html</loc></url>
 <url><loc>https://wpeterman.github.io/multiScaleR/reference/surv_pts.html</loc></url>

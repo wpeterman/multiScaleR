@@ -139,8 +139,10 @@ A named list with three elements:
 
 - `pts`:
 
-  An `sf` POINT object with `n_points` rows. An `obs` column is appended
-  containing the true abundance/occupancy values. Pass to
+  An `sf` POINT object with `n_points` rows and the coordinate reference
+  system of `raster_stack` (none when the raster has none). An `obs`
+  column is appended containing the true abundance/occupancy values.
+  Pass to
   [`kernel_prep`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
   as `pts`.
 

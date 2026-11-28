@@ -17,7 +17,7 @@ vignette(&quot;v01-quickstart&quot;, package = &quot;multiScaleR&quot;)."><meta 
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,6 +54,9 @@ vignette(&quot;v01-quickstart&quot;, package = &quot;multiScaleR&quot;)."><meta 
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -187,8 +190,14 @@ values into distance bins. <code><a href="multiScale_optim.html">multiScale_opti
 means from the bins instead of every cell, which is much faster and no
 longer depends on <code>max_D</code>, at the cost of a negligible approximation.
 The analytic backends and <code><a href="multiScale_bayes.html">multiScale_bayes()</a></code> require it for kernel
-means. Landscape and surface metrics are never binned. <code>FALSE</code> forces exact cell-by-cell
-evaluation.</p></dd>
+means. With the default <code>refit</code> backend it also bins kernel-weighted
+surface metrics (<code>surface_var(weighted = TRUE)</code> with <code>"sq"</code>, <code>"ssk"</code>, or
+<code>"sku"</code>): each cell's centered value powers are split between the two
+nearest distance nodes, which keeps their approximation as small as that
+of a binned kernel mean. Weighted <code>"sa"</code>, <code>kernel = "fixed"</code>, landscape
+metrics, and hard-radius surface metrics are never binned, and the
+analytic backends and <code><a href="multiScale_bayes.html">multiScale_bayes()</a></code> evaluate weighted surface
+metrics from every cell. <code>FALSE</code> forces exact cell-by-cell evaluation.</p></dd>
 
 
 <dt id="arg-nbins">nbins<a class="anchor" aria-label="anchor" href="#arg-nbins"></a></dt>
@@ -315,7 +324,7 @@ argument on a worked example.</p></div>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>full <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/object.size.html" class="external-link">object.size</a></span><span class="op">(</span><span class="va">kernel_inputs</span><span class="op">)</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  lean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/object.size.html" class="external-link">object.size</a></span><span class="op">(</span><span class="va">lean_inputs</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="fl">1e6</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     full     lean </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2.547640 0.328192 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2.547720 0.328272 </span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

@@ -24,7 +24,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,6 +63,9 @@
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -350,14 +353,14 @@ clamped prediction divided by the unclamped prediction.</em></strong>
 <span><span class="fu"><a href="https://rspatial.github.io/terra/reference/math-generics.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>min_ratio <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/minmax.html" class="external-link">minmax</a></span><span class="op">(</span><span class="va">change</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>, max_ratio <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/minmax.html" class="external-link">minmax</a></span><span class="op">(</span><span class="va">change</span><span class="op">)</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span>,</span>
 <span>        max_count <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/minmax.html" class="external-link">minmax</a></span><span class="op">(</span><span class="va">pred_clamped</span><span class="op">)</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; min_ratio max_ratio max_count </span></span>
-<span><span class="co">#&gt;      0.53      1.97     21.63</span></span></code></pre></div>
+<span><span class="co">#&gt;      0.31      1.55      9.39</span></span></code></pre></div>
 <p><strong>How to read these maps:</strong> The left panel is the
 clamped prediction. The right panel shows what clamping changed. A ratio
 of 1 means no change, and that holds for every cell inside the surveyed
 range. Ratios below 1 mark cells where clamping lowered the expected
-count, by as much as 47%. Ratios above 1 mark cells where it raised a
-count that extrapolation had lowered, by a factor of up to 1.97. The
-largest expected count on the map fell from 30.6 to 21.6.</p>
+count, by as much as 69%. Ratios above 1 mark cells where it raised a
+count that extrapolation had lowered, by a factor of up to 1.55. The
+largest expected count on the map fell from 30.6 to 9.4.</p>
 <p>The clamped maximum still exceeds the largest fitted count at a
 survey point. Clamping limits each covariate separately. The cell with
 the largest clamped count sits on the western border, where
@@ -440,30 +443,30 @@ distance inside.</p>
 <tbody>
 <tr class="odd">
 <td align="right">-0.1</td>
-<td align="right">-2.22</td>
-<td align="right">1.60</td>
-<td align="right">-1.96</td>
-<td align="right">1.73</td>
-<td align="right">25.94</td>
-<td align="right">12.85</td>
+<td align="right">-1.16</td>
+<td align="right">2.67</td>
+<td align="right">-1.84</td>
+<td align="right">1.28</td>
+<td align="right">36.48</td>
+<td align="right">5.83</td>
 </tr>
 <tr class="even">
 <td align="right">0.0</td>
-<td align="right">-2.70</td>
-<td align="right">2.08</td>
-<td align="right">-2.42</td>
-<td align="right">2.19</td>
-<td align="right">11.16</td>
-<td align="right">21.63</td>
+<td align="right">-1.64</td>
+<td align="right">3.15</td>
+<td align="right">-2.23</td>
+<td align="right">1.67</td>
+<td align="right">22.13</td>
+<td align="right">9.39</td>
 </tr>
 <tr class="odd">
 <td align="right">0.1</td>
-<td align="right">-3.18</td>
-<td align="right">2.56</td>
-<td align="right">-2.88</td>
-<td align="right">2.65</td>
-<td align="right">3.60</td>
-<td align="right">28.63</td>
+<td align="right">-2.12</td>
+<td align="right">3.47</td>
+<td align="right">-2.62</td>
+<td align="right">2.06</td>
+<td align="right">11.58</td>
+<td align="right">15.13</td>
 </tr>
 </tbody>
 </table>

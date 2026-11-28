@@ -122,11 +122,11 @@ if (requireNamespace("TMB", quietly = TRUE) &&
   # Adding the eight block field values gives a 10 x 10 matrix
   print(dim(vcov(field_fit, type = "lambda", fixedOnly = FALSE)))
 }
-#>              lambda(Int)  lambda(hab)
-#> lambda(Int)  0.048130797 -0.002926743
-#> lambda(hab) -0.002926743  0.014449645
+#>             lambda(Int) lambda(hab)
+#> lambda(Int)  0.04813091 -0.00292675
+#> lambda(hab) -0.00292675  0.01444965
 #> lambda(Int) lambda(hab) 
-#>   0.2193873   0.1202067 
+#>   0.2193876   0.1202067 
 #>             lambda(Int) lambda(hab) dist(Int) rem(Int)
 #> lambda(Int)      0.0481     -0.0029   -0.0104  -0.0126
 #> lambda(hab)     -0.0029      0.0144    0.0000   0.0000

@@ -97,7 +97,7 @@ kernels and covariate types, and its own requirements appear under
 | Case weights | Whatever the model class allows | Whole-number frequency weights for count and binomial models | No | No |
 | Covariates kept in their own units, `covariate_transform = "raw"` | Yes | No | No | No |
 | Interval for sigma | Wald, or profile likelihood with `summary(fit, profile = TRUE)` | Wald, or profile likelihood with `summary(fit, profile = TRUE)` | None | Posterior credible interval |
-| Uncertainty from [`predict()`](https://rspatial.github.io/terra/reference/predict.html) | Conditional standard errors | Conditional or joint standard errors and confidence intervals | Conditional standard errors | Posterior intervals |
+| Uncertainty from [`predict()`](https://rspatial.github.io/terra/reference/predict.html) | Conditional standard errors when the model class’s own [`predict()`](https://rspatial.github.io/terra/reference/predict.html) gives them (not `pscl`, `gls`, or `spaMM` fits) | Conditional or joint standard errors and confidence intervals | Conditional standard errors | Posterior intervals |
 | Model comparison with [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md) and [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md) | Yes | Yes | Yes | No |
 
 **How to read the table:** A *conditional* standard error treats the
@@ -209,7 +209,7 @@ knitr::kable(scale_table, digits = 1, row.names = FALSE,
 round(c(refit = time_refit[["elapsed"]],
         profile_glm = time_profile[["elapsed"]]), 2)
 #>       refit profile_glm 
-#>        0.21        0.18
+#>        0.18        0.13
 ```
 
 **How to read the output:** Both backends maximize the same likelihood
@@ -458,10 +458,10 @@ effect and their predictions.
 |:---|:---|
 | `profile_glm` | Experimental. In simulations its 95% Wald intervals for sigma held the true value in 76% to 92% of data sets, depending on the response family. Profile-likelihood limits did better |
 | `profile_glm`, `joint_nb2` | Need a [`glm()`](https://rdrr.io/r/stats/glm.html) or [`MASS::glm.nb()`](https://rdrr.io/pkg/MASS/man/glm.nb.html) object, and `joint_nb2` needs the negative binomial one. Set `n_cores = 1`. Put offsets in the formula with [`offset()`](https://rdrr.io/r/stats/offset.html) |
-| Joint intervals | Withheld when a fit fails its numerical checks, for example when a scale sits at a search bound or when a Poisson model fits negative binomial data equally well. `diagnostics(fit)$profile_glm$reasons` gives the reason, and conditional standard errors remain available |
+| Joint intervals | Withheld when a fit fails its numerical checks, for example when a scale sits at a search bound or when a Poisson model fits negative binomial data equally well. `diagnostics(fit)$profile_glm$reasons` gives the reason, and conditional standard errors remain available. Each scale keeps its own standard error unless that scale fails a check. When a scale at a search bound is the only failed check, joint intervals from either backend hold that scale fixed at the bound, and `diagnostics(fit)$profile_glm$joint_conditional_on` names it |
 | `conditional_logit` | Reports sigma with no standard error and no interval. Needs complete choice sets with one used step each, no weights, and `n_cores = 1` |
 | [`survival::clogit()`](https://rdrr.io/pkg/survival/man/clogit.html) and `coxph()` starting models | When the formula uses [`scale()`](https://rspatial.github.io/terra/reference/scale.html), [`poly()`](https://rdrr.io/r/stats/poly.html), or a spline, fit with `model = TRUE` and `na.action = stats::na.fail`. Recent versions of `survival` otherwise drop the stored center, spread, or knots, and predictions cannot recover the original units |
-| `joint_mixed` | Needs the optional packages `RTMB`, `TMB`, and `glmmTMB`, a Gaussian or exponential kernel, and a `glmmTMB` model. Reports sigma with no standard error, and conditional prediction standard errors only |
+| `joint_mixed` | Needs the optional packages `RTMB`, `TMB`, and `glmmTMB`, a Gaussian or exponential kernel, and a `glmmTMB` model. Reports sigma with a Wald standard error and interval for each scale that passes its checks. In simulations its 95% Wald intervals held the true sigma in 77% to 97% of data sets. Profile-likelihood limits from `summary(fit, profile = TRUE)` held it in 89% to 96%. Prediction standard errors are conditional only |
 | All backends except `refit` | Match model rows to survey points by row name. Build the model data from `kernel_dat` and keep its row names when you subset |
 | Estimated radius of a hard-edged metric, and `kernel = "fixed"` | Sigma has no standard error. Use `summary(fit, profile = TRUE)` for an interval. With `kernel = "fixed"`, [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md) screens starting values by default, because a single start cannot move. The estimate is then the best screened candidate |
 | [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md) | Experimental, and printed as such. [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md) and [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md) stop with an error for a Bayesian fit |

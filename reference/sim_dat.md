@@ -140,8 +140,9 @@ A named list with three elements:
   this data frame estimates the coefficients at the true scales.
 
 - `pts`: the survey points with an `obs` column holding the response.
-  With an integer `n_points`, an `sf` POINT object with no coordinate
-  reference system. Otherwise the supplied points. Pass it to
+  With an integer `n_points`, an `sf` POINT object with the coordinate
+  reference system of `raster_stack` (none when the raster has none).
+  Otherwise the supplied points. Pass it to
   [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
   as `pts`.
 
@@ -266,7 +267,7 @@ summary(fit)
 #> 
 #> 
 #> Call:
-#> glm(formula = y ~ bin1 + cont1, family = poisson, data = data)
+#> stats::glm(formula = y ~ bin1 + cont1, family = poisson, data = data)
 #> 
 #> Coefficients:
 #>             Estimate Std. Error z value Pr(>|z|)    

@@ -62,7 +62,11 @@ kernel_scale.raster(
   from it. A fitted object supplies the estimated scales. A prepared
   object supplies the starting scales of
   [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md).
-  Default: `NULL`.
+  Default: `NULL`. A Bayesian fit from
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  is refused; to map it, pass a posterior scale from
+  [`posterior_scales()`](https://wpeterman.github.io/multiScaleR/reference/posterior_scales.md)
+  to `sigma`.
 
 - shape:
 
@@ -175,9 +179,12 @@ kernel_scale.raster(
   `list(season = "spring", effort = 2, surveyed = TRUE)`. Requires a
   fitted object. Factor and character values must be fitted levels.
   Omitted numeric predictors default to zero, and categorical predictors
-  need an explicit value. Unknown names and attempts to overwrite a
-  spatial layer are errors. Use `offset_values` for variables that occur
-  only inside offsets.
+  need an explicit value. For a `conditional_logit` fit, the `strata()`
+  choice-set ID defaults to the first fitted ID, and any other fitted ID
+  may be supplied. The ID does not change link or relative-score maps
+  from `terra::predict(..., reference = "zero")`. Unknown names and
+  attempts to overwrite a spatial layer are errors. Use `offset_values`
+  for variables that occur only inside offsets.
 
 - ...:
 

@@ -17,7 +17,7 @@ preserves the fitted object."><meta property="og:image" content="https://wpeterm
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,6 +54,9 @@ preserves the fitted object."><meta property="og:image" content="https://wpeterm
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -109,7 +112,9 @@ preserves the fitted object.</p>
 or <code>backend = "joint_nb2"</code>,
 with NB2 errors and exactly one optimized kernel mean or weighted surface
 SQ covariate. Weighted SQ requires retained raw buffers and a Gaussian or
-exponential kernel.</p></dd>
+exponential kernel. A Bayesian fit from <code><a href="multiScale_bayes.html">multiScale_bayes</a></code> is
+refused; its posterior already describes scale uncertainty (see
+<code><a href="posterior_scales.html">posterior_scales</a></code>).</p></dd>
 
 
 <dt id="arg-sigma-values">sigma_values<a class="anchor" aria-label="anchor" href="#arg-sigma-values"></a></dt>
@@ -290,7 +295,7 @@ are unchanged.</p>
 <span class="r-in"><span>  <span class="va">assessment</span><span class="op">$</span><span class="va">profile_set</span>   <span class="co"># Separate regions, with explicit search bounds.</span></span></span>
 <span class="r-in"><span>  <span class="va">assessment</span><span class="op">$</span><span class="va">diagnostics</span>  <span class="co"># A broad region may leave scale unresolved.</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Joint Wald uncertainty unavailable: Poisson limit within the diagnostic likelihood threshold. Inspect diagnostics and likelihood profiles.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Joint Wald uncertainty unavailable: Poisson limit within the diagnostic likelihood threshold. Scale SEs are withheld for: hab. Inspect diagnostics and likelihood profiles.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $zero_effect_deviance</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 20.88188</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>

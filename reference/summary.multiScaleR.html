@@ -11,7 +11,7 @@ kernel's weight, and the fitted model at those scales."><meta property="og:image
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,6 +48,9 @@ kernel's weight, and the fitted model at those scales."><meta property="og:image
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -115,8 +118,11 @@ Default: <code>0.9</code>.</p></dd>
     <p>An object of class <code>summary_multiScaleR</code>, a list that prints as a
 report. Its elements:</p><ul><li><p><code>opt_scale</code>: data frame with one row per optimized covariate and columns
 <code>Mean</code> (estimated sigma, map units), <code>SE</code>, <code>2.5%</code>, and <code>97.5%</code>. Its
-<code>interval_method</code> attribute records <code>"wald"</code> or <code>"profile"</code> for each
-row.</p></li>
+<code>interval_method</code> attribute records how each row's limits were found,
+such as <code>"wald"</code>, <code>"log_wald"</code>, <code>"profile"</code>, or <code>"unavailable"</code>.
+Profile limits that reach a search bound are labeled <code>"profile_bound"</code>
+by the default refit backend and <code>"profile-bound-limited"</code> by the
+analytic and joint mixed backends.</p></li>
 <li><p><code>opt_shape</code>: the same table for the shape parameter under
 <code>kernel = "expow"</code>, otherwise <code>NULL</code>.</p></li>
 <li><p><code>opt_dist_1d</code>: distances in map units, with columns <code>Mean</code>, <code>2.5%</code>, and
@@ -132,7 +138,7 @@ through version 0.7.3).</p></li>
 <li><p><code>dimension</code>: the selected definition, <code>"2d"</code> or <code>"1d"</code>.</p></li>
 <li><p><code>prob</code>: the cumulative weight proportion used for the distances.</p></li>
 <li><p><code>fitted_mod</code>: the model refit at the estimated scales (<code>opt_mod</code> of the
-fit).</p></li>
+fit, or the native <code>survival</code> model inside an <code>amt</code> wrapper).</p></li>
 <li><p><code>kernel</code>: the kernel name.</p></li>
 <li><p><code>hard_radius</code>: names of covariates whose scale is a hard radius.</p></li>
 <li><p><code>diagnostics</code>, <code>warn_message</code>, <code>next_run</code>, <code>call</code>: copied from the fit;
@@ -163,7 +169,7 @@ can change the realized weight in the prepared data.</p>
     <div class="section level2">
     <h2 id="profile-likelihood-intervals">Profile-likelihood intervals<a class="anchor" aria-label="anchor" href="#profile-likelihood-intervals"></a></h2>
     <p>The default refit backend caches profile results during the current R
-session; the analytic backends recompute them. Set
+session; the analytic and joint mixed backends recompute them. Set
 <code>options(multiScaleR.profile_cache_max_bytes = 64 * 1024^2)</code> to bound the
 retained cache entries (64 MiB by default), or set it to zero to disable
 caching and clear retained entries at the next profile request. Oversized
@@ -173,19 +179,32 @@ numerical profile failures still raise errors. The returned refit scale
 table records cache availability in its <code>profile_cache</code> attribute. The
 option bounds retained entries, not temporary key construction or the
 memory used by the numerical profile.</p>
+<p>Two kinds of fit have no profile intervals. For a fit with a declared
+<code>radius_grid</code> (see <code><a href="multiScale_optim.html">multiScale_optim()</a></code>), <code>profile = TRUE</code> warns and
+returns the summary with the ordinary limits: <code>NA</code> for the hard radii and
+Wald limits, conditional on the selected radii, for any smooth scale.
+Inspect <code>diagnostics(object)$radius_profile</code> for the candidate
+likelihoods. For <code>backend = "conditional_logit"</code>, scale uncertainty is not
+calibrated, so <code>profile = TRUE</code> warns and returns <code>NA</code> scale limits; use
+<code><a href="profile_sigma.html">profile_sigma()</a></code> to view the log-likelihood across sigma.</p>
     </div>
     <div class="section level2">
     <h2 id="analytic-backends">Analytic backends<a class="anchor" aria-label="anchor" href="#analytic-backends"></a></h2>
     <p>For <code>backend = "profile_glm"</code> or <code>"joint_nb2"</code>, default scale limits use
 joint information on the log scale and are omitted when the
-identifiability checks fail (see <a href="multiScaleR-fitting-methods.html">multiScaleR-fitting-methods</a>). A returned
+identifiability checks fail (see <a href="multiScaleR-fitting-methods.html">multiScaleR-fitting-methods</a>).
+<code>backend = "joint_mixed"</code> reports the same log-scale Wald limits from its
+joint Hessian, one scale at a time. A returned
 Wald interval describes the local curvature around the selected optimum
 and can extend beyond the searched scale range. Coverage can fall below the
 nominal level even for an interior fit, so inspect the likelihood over the
 admissible range when scale inference matters.</p>
-<p>With <code>profile = TRUE</code>, the analytic summary follows the connected
-likelihood region around the fitted scale, and an endpoint at a search
-bound is labeled bound-limited. For a supported one-scale NB2 fit,
+<p>With <code>profile = TRUE</code>, the analytic and <code>"joint_mixed"</code> summaries follow
+the connected likelihood region around the fitted scale, and an endpoint
+at a search bound is labeled bound-limited. A <code>"joint_mixed"</code> profile
+refits the native <code>glmmTMB</code> model at each candidate sigma and reports
+limits for every scale, including one whose standard error is withheld
+(see <a href="multiScaleR-fitting-methods.html">multiScaleR-fitting-methods</a>). For a supported one-scale NB2 fit,
 <code><a href="scale_inference.html">scale_inference()</a></code> checks the full range and reports the regions it
 detects. If a full-range profile suggests a competing optimum, compare
 additional starts, including both bounds. The printed coefficient summary

@@ -19,7 +19,7 @@ which compares them on one data set.
 | `"refit"` (default) | Any model that [`stats::update()`](https://rdrr.io/r/stats/update.html), the `unmarked` equivalent, or a `refit_fn` can refit | Kernel scales and shapes. The model's own parameters are refit at every candidate | Hessian (Wald) standard errors for smooth kernels. Profile likelihood with `summary(fit, profile = TRUE)` |
 | `"profile_glm"` | Gaussian identity, Poisson log, and binomial logit [`glm()`](https://rdrr.io/r/stats/glm.html) fits, and NB2 log-link fits | Kernel scales and NB2 theta. Coefficients are solved at every candidate | Joint Wald limits when the checks below pass |
 | `"joint_nb2"` | NB2 log-link fits, including the exact Poisson boundary | Kernel scales, coefficients, and dispersion | Joint Wald limits when the checks pass. None at the Poisson boundary |
-| `"joint_mixed"` | Poisson and NB2 `glmmTMB` fits with one random intercept | Kernel scales and all model parameters, with the random intercept integrated out | None. Coefficient uncertainty is conditional on the scales |
+| `"joint_mixed"` | Poisson and NB2 `glmmTMB` fits with one random intercept | Kernel scales and all model parameters, with the random intercept integrated out | Wald limits for each scale that passes its checks. Profile likelihood with `summary(fit, profile = TRUE)`. Coefficient uncertainty is conditional on the scales |
 | `"conditional_logit"` | Step-selection models from [`survival::clogit()`](https://rdrr.io/pkg/survival/man/clogit.html) or [`amt::fit_clogit()`](https://rdrr.io/pkg/amt/man/fit_clogit.html) | Smooth kernel scales and conditional-logistic coefficients | None. Coefficient uncertainty is conditional on the scales |
 
 A *conditional* standard error treats the estimated scales as known. A
@@ -58,14 +58,18 @@ gives an absurdly large curvature. This case also gives a warning,
 because it means the model is hard to refit near the estimate.
 
 A smooth kernel or shape parameter within `1e-5` of a search bound, on
-the log scale, invalidates the Wald approximation. Its standard errors
-and Wald limits are withheld. The raw Hessian, the original curvature
-status, and a table of parameter bounds stay in
-`diagnostics(fit)$refit_hessian`. A lower bound of zero is flagged only
-when it is reached. This flag is numerical. It does not establish that a
-scale is identified or give a calibrated interval. Native coefficient
-covariance still conditions on the selected kernels, and likelihoods and
-parameter counts are unchanged.
+the log scale, invalidates the Wald approximation for that parameter.
+Its standard error and Wald limits are withheld. The other smooth
+parameters keep Wald standard errors from their own block of the
+Hessian, which holds the bounded parameters fixed at their bounds;
+`diagnostics(fit)$refit_hessian$conditional_on` names those bounded
+parameters. The raw Hessian, the original curvature status, and a table
+of parameter bounds stay in `diagnostics(fit)$refit_hessian`. A lower
+bound of zero is flagged only when it is reached. This flag is
+numerical. It does not establish that a scale is identified or give a
+calibrated interval. Native coefficient covariance still conditions on
+the selected kernels, and likelihoods and parameter counts are
+unchanged.
 
 Hard-radius covariates (landscape metrics, unweighted surface metrics,
 and every scale under `kernel = "fixed"`) have a likelihood that changes
@@ -299,6 +303,31 @@ upper theta bound does not establish a finite dispersion maximum. The
 marginal covariance and Hessian are missing whenever joint uncertainty
 is unavailable.
 
+A kernel parameter at a search bound does not withhold joint uncertainty
+when every other rule passes for the remaining parameters. Joint
+covariance and joint prediction uncertainty then hold the bounded kernel
+parameters fixed at their bounds. They come from the observed
+information with those parameters removed, which must be positive and
+well conditioned, with every remaining log-kernel standard error at most
+one. Competing modes, a dispersion bound, a Poisson-compatible NB2 fit,
+or every kernel parameter at a bound still withholds them. `vcov(fit)`
+returns zero rows and columns for the held parameters, the marginal
+Hessian is missing for them, and
+`diagnostics(fit)$profile_glm$joint_conditional_on` names them.
+`uncertainty_available` stays `FALSE`. The rule is the same for
+`"profile_glm"` and `"joint_nb2"`.
+
+The scale table applies the kernel-specific rules one parameter at a
+time. A kernel parameter loses its standard error and Wald limits only
+when it sits at a search bound, its own log-scale standard error exceeds
+one, or competing starts move it by more than 0.5 log units. Bounded
+kernel parameters are dropped from the observed information, so the
+remaining standard errors hold them fixed at their bounds, and
+`diagnostics(fit)$profile_glm` names them in `scale_se_conditional_on`.
+Unusable information, a dispersion bound, a Poisson-compatible NB2 fit,
+or the exact Poisson boundary still withholds every scale standard
+error.
+
 Predictions with `uncertainty = "conditional"` at the Poisson boundary
 condition on both the kernel parameters and the boundary dispersion.
 They say nothing about uncertainty in either. See
@@ -367,13 +396,64 @@ The result's `opt_mod` is the final native `glmmTMB` fit, and
 the selected start. Narrow raw prediction data keep fixed-transform
 inputs for effect curves once the temporary refit data are gone.
 `diagnostics(fit)$joint_mixed` reports eligibility and scale-boundary
-flags. Scale uncertainty has not been calibrated: scale standard errors
-and legacy scale Hessians are `NA`, and joint intervals are unavailable.
-Coefficient and prediction covariance condition on the selected scales.
-Use `predict(fit, se.fit = TRUE, uncertainty = "conditional")` or
+flags. As with the analytic GLM backends, an estimate whose distance
+approaches `max_D` records the `max_distance` diagnostic and warning
+code, and `fit$next_run` suggests a follow-up `max_D` and starts.
+
+Scale standard errors come from the joint Hessian of the selected start,
+which TMB computes for the Laplace-approximated likelihood with every
+model parameter free. `fit$scale_est$SE` is sigma times the standard
+error of log(sigma), and `summary(fit)` reports Wald limits on the log
+scale, as for `"profile_glm"`. The checks match that backend, one scale
+at a time. A scale within `1e-5` of a search bound on the log scale
+loses its standard error, and the other scales hold it fixed at its
+bound. A scale also loses its standard error when its log-scale standard
+error exceeds one, or when another start within the 95 percent
+likelihood threshold moves it by more than 0.5 log units. A Hessian that
+is not positive definite, or unusable covariance, withholds every scale
+standard error. `diagnostics(fit)$joint_mixed` gives the status, the
+reason for each scale, and the bounded scales held fixed. Legacy scale
+Hessians stay `NA`.
+
+Treat these limits with caution. In a simulation with one Gaussian
+kernel mean and 200 points in 40 sites, 95 percent Wald intervals held
+the true sigma in 77 percent to 97 percent of interior fits, depending
+on the scale and response family. They fell short where the likelihood
+was sharply peaked near the estimate but stayed close to its maximum
+over a wider range of scales. The limits describe local curvature only,
+and coefficient and prediction covariance still condition on the
+selected scales. Use
+`predict(fit, se.fit = TRUE, uncertainty = "conditional")` or
 `predict(fit$opt_mod, ...)`. This backend does not extend the
 single-predictor NB2 contract of
 [`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md).
+
+`summary(fit, profile = TRUE)` reports profile-likelihood limits
+instead. For each scale in turn, it holds sigma at candidate values and
+refits the native `glmmTMB` model, the same new fit that checks each
+start. The coefficients, the random-intercept standard deviation, and
+any NB2 dispersion are re-estimated, and the random intercept is
+integrated out as in the fit. With several scales, the other scales are
+re-estimated too, on the joint likelihood from the optimum of each
+eligible start, and a native refit checks that value. As for the
+analytic GLM backends, the limits bound the connected region around the
+estimate where the likelihood-ratio statistic stays below the 95 percent
+chi-square quantile with one degree of freedom. A limit that reaches a
+search bound is labeled `"profile-bound-limited"` and is not a fully
+resolved confidence limit. Every scale gets profile limits, including
+one whose standard error is withheld, for example at a search bound.
+Profiling stops with an error when a refit fails or finds a better
+optimum than the fit, and it needs the optional packages and the refit
+data stored in `mixed_fit`. In the same simulation, profile intervals
+held the true sigma in 842 of 900 data sets (89 percent to 96 percent by
+scale and family), against 821 of 899 for the Wald intervals. Where Wald
+coverage was lowest, NB2 at a true sigma of 240, the profile intervals
+held it in 133 of 150 data sets and the Wald intervals in 115 of 149.
+Profile limits therefore describe scale uncertainty better than the Wald
+limits, but they can still fall short of nominal coverage, as they did
+in that scenario. Each profile took a median of 2 to 5 seconds there.
+[`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+instead holds the other scales at their estimates.
 
 ## Conditional-logistic backend
 
@@ -386,8 +466,10 @@ available step per set. See
 
 Use a
 [`survival::clogit()`](https://rdrr.io/pkg/survival/man/clogit.html)
-model fitted with `model = TRUE`, or an
-[`amt::fit_clogit()`](https://rdrr.io/pkg/amt/man/fit_clogit.html)
+model fitted with `model = TRUE`, a
+[`survival::coxph()`](https://rdrr.io/pkg/survival/man/coxph.html) model
+with a constant-time response such as `Surv(rep(1, nrow(dat)), case)`,
+or an [`amt::fit_clogit()`](https://rdrr.io/pkg/amt/man/fit_clogit.html)
 wrapper, with Gaussian or exponential kernels and one bare
 `strata(choice_id)` term. A quoted choice-set ID is still one bare
 variable, and special-call text inside a quoted predictor name is not

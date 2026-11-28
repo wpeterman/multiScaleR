@@ -93,7 +93,15 @@ diagnostics(fit)$profile_glm$uncertainty_available    # TRUE: joint intervals ex
 fit, because both backends maximize the same likelihood for this model.
 The last line reports whether the fit passed the numerical checks that a
 joint interval requires. When it is `FALSE`, only conditional intervals
-are available, and `diagnostics(fit)$profile_glm$reasons` says why.
+are available, and `diagnostics(fit)$profile_glm$reasons` says why. The
+standard errors in `fit$scale_est` are checked one scale at a time, so a
+scale that passes its own checks keeps its standard error even when this
+flag is `FALSE`. One case keeps joint intervals with the flag `FALSE`:
+when the only failed check is a scale at a search bound,
+`diagnostics(fit)$profile_glm$joint_conditional_on` names that scale,
+and joint intervals hold it fixed at the bound. They are narrower than
+intervals that let that scale vary, so widen the search before you rely
+on them.
 
 ### Predict with each kind of uncertainty
 

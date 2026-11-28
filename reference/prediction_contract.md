@@ -56,8 +56,9 @@ numerical outputs inside a snapshot keep their native attributes.
   whether observation noise is included (`observation_noise`), what the
   intervals mean, what is omitted (`omitted`), and `calibration`, which
   is always `"not_established"`. Analytic snapshots also record whether
-  joint covariance was available at preparation (`joint_available`).
-  This does not bypass the covariance checks in
+  joint covariance was available at preparation (`joint_available`), and
+  `joint_conditional_on` names any kernel parameters at a search bound
+  that it holds fixed. This does not bypass the covariance checks in
   [`predict.multiScaleR()`](https://wpeterman.github.io/multiScaleR/reference/predict.multiScaleR.md).
 
 - `original_coordinates`, `joint_parameter_map_complete`: the parameter

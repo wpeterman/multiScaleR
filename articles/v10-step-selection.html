@@ -24,7 +24,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">multiScaleR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,6 +63,9 @@
     <li><a class="dropdown-item" href="../articles/v13-bayesian-scales.html">13. Estimate Scales of Effect with a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v14-bayesian-prediction.html">14. Predict New Sites and Years from a Bayesian Model</a></li>
     <li><a class="dropdown-item" href="../articles/v15-bayesian-computation.html">15. Choose and Check a Bayesian Computation Method</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Combining data sets</h6></li>
+    <li><a class="dropdown-item" href="../articles/v16-joint-data-sets.html">16. Combine Data Sets to Estimate a Shared Scale of Effect</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -377,8 +380,51 @@ ratios between rows carry meaning. <code>type = "link"</code> returns
 its logarithm. Standard errors are available with
 <code>se.fit = TRUE, uncertainty = "conditional"</code>. They hold sigma
 fixed.</p>
+</div>
+<div class="section level2">
+<h2 id="map-the-relative-selection-score">Map the relative selection score<a class="anchor" aria-label="anchor" href="#map-the-relative-selection-score"></a>
+</h2>
 <p>A raster has no choice sets, so a map can show the link or the
-relative score only.</p>
+relative score only. Build the map in two steps. First,
+<code><a href="../reference/kernel_scale.raster.html">kernel_scale.raster()</a></code> smooths the forest layer at the
+estimated sigma and standardizes it with the training mean and standard
+deviation. Second, <code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">terra::predict()</a></code> applies the fitted
+coefficients to every cell.</p>
+<p><code><a href="../reference/kernel_scale.raster.html">kernel_scale.raster()</a></code> also adds a constant layer for
+each model term that is not a raster. Here those are step length, set to
+0 by default, and the choice-set ID, set to the first fitted ID.
+<code>survival</code> needs a fitted ID before it will predict, but with
+<code>reference = "zero"</code> the ID does not change the map. Use
+<code>site_values</code> to hold step length at another value, for
+example <code>site_values = list(sl_km = 0.1)</code>.</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Smoothed, standardized forest plus constant sl_km and step_id layers</span></span>
+<span><span class="va">map_stack</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/kernel_scale.raster.html">kernel_scale.raster</a></span><span class="op">(</span><span class="va">forest</span>, multiScaleR <span class="op">=</span> <span class="va">opt</span>,</span>
+<span>                                 scale_center <span class="op">=</span> <span class="cn">TRUE</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">map_stack</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "forest"  "sl_km"   "step_id"</span></span>
+<span></span>
+<span><span class="co"># exp(linear predictor) with no centering: a relative selection score</span></span>
+<span><span class="va">rss_map</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">map_stack</span>, <span class="va">opt</span><span class="op">$</span><span class="va">opt_mod</span>,</span>
+<span>                          type <span class="op">=</span> <span class="st">"risk"</span>, reference <span class="op">=</span> <span class="st">"zero"</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">rss_map</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="v10-step-selection_files/figure-html/map-1.png" class="r-plt" alt="***Relative selection score for forest at the estimated sigma, with step length held at 0.***" width="624"><p class="caption">
+<strong><em>Relative selection score for forest at the estimated sigma,
+with step length held at 0.</em></strong>
+</p>
+</div>
+<p><strong>How to read this map:</strong> Each cell holds the relative
+selection score of a step ending there, compared with a step ending
+where kernel-weighted forest is at its training mean. A cell with a
+value of 2 is twice as likely to be chosen as such a step, when both are
+equally reachable. The map does not account for how far the animal must
+travel to reach a cell, and it is not a map of space use. Use
+<code>type = "lp"</code> for the log of the same score.</p>
+<p>If you fitted the starting model with <code><a href="https://rdrr.io/pkg/amt/man/fit_clogit.html" class="external-link">amt::fit_clogit()</a></code>,
+<code>opt$opt_mod</code> is the <code>amt</code> wrapper, which has no
+<code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">predict()</a></code> method. Pass the native model inside it,
+<code>opt$opt_mod$model</code>, to <code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">terra::predict()</a></code>.</p>
 </div>
 <div class="section level2">
 <h2 id="score-the-model-on-held-out-choice-sets">Score the model on held-out choice sets<a class="anchor" aria-label="anchor" href="#score-the-model-on-held-out-choice-sets"></a>
@@ -389,7 +435,7 @@ and <code><a href="../reference/cross_validate_clogit.html">cross_validate_clogi
 coefficients on the training sets in each fold before scoring the
 held-out sets. With several animals, group the folds by animal to test
 transfer to new individuals.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Four folds. All rows of a choice set stay together</span></span>
 <span><span class="va">folds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/grouped_cv_folds.html">grouped_cv_folds</a></span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">step_id</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span></span>
@@ -490,9 +536,9 @@ prepared with <code>bin = TRUE</code> (the default)</td>
 <tr class="odd">
 <td align="left">Standard error and interval for sigma</td>
 <td align="left">Not available.
-<code>summary(opt, profile = TRUE)</code> stops with an error.
-<code>profile_sigma(opt)</code> draws the log-likelihood across
-sigma</td>
+<code>summary(opt, profile = TRUE)</code> warns and reports the limits
+as <code>NA</code>. <code>profile_sigma(opt)</code> draws the
+log-likelihood across sigma</td>
 </tr>
 <tr class="even">
 <td align="left">Prediction intervals</td>
@@ -511,7 +557,7 @@ sigma</td>
 <div class="section level2">
 <h2 id="quick-reference">Quick reference<a class="anchor" aria-label="anchor" href="#quick-reference"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://wpeterman.github.io/multiScaleR/">multiScaleR</a></span><span class="op">)</span>; <span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://rspatial.org/" class="external-link">terra</a></span><span class="op">)</span>; <span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/therneau/survival" class="external-link">survival</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># 1. Prepare kernel inputs at every step end point (used and available)</span></span>
@@ -580,16 +626,25 @@ sigma</td>
 the linear predictor</td>
 </tr>
 <tr class="odd">
+<td align="left">
+<code><a href="../reference/kernel_scale.raster.html">kernel_scale.raster()</a></code>,
+<code><a href="https://rspatial.github.io/terra/reference/predict.html" class="external-link">terra::predict()</a></code>
+</td>
+<td align="left">Map the relative selection score. For an
+<code>amt</code> fit, pass <code>opt$opt_mod$model</code>
+</td>
+</tr>
+<tr class="even">
 <td align="left"><code><a href="../reference/grouped_cv_folds.html">grouped_cv_folds()</a></code></td>
 <td align="left">Build folds that keep choice sets, or animals,
 together</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left"><code><a href="../reference/cross_validate_clogit.html">cross_validate_clogit()</a></code></td>
 <td align="left">Score a step-selection model on held-out choice
 sets</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left"><code><a href="../reference/cv_tab.html">cv_tab()</a></code></td>
 <td align="left">Compare cross-validation scores among models</td>
 </tr>

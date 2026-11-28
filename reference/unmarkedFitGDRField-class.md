@@ -167,7 +167,7 @@ if (requireNamespace("TMB", quietly = TRUE) &&
 #>  $ state_count : int 8
 #>  $ survey_count: int 48
 #>                 0.025     0.975
-#> lambda(Int) 5.6993885 6.5593710
-#> lambda(hab) 0.2067472 0.6779487
+#> lambda(Int) 5.6993885 6.5593720
+#> lambda(hab) 0.2067481 0.6779497
 # }
 ```

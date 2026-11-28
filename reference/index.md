@@ -65,6 +65,19 @@ and assess the fit.
   : Profile Model Fit Across Sigma
 - [`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md)
   : Profile and Bootstrap Inference for an NB2 Scale
+- [`multiScale_joint()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_joint.md)
+  : Estimate scales of effect jointly across independent data sets
+- [`footprint_sd()`](https://wpeterman.github.io/multiScaleR/reference/footprint_sd.md)
+  : Convert a sampling geometry to a footprint SD
+- [`print(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`summary(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`print(`*`<summary_multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`logLik(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`nobs(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`coef(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`vcov(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`anova(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  : Methods for joint scale fits
 - [`diagnostics()`](https://wpeterman.github.io/multiScaleR/reference/diagnostics.md)
   : Retrieve diagnostics from multiScaleR objects
 - [`vcov(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/vcov.multiScaleR.md)
@@ -100,6 +113,22 @@ Estimate scales of effect with full posterior uncertainty.
 
 - [`summary(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/summary.multiScaleR.md)
   : Summarize a multiScaleR fit
+- [`coef(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`fitted(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`residuals(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`nobs(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`formula(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`family(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`deviance(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`df.residual(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`logLik(`*`<multiScaleR>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`coef(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`fitted(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`residuals(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`vcov(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`logLik(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  [`nobs(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR-methods.md)
+  : Standard model methods for multiScaleR fits
 - [`kernel_dist()`](https://wpeterman.github.io/multiScaleR/reference/kernel_dist.md)
   : Convert Sigma into an Effective Distance
 - [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md)
@@ -127,6 +156,15 @@ Estimate scales of effect with full posterior uncertainty.
   [`surface_var()`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
   [`print(`*`<multiScaleR_vars>`*`)`](https://wpeterman.github.io/multiScaleR/reference/msr_vars.md)
   : Define Model Covariates from Raster Layers
+- [`print(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`summary(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`print(`*`<summary_multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`logLik(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`nobs(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`coef(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`vcov(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  [`anova(`*`<multiScaleR_joint>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScaleR_joint-methods.md)
+  : Methods for joint scale fits
 - [`summary(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
   [`print(`*`<multiScaleR_bayes>`*`)`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
   [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
@@ -201,8 +239,9 @@ Apply fitted scales to new observations and to rasters.
 
 ## Distance-removal models
 
-Data preparation, fitting helpers, and audits for generalized
-distance-removal (GDR) models, including spatial response fields.
+Data preparation, fitting helpers, whole-survey predictions and
+simulations, and audits for generalized distance-removal (GDR) models,
+including spatial response fields.
 
 - [`prepare_gdr_histories()`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.md)
   [`print(`*`<msr_gdr_histories>`*`)`](https://wpeterman.github.io/multiScaleR/reference/prepare_gdr_histories.md)
@@ -216,6 +255,11 @@ distance-removal (GDR) models, including spatial response fields.
   : List the Starting-Value Order of a Distance-Removal Model
 - [`make_gdr_refitter()`](https://wpeterman.github.io/multiScaleR/reference/make_gdr_refitter.md)
   : Create an Audited Refit Function for Distance-Removal Models
+- [`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md)
+  : Predict Whole-Survey Detection and Expected Counts for
+  Distance-Removal Models
+- [`simulate_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/simulate_gdistremoval.md)
+  : Simulate Distance-Removal Surveys from a Fitted Model
 - [`fit_gdr_response_field()`](https://wpeterman.github.io/multiScaleR/reference/fit_gdr_response_field.md)
   : Fit a Fixed-Range Spatial Abundance Field to a Distance-Removal
   Model

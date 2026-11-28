@@ -1,5 +1,424 @@
 # Changelog
 
+## multiScaleR 1.1.0
+
+- Fixes from an integration audit that ran every post-fit function on
+  real fits of each supported model class and backend. A new test,
+  `test-integration-matrix.R`, now repeats that check: each combination
+  of model and post-fit function must either work or refuse with a
+  documented message.
+
+- [`coef()`](https://rdrr.io/r/stats/coef.html),
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html),
+  [`residuals()`](https://rdrr.io/r/stats/residuals.html),
+  [`nobs()`](https://rdrr.io/r/stats/nobs.html),
+  [`formula()`](https://rdrr.io/r/stats/formula.html),
+  [`family()`](https://rdrr.io/r/stats/family.html),
+  [`deviance()`](https://rdrr.io/r/stats/deviance.html), and
+  [`df.residual()`](https://rdrr.io/r/stats/df.residual.html) now work
+  on
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  fits and read the model refitted at the estimated scales.
+  `fitted(fit)` used to return the starting model, and the others
+  returned `NULL` or failed.
+  [`logLik()`](https://rdrr.io/r/stats/logLik.html),
+  [`AIC()`](https://rdrr.io/r/stats/AIC.html), and
+  [`BIC()`](https://rdrr.io/r/stats/AIC.html) now work too and count
+  each estimated scale and shape parameter, so they match
+  `aic_tab(AICc = FALSE)` and
+  [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md).
+  On a
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  fit, [`coef()`](https://rdrr.io/r/stats/coef.html),
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html),
+  [`residuals()`](https://rdrr.io/r/stats/residuals.html),
+  [`vcov()`](https://rdrr.io/r/stats/vcov.html),
+  [`logLik()`](https://rdrr.io/r/stats/logLik.html), and
+  [`diagnostics()`](https://wpeterman.github.io/multiScaleR/reference/diagnostics.md)
+  now stop with a pointer to the Bayesian tools, and
+  [`nobs()`](https://rdrr.io/r/stats/nobs.html) returns the number of
+  observations.
+
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  now completes for
+  [`nlme::lme()`](https://rdrr.io/pkg/nlme/man/lme.html) models, which
+  failed after the search with “Expecting a single value”. Wald scale
+  limits use N minus the number of fixed coefficients as residual
+  degrees of freedom.
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html)
+  and [`plot()`](https://rspatial.github.io/terra/reference/plot.html)
+  now work for
+  [`amt::fit_clogit()`](https://rdrr.io/pkg/amt/man/fit_clogit.html) and
+  [`amt::fit_issf()`](https://rdrr.io/pkg/amt/man/fit_clogit.html) fits
+  made with the default `refit` backend.
+
+- [`print()`](https://rdrr.io/r/base/print.html) and
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html)
+  now explain every scale reported without a standard error:
+  `conditional_logit` fits point to
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md),
+  `profile_glm` and `joint_nb2` fits name the withheld scales and the
+  reasons under the scale table, and fits whose Hessian included a
+  failed refit or could not be inverted now say so. Fits made through
+  [`do.call()`](https://rdrr.io/r/base/do.call.html) print a compact
+  call instead of appearing to hang. `summary(fit, profile = TRUE)` on a
+  fit with a declared `radius_grid` now warns and returns the summary
+  instead of stopping. Printing the summary of a `profile_glm` negative
+  binomial fit at the Poisson limit no longer fails inside `MASS` on the
+  undefined theta standard error.
+
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  now refits models fitted inside a function or
+  [`lapply()`](https://rdrr.io/r/base/lapply.html) with the formula in a
+  local variable, such as a multi-species loop built with
+  [`reformulate()`](https://rdrr.io/r/stats/delete.response.html). These
+  fits used to fail after the whole search with “object ‘form’ not
+  found”. When a workspace object had the same name as the local
+  formula, the refit silently used the workspace object and could fit a
+  different model. The model’s own formula environment is now used
+  first.
+
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  now checks once, before the search, that the model can be refitted. A
+  fitting call that names an object that no longer exists, or a model
+  whose raw inputs cannot be recovered (for example an
+  [`amt::fit_issf()`](https://rdrr.io/pkg/amt/man/fit_clogit.html) fit
+  with `cos(ta_)` in its formula, or a Cox or `amt` fit made without
+  `model = TRUE`), now stops at once and says what to change.
+
+- Refitted models keep any raw training inputs that post-fit tools
+  cannot otherwise recover.
+  [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md),
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md),
+  and raster
+  [`predict()`](https://rspatial.github.io/terra/reference/predict.html)
+  now work for [`nlme::gls()`](https://rdrr.io/pkg/nlme/man/gls.html)
+  fits, for [`clogit()`](https://rdrr.io/pkg/survival/man/clogit.html)
+  and [`coxph()`](https://rdrr.io/pkg/survival/man/coxph.html) fits made
+  without `model = TRUE`, and for step-selection formulas with
+  `cos(ta_)` or similar terms on both the `refit` and
+  `conditional_logit` backends.
+
+- A covariate used in both parts of a
+  [`pscl::zeroinfl()`](https://rdrr.io/pkg/pscl/man/zeroinfl.html) or
+  [`pscl::hurdle()`](https://rdrr.io/pkg/pscl/man/hurdle.html) model now
+  gets one scale; these fits failed after the search. Cox models with
+  [`cluster()`](https://rdrr.io/pkg/survival/man/cluster.html) terms now
+  refit.
+
+- `kernel_scale.raster(clamp = TRUE)` now works when a covariate enters
+  the model only through a function such as
+  [`poly()`](https://rdrr.io/r/stats/poly.html),
+  [`splines::ns()`](https://rdrr.io/r/splines/ns.html), or
+  [`log()`](https://rdrr.io/r/base/Log.html), and `include_fixed = TRUE`
+  now works for a fixed-radius metric used inside
+  [`poly()`](https://rdrr.io/r/stats/poly.html) or
+  [`log()`](https://rdrr.io/r/base/Log.html).
+
+- A model fitted with the `offset =` argument (rather than
+  [`offset()`](https://rdrr.io/r/stats/offset.html) in the formula) no
+  longer gets predictions that reuse its training offsets.
+  [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+  holds the offset at its mean,
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  adds an offset layer, and an offset that is not a data column gives a
+  clear error.
+
+- [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  now warns when the default value 0 of a nonspatial covariate makes a
+  formula term undefined, such as `log(sl_)`, which made every cell of
+  the map 0 or infinite. Supply a value with `site_values`.
+
+- [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+  now draws
+  [`colext()`](https://ecoverseR.github.io/unmarked/reference/colext.html)
+  fits (state component `psi`), accepts `type = "state"` for
+  [`gdistsamp()`](https://ecoverseR.github.io/unmarked/reference/gdistsamp.html)
+  and
+  [`gmultmix()`](https://ecoverseR.github.io/unmarked/reference/gmultmix.html)
+  fits, warns instead of silently returning an empty list when the
+  requested component has no covariates, and refuses penalized Cox
+  ([`frailty()`](https://rdrr.io/pkg/survival/man/frailty.html)) fits
+  with a clear message.
+
+- Cross-validation:
+  [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md),
+  [`cross_validate_glm()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_glm.md),
+  [`cross_validate_clogit()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md),
+  [`cross_validate_mixed()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_mixed.md),
+  [`cross_validate_field()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_field.md),
+  and
+  [`cross_validate_bayes()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_bayes.md)
+  now warn when they return a result with unscored folds, giving the
+  number of failed folds and the first reasons recorded in `errors`.
+  [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md)
+  with the `profile_glm` or `joint_nb2` backend now stops before fitting
+  any fold when the formula has an estimated hard radius, a weighted
+  surface metric other than SQ, or a fixed kernel, and
+  [`cross_validate_clogit()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md)
+  with `conditional_logit` stops before fitting when the kernel is not
+  Gaussian or exponential or a predictor is a hard radius.
+  [`cross_validate()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate.md),
+  [`cross_validate_glm()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_glm.md),
+  and
+  [`cross_validate_clogit()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_clogit.md)
+  now accept a tibble, such as
+  [`amt::random_steps()`](https://rdrr.io/pkg/amt/man/random_steps.html)
+  output. A fold stopped by an estimated hard radius now suggests
+  `optim_args = list(radius_grid = ...)`.
+  [`cv_tab()`](https://wpeterman.github.io/multiScaleR/reference/cv_tab.md)
+  and
+  [`select_cv()`](https://wpeterman.github.io/multiScaleR/reference/select_cv.md)
+  now say when they receive one CV result or a fitted model instead of a
+  named list, and
+  [`cross_validate_bayes()`](https://wpeterman.github.io/multiScaleR/reference/cross_validate_bayes.md)
+  names `bin_reference = "fixed"` when it refuses inputs prepared with
+  `store_cell_data = FALSE`.
+
+- Bayesian fits: parallel
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  fits on Windows now retry briefly when a worker file cannot be removed
+  at once, instead of stopping with “Cannot clear Bayesian worker data”.
+  [`diagnose_bayes_scales()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_scales.md)
+  and
+  [`diagnose_bayes_probabilities()`](https://wpeterman.github.io/multiScaleR/reference/diagnose_bayes_probabilities.md)
+  now report that a `method = "prepare"` object has no posterior draws.
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md),
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md),
+  [`prepare_prediction()`](https://wpeterman.github.io/multiScaleR/reference/prepare_prediction.md),
+  and
+  [`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md)
+  now point a Bayesian fit to
+  [`posterior_scales()`](https://wpeterman.github.io/multiScaleR/reference/posterior_scales.md),
+  [`predict_scales()`](https://wpeterman.github.io/multiScaleR/reference/predict_scales.md),
+  and
+  [`predict()`](https://rspatial.github.io/terra/reference/predict.html).
+
+- `backend = "conditional_logit"` now accepts
+  [`coxph()`](https://rdrr.io/pkg/survival/man/coxph.html) responses
+  such as `Surv(rep(1, nrow(dat)), case)` and `Surv(one, case)`, not
+  only a literal row count.
+
+- Clearer messages: `kernel_scale.raster(match_buffer = TRUE)` names the
+  failed requirement (missing CRS, longitude/latitude, or resolution)
+  and shows how to assign a CRS; `kernel_scale.raster(fft = FALSE)`
+  explains a kernel window larger than twice the raster and suggests
+  `fft = TRUE`;
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  suggests `sigma =` when an estimated metric is constant at its
+  starting scale;
+  [`aic_tab()`](https://wpeterman.github.io/multiScaleR/reference/aic_tab.md)
+  and
+  [`bic_tab()`](https://wpeterman.github.io/multiScaleR/reference/bic_tab.md)
+  name an empty list, a bare fit, or NULL elements; and refusals from
+  `joint_mixed`, `joint_nb2`,
+  [`scale_inference()`](https://wpeterman.github.io/multiScaleR/reference/scale_inference.md),
+  [`response_field_geometry()`](https://wpeterman.github.io/multiScaleR/reference/response_field_geometry.md),
+  and prediction of `pscl` and `unmarked` fits without a valid `type` or
+  `component` name the failed condition and the valid values.
+
+- [`sim_dat_unmarked()`](https://wpeterman.github.io/multiScaleR/reference/sim_dat_unmarked.md)
+  points now carry the raster’s CRS, so
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  no longer warns about a missing CRS. Simulated values are unchanged.
+
+- [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  now sets `min_D`, the lower bound of the sigma search in
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+  to one cell width, as
+  [`kernel_prep_by_group()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep_by_group.md)
+  already did. It used to take the distance between the first two cells
+  extracted around the first point. When the top row of that buffer held
+  a single cell, the second cell lay on the next row and `min_D` became
+  several cells wide (for example 41 m with 10 m cells), so a fit could
+  stop at a spurious lower bound with its standard error withheld.
+  Inputs whose first two cells were neighbors in one row are unchanged.
+
+- New experimental
+  [`multiScale_joint()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_joint.md)
+  estimates scales of effect jointly across two or more independent data
+  sets. Each data set is first fitted with the default refit backend of
+  [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md),
+  so the data sets can use different model classes, for example Poisson
+  counts and an `unmarked` occupancy model. A scale can be common to all
+  data sets, separate for each, or common but seen through each data
+  set’s sampling footprint
+  ([`footprint_sd()`](https://wpeterman.github.io/multiScaleR/reference/footprint_sd.md)),
+  and a landscape coefficient can be shared across data sets. Sites that
+  data sets share can be named through `cluster` to report residual
+  correlation and jackknife standard errors. The result gives
+  profile-likelihood intervals, a likelihood-ratio test against separate
+  scales, [`logLik()`](https://rdrr.io/r/stats/logLik.html) for
+  [`AIC()`](https://rdrr.io/r/stats/AIC.html), and one `multiScaleR` fit
+  per data set for plots, marginal effects, and maps.
+
+- New vignette,
+  [`vignette("v16-joint-data-sets", package = "multiScaleR")`](https://wpeterman.github.io/multiScaleR/articles/v16-joint-data-sets.md),
+  works through
+  [`multiScale_joint()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_joint.md)
+  with three simulated surveys: a common scale and its test, surveys
+  that share sites, a shared coefficient, and acoustic recorders with a
+  sampling footprint.
+
+- `multiScale_joint(scales = "footprint_scaled")` no longer stops at its
+  starting values when a trial step would carry a data set’s apparent
+  scale past its `max_D`, and it now also starts `kappa` at 0, so it no
+  longer ends below the common-scale fit that it nests.
+  [`anova()`](https://rdrr.io/r/stats/anova.html) of a common-scale fit
+  against a `"footprint_scaled"` fit now treats `kappa = 0` as a
+  boundary value, and the printed test against separate scales is no
+  longer halved. Component fits in `$fits` now give follow-up advice at
+  the joint scales.
+
+- New experimental
+  [`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md)
+  and
+  [`simulate_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/simulate_gdistremoval.md)
+  for
+  [`unmarked::gdistremoval()`](https://ecoverseR.github.io/unmarked/reference/gdistremoval.html)
+  models, alone or inside a `multiScaleR` fit.
+  [`predict_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/predict_gdistremoval.md)
+  combines the fitted components into whole-survey detection, abundance
+  and density (including structural zeros for zero-inflated models), and
+  the expected count, for the fitted surveys or for a new frame or
+  survey protocol.
+  [`simulate_gdistremoval()`](https://wpeterman.github.io/multiScaleR/reference/simulate_gdistremoval.md)
+  draws new paired distance and removal histories. Both give each visit
+  its own distance scale and use closed-form distance integrals for
+  half-normal and exponential keys. In `unmarked` 1.5.2,
+  [`getP()`](https://ecoverseR.github.io/unmarked/reference/getP.html),
+  [`fitted()`](https://rdrr.io/r/stats/fitted.values.html), and
+  [`simulate()`](https://rdrr.io/r/stats/simulate.html) apply the first
+  visit’s distance scale to every visit, and
+  [`simulate()`](https://rdrr.io/r/stats/simulate.html) back-transforms
+  the zero-inflation parameter with
+  [`exp()`](https://rdrr.io/r/base/Log.html). The distance-removal
+  vignette shows both functions.
+
+- [`multiScale_optim()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_optim.md)
+  fits of `unmarked` models are faster. Objective refits during the
+  scale search now pass `se = FALSE` when the fitting function accepts
+  it, which skips the coefficient Hessian that `unmarked` computes after
+  its optimizer converges. Estimates and log-likelihoods are unchanged,
+  and the final model keeps its original `se` setting. The
+  [`pcount()`](https://ecoverseR.github.io/unmarked/reference/pcount.html)
+  example in the user guide and the
+  [`gdistremoval()`](https://ecoverseR.github.io/unmarked/reference/gdistremoval.html)
+  example in the distance-removal vignette now fit about 30% faster,
+  with identical results. A custom `refit_fn` is unaffected.
+
+- `summary(fit, profile = TRUE)` on a `conditional_logit` fit now warns
+  and returns the ordinary summary with scale limits as `NA`, instead of
+  stopping. Printed summaries of `conditional_logit` fits with a
+  hard-radius covariate now point to
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+  rather than to `summary(x, profile = TRUE)`.
+
+- [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  now adds the
+  [`strata()`](https://rdrr.io/pkg/survival/man/strata.html) choice-set
+  ID of a `conditional_logit` fit as a constant layer holding a fitted
+  ID. As a result,
+  [`terra::predict()`](https://rspatial.github.io/terra/reference/predict.html)
+  on the native model maps relative selection scores without `const` and
+  without a warning about a categorical covariate. `site_values` can
+  select any other fitted ID.
+
+- [`plot_marginal_effects()`](https://wpeterman.github.io/multiScaleR/reference/plot_marginal_effects.md)
+  no longer fails with “factor strata(…) has new level” for
+  `conditional_logit` fits that combine optimized predictors with a
+  transformed fixed predictor, such as `scale(dist_to_road)`. Effect
+  curves and
+  [`kernel_scale.raster()`](https://wpeterman.github.io/multiScaleR/reference/kernel_scale.raster.md)
+  now take the choice-set ID from the fitted strata labels, so numeric
+  IDs stay numeric and factor or character IDs keep every fitted level.
+
+- The step-selection vignette shows how to map relative selection
+  scores, including fits that started from
+  [`amt::fit_clogit()`](https://rdrr.io/pkg/amt/man/fit_clogit.html).
+
+- Scale standard errors are withheld one scale at a time. In 1.0.0 and
+  1.0.1, one scale at a search bound removed the standard errors and
+  Wald limits of every scale. Under the default `refit` backend this
+  also affected older saved fits when printed. Now only the bounded
+  scale loses them. The other scales report Wald standard errors that
+  hold the bounded scale fixed at its bound, and
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html)
+  says so. `profile_glm` and `joint_nb2` fits now drop a scale’s
+  standard error only when that scale fails a check: it sits at a bound,
+  its log-scale SE exceeds one, or competing starts move it.
+
+- `profile_glm` and `joint_nb2` joint uncertainty no longer stops at a
+  scale on a search bound when the bound is the only failed check.
+  `vcov(fit)` and `predict(fit, uncertainty = "joint")` now hold the
+  bounded kernel parameters fixed at their bounds and let the other
+  parameters vary. The bounded rows and columns of `vcov(fit)` are zero,
+  and predictions name the held parameters in `conditional_on`.
+  [`summary()`](https://rspatial.github.io/terra/reference/summary.html),
+  [`print()`](https://rdrr.io/r/base/print.html), and
+  `diagnostics(fit)$profile_glm$joint_conditional_on` report them. These
+  intervals are narrower than fully joint ones, so widen the search
+  before relying on them. Fits with no bounded scale give the same
+  results as before.
+
+- `joint_mixed` fits now report a Wald standard error and log-scale Wald
+  limits for each kernel scale, from the joint Hessian of the selected
+  start. Before, every scale SE was `NA`. A scale loses its SE under the
+  same per-scale checks as `profile_glm`, and every scale SE is withheld
+  when the Hessian is not positive definite.
+  `diagnostics(fit)$joint_mixed` gives the reason for each scale. In a
+  simulation, 95% intervals held the true sigma in 77% to 97% of
+  interior fits, so treat them with caution. Coefficient and prediction
+  uncertainty still condition on the selected scales. `joint_mixed` fits
+  also now warn when an estimate approaches `max_D` and fill `next_run`,
+  as the analytic GLM backends do, and
+  `diagnostics(fit)$joint_mixed$triggered` is `TRUE` only when a scale
+  SE is withheld.
+
+- `summary(fit, profile = TRUE)` and
+  [`profile_sigma()`](https://wpeterman.github.io/multiScaleR/reference/profile_sigma.md)
+  now work for `joint_mixed` fits instead of stopping with “Scale
+  profiling is not validated for joint_mixed”. Each profile point refits
+  the native `glmmTMB` model with sigma held fixed, and with several
+  scales the other scales are re-estimated as well. Limits follow the
+  connected likelihood region around the estimate, and a limit at a
+  search bound is labeled `"profile-bound-limited"`, as for
+  `profile_glm` and `joint_nb2`. Every scale gets profile limits, even
+  when its SE is withheld. In the same simulation, 95% profile intervals
+  held the true sigma in 842 of 900 data sets (89% to 96% by scale and
+  family), against 821 of 899 for Wald intervals.
+
+- Kernel-weighted surface metrics (`surface_var(weighted = TRUE)` with
+  `"sq"`, `"ssk"`, or `"sku"`) are now distance-binned when
+  [`kernel_prep()`](https://wpeterman.github.io/multiScaleR/reference/kernel_prep.md)
+  uses `bin = TRUE`, the default, as kernel means are. Each cell’s
+  centered value powers are split between the two nearest distance
+  nodes, so the approximation stays as small as that of a binned kernel
+  mean. In a 100-point example, refit searches ran in under a second
+  instead of 53 to 91 seconds. Estimated scales and likelihoods change
+  slightly from the exact per-cell values. Set `bin = FALSE` to keep the
+  exact evaluation. Weighted `"sa"`, `kernel = "fixed"`, the analytic
+  backends, and
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  still evaluate weighted surface metrics from every cell.
+
+## multiScaleR 1.0.1
+
+CRAN release: 2026-11-19
+
+- Fits that check memory before automatic differentiation, including
+  some
+  [`multiScale_bayes()`](https://wpeterman.github.io/multiScaleR/reference/multiScale_bayes.md)
+  fits, no longer stop with “Cannot detect RAM” on Windows machines
+  where PowerShell is slow or blocked. multiScaleR now reads total RAM
+  directly from the operating system and runs outside commands only as a
+  fallback.
+
+- CRAN’s package check no longer runs the code in vignettes 2 to 15 or
+  the 77 slowest test files, so the check fits within CRAN’s time limit.
+  The built vignettes still show their full results, and GitHub Actions
+  and `devtools::check()` still run every vignette and test.
+
 ## multiScaleR 1.0.0
 
 multiScaleR 1.0.0 is the first release since 0.7.4. It adds Bayesian
